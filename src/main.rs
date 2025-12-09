@@ -23,7 +23,9 @@ use std::{
 use hyper::{Body, Request, Response, Server};
 
 use tokio::{self};
+use tracing_subscriber::EnvFilter;
 
+pub mod config;
 /// ENV references to API endpoints (host:port)
 mod env;
 
@@ -33,8 +35,10 @@ mod route;
 /// Common utilities
 pub mod util;
 
+pub mod backend_send;
 pub(crate) mod sandbox;
 pub(crate) mod stats;
+pub(crate) mod store;
 
 /// Name to register with the Lambda Extension API.
 ///
@@ -63,13 +67,23 @@ pub static LAMBDA_RUNTIME_API_VERSION: &str = "2018-06-01";
 ///
 #[tokio::main]
 async fn main() {
+    let filter = EnvFilter::try_from_env("OTEL_EXTENSION_LOG_LEVEL")
+        .unwrap_or_else(|_| EnvFilter::new("warn"));
+    tracing_subscriber::fmt()
+        .json()
+        .with_env_filter(filter)
+        .with_current_span(true)
+        .with_level(true)
+        .with_target(true)
+        .flatten_event(true)
+        .init();
     stats::init_start();
 
-    println!(
+    tracing::info!(
         "[LRAP] start; path={}",
         std::env::current_exe().unwrap().to_str().unwrap()
     );
-    println!(
+    tracing::info!(
         "[LRAP] commandline arguments: {}",
         std::env::args()
             .map(|v| format!("\"{}\"", v))
@@ -82,7 +96,7 @@ async fn main() {
     let addr: SocketAddr = env::lrap_api()
         .parse()
         .expect("Invalid IP specification from Lambda Runtime API endpoint");
-    println!("[LRAP] listening on {}", addr);
+    tracing::info!("[LRAP] listening on {}", addr);
 
     // bind the server to the Lambda Runtime API Router service
     let server = Server::bind(&addr).serve(route::make_route().into_service());
@@ -94,6 +108,7 @@ async fn main() {
     // We ignore extension events because all LRAP capability is in the Proxy.
     tokio::task::spawn(async {
         sandbox::extension::register().await;
+        sandbox::extension::register_telemetry().await;
         // Lambda Application runtime will start once our extension is registered
         stats::app_start();
 
@@ -108,7 +123,7 @@ async fn main() {
         .expect("Failed to join the server task")
     {
         Err(e) => {
-            eprintln!("[LRAP] Hyper server error: {}", e);
+            tracing::error!("[LRAP] Hyper server error: {}", e);
         }
         Ok(_) => { /* never reached */ }
     }

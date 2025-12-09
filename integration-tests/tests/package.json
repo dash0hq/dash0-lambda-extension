@@ -1,0 +1,25 @@
+{
+  "name": "integration-tests",
+  "version": "1.0.0",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "vitest": "vitest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.15"
+  },
+  "dependencies": {
+    "@aws-sdk/client-lambda": "^3.943.0",
+    "node-fetch": "^3.3.2"
+  }
+}

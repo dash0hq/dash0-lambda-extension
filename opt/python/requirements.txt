@@ -1,0 +1,1 @@
+lumigo-opentelemetry==1.0.190

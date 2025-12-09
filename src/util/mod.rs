@@ -4,5 +4,8 @@
 //
 
 mod limited_buffer;
+pub mod log_mutations;
+pub mod parsers;
+pub mod span_mutations;
 
 pub use limited_buffer::{LimitedBuffer, LimitedBufferReader};

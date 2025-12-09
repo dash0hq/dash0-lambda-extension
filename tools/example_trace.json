@@ -1,0 +1,255 @@
+{
+  "resource_spans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "string_value": "python"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "string_value": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "string_value": "1.34.1"
+            }
+          },
+          {
+            "key": "framework",
+            "value": {
+              "string_value": "Unknown"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "string_value": "unknown_service"
+            }
+          },
+          {
+            "key": "process.environ",
+            "value": {
+              "string_value": "{\"AWS_LAMBDA_FUNCTION_VERSION\": \"$LATEST\", \"AWS_EXECUTION_ENV\": \"AWS_Lambda_python3.12\", \"AWS_DEFAULT_REGION\": \"us-west-2\", \"AWS_LAMBDA_LOG_STREAM_NAME\": \"2025/11/30/[$LATEST]fc4633208abc47b0945e8ba6646927d1\", \"LUMIGO_TRACER_TOKEN\": \"t_72db2cb37bb24422be537\", \"AWS_REGION\": \"us-west-2\", \"PWD\": \"/var/task\", \"_HANDLER\": \"otel_wrapper.lambda_handler\", \"LAMBDA_LAYER_PKGS_DIR\": \"/opt/python\", \"ORIG_HANDLER\": \"lambda_function.lambda_handler\", \"TZ\": \":UTC\", \"AWS_LAMBDA_EXEC_WRAPPER\": \"/opt/wrapper\", \"LAMBDA_TASK_ROOT\": \"/var/task\", \"LANG\": \"en_US.UTF-8\", \"AWS_SECRET_ACCESS_KEY\": \"****\", \"AWS_LAMBDA_LOG_GROUP_NAME\": \"/aws/lambda/testing-extension-python\", \"test_x_LUMIGO_ENDPOINT\": \"https://ga-otlp.lumigo-tracer-edge.golumigo.com\", \"AWS_LAMBDA_RUNTIME_API\": \"127.0.0.1:9009\", \"AWS_LAMBDA_FUNCTION_MEMORY_SIZE\": \"128\", \"LAMBDA_RUNTIME_DIR\": \"/var/runtime\", \"PYTHONPATH\": \"/var/runtime:/opt/python:\", \"_AWS_XRAY_DAEMON_ADDRESS\": \"169.254.100.1\", \"AWS_XRAY_DAEMON_ADDRESS\": \"169.254.100.1:2000\", \"SHLVL\": \"0\", \"AWS_ACCESS_KEY_ID\": \"****\", \"LD_LIBRARY_PATH\": \"/var/lang/lib:/lib64:/usr/lib64:/var/runtime:/var/runtime/lib:/var/task:/var/task/lib:/opt/lib\", \"LUMIGO_ENDPOINT\": \"http://127.0.0.1:9009/v1/traces\", \"AWS_LAMBDA_FUNCTION_NAME\": \"testing-extension-python\", \"x_LUMIGO_ENDPOINT\": \"https://e7ombfy3t62jczfmcfrwdgzlyu0anjhb.lambda-url.us-west-2.on.aws\", \"PATH\": \"/var/lang/bin:/usr/local/bin:/usr/bin/:/bin:/opt/bin\", \"AWS_LAMBDA_INITIALIZATION_TYPE\": \"on-demand\", \"AWS_SESSION_TOKEN\": \"IQoJb3JpZ2luX2VjEBsaCXVzLXdlc3QtMiJHMEUCIQDs2Otho7psEvkfb5ezLOWcGGXq0IoIEYKDaGx8AiUQ9gIgIscJyGY4/DvctQQLFSjNffaEW65FNQAJ3X8UoiwvkxUqjQMI5P//////////ARABGgwyODU3MzI2NDIxODEiDHDFZ3PbusaEnOisGCrhAmLzuSJZnJHGGB2EO3C7+/w+e1E3zzpzqyqpGxPyTCB2neZm8oHG8GqTG3iyJMm7JN2cpKxL+O8rgb+yECORCw4HeWkQW3Pn4MxgRTXoey6oMtC/iokLIP/Oefov9ZFnAKS1MgDWhoUBkPrJhIJGwHB4Xjy8kwRAXXd1sZTZClsiE0h90Iz7v3PLO8jxLKIhdszONzkKXC3kpY1CNYEBuLcm0+X/d2z86ARjv7NvLBgCzRi5aa/YTA2EQ4s6PtzgT/7SrKwrCRv/Ij6+z2WZsEqTL1K+WmcU5MK+1Hwvmi/UWRVXv5ksWZUSRYh7iW96CvgnXtYp9lQ2Ch2hfKIoQ2abaY3dn9zwBEfmkNQ5Zs0tuwp...[too long]"
+            }
+          },
+          {
+            "key": "process.runtime.description",
+            "value": {
+              "string_value": "3.12.12 (main, Nov 3 2025, 10:02:13) [GCC 11.5.0 20240719 (Red Hat 11.5.0-5)]"
+            }
+          },
+          {
+            "key": "process.runtime.name",
+            "value": {
+              "string_value": "cpython"
+            }
+          },
+          {
+            "key": "process.runtime.version",
+            "value": {
+              "string_value": "3.12.12"
+            }
+          },
+          {
+            "key": "lumigo.distro.version",
+            "value": {
+              "string_value": "1.0.189"
+            }
+          }
+        ]
+      },
+      "scope_spans": [
+        {
+          "scope": {
+            "name": "opentelemetry.instrumentation.requests",
+            "version": "0.55b1"
+          },
+          "spans": [
+            {
+              "trace_id": "MUp1Bx93P+gyBsNmAAAAAA==",
+              "span_id": "UQrUpMm4Hwg=",
+              "parent_span_id": "8x2sNO9I4zs=",
+              "name": "POST",
+              "kind": "SPAN_KIND_CLIENT",
+              "start_time_unix_nano": "1764499825096886393",
+              "end_time_unix_nano": "1764499828873590347",
+              "attributes": [
+                {
+                  "key": "http.method",
+                  "value": {
+                    "string_value": "POST"
+                  }
+                },
+                {
+                  "key": "http.url",
+                  "value": {
+                    "string_value": "https://httpbin.org/post"
+                  }
+                },
+                {
+                  "key": "http.request.headers",
+                  "value": {
+                    "string_value": "{'User-Agent': 'python-requests/2.32.5', 'Accept-Encoding': 'gzip, deflate', 'Accept': '*/*', 'Connection': 'keep-alive', 'Content-Length': '18', 'Content-Type': 'application/json'}"
+                  }
+                },
+                {
+                  "key": "http.request.body",
+                  "value": {
+                    "string_value": "{\"hello\": \"world\"}"
+                  }
+                },
+                {
+                  "key": "http.status_code",
+                  "value": {
+                    "int_value": "200"
+                  }
+                },
+                {
+                  "key": "http.response.headers",
+                  "value": {
+                    "string_value": "{'Date': 'Sun, 30 Nov 2025 10:50:28 GMT', 'Content-Type': 'application/json', 'Content-Length': '565', 'Connection': 'keep-alive', 'Server': 'gunicorn/19.9.0', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Credentials': 'true'}"
+                  }
+                },
+                {
+                  "key": "http.response.body",
+                  "value": {
+                    "string_value": "{\n \"args\": {}, \n \"data\": \"{\\\"hello\\\": \\\"world\\\"}\", \n \"files\": {}, \n \"form\": {}, \n \"headers\": {\n \"Accept\": \"*/*\", \n \"Accept-Encoding\": \"gzip, deflate\", \n \"Content-Length\": \"18\", \n \"Content-Type\": \"application/json\", \n \"Host\": \"httpbin.org\", \n \"Traceparent\": \"00-314a75071f773fe83206c36600000000-510ad4a4c9b81f08-01\", \n \"User-Agent\": \"python-requests/2.32.5\", \n \"X-Amzn-Trace-Id\": \"Root=1-692c2171-56458f167b91572538fac9cd\"\n }, \n \"json\": {\n \"hello\": \"world\"\n }, \n \"origin\": \"54.190.145.125\", \n \"url\": \"https://httpbin.org/post\"\n}\n"
+                  }
+                }
+              ],
+              "status": {},
+              "flags": 256
+            }
+          ],
+          "schema_url": "https://opentelemetry.io/schemas/1.11.0"
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "string_value": "python"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "string_value": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "string_value": "1.34.1"
+            }
+          },
+          {
+            "key": "framework",
+            "value": {
+              "string_value": "Unknown"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "string_value": "unknown_service"
+            }
+          },
+          {
+            "key": "process.environ",
+            "value": {
+              "string_value": "{\"AWS_LAMBDA_FUNCTION_VERSION\": \"$LATEST\", \"AWS_EXECUTION_ENV\": \"AWS_Lambda_python3.12\", \"AWS_DEFAULT_REGION\": \"us-west-2\", \"AWS_LAMBDA_LOG_STREAM_NAME\": \"2025/11/30/[$LATEST]fc4633208abc47b0945e8ba6646927d1\", \"LUMIGO_TRACER_TOKEN\": \"t_72db2cb37bb24422be537\", \"AWS_REGION\": \"us-west-2\", \"PWD\": \"/var/task\", \"_HANDLER\": \"otel_wrapper.lambda_handler\", \"LAMBDA_LAYER_PKGS_DIR\": \"/opt/python\", \"ORIG_HANDLER\": \"lambda_function.lambda_handler\", \"TZ\": \":UTC\", \"AWS_LAMBDA_EXEC_WRAPPER\": \"/opt/wrapper\", \"LAMBDA_TASK_ROOT\": \"/var/task\", \"LANG\": \"en_US.UTF-8\", \"AWS_SECRET_ACCESS_KEY\": \"****\", \"AWS_LAMBDA_LOG_GROUP_NAME\": \"/aws/lambda/testing-extension-python\", \"test_x_LUMIGO_ENDPOINT\": \"https://ga-otlp.lumigo-tracer-edge.golumigo.com\", \"AWS_LAMBDA_RUNTIME_API\": \"127.0.0.1:9009\", \"AWS_LAMBDA_FUNCTION_MEMORY_SIZE\": \"128\", \"LAMBDA_RUNTIME_DIR\": \"/var/runtime\", \"PYTHONPATH\": \"/var/runtime:/opt/python:\", \"_AWS_XRAY_DAEMON_ADDRESS\": \"169.254.100.1\", \"AWS_XRAY_DAEMON_ADDRESS\": \"169.254.100.1:2000\", \"SHLVL\": \"0\", \"AWS_ACCESS_KEY_ID\": \"****\", \"LD_LIBRARY_PATH\": \"/var/lang/lib:/lib64:/usr/lib64:/var/runtime:/var/runtime/lib:/var/task:/var/task/lib:/opt/lib\", \"LUMIGO_ENDPOINT\": \"http://127.0.0.1:9009/v1/traces\", \"AWS_LAMBDA_FUNCTION_NAME\": \"testing-extension-python\", \"x_LUMIGO_ENDPOINT\": \"https://e7ombfy3t62jczfmcfrwdgzlyu0anjhb.lambda-url.us-west-2.on.aws\", \"PATH\": \"/var/lang/bin:/usr/local/bin:/usr/bin/:/bin:/opt/bin\", \"AWS_LAMBDA_INITIALIZATION_TYPE\": \"on-demand\", \"AWS_SESSION_TOKEN\": \"IQoJb3JpZ2luX2VjEBsaCXVzLXdlc3QtMiJHMEUCIQDs2Otho7psEvkfb5ezLOWcGGXq0IoIEYKDaGx8AiUQ9gIgIscJyGY4/DvctQQLFSjNffaEW65FNQAJ3X8UoiwvkxUqjQMI5P//////////ARABGgwyODU3MzI2NDIxODEiDHDFZ3PbusaEnOisGCrhAmLzuSJZnJHGGB2EO3C7+/w+e1E3zzpzqyqpGxPyTCB2neZm8oHG8GqTG3iyJMm7JN2cpKxL+O8rgb+yECORCw4HeWkQW3Pn4MxgRTXoey6oMtC/iokLIP/Oefov9ZFnAKS1MgDWhoUBkPrJhIJGwHB4Xjy8kwRAXXd1sZTZClsiE0h90Iz7v3PLO8jxLKIhdszONzkKXC3kpY1CNYEBuLcm0+X/d2z86ARjv7NvLBgCzRi5aa/YTA2EQ4s6PtzgT/7SrKwrCRv/Ij6+z2WZsEqTL1K+WmcU5MK+1Hwvmi/UWRVXv5ksWZUSRYh7iW96CvgnXtYp9lQ2Ch2hfKIoQ2abaY3dn9zwBEfmkNQ5Zs0tuwp...[too long]"
+            }
+          },
+          {
+            "key": "process.runtime.description",
+            "value": {
+              "string_value": "3.12.12 (main, Nov 3 2025, 10:02:13) [GCC 11.5.0 20240719 (Red Hat 11.5.0-5)]"
+            }
+          },
+          {
+            "key": "process.runtime.name",
+            "value": {
+              "string_value": "cpython"
+            }
+          },
+          {
+            "key": "process.runtime.version",
+            "value": {
+              "string_value": "3.12.12"
+            }
+          },
+          {
+            "key": "lumigo.distro.version",
+            "value": {
+              "string_value": "1.0.189"
+            }
+          }
+        ]
+      },
+      "scope_spans": [
+        {
+          "scope": {
+            "name": "opentelemetry.instrumentation.aws_lambda",
+            "version": "0.55b1"
+          },
+          "spans": [
+            {
+              "trace_id": "MUp1Bx93P+gyBsNmAAAAAA==",
+              "span_id": "8x2sNO9I4zs=",
+              "name": "lambda_function.lambda_handler",
+              "kind": "SPAN_KIND_SERVER",
+              "start_time_unix_nano": "1764499825096023566",
+              "end_time_unix_nano": "1764499832875102736",
+              "attributes": [
+                {
+                  "key": "cloud.resource_id",
+                  "value": {
+                    "string_value": "arn:aws:lambda:us-west-2:285732642181:function:testing-extension-python"
+                  }
+                },
+                {
+                  "key": "faas.invocation_id",
+                  "value": {
+                    "string_value": "e68d0162-18a5-416a-a0b0-65a57ca6f6ce"
+                  }
+                },
+                {
+                  "key": "cloud.account.id",
+                  "value": {
+                    "string_value": "285732642181"
+                  }
+                },
+                {
+                  "key": "faas.event",
+                  "value": {
+                    "string_value": "{\"key1\":\"value1\",\"key2\":\"value2\",\"key3\":\"value3\"}"
+                  }
+                },
+                {
+                  "key": "faas.return_value",
+                  "value": {
+                    "string_value": "{\"statusCode\": 200, \"body\": \"\\\"Hello from Lambda!\\\"\"}"
+                  }
+                }
+              ],
+              "status": {},
+              "flags": 256
+            }
+          ],
+          "schema_url": "https://opentelemetry.io/schemas/1.11.0"
+        }
+      ]
+    }
+  ]
+}

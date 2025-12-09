@@ -37,31 +37,31 @@ clean-cargo:
 build/lrap_x86_64: $(RS_FILES) Cargo.toml
 	@echo Building Rust application for x86_64
 	@mkdir -p build
-	@cross build --release --target x86_64-unknown-linux-gnu ${CARGO_FEATURES}
-	@cp target/x86_64-unknown-linux-gnu/release/aws-lambda-runtime-api-proxy-rs build/lrap_x86_64
+	@cross build --release --target x86_64-unknown-linux-musl ${CARGO_FEATURES}
+	@cp target/x86_64-unknown-linux-musl/release/aws-lambda-runtime-api-proxy-rs build/lrap_x86_64
 
 build/lrap_aarch64: $(RS_FILES) Cargo.toml
 	@echo Building Rust application for aarch64
 	@mkdir -p build
-	@cross build --release --target aarch64-unknown-linux-gnu ${CARGO_FEATURES}
-	@cp target/aarch64-unknown-linux-gnu/release/aws-lambda-runtime-api-proxy-rs build/lrap_aarch64
+	@cross build --release --target aarch64-unknown-linux-musl ${CARGO_FEATURES}
+	@cp target/aarch64-unknown-linux-musl/release/aws-lambda-runtime-api-proxy-rs build/lrap_aarch64
 
-build/python: opt/requirements.txt opt/Dockerfile
+build/python: opt/python/requirements.txt opt/python/Dockerfile
 	@mkdir -p build
 	@rm -rf build/python
-	@docker build -t $(PYTHON_DEPS_IMAGE) -f opt/Dockerfile .
+	@docker build -t $(PYTHON_DEPS_IMAGE) -f opt/python/Dockerfile .
 	@cid=$$(docker create $(PYTHON_DEPS_IMAGE)); \
 		docker cp $$cid:/asset-output/python build/python; \
 		docker rm $$cid >/dev/null
 
 
 
-build/$(ZIP_NAME): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/wrapper opt/otel_wrapper.py build/python
+build/$(ZIP_NAME): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/python/wrapper opt/python/otel_wrapper.py build/python
 	@rm -f build/layer-lrap.zip
 	@mkdir -p build/extensions
 	@cp opt/entrypoint build/extensions/lrap
-	@cp opt/wrapper build/wrapper
-	@cp opt/otel_wrapper.py build/python/otel_wrapper.py
+	@cp opt/python/wrapper build/wrapper
+	@cp opt/python/otel_wrapper.py build/python/otel_wrapper.py
 	@cd build && zip -r $(ZIP_NAME) lrap_* wrapper python extensions
 
 

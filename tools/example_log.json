@@ -1,0 +1,278 @@
+{
+  "resource_logs": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "string_value": "python"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "string_value": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "string_value": "1.34.1"
+            }
+          },
+          {
+            "key": "framework",
+            "value": {
+              "string_value": "Unknown"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "string_value": "unknown_service"
+            }
+          },
+          {
+            "key": "process.environ",
+            "value": {
+              "string_value": "{\"LUMIGO_LOGS_ENDPOINT\": \"http://127.0.0.1:9009/v1/logs\", \"AWS_LAMBDA_FUNCTION_VERSION\": \"$LATEST\", \"AWS_EXECUTION_ENV\": \"AWS_Lambda_python3.12\", \"SEND_ON_INVOCATION_END\": \"true\", \"AWS_DEFAULT_REGION\": \"us-west-2\", \"AWS_LAMBDA_LOG_STREAM_NAME\": \"2025/12/07/[$LATEST]2f6bc59ae12243eea0b6b346378aebee\", \"LUMIGO_TRACER_TOKEN\": \"t_72db2cb37bb24422be537\", \"AWS_REGION\": \"us-west-2\", \"PWD\": \"/var/task\", \"_HANDLER\": \"otel_wrapper.lambda_handler\", \"LAMBDA_LAYER_PKGS_DIR\": \"/opt/python\", \"ORIG_HANDLER\": \"lambda_function.lambda_handler\", \"test2_x_LUMIGO_ENDPOINT\": \"https://ga-otlp.lumigo-tracer-edge.golumigo.com\", \"TZ\": \":UTC\", \"AWS_LAMBDA_EXEC_WRAPPER\": \"/opt/wrapper\", \"LAMBDA_TASK_ROOT\": \"/var/task\", \"LANG\": \"en_US.UTF-8\", \"DASH0_TOKEN\": \"auth_oEiAAAy5hZvVsEAADPm4uDyV7OcBmU4B\", \"OTEL_EXTENSION_LOG_LEVEL\": \"info\", \"AWS_SECRET_ACCESS_KEY\": \"****\", \"AWS_LAMBDA_LOG_GROUP_NAME\": \"/aws/lambda/testing-extension-python\", \"AWS_LAMBDA_RUNTIME_API\": \"127.0.0.1:9009\", \"AWS_LAMBDA_FUNCTION_MEMORY_SIZE\": \"128\", \"LAMBDA_RUNTIME_DIR\": \"/var/runtime\", \"PYTHONPATH\": \"/var/runtime:/opt/python:\", \"_AWS_XRAY_DAEMON_ADDRESS\": \"169.254.100.1\", \"AWS_XRAY_DAEMON_ADDRESS\": \"169.254.100.1:2000\", \"SHLVL\": \"0\", \"AWS_ACCESS_KEY_ID\": \"****\", \"LD_LIBRARY_PATH\": \"/var/lang/lib:/lib64:/usr/lib64:/var/runtime:/var/runtime/lib:/var/task:/var/task/lib:/opt/lib\", \"LUMIGO_ENDPOINT\": \"http://127.0.0.1:9009/v1/traces\", \"LUMIGO_ENABLE_LOGS\": \"true\", \"AWS_LAMBDA_FUNCTION_NAME\": \"testing-extension-python\", \"x_LUMIGO_ENDPOINT\": \"https://e7ombfy3t62jczfmcfrwdgzlyu0anjhb.lambda-url.us-west-2.on.aws\", \"PATH\": \"/var/lang/bin:/usr/local/bin:/usr/bin/:/bin:/opt/bin\", \"AWS_LAMBDA_INITIALIZATION_TYPE\": \"on-demand\", \"AWS_SESSION_TOKEN\": \"IQoJb3JpZ2luX2VjEL3//////////wEaCXVzLXdlc3QtMiJHMEUCIQDdG8h+/ZlQAC0DL15Otr6BcboBD5S0gI3jI0jmT8kAAQIgIAo2Hum95zn1aOMaFR1pcVvlkeYGrcgrYBDvKF5mr3wqjQMIhv//////////ARABGgwyODU3MzI2NDIxODEiDBfBxxwzjV/Sf2BhwyrhAvtO3Gaja5ibBb2/ei/mT7whcHLk+yUw6teicp1fnIVaDw8hMW29zu7ZG3clMXP2jorH+/keO18DJHx69ZA/+hRE1CWeeBKmGwKifKxK+eh0tQKAPP454YmAjvKAAbFLn9k7HdfHzF90h...[too long]"
+            }
+          },
+          {
+            "key": "process.runtime.description",
+            "value": {
+              "string_value": "3.12.12 (main, Nov 3 2025, 10:02:13) [GCC 11.5.0 20240719 (Red Hat 11.5.0-5)]"
+            }
+          },
+          {
+            "key": "process.runtime.name",
+            "value": {
+              "string_value": "cpython"
+            }
+          },
+          {
+            "key": "process.runtime.version",
+            "value": {
+              "string_value": "3.12.12"
+            }
+          },
+          {
+            "key": "lumigo.distro.version",
+            "value": {
+              "string_value": "1.0.189"
+            }
+          }
+        ]
+      },
+      "scope_logs": [
+        {
+          "scope": {
+            "name": "root"
+          },
+          "log_records": [
+            {
+              "time_unix_nano": "1765083999911737088",
+              "severity_number": "SEVERITY_NUMBER_INFO",
+              "severity_text": "INFO",
+              "body": {
+                "string_value": "{\"key1\": \"****\", \"key2\": \"****\", \"key3\": \"****\"}"
+              },
+              "attributes": [
+                {
+                  "key": "otelSpanID",
+                  "value": {
+                    "string_value": "4f971930cd8d92ce"
+                  }
+                },
+                {
+                  "key": "otelTraceID",
+                  "value": {
+                    "string_value": "0726a111546900b7496d455d00000000"
+                  }
+                },
+                {
+                  "key": "otelTraceSampled",
+                  "value": {
+                    "bool_value": true
+                  }
+                },
+                {
+                  "key": "otelServiceName",
+                  "value": {
+                    "string_value": "unknown_service"
+                  }
+                },
+                {
+                  "key": "aws_request_id",
+                  "value": {
+                    "string_value": "5240aec1-4702-4f76-ae58-56bb3c6880e3"
+                  }
+                },
+                {
+                  "key": "tenant_id"
+                },
+                {
+                  "key": "code.file.path",
+                  "value": {
+                    "string_value": "/var/task/lambda_function.py"
+                  }
+                },
+                {
+                  "key": "code.function.name",
+                  "value": {
+                    "string_value": "lambda_handler"
+                  }
+                },
+                {
+                  "key": "code.line.number",
+                  "value": {
+                    "int_value": "15"
+                  }
+                }
+              ],
+              "flags": 1,
+              "trace_id": "ByahEVRpALdJbUVdAAAAAA==",
+              "span_id": "T5cZMM2Nks4=",
+              "observed_time_unix_nano": "1765083999911920387"
+            },
+            {
+              "time_unix_nano": "1765083999912386816",
+              "severity_number": "SEVERITY_NUMBER_INFO",
+              "severity_text": "INFO",
+              "body": {
+                "string_value": "\"hello world\""
+              },
+              "attributes": [
+                {
+                  "key": "otelSpanID",
+                  "value": {
+                    "string_value": "4f971930cd8d92ce"
+                  }
+                },
+                {
+                  "key": "otelTraceID",
+                  "value": {
+                    "string_value": "0726a111546900b7496d455d00000000"
+                  }
+                },
+                {
+                  "key": "otelTraceSampled",
+                  "value": {
+                    "bool_value": true
+                  }
+                },
+                {
+                  "key": "otelServiceName",
+                  "value": {
+                    "string_value": "unknown_service"
+                  }
+                },
+                {
+                  "key": "aws_request_id",
+                  "value": {
+                    "string_value": "5240aec1-4702-4f76-ae58-56bb3c6880e3"
+                  }
+                },
+                {
+                  "key": "tenant_id"
+                },
+                {
+                  "key": "code.file.path",
+                  "value": {
+                    "string_value": "/var/task/lambda_function.py"
+                  }
+                },
+                {
+                  "key": "code.function.name",
+                  "value": {
+                    "string_value": "lambda_handler"
+                  }
+                },
+                {
+                  "key": "code.line.number",
+                  "value": {
+                    "int_value": "16"
+                  }
+                }
+              ],
+              "flags": 1,
+              "trace_id": "ByahEVRpALdJbUVdAAAAAA==",
+              "span_id": "T5cZMM2Nks4=",
+              "observed_time_unix_nano": "1765083999912478695"
+            }
+          ]
+        },
+        {
+          "scope": {
+            "name": "opentelemetry.instrumentation.aws_lambda"
+          },
+          "log_records": [
+            {
+              "time_unix_nano": "1765084001970970112",
+              "severity_number": "SEVERITY_NUMBER_WARN",
+              "severity_text": "WARN",
+              "body": {
+                "string_value": "\"MeterProvider was missing `force_flush` method. This is necessary in case of a Lambda freeze and would exist in the OTel SDK implementation.\""
+              },
+              "attributes": [
+                {
+                  "key": "otelSpanID",
+                  "value": {
+                    "string_value": "0"
+                  }
+                },
+                {
+                  "key": "otelTraceID",
+                  "value": {
+                    "string_value": "0"
+                  }
+                },
+                {
+                  "key": "otelTraceSampled",
+                  "value": {
+                    "bool_value": false
+                  }
+                },
+                {
+                  "key": "otelServiceName",
+                  "value": {
+                    "string_value": "unknown_service"
+                  }
+                },
+                {
+                  "key": "aws_request_id",
+                  "value": {
+                    "string_value": "5240aec1-4702-4f76-ae58-56bb3c6880e3"
+                  }
+                },
+                {
+                  "key": "tenant_id"
+                },
+                {
+                  "key": "code.file.path",
+                  "value": {
+                    "string_value": "/opt/python/opentelemetry/instrumentation/aws_lambda/__init__.py"
+                  }
+                },
+                {
+                  "key": "code.function.name",
+                  "value": {
+                    "string_value": "_instrumented_lambda_handler_call"
+                  }
+                },
+                {
+                  "key": "code.line.number",
+                  "value": {
+                    "int_value": "412"
+                  }
+                }
+              ],
+              "observed_time_unix_nano": "1765084001971119093"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -12,7 +12,23 @@ parking_lot = "0.12.1"
 tokio = { version = "1.29.1", features = ["full"] }
 tokio-util = { version = "0.7.8", features = ["io"] }
 hyper = { version = "0.14.27", features = ["client", "server", "runtime", "tcp", "stream", "http1"] }
+hyper-rustls = { version = "0.24", features = ["http1", "native-tokio", "tls12"] }
 httprouter = "0.5.0"
+opentelemetry-proto = { version = "0.31", features = ["trace", "logs", "with-serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+prost = "0.14.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "json", "env-filter"] }
+aws-config = { version = "1.8", features = ["behavior-version-latest"] }
+aws-sdk-sts = "1.9"
+hex = "0.4.3"
 
 [features]
 default = []
+
+[dev-dependencies]
+tokio-test = "0.4"
+serial_test = "3.0"

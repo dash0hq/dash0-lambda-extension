@@ -38,7 +38,7 @@ pub fn latch_runtime_env() {
         .or(Some(crate::DEFAULT_PROXY_PORT))
         .unwrap();
 
-    let lrap_api = format!("127.0.0.1:{}", listener_port);
+    let lrap_api = format!("0.0.0.0:{}", listener_port);
 
     LRAP_API.set(lrap_api.clone()).expect("aws_lambda_runtime_api_proxy_rs::env::LRAP_API was previously initialized and should not be");
 }

@@ -26,7 +26,7 @@ pub fn app_start() {
 pub fn get_next_event() {
     match *EVENT_START.lock() {
         None => {
-            eprintln!(
+            tracing::info!(
                 "[LRAP] LRAP init     : {} us",
                 APP_START
                     .get()
@@ -34,13 +34,13 @@ pub fn get_next_event() {
                     .duration_since(*INIT_START.get().unwrap())
                     .as_micros()
             );
-            eprintln!(
+            tracing::info!(
                 "[LRAP] App  init     : {} us",
                 APP_START.get().unwrap().elapsed().as_micros()
             );
         }
         Some(event_start) => {
-            eprintln!(
+            tracing::info!(
                 "[LRAP] App run time  : {} us",
                 event_start.elapsed().as_micros()
             );
