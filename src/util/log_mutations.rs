@@ -1,4 +1,5 @@
-use crate::store::{get_invocation_span_id, TelemetryLog};
+use crate::config::is_auto_instrumented_disabled;
+use crate::store::{get_invocation_span_id, store_telemetry_logs, TelemetryLog};
 use crate::util::parsers::{get_span_id_from_invocation_id, get_trace_id_from_invocation_id};
 use chrono::DateTime;
 use opentelemetry_proto::tonic::common::v1::AnyValue;
@@ -92,7 +93,7 @@ fn format_platform_runtime_done_message(
     format!("END RequestId: {}", request_id)
 }
 
-pub fn map_logs_to_otlp(logs: &[TelemetryLog]) -> Vec<LogRecord> {
+pub fn map_logs_to_otlp(logs: &[TelemetryLog], is_invocation_end: bool) -> Vec<LogRecord> {
     let mut log_records = Vec::new();
     for log in logs {
         // Determine the log body based on log type
@@ -171,9 +172,16 @@ pub fn map_logs_to_otlp(logs: &[TelemetryLog]) -> Vec<LogRecord> {
                         span_id = sid;
                     }
                 }
-            } else {
+            } else if is_invocation_end || is_auto_instrumented_disabled() {
                 trace_id = get_trace_id_from_invocation_id(invocation_id);
                 span_id = get_span_id_from_invocation_id(invocation_id);
+            } else {
+                tracing::info!(
+                    "[LRAP] trace/span ids not found for invocation_id {}, putting back to store",
+                    invocation_id
+                );
+                store_telemetry_logs(vec![log.clone()]);
+                continue;
             }
         }
 
@@ -265,7 +273,7 @@ mod tests {
             invocation_id: Some("inv-123".to_string()),
         }];
 
-        let result = map_logs_to_otlp(&logs);
+        let result = map_logs_to_otlp(&logs, true);
 
         assert_eq!(result.len(), 1);
         let log = &result[0];
@@ -294,7 +302,7 @@ mod tests {
             invocation_id: Some("inv-123".to_string()),
         }];
 
-        let result = map_logs_to_otlp(&logs);
+        let result = map_logs_to_otlp(&logs, true);
         assert!(result.is_empty());
     }
 
@@ -307,7 +315,7 @@ mod tests {
             invocation_id: Some("inv-123".to_string()),
         }];
 
-        let result = map_logs_to_otlp(&logs);
+        let result = map_logs_to_otlp(&logs, true);
         assert!(result.is_empty());
     }
 
@@ -320,7 +328,7 @@ mod tests {
             invocation_id: Some("inv-123".to_string()),
         }];
 
-        let result = map_logs_to_otlp(&logs);
+        let result = map_logs_to_otlp(&logs, true);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].time_unix_nano, 0);
     }
@@ -334,7 +342,7 @@ mod tests {
             invocation_id: None,
         }];
 
-        let result = map_logs_to_otlp(&logs);
+        let result = map_logs_to_otlp(&logs, true);
         assert_eq!(result.len(), 1);
         assert!(result[0].attributes.is_empty());
     }
@@ -362,7 +370,7 @@ mod tests {
             },
         ];
 
-        let result = map_logs_to_otlp(&logs);
+        let result = map_logs_to_otlp(&logs, true);
         assert_eq!(result.len(), 2);
         assert_eq!(
             get_string_value(&result[0].body),
@@ -409,7 +417,7 @@ mod tests {
             invocation_id: Some(invocation_id.to_string()),
         }];
 
-        let result = map_logs_to_otlp(&logs);
+        let result = map_logs_to_otlp(&logs, true);
 
         assert_eq!(result.len(), 1);
         let log = &result[0];
@@ -441,7 +449,7 @@ mod tests {
             invocation_id: Some("inv-report-1".to_string()),
         }];
 
-        let result = map_logs_to_otlp(&logs);
+        let result = map_logs_to_otlp(&logs, true);
 
         assert_eq!(result.len(), 1);
         let log = &result[0];
@@ -480,7 +488,7 @@ mod tests {
             invocation_id: Some("inv-report-2".to_string()),
         }];
 
-        let result = map_logs_to_otlp(&logs);
+        let result = map_logs_to_otlp(&logs, true);
 
         assert_eq!(result.len(), 1);
         let log = &result[0];
@@ -516,7 +524,7 @@ mod tests {
             invocation_id: Some("inv-timeout-1".to_string()),
         }];
 
-        let result = map_logs_to_otlp(&logs);
+        let result = map_logs_to_otlp(&logs, true);
 
         assert_eq!(result.len(), 1);
         let log = &result[0];
@@ -562,7 +570,7 @@ mod tests {
             invocation_id: Some("inv-success-1".to_string()),
         }];
 
-        let result = map_logs_to_otlp(&logs);
+        let result = map_logs_to_otlp(&logs, true);
 
         assert_eq!(result.len(), 1);
         let log = &result[0];
@@ -600,7 +608,7 @@ mod tests {
             invocation_id: Some("inv-error-1".to_string()),
         }];
 
-        let result = map_logs_to_otlp(&logs);
+        let result = map_logs_to_otlp(&logs, true);
 
         assert_eq!(result.len(), 1);
         let log = &result[0];
@@ -641,7 +649,7 @@ mod tests {
             },
         ];
 
-        let result = map_logs_to_otlp(&logs);
+        let result = map_logs_to_otlp(&logs, true);
 
         assert_eq!(result.len(), 2);
 
@@ -669,7 +677,7 @@ mod tests {
             invocation_id: Some("inv-start-1".to_string()),
         }];
 
-        let result = map_logs_to_otlp(&logs);
+        let result = map_logs_to_otlp(&logs, true);
 
         assert_eq!(result.len(), 1);
         let log = &result[0];
@@ -710,7 +718,7 @@ mod tests {
             invocation_id: Some("inv-end-1".to_string()),
         }];
 
-        let result = map_logs_to_otlp(&logs);
+        let result = map_logs_to_otlp(&logs, true);
 
         assert_eq!(result.len(), 1);
         let log = &result[0];
@@ -770,7 +778,7 @@ mod tests {
             },
         ];
 
-        let result = map_logs_to_otlp(&logs);
+        let result = map_logs_to_otlp(&logs, true);
 
         assert_eq!(result.len(), 4);
 
@@ -836,7 +844,7 @@ mod tests {
             },
         ];
 
-        let result = map_logs_to_otlp(&logs);
+        let result = map_logs_to_otlp(&logs, true);
 
         assert_eq!(result.len(), 4);
 
@@ -855,5 +863,28 @@ mod tests {
         // Verify REPORT has INFO severity
         assert_eq!(result[3].severity_number, 9); // INFO
         assert_eq!(result[3].severity_text, "INFO");
+    }
+    #[test]
+    fn test_map_logs_not_invocation_end() {
+        let logs = vec![TelemetryLog {
+            time: "2023-10-26T12:00:00.000Z".to_string(),
+            r#type: "function".to_string(),
+            record: json!("Log message"),
+            invocation_id: Some("inv-not-end".to_string()),
+        }];
+
+        // When is_invocation_end is false, and no trace/span ID is stored,
+        // it should NOT generate deterministic IDs and should return empty IDs.
+        let result = map_logs_to_otlp(&logs, false);
+
+        assert_eq!(result.len(), 1);
+        let log = &result[0];
+
+        // TraceID and SpanID should be empty (zeros) because:
+        // 1. They are not in the store.
+        // 2. auto_instrumentation is not disabled (assumed default).
+        // 3. is_invocation_end is false.
+        assert_eq!(log.trace_id, vec![0u8; 16]);
+        assert_eq!(log.span_id, vec![0u8; 8]);
     }
 }

@@ -291,6 +291,11 @@ fn create_exception_event(
     None
 }
 
+fn is_lambda_instrumentation_scope(scope_name: &str) -> bool {
+    scope_name == "opentelemetry.instrumentation.aws_lambda"
+        || scope_name == "@opentelemetry/instrumentation-aws-lambda"
+}
+
 pub fn add_event_payload_to_lambda_server_spans(
     request: &mut ExportTraceServiceRequest,
     invocation_ids: &mut Vec<String>,
@@ -299,7 +304,7 @@ pub fn add_event_payload_to_lambda_server_spans(
     for resource_span in &mut request.resource_spans {
         for scope_span in &mut resource_span.scope_spans {
             if let Some(scope) = &scope_span.scope {
-                if scope.name == "opentelemetry.instrumentation.aws_lambda" {
+                if is_lambda_instrumentation_scope(&scope.name) {
                     added |= annotate_server_spans(&mut scope_span.spans, invocation_ids);
                 }
             }
@@ -384,7 +389,7 @@ pub fn annotate_return_payload(
     for resource_span in &mut request.resource_spans {
         for scope_span in &mut resource_span.scope_spans {
             if let Some(scope) = &scope_span.scope {
-                if scope.name == "opentelemetry.instrumentation.aws_lambda" {
+                if is_lambda_instrumentation_scope(&scope.name) {
                     for span in &mut scope_span.spans {
                         if let Some(id) = extract_invocation_id(span) {
                             if id == invocation_id {
@@ -1232,6 +1237,56 @@ mod tests {
                 _ => None,
             });
         assert_eq!(escaped_attr, Some("False".to_string()));
+    }
+
+    #[test]
+    #[serial]
+    fn add_event_payload_support_nodejs_scope() {
+        let invocation_id = "inv-event-node";
+        store_event_payload(invocation_id, r#"{"hello":"node"}"#);
+        let span = make_span_with_invocation(invocation_id);
+        let mut request =
+            make_request_with_scope("@opentelemetry/instrumentation-aws-lambda", span);
+        let mut invocation_ids = Vec::new();
+
+        let added = add_event_payload_to_lambda_server_spans(&mut request, &mut invocation_ids);
+
+        assert!(added, "expected faas.event to be added for nodejs scope");
+        assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
+        let span = &request.resource_spans[0].scope_spans[0].spans[0];
+        let event_attr = find_attribute(span, "faas.event");
+        assert!(event_attr.is_some(), "faas.event attribute should exist");
+    }
+
+    #[test]
+    #[serial]
+    fn add_return_payload_support_nodejs_scope() {
+        take_traces();
+        let invocation_id = "inv-return-node";
+        let mut span = make_span_with_invocation(invocation_id);
+        span.kind = SpanKind::Server as i32;
+        let request = make_request_with_scope("@opentelemetry/instrumentation-aws-lambda", span);
+        let trace = StoredTrace {
+            method: Method::POST,
+            path_and_query: "/v1/traces".to_string(),
+            headers: hyper::HeaderMap::new(),
+            body: request.encode_to_vec(),
+            invocation_ids: vec![invocation_id.to_string()],
+        };
+        store_trace(trace);
+
+        add_return_payload_to_lambda_server_spans(invocation_id, "node_result");
+
+        let traces = take_traces();
+        assert_eq!(traces.len(), 1);
+        let decoded = ExportTraceServiceRequest::decode(traces[0].body.as_slice())
+            .expect("should decode updated trace");
+        let span = &decoded.resource_spans[0].scope_spans[0].spans[0];
+        let attr = find_attribute(span, "faas.return_value");
+        assert!(
+            attr.is_some(),
+            "faas.return_value should be added for nodejs scope"
+        );
     }
 }
 

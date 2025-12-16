@@ -3,3 +3,4 @@ build
 .vscode
 .lambda-layer
 .idea
+opt/node/node_modules

@@ -1,0 +1,29 @@
+{
+  "name": "@opentelemetry-lambda/sdk-layer",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Layer including OpenTelemetry SDK for use with AWS Lambda.",
+  "repository": "open-telemetry/opentelemetry-lambda",
+  "scripts": {
+  },
+  "keywords": [
+    "opentelemetry",
+    "awslambda",
+    "nodejs",
+    "tracing",
+    "profiling",
+    "instrumentation"
+  ],
+  "author": "OpenTelemetry Authors",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=18.19.0"
+  },
+  "dependencies": {
+    "@lumigo/opentelemetry": "^1.53.0",
+    "@opentelemetry/instrumentation-aws-lambda": "0.61.0",
+    "import-in-the-middle": "2.0.0",
+    "require-in-the-middle": "^8.0.1"
+  },
+  "sideEffects": false
+}

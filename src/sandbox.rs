@@ -201,7 +201,8 @@ pub mod extension {
 
                     if should_flush {
                         crate::backend_send::flush_traces().await;
-                        crate::backend_send::flush_logs().await;
+                        crate::backend_send::flush_logs(matches!(event_type, Some("SHUTDOWN")))
+                            .await;
                     }
 
                     if matches!(event_type, Some("INVOKE"))
@@ -224,7 +225,7 @@ pub mod extension {
                                 tracing::info!(
                                     "[LRAP:Extension] Received platform.runtimeDone signal"
                                 );
-                                crate::backend_send::flush_logs().await;
+                                crate::backend_send::flush_logs(true).await;
                             }
                             Ok(Err(_)) => {
                                 tracing::warn!(

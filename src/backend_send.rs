@@ -25,13 +25,13 @@ use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 
 use opentelemetry_proto::tonic::logs::v1::{ResourceLogs, ScopeLogs};
 
-pub async fn flush_logs() {
+pub async fn flush_logs(is_invocation_end: bool) {
     let logs = take_telemetry_logs();
     if logs.is_empty() {
         return;
     }
 
-    let log_records = map_logs_to_otlp(&logs);
+    let log_records = map_logs_to_otlp(&logs, is_invocation_end);
 
     if log_records.is_empty() {
         return;

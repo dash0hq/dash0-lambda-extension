@@ -1,9 +1,8 @@
-import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 import fetch from 'node-fetch';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
 import {DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./config";
-import {checkHttpSpan, checkLogs, getAttributesMap, getRequestPayload, invokeFunction} from "./utils";
+import {checkException, checkHttpSpan, checkLogs, getAttributesMap, getRequestPayload, invokeFunction} from "./utils";
 
 
 const verifySuccessInvocation = async (functionName: string, invocationEnd: boolean, traced: boolean) => {
@@ -35,19 +34,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             const spanAttributes = getAttributesMap(span.attributes);
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
             expect(spanAttributes['faas.event'].stringValue).toEqual('{"parameter1":"right"}');
-            // check exception event
-            const events = span.events;
-            expect(events.length).toEqual(1);
-            const exceptionEvent = events[0];
-            expect(exceptionEvent.name).toEqual('exception');
-            const eventAttributes = exceptionEvent.attributes;
-            const eventAttrMap: Record<string, any> = {};
-            for (const attr of eventAttributes) {
-                eventAttrMap[attr.key] = attr.value;
-            }
-            expect(eventAttrMap['exception.type'].stringValue).toEqual('timeout');
-            expect(span.status.code).toEqual(2); // 2 = ERROR
-            expect(span.status.message).toEqual('timeout');
+            checkException(span, 'timeout');
             traceId = spanPayload.resourceSpans[0].scopeSpans[0].spans[0].traceId;
             parentSpanId = spanPayload.resourceSpans[0].scopeSpans[0].spans[0].spanId;
             break;

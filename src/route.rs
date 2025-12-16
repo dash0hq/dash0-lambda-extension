@@ -287,7 +287,7 @@ pub async fn telemetry_sink(req: Request<Body>) -> Result<Response<Body>, Error>
         if !traces_to_send.is_empty() {
             send_traces(traces_to_send).await;
         }
-        flush_logs().await;
+        flush_logs(true).await;
     }
 
     Ok(Response::builder().status(200).body(Body::empty()).unwrap())
@@ -320,7 +320,7 @@ pub async fn invocation_response_proxy(req: Request<Body>) -> Result<Response<Bo
     }
     if is_send_on_invocation_end() {
         flush_traces().await;
-        flush_logs().await;
+        flush_logs(true).await;
     }
     tracing::info!(
         "[LRAP] Total handle time for invocation response: {} ms",
@@ -337,17 +337,74 @@ pub async fn traces(req: Request<Body>) -> Result<Response<Body>, Error> {
     // Try to decode and add event payload to server span from AWS Lambda instrumentation
     let mut encoded_body: Vec<u8> = body_bytes.to_vec();
     let mut invocation_ids: Vec<String> = Vec::new();
+    let mut converted_from_json = false;
+
+    // print the body
+    tracing::info!(
+        "[LRAP] /v1/traces body: {}",
+        String::from_utf8_lossy(&encoded_body)
+    );
+
     match ExportTraceServiceRequest::decode(body_bytes.as_ref()) {
         Ok(mut decoded) => {
             process_trace_request(&mut decoded, &mut invocation_ids, &mut encoded_body);
         }
-        Err(err) => tracing::error!("[LRAP] /v1/traces failed to decode OTLP: {}", err),
+        Err(err) => {
+            tracing::info!(
+                "[LRAP] /v1/traces failed to decode as protobuf, trying JSON: {}",
+                err
+            );
+
+            // Try to parse as JSON and convert to protobuf
+            match serde_json::from_slice::<ExportTraceServiceRequest>(body_bytes.as_ref()) {
+                Ok(mut decoded) => {
+                    tracing::info!("[LRAP] /v1/traces successfully parsed JSON trace");
+
+                    for resource_span in &mut decoded.resource_spans {
+                        for scope_span in &mut resource_span.scope_spans {
+                            for span in &mut scope_span.spans {
+                                for attribute in &mut span.attributes {
+                                    if attribute.key == "faas.execution" {
+                                        attribute.key = "faas.invocation_id".to_string();
+                                    } else if attribute.key == "faas.id" {
+                                        attribute.key = "cloud.resource_id".to_string();
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Convert to protobuf format for storage
+                    // This ensures encoded_body contains protobuf bytes before calling process_trace_request
+                    encoded_body = decoded.encode_to_vec();
+                    tracing::info!(
+                        "[LRAP] /v1/traces successfully converted JSON to protobuf ({} bytes)",
+                        encoded_body.len()
+                    );
+
+                    process_trace_request(&mut decoded, &mut invocation_ids, &mut encoded_body);
+                    converted_from_json = true;
+                }
+                Err(json_err) => {
+                    tracing::error!("[LRAP] /v1/traces failed to parse as JSON: {}", json_err);
+                }
+            }
+        }
     }
 
     if invocation_ids.is_empty() {
         if let Some(current) = crate::store::get_current_invocation_id() {
             invocation_ids.push(current);
         }
+    }
+
+    // If we converted from JSON to protobuf, update the Content-Type header
+    let mut headers = parts.headers;
+    if converted_from_json {
+        headers.insert(
+            hyper::header::CONTENT_TYPE,
+            hyper::header::HeaderValue::from_static("application/x-protobuf"),
+        );
     }
 
     store_trace(StoredTrace {
@@ -357,7 +414,7 @@ pub async fn traces(req: Request<Body>) -> Result<Response<Body>, Error> {
             .path_and_query()
             .map(|pq| pq.as_str().to_string())
             .unwrap_or_else(|| "/".to_string()),
-        headers: parts.headers,
+        headers,
         body: encoded_body,
         invocation_ids,
     });

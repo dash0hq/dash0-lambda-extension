@@ -1,16 +1,12 @@
-import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 import fetch from 'node-fetch';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
 import {DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./config";
-import {checkHttpSpan, checkLogs, getAttributesMap, getRequestPayload, invokeFunction} from "./utils";
+import {checkException, checkHttpSpan, checkLogs, getAttributesMap, getRequestPayload, invokeFunction} from "./utils";
 
-const lambdaClient = new LambdaClient({
-    region: process.env.AWS_REGION ?? 'us-west-2',
-});
 
 const verifySuccessInvocation = async (functionName: string, invocationEnd: boolean, traced: boolean) => {
-    const invocationId = await invokeFunction(functionName, invocationEnd, false);
+    const invocationId = await invokeFunction(functionName, invocationEnd, true);
 
     let traceId: string | undefined = undefined;
     let parentSpanId: string | undefined = undefined;
@@ -34,10 +30,11 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             expect(spanPayload?.resourceSpans[0].scopeSpans[0].scope.name).toEqual("opentelemetry.instrumentation.aws_lambda");
             expect(spanPayload?.resourceSpans[0].scopeSpans[0].spans.length).toEqual(1);
             // check span attributes
-            const spanAttributes = getAttributesMap(spanPayload.resourceSpans[0].scopeSpans[0].spans[0].attributes);
+            const span = spanPayload.resourceSpans[0].scopeSpans[0].spans[0];
+            const spanAttributes = getAttributesMap(span.attributes);
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
             expect(spanAttributes['faas.event'].stringValue).toEqual('{"parameter1":"right"}');
-            expect(spanAttributes['faas.return_value'].stringValue).toEqual('{"statusCode": 200, "body": "\\"Hello from Lambda!\\""}');
+            checkException(span, 'timeout');
             traceId = spanPayload.resourceSpans[0].scopeSpans[0].spans[0].traceId;
             parentSpanId = spanPayload.resourceSpans[0].scopeSpans[0].spans[0].spanId;
             break;
@@ -48,44 +45,35 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             }
         }
     }
-    if (traced) {
-        await checkHttpSpan({
-            invocationId: invocationId!,
-            functionName,
-            traceId: traceId!,
-            parentSpanId: parentSpanId!,
-        });
-    }
     const logsToBeChecked = [
         'START RequestId: ',
+        "Handler invoked with event:",
         'END RequestId: ',
-        "response.status_code:",
-    ]
+    ];
     if (!invocationEnd) {
-        logsToBeChecked.push('REPORT RequestId: ');
+        logsToBeChecked.push("REPORT RequestId: ", "Status: timeout");
     }
     await checkLogs({
         invocationId: invocationId!,
         functionName,
         traceId: traceId!,
         parentSpanId: parentSpanId!,
-        success: true,
-        logsToBeChecked
+        success: false,
+        logsToBeChecked,
     });
 }
 
-describe.concurrent('Lambda invocation', () => {
-    const runtimes = ['python3-10', 'python3-11', 'python3-12', 'python3-13', 'python3-14'];
+describe.concurrent('Lambda invocations with timeout', () => {
+    const runtimes = ['nodejs18-x', 'nodejs20-x', 'nodejs22-x', 'nodejs24-x'];
     const architectures = ['x86_64', 'arm64'] as const;
-    const invocationEndValues = [true, false] as const;
     const tracedValues = [true, false] as const;
+    const invocationEndValues = [true, false] as const;
 
     for (const runtime of runtimes) {
         for (const architecture of architectures) {
-            for (const invocationEnd of invocationEndValues) {
-                for (const traced of tracedValues) {
-                    const invocationEndLabel = invocationEnd ? 'true' : 'false';
-                    const functionName = `${runtime}-success-${traced}-invocation-end-${invocationEndLabel}-${architecture}`;
+            for (const traced of tracedValues) {
+                for (const invocationEnd of invocationEndValues) {
+                    const functionName = `${runtime}-timeout-${traced}-invocation-end-${invocationEnd}-${architecture}`;
                     it(
                         `invokes ${functionName} successfully`,
                         async () => {

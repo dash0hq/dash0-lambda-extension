@@ -2,12 +2,14 @@ import fetch from 'node-fetch';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
 import {DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./config";
-import {checkLogs, getAttributesMap, getRequestPayload, invokeFunction} from "./utils";
+import {checkHttpSpan, checkLogs, getAttributesMap, getRequestPayload, invokeFunction} from "./utils";
 
 
 const verifySuccessInvocation = async (functionName: string, invocationEnd: boolean, traced: boolean) => {
-    const invocationId = await invokeFunction(functionName, invocationEnd, true);
+    const invocationId = await invokeFunction(functionName, invocationEnd, false);
 
+    let traceId: string | undefined = undefined;
+    let parentSpanId: string | undefined = undefined;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         await delay(RETRY_DELAY_MS);
         console.log(`Attempt ${attempt} to fetch spans for invocation ID ${invocationId}`);
@@ -27,29 +29,13 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             expect(spanPayload?.resourceSpans[0].scopeSpans.length).toEqual(1);
             expect(spanPayload?.resourceSpans[0].scopeSpans[0].scope.name).toEqual("opentelemetry.instrumentation.aws_lambda");
             expect(spanPayload?.resourceSpans[0].scopeSpans[0].spans.length).toEqual(1);
-
-            // check resource attributes
-            const resourceAttrMap = getAttributesMap(spanPayload.resourceSpans[0].resource.attributes);
-            expect(resourceAttrMap['cloud.resource_id'].stringValue).toContain(functionName);
-
             // check span attributes
-            const span = spanPayload.resourceSpans[0].scopeSpans[0].spans[0];
-            const spanAttributes = getAttributesMap(span.attributes);
+            const spanAttributes = getAttributesMap(spanPayload.resourceSpans[0].scopeSpans[0].spans[0].attributes);
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
-
-            // check exception event
-            const events = span.events;
-            expect(events.length).toEqual(1);
-            const exceptionEvent = events[0];
-            expect(exceptionEvent.name).toEqual('exception');
-            const eventAttributes = exceptionEvent.attributes;
-            const eventAttrMap: Record<string, any> = {};
-            for (const attr of eventAttributes) {
-                eventAttrMap[attr.key] = attr.value;
-            }
-            expect(eventAttrMap['exception.type'].stringValue).toEqual('Runtime.ImportModuleError');
-            expect(span.status.code).toEqual(2); // 2 = ERROR
-            expect(span.status.message).toEqual('Runtime.ImportModuleError');
+            expect(spanAttributes['faas.event'].stringValue).toEqual('{"parameter1":"right"}');
+            expect(spanAttributes['faas.return_value'].stringValue).toEqual('{"statusCode": 200, "body": "\\"Hello from Lambda!\\""}');
+            traceId = spanPayload.resourceSpans[0].scopeSpans[0].spans[0].traceId;
+            parentSpanId = spanPayload.resourceSpans[0].scopeSpans[0].spans[0].spanId;
             break;
         } catch (error) {
             console.error(`Error fetching spans on attempt ${attempt}:`, error);
@@ -58,34 +44,44 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             }
         }
     }
+    if (traced) {
+        await checkHttpSpan({
+            invocationId: invocationId!,
+            functionName,
+            traceId: traceId!,
+            parentSpanId: parentSpanId!,
+        });
+    }
     const logsToBeChecked = [
         'START RequestId: ',
         'END RequestId: ',
-    ];
+        "response.status_code:",
+    ]
     if (!invocationEnd) {
-        logsToBeChecked.push("Error Type: Runtime.ImportModuleError", "REPORT RequestId: ");
+        logsToBeChecked.push('REPORT RequestId: ');
     }
     await checkLogs({
         invocationId: invocationId!,
         functionName,
-        traceId: null,
-        parentSpanId: null,
-        success: false,
-        logsToBeChecked,
+        traceId: traceId!,
+        parentSpanId: parentSpanId!,
+        success: true,
+        logsToBeChecked
     });
 }
 
-describe.concurrent('Lambda invocations with importerror', {retry: 1}, () => {
+describe.concurrent('Lambda invocation', () => {
     const runtimes = ['python3-10', 'python3-11', 'python3-12', 'python3-13', 'python3-14'];
     const architectures = ['x86_64', 'arm64'] as const;
-    const tracedValues = [true, false] as const;
     const invocationEndValues = [true, false] as const;
+    const tracedValues = [true, false] as const;
 
     for (const runtime of runtimes) {
         for (const architecture of architectures) {
-            for (const traced of tracedValues) {
-                for (const invocationEnd of invocationEndValues) {
-                    const functionName = `${runtime}-importerror-${traced}-invocation-end-${invocationEnd}-${architecture}`;
+            for (const invocationEnd of invocationEndValues) {
+                for (const traced of tracedValues) {
+                    const invocationEndLabel = invocationEnd ? 'true' : 'false';
+                    const functionName = `${runtime}-success-${traced}-invocation-end-${invocationEndLabel}-${architecture}`;
                     it(
                         `invokes ${functionName} successfully`,
                         async () => {

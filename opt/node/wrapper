@@ -14,17 +14,13 @@ if [ -z "${OTEL_SERVICE_NAME}" ]; then
     export OTEL_SERVICE_NAME=$AWS_LAMBDA_FUNCTION_NAME;
 fi
 
-
 # enable auto instrumentation unless DISABLE_AUTO_INSTRUMENTATION is set
 if [ -z "$DISABLE_AUTO_INSTRUMENTATION" ] || [ "${DISABLE_AUTO_INSTRUMENTATION,,}" = "false" ]; then
-  export LAMBDA_LAYER_PKGS_DIR="/opt/python";
-  export PYTHONPATH="$LAMBDA_LAYER_PKGS_DIR:$PYTHONPATH";
-  export PYTHONPATH="$LAMBDA_RUNTIME_DIR:$PYTHONPATH";
-
-  export ORIG_HANDLER=$_HANDLER;
-  export _HANDLER="otel_wrapper.lambda_handler";
 
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+  PACKAGE_PATH="/opt/init.mjs"
+  export NODE_OPTIONS="${NODE_OPTIONS} --import \"${PACKAGE_PATH}\""
 fi
 
 exec "${args[@]}"

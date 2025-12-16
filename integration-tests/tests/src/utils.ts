@@ -185,3 +185,19 @@ export const checkLogs = async ({
         }
     }
 }
+
+export const checkException = (span: any, exception_type: string) => {
+    const events = span.events;
+    expect(events.length).toEqual(1);
+    const exceptionEvent = events[0];
+    expect(exceptionEvent.name).toEqual('exception');
+    const eventAttributes = exceptionEvent.attributes;
+    const eventAttrMap: Record<string, any> = {};
+    for (const attr of eventAttributes) {
+        eventAttrMap[attr.key] = attr.value;
+    }
+    expect(eventAttrMap['exception.type'].stringValue).toEqual(exception_type);
+    expect(span.status.code).toEqual(2); // 2 = ERROR
+    expect(span.status.message).toEqual(exception_type);
+
+}
