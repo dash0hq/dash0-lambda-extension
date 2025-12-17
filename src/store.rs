@@ -50,6 +50,7 @@ pub fn take_traces() -> Vec<StoredTrace> {
     std::mem::take(&mut *TRACE_STORE.lock())
 }
 
+#[allow(dead_code)]
 pub fn snapshot_traces() -> Vec<StoredTrace> {
     TRACE_STORE.lock().clone()
 }
@@ -156,6 +157,45 @@ pub fn take_runtime_done_notifier() -> Option<tokio::sync::oneshot::Sender<()>> 
 static RUNTIME_DONE_NOTIFIER: Lazy<Mutex<Option<tokio::sync::oneshot::Sender<()>>>> =
     Lazy::new(|| Mutex::new(None));
 
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+pub struct InvocationData {
+    pub init_duration: f64,
+    pub duration: f64,
+    pub billed_duration: f64,
+    pub start_time: f64,
+    pub end_time: f64,
+    pub memory_usage: u64,
+}
+
+pub fn update_invocation_data<F>(invocation_id: &str, update_fn: F)
+where
+    F: FnOnce(&mut InvocationData),
+{
+    let mut store = INVOCATION_DATA.lock();
+    let data = store
+        .entry(invocation_id.to_string())
+        .or_insert_with(InvocationData::default);
+    update_fn(data);
+}
+
+pub fn get_invocation_data(invocation_id: &str) -> Option<InvocationData> {
+    INVOCATION_DATA.lock().get(invocation_id).cloned()
+}
+
+static INVOCATION_DATA: Lazy<Mutex<HashMap<String, InvocationData>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+pub fn take_invocation_data(invocation_id: &str) -> Option<InvocationData> {
+    INVOCATION_DATA.lock().remove(invocation_id)
+}
+
+pub(crate) fn cleanup_invocation(invocation_id: &str) {
+    take_event_payload(invocation_id);
+    take_invocation_start(invocation_id);
+    take_return_payload(invocation_id);
+    take_invocation_data(invocation_id);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -241,5 +281,44 @@ mod tests {
 
         let result = get_event_payload(invocation_id);
         assert_eq!(result, Some(payload2.to_string()));
+    }
+
+    // ============================================================================
+    // Tests for invocation data storage functions
+    // ============================================================================
+
+    #[test]
+    #[serial]
+    fn test_update_invocation_data_creates_new() {
+        let invocation_id = "test-inv-data-create";
+
+        update_invocation_data(invocation_id, |data| {
+            data.start_time = 100.0;
+        });
+
+        let result = get_invocation_data(invocation_id).expect("Should exist");
+        assert_eq!(result.start_time, 100.0);
+        // Check default values
+        assert_eq!(result.duration, 0.0);
+    }
+
+    #[test]
+    #[serial]
+    fn test_update_invocation_data_updates_existing_and_preserves() {
+        let invocation_id = "test-inv-data-update";
+
+        // First update: set start_time
+        update_invocation_data(invocation_id, |data| {
+            data.start_time = 100.0;
+        });
+
+        // Second update: set duration, verifying start_time is preserved
+        update_invocation_data(invocation_id, |data| {
+            data.duration = 50.0;
+        });
+
+        let result = get_invocation_data(invocation_id).expect("Should exist");
+        assert_eq!(result.start_time, 100.0);
+        assert_eq!(result.duration, 50.0);
     }
 }

@@ -139,7 +139,8 @@ export const checkLogs = async ({
     parentSpanId: string | null,
     success: boolean,
     logsToBeChecked: string[],
-}) => {
+}): Promise<string> => {
+    let reportLog = null;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         await delay(RETRY_DELAY_MS);
         console.log(`Attempt ${attempt} to fetch logs for invocation ID ${invocationId}`);
@@ -172,6 +173,9 @@ export const checkLogs = async ({
                         logsToBeCheckedCount[logMessage] = true;
                     }
                 }
+                if (logRecord.body.stringValue.startsWith("REPORT RequestId: ")) {
+                    reportLog = logRecord.body.stringValue;
+                }
             }
             for (const logMessage of logsToBeChecked) {
                 expect(logsToBeCheckedCount[logMessage]).toBeTruthy();
@@ -184,6 +188,7 @@ export const checkLogs = async ({
             }
         }
     }
+    return reportLog;
 }
 
 export const checkException = (span: any, exception_type: string) => {
@@ -199,5 +204,27 @@ export const checkException = (span: any, exception_type: string) => {
     expect(eventAttrMap['exception.type'].stringValue).toEqual(exception_type);
     expect(span.status.code).toEqual(2); // 2 = ERROR
     expect(span.status.message).toEqual(exception_type);
+}
 
+export const checkSpanAttributesFromReport = (reportLog: string, span: any) => {
+    const spanAttributes = getAttributesMap(span.attributes);
+    const reportRegex = /REPORT RequestId: (?<requestId>[a-f0-9\-]+)\s+Duration: (?<duration>[\d\.]+) ms\s+Billed Duration: (?<billedDuration>[\d\.]+) ms\s+Memory Size: (?<memorySize>\d+) MB\s+Max Memory Used: (?<maxMemoryUsed>\d+) MB\s+Init Duration: (?<initDuration>[\d\.]+) ms/;
+    const match = reportLog.match(reportRegex);
+    if (match?.groups) {
+        const initDuration = parseFloat(match.groups.initDuration);
+        const billedDuration = parseFloat(match.groups.billedDuration);
+        const maxMemoryUsed = parseInt(match.groups.maxMemoryUsed);
+        const duration = parseFloat(match.groups.duration);
+
+        expect(initDuration).toBeCloseTo(spanAttributes['faas.init_duration'].doubleValue, 0);
+        expect(billedDuration).toEqual(spanAttributes['faas.billed_duration'].doubleValue);
+        expect(maxMemoryUsed).toEqual(Number(spanAttributes['faas.memory_used'].intValue));
+
+        const spanDurationNano = Number(BigInt(span.endTimeUnixNano) - BigInt(span.startTimeUnixNano));
+        const spanDurationMs = spanDurationNano / 1e6;
+        expect(spanDurationMs).toBeGreaterThanOrEqual(duration - 2);
+        expect(spanDurationMs).toBeLessThanOrEqual(duration + 2);
+    } else {
+        throw new Error("Failed to parse REPORT log: " + reportLog);
+    }
 }

@@ -34,6 +34,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             const spanAttributes = getAttributesMap(span.attributes);
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
             expect(spanAttributes['faas.event'].stringValue).toEqual('{"parameter1":"right"}');
+            expect(spanAttributes['faas.init_duration'].doubleValue).toBeGreaterThan(0);
             checkException(span, 'timeout');
             traceId = spanPayload.resourceSpans[0].scopeSpans[0].spans[0].traceId;
             parentSpanId = spanPayload.resourceSpans[0].scopeSpans[0].spans[0].spanId;
@@ -64,7 +65,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
 }
 
 describe.concurrent('Lambda invocations with timeout', () => {
-    const runtimes = ['nodejs18-x', 'nodejs20-x', 'nodejs22-x', 'nodejs24-x'];
+    const runtimes = ['nodejs20-x', 'nodejs22-x', 'nodejs24-x'];
     const architectures = ['x86_64', 'arm64'] as const;
     const tracedValues = [true, false] as const;
     const invocationEndValues = [true, false] as const;

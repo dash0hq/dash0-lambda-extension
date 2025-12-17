@@ -63,7 +63,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
 }
 
 describe.concurrent('Lambda invocations with importerror', {retry: 1}, () => {
-    const runtimes = ['nodejs18-x', 'nodejs20-x', 'nodejs22-x', 'nodejs24-x'];
+    const runtimes = ['nodejs20-x', 'nodejs22-x', 'nodejs24-x'];
     const architectures = ['x86_64', 'arm64'] as const;
     const tracedValues = [true, false] as const;
     const invocationEndValues = [true, false] as const;

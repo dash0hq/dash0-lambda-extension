@@ -21,15 +21,13 @@ use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 
 use crate::backend_send::flush_logs;
-use crate::config::{is_auto_instrumented_disabled, is_send_on_invocation_end};
-use crate::store::take_return_payload;
+use crate::config::is_auto_instrumented_disabled;
 use crate::{
-    backend_send::{flush_traces, send_traces},
+    backend_send::send_traces,
     env, sandbox, stats,
     store::{
         force_init_trace_store, store_current_invocation_id, store_event_payload,
-        store_invocation_start, store_trace, take_event_payload, take_invocation_start,
-        take_traces, StoredTrace,
+        store_invocation_start, store_trace, take_traces, StoredTrace,
     },
     util::{
         parsers::{extract_error_invocation_ids, extract_invocation_id_from_path},
@@ -205,45 +203,7 @@ pub async fn telemetry_sink(req: Request<Body>) -> Result<Response<Body>, Error>
     );
 
     if let Ok(mut logs) = serde_json::from_str::<Vec<crate::store::TelemetryLog>>(&body_text) {
-        let mut current_invocation_id = crate::store::get_last_seen_invocation_start();
-
-        for log in &mut logs {
-            if log.r#type == "platform.start" {
-                if let Some(record) = log.record.as_object() {
-                    if let Some(req_id) = record.get("requestId").and_then(|v| v.as_str()) {
-                        crate::store::store_last_seen_invocation_start(req_id);
-                        current_invocation_id = Some(req_id.to_string());
-                    }
-                }
-            }
-
-            // Signal when platform.runtimeDone is received
-            if log.r#type == "platform.runtimeDone" {
-                if let Some(notifier) = crate::store::take_runtime_done_notifier() {
-                    // Signal the waiting task
-                    tracing::info!("[LRAP] Signaled platform.runtimeDone");
-                    let _ = notifier.send(());
-                }
-            }
-
-            // For platform logs, extract invocation ID from the log record itself (safer than state)
-            // For other logs, use the current invocation ID from state
-            let invocation_id = if log.r#type == "platform.start"
-                || log.r#type == "platform.runtimeDone"
-                || log.r#type == "platform.report"
-            {
-                log.record
-                    .as_object()
-                    .and_then(|record| record.get("requestId"))
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string())
-                    .or_else(|| current_invocation_id.clone())
-            } else {
-                current_invocation_id.clone()
-            };
-
-            log.invocation_id = invocation_id;
-        }
+        crate::util::log_processing::process_telemetry_logs(&mut logs);
         crate::store::store_telemetry_logs(logs);
     } else {
         tracing::debug!("[LRAP] Failed to deserialize telemetry logs from body");
@@ -285,7 +245,7 @@ pub async fn telemetry_sink(req: Request<Body>) -> Result<Response<Body>, Error>
         }
 
         if !traces_to_send.is_empty() {
-            send_traces(traces_to_send).await;
+            send_traces(traces_to_send, true).await;
         }
         flush_logs(true).await;
     }
@@ -317,10 +277,6 @@ pub async fn invocation_response_proxy(req: Request<Body>) -> Result<Response<Bo
                 );
             }
         }
-    }
-    if is_send_on_invocation_end() {
-        flush_traces().await;
-        flush_logs(true).await;
     }
     tracing::info!(
         "[LRAP] Total handle time for invocation response: {} ms",
@@ -358,8 +314,6 @@ pub async fn traces(req: Request<Body>) -> Result<Response<Body>, Error> {
             // Try to parse as JSON and convert to protobuf
             match serde_json::from_slice::<ExportTraceServiceRequest>(body_bytes.as_ref()) {
                 Ok(mut decoded) => {
-                    tracing::info!("[LRAP] /v1/traces successfully parsed JSON trace");
-
                     for resource_span in &mut decoded.resource_spans {
                         for scope_span in &mut resource_span.scope_spans {
                             for span in &mut scope_span.spans {
@@ -377,10 +331,6 @@ pub async fn traces(req: Request<Body>) -> Result<Response<Body>, Error> {
                     // Convert to protobuf format for storage
                     // This ensures encoded_body contains protobuf bytes before calling process_trace_request
                     encoded_body = decoded.encode_to_vec();
-                    tracing::info!(
-                        "[LRAP] /v1/traces successfully converted JSON to protobuf ({} bytes)",
-                        encoded_body.len()
-                    );
 
                     process_trace_request(&mut decoded, &mut invocation_ids, &mut encoded_body);
                     converted_from_json = true;
@@ -424,12 +374,6 @@ pub async fn traces(req: Request<Body>) -> Result<Response<Body>, Error> {
         start.elapsed().as_millis()
     );
     Ok(Response::builder().status(200).body(Body::empty()).unwrap())
-}
-
-pub(crate) fn cleanup_invocation(invocation_id: &str) {
-    take_event_payload(invocation_id);
-    take_invocation_start(invocation_id);
-    take_return_payload(invocation_id);
 }
 
 pub(crate) static HTTPS_CLIENT: Lazy<

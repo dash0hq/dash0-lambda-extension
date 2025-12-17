@@ -78,7 +78,7 @@ pub mod extension {
     use crate::DEFAULT_PROXY_PORT;
     use hyper::Body;
     use once_cell::sync::OnceCell;
-    use std::time::Instant;
+    use std::time::{Duration, Instant};
     /// Cannonical Lambda Extensions API version
     ///
     /// Documentation: https://docs.aws.amazon.com/lambda/latest/dg/runtimes-extensions-api.html
@@ -200,9 +200,10 @@ pub mod extension {
                             && shutdown_reason.as_deref() == Some("spindown"));
 
                     if should_flush {
-                        crate::backend_send::flush_traces().await;
-                        crate::backend_send::flush_logs(matches!(event_type, Some("SHUTDOWN")))
-                            .await;
+                        tokio::time::sleep(Duration::from_millis(50)).await;
+                        let is_invocation_end = matches!(event_type, Some("SHUTDOWN"));
+                        crate::backend_send::flush_traces(is_invocation_end).await;
+                        crate::backend_send::flush_logs(is_invocation_end).await;
                     }
 
                     if matches!(event_type, Some("INVOKE"))
@@ -225,6 +226,7 @@ pub mod extension {
                                 tracing::info!(
                                     "[LRAP:Extension] Received platform.runtimeDone signal"
                                 );
+                                crate::backend_send::flush_traces(true).await;
                                 crate::backend_send::flush_logs(true).await;
                             }
                             Ok(Err(_)) => {

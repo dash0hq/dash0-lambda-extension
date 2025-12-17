@@ -874,17 +874,9 @@ mod tests {
         }];
 
         // When is_invocation_end is false, and no trace/span ID is stored,
-        // it should NOT generate deterministic IDs and should return empty IDs.
+        // it should put the log back to store and return empty list (retry later).
         let result = map_logs_to_otlp(&logs, false);
 
-        assert_eq!(result.len(), 1);
-        let log = &result[0];
-
-        // TraceID and SpanID should be empty (zeros) because:
-        // 1. They are not in the store.
-        // 2. auto_instrumentation is not disabled (assumed default).
-        // 3. is_invocation_end is false.
-        assert_eq!(log.trace_id, vec![0u8; 16]);
-        assert_eq!(log.span_id, vec![0u8; 8]);
+        assert_eq!(result.len(), 0);
     }
 }

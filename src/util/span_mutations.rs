@@ -410,6 +410,62 @@ pub fn annotate_return_payload(
     modified
 }
 
+pub fn merge_telemetry_invocation_data(request: &mut ExportTraceServiceRequest) -> i32 {
+    let mut modified = 0;
+    for resource_span in &mut request.resource_spans {
+        for scope_span in &mut resource_span.scope_spans {
+            if let Some(scope) = &scope_span.scope {
+                if is_lambda_instrumentation_scope(&scope.name) {
+                    for span in &mut scope_span.spans {
+                        if let Some(invocation_id) = extract_invocation_id(span) {
+                            if let Some(data) = crate::store::get_invocation_data(&invocation_id) {
+                                if data.init_duration > 0.0 {
+                                    span.attributes.push(KeyValue {
+                                        key: "faas.init_duration".to_string(),
+                                        value: Some(AnyValue {
+                                            value: Some(Value::DoubleValue(data.init_duration)),
+                                        }),
+                                    });
+                                    modified += 1;
+                                }
+                                if data.billed_duration > 0.0 {
+                                    span.attributes.push(KeyValue {
+                                        key: "faas.billed_duration".to_string(),
+                                        value: Some(AnyValue {
+                                            value: Some(Value::DoubleValue(data.billed_duration)),
+                                        }),
+                                    });
+                                    modified += 1;
+                                }
+                                if data.memory_usage > 0 {
+                                    span.attributes.push(KeyValue {
+                                        key: "faas.memory_used".to_string(),
+                                        value: Some(AnyValue {
+                                            value: Some(Value::IntValue(data.memory_usage as i64)),
+                                        }),
+                                    });
+                                    modified += 1;
+                                }
+
+                                if data.start_time > 0.0 {
+                                    span.start_time_unix_nano =
+                                        (data.start_time * 1_000_000.0) as u64;
+                                    modified += 1;
+                                }
+                                if data.end_time > 0.0 {
+                                    span.end_time_unix_nano = (data.end_time * 1_000_000.0) as u64;
+                                    modified += 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    modified
+}
+
 /// Process a decoded trace request by adding event payloads, return payloads, and storing invocation span IDs.
 /// Returns true if the request was modified and needs to be re-encoded.
 pub fn process_trace_request(
@@ -1287,6 +1343,53 @@ mod tests {
             attr.is_some(),
             "faas.return_value should be added for nodejs scope"
         );
+    }
+    #[test]
+    #[serial]
+    fn test_merge_telemetry_invocation_data_updates_span() {
+        let invocation_id = "inv-merge-data";
+
+        // Setup InvocationData
+        crate::store::update_invocation_data(invocation_id, |data| {
+            data.init_duration = 100.0;
+            data.billed_duration = 200.0;
+            data.memory_usage = 128;
+            data.start_time = 1_000.0; // 1 second
+            data.end_time = 2_000.0; // 2 seconds
+        });
+
+        let span = make_span_with_invocation(invocation_id);
+        let mut request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
+
+        let modified = super::merge_telemetry_invocation_data(&mut request);
+
+        assert!(modified > 0, "request should be modified");
+
+        let span = &request.resource_spans[0].scope_spans[0].spans[0];
+
+        // attributes
+        let init_attr = find_attribute(span, "faas.init_duration").and_then(|v| match &v.value {
+            Some(Value::DoubleValue(d)) => Some(*d),
+            _ => None,
+        });
+        assert_eq!(init_attr, Some(100.0));
+
+        let billed_attr =
+            find_attribute(span, "faas.billed_duration").and_then(|v| match &v.value {
+                Some(Value::DoubleValue(d)) => Some(*d),
+                _ => None,
+            });
+        assert_eq!(billed_attr, Some(200.0));
+
+        let mem_attr = find_attribute(span, "faas.memory_used").and_then(|v| match &v.value {
+            Some(Value::IntValue(i)) => Some(*i),
+            _ => None,
+        });
+        assert_eq!(mem_attr, Some(128));
+
+        // timestamps (ms -> ns)
+        assert_eq!(span.start_time_unix_nano, 1_000_000_000);
+        assert_eq!(span.end_time_unix_nano, 2_000_000_000);
     }
 }
 

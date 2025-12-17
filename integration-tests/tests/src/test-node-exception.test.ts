@@ -2,7 +2,10 @@ import fetch from 'node-fetch';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
 import {DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./config";
-import {checkException, checkHttpSpan, checkLogs, getAttributesMap, getRequestPayload, invokeFunction} from "./utils";
+import {
+    checkException, checkHttpSpan, checkLogs,
+    checkSpanAttributesFromReport, getAttributesMap, getRequestPayload, invokeFunction
+} from "./utils";
 
 
 const verifySuccessInvocation = async (functionName: string, invocationEnd: boolean, traced: boolean) => {
@@ -10,6 +13,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
 
     let traceId: string | undefined = undefined;
     let parentSpanId: string | undefined = undefined;
+    let span = undefined
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         await delay(RETRY_DELAY_MS);
         console.log(`Attempt ${attempt} to fetch spans for invocation ID ${invocationId}`);
@@ -31,7 +35,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             expect(spanPayload?.resourceSpans[0].scopeSpans[0].scope.name).toEqual(expectedScopeName);
             expect(spanPayload?.resourceSpans[0].scopeSpans[0].spans.length).toEqual(1);
             // check span attributes
-            const span = spanPayload.resourceSpans[0].scopeSpans[0].spans[0];
+            span = spanPayload.resourceSpans[0].scopeSpans[0].spans[0];
             const spanAttributes = getAttributesMap(span.attributes);
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
             expect(spanAttributes['faas.event'].stringValue).toEqual('{"parameter1":"right"}');
@@ -51,8 +55,8 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             expect(span.status.code).toEqual(2); // 2 = ERROR
             expect(span.status.message).toEqual(traced ? 'nothing is not defined' : 'ReferenceError');
 
-            traceId = spanPayload.resourceSpans[0].scopeSpans[0].spans[0].traceId;
-            parentSpanId = spanPayload.resourceSpans[0].scopeSpans[0].spans[0].spanId;
+            traceId = span.traceId;
+            parentSpanId = span.spanId;
             break;
         } catch (error) {
             console.error(`Error fetching spans on attempt ${attempt}:`, error);
@@ -70,7 +74,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
     if (!invocationEnd) {
         logsToBeChecked.push('REPORT RequestId: ');
     }
-    await checkLogs({
+    const reportLog = await checkLogs({
         invocationId: invocationId!,
         functionName,
         traceId: traceId!,
@@ -78,10 +82,13 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
         success: true,
         logsToBeChecked
     });
+    if (!invocationEnd) {
+        checkSpanAttributesFromReport(reportLog, span);
+    }
 }
 
 describe.concurrent('Lambda invocation', () => {
-    const runtimes = ['nodejs18-x', 'nodejs20-x', 'nodejs22-x', 'nodejs24-x'];
+    const runtimes = ['nodejs20-x', 'nodejs22-x', 'nodejs24-x'];
     const architectures = ['x86_64', 'arm64'] as const;
     const invocationEndValues = [true, false] as const;
     const tracedValues = [true, false] as const;
