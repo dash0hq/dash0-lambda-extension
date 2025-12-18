@@ -11,6 +11,10 @@ pub fn is_send_on_invocation_end() -> bool {
 }
 
 pub fn is_auto_instrumented_disabled() -> bool {
+    if std::env::var("AWS_LAMBDA_EXEC_WRAPPER").is_err() {
+        return true;
+    }
+
     match std::env::var("DISABLE_AUTO_INSTRUMENTATION") {
         Ok(val) => matches!(
             val.as_str(),
@@ -22,7 +26,7 @@ pub fn is_auto_instrumented_disabled() -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::is_send_on_invocation_end;
+    use super::{is_auto_instrumented_disabled, is_send_on_invocation_end};
 
     #[test]
     fn defaults_to_false_when_missing() {
@@ -44,5 +48,25 @@ mod tests {
             std::env::set_var("SEND_ON_INVOCATION_END", val);
             assert!(!is_send_on_invocation_end(), "value {}", val);
         }
+    }
+
+    #[test]
+    fn auto_instrumentation_disabled_when_wrapper_missing() {
+        std::env::remove_var("AWS_LAMBDA_EXEC_WRAPPER");
+        assert!(is_auto_instrumented_disabled());
+    }
+
+    #[test]
+    fn auto_instrumentation_enabled_when_wrapper_present() {
+        std::env::set_var("AWS_LAMBDA_EXEC_WRAPPER", "/opt/lumigo_wrapper");
+        std::env::remove_var("DISABLE_AUTO_INSTRUMENTATION");
+        assert!(!is_auto_instrumented_disabled());
+    }
+
+    #[test]
+    fn auto_instrumentation_disabled_explicitly() {
+        std::env::set_var("AWS_LAMBDA_EXEC_WRAPPER", "/opt/lumigo_wrapper");
+        std::env::set_var("DISABLE_AUTO_INSTRUMENTATION", "true");
+        assert!(is_auto_instrumented_disabled());
     }
 }
