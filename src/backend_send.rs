@@ -28,7 +28,6 @@ use opentelemetry_proto::tonic::logs::v1::{ResourceLogs, ScopeLogs};
 
 pub async fn flush_logs(is_invocation_end: bool) {
     let logs = take_telemetry_logs();
-    tracing::info!("[SENDING] flushing logs count: {}", logs.len());
 
     if logs.is_empty() {
         return;
@@ -248,7 +247,6 @@ async fn send_request(
     item_type: &str,
 ) -> Result<(), ()> {
     let start = std::time::Instant::now();
-    tracing::info!("[SENDING] Sending request to {}", req.uri());
     match tokio::time::timeout(Duration::from_secs(2), client.request(req)).await {
         Ok(Ok(resp)) => {
             if resp.status().is_success() {
