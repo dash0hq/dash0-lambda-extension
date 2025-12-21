@@ -211,8 +211,14 @@ pub fn map_logs_to_otlp(logs: &[TelemetryLog], is_invocation_end: bool) -> Vec<L
     log_records
 }
 
+fn try_read_env_from_file(key: &str) -> Option<String> {
+    let content = std::fs::read_to_string("/tmp/lumigo_env_vars").ok()?;
+    let json: serde_json::Value = serde_json::from_str(&content).ok()?;
+    json.get(key).and_then(|v| v.as_str()).map(|s| s.to_string())
+}
+
 pub fn get_resources_attributes() -> Vec<opentelemetry_proto::tonic::common::v1::KeyValue> {
-    vec![
+    let mut attributes = vec![
         opentelemetry_proto::tonic::common::v1::KeyValue {
             key: "cloud.resource.id".to_string(),
             value: Some(AnyValue {
@@ -241,12 +247,36 @@ pub fn get_resources_attributes() -> Vec<opentelemetry_proto::tonic::common::v1:
                         std::env::var("OTEL_SERVICE_NAME")
                             .ok()
                             .filter(|v| !v.is_empty())
+                            .or_else(|| try_read_env_from_file("OTEL_SERVICE_NAME"))
                             .unwrap_or_else(|| "unknown_service".to_string()),
                     ),
                 ),
             }),
         },
-    ]
+    ];
+
+    let resource_attributes = std::env::var("OTEL_RESOURCE_ATTRIBUTES")
+        .ok()
+        .filter(|v| !v.is_empty())
+        .or_else(|| try_read_env_from_file("OTEL_RESOURCE_ATTRIBUTES"))
+        .unwrap_or_default();
+
+    for pair in resource_attributes.split(',') {
+        if let Some((key, value)) = pair.split_once('=') {
+            attributes.push(opentelemetry_proto::tonic::common::v1::KeyValue {
+                key: key.trim().to_string(),
+                value: Some(AnyValue {
+                    value: Some(
+                        opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(
+                            value.trim().to_string(),
+                        ),
+                    ),
+                }),
+            });
+        }
+    }
+
+    attributes
 }
 
 #[cfg(test)]
@@ -383,7 +413,11 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn test_get_resources_attributes_structure() {
+        let expected_service_name = "test-service-name";
+        std::env::set_var("OTEL_SERVICE_NAME", expected_service_name);
+        
         let attributes = get_resources_attributes();
 
         let keys: Vec<String> = attributes.iter().map(|kv| kv.key.clone()).collect();
@@ -391,10 +425,72 @@ mod tests {
         assert!(keys.contains(&"cloud.account.id".to_string()));
         assert!(keys.contains(&"service.name".to_string()));
 
-        // Since we can't easily mock env vars or sandbox calls here without more setup,
-        // we mainly check the structure and keys.
-        assert_eq!(attributes.len(), 3);
+        let service_name_attr = attributes
+            .iter()
+            .find(|kv| kv.key == "service.name")
+            .unwrap();
+        
+        assert_eq!(
+            get_string_value(&service_name_attr.value),
+            Some(expected_service_name.to_string())
+        );
+
+        // Cleanup
+        std::env::remove_var("OTEL_SERVICE_NAME");
     }
+    #[test]
+    #[serial_test::serial]
+    fn test_get_resources_attributes_from_file_fallback() {
+        // Ensure env var is unset
+        std::env::remove_var("OTEL_SERVICE_NAME");
+        std::env::remove_var("OTEL_RESOURCE_ATTRIBUTES");
+        
+        // Write mock file
+        let file_path = "/tmp/lumigo_env_vars";
+        let expected_service_name = "service-from-file";
+        let expected_resource_attrs = "key1=value1,key2=value2";
+        let content = json!({
+            "OTEL_SERVICE_NAME": expected_service_name,
+            "OTEL_RESOURCE_ATTRIBUTES": expected_resource_attrs
+        }).to_string();
+        std::fs::write(file_path, content).expect("Failed to write mock file");
+
+        let attributes = get_resources_attributes();
+        
+        // Cleanup file
+        std::fs::remove_file(file_path).expect("Failed to cleanup mock file");
+
+        let service_name_attr = attributes
+            .iter()
+            .find(|kv| kv.key == "service.name")
+            .unwrap();
+
+        assert_eq!(
+            get_string_value(&service_name_attr.value),
+            Some(expected_service_name.to_string())
+        );
+
+        let key1_attr = attributes
+            .iter()
+            .find(|kv| kv.key == "key1")
+            .unwrap();
+        
+        assert_eq!(
+            get_string_value(&key1_attr.value),
+            Some("value1".to_string())
+        );
+
+        let key2_attr = attributes
+            .iter()
+            .find(|kv| kv.key == "key2")
+            .unwrap();
+        
+        assert_eq!(
+            get_string_value(&key2_attr.value),
+            Some("value2".to_string())
+        );
+    }
+
     #[test]
     fn test_map_logs_with_trace_and_span_id_from_store() {
         use crate::store::store_invocation_span_id;

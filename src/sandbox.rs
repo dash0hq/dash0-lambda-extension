@@ -200,8 +200,12 @@ pub mod extension {
                             && shutdown_reason.as_deref() == Some("spindown"));
 
                     if should_flush {
-                        tokio::time::sleep(Duration::from_millis(50)).await;
                         let is_invocation_end = matches!(event_type, Some("SHUTDOWN"));
+                        if is_invocation_end {
+                            tokio::time::sleep(Duration::from_millis(200)).await;
+                        } else {
+                            tokio::time::sleep(Duration::from_millis(20)).await;
+                        }
                         crate::backend_send::flush_traces(is_invocation_end).await;
                         crate::backend_send::flush_logs(is_invocation_end).await;
                     }

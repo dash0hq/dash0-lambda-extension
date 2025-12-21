@@ -24,9 +24,16 @@ pub fn is_auto_instrumented_disabled() -> bool {
     }
 }
 
+pub fn max_event_payload_size() -> usize {
+    match std::env::var("MAX_EVENT_PAYLOAD") {
+        Ok(val) => val.parse::<usize>().unwrap_or(20) * 1024,
+        Err(_) => 20 * 1024,
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{is_auto_instrumented_disabled, is_send_on_invocation_end};
+    use super::{is_auto_instrumented_disabled, is_send_on_invocation_end, max_event_payload_size};
 
     #[test]
     fn defaults_to_false_when_missing() {
@@ -68,5 +75,23 @@ mod tests {
         std::env::set_var("AWS_LAMBDA_EXEC_WRAPPER", "/opt/lumigo_wrapper");
         std::env::set_var("DISABLE_AUTO_INSTRUMENTATION", "true");
         assert!(is_auto_instrumented_disabled());
+    }
+
+    #[test]
+    fn max_event_payload_size_defaults_to_20kb() {
+        std::env::remove_var("MAX_EVENT_PAYLOAD");
+        assert_eq!(max_event_payload_size(), 20 * 1024);
+    }
+
+    #[test]
+    fn max_event_payload_size_parses_value() {
+        std::env::set_var("MAX_EVENT_PAYLOAD", "100");
+        assert_eq!(max_event_payload_size(), 100 * 1024);
+    }
+
+    #[test]
+    fn max_event_payload_size_handles_invalid_value() {
+        std::env::set_var("MAX_EVENT_PAYLOAD", "not_a_number");
+        assert_eq!(max_event_payload_size(), 20 * 1024);
     }
 }

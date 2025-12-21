@@ -21,7 +21,7 @@ use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 
 use crate::backend_send::flush_logs;
-use crate::config::is_auto_instrumented_disabled;
+use crate::config::{is_auto_instrumented_disabled, max_event_payload_size};
 use crate::{
     backend_send::send_traces,
     env, sandbox, stats,
@@ -258,7 +258,19 @@ pub async fn invocation_response_proxy(req: Request<Body>) -> Result<Response<Bo
     let invocation_id = extract_invocation_id_from_path(req.uri().path());
     let (parts, body) = req.into_parts();
     let body_bytes = hyper::body::to_bytes(body).await?;
-    let return_payload = String::from_utf8_lossy(&body_bytes).to_string();
+
+    let max_size = max_event_payload_size();
+    let payload_slice = if body_bytes.len() > max_size {
+        tracing::info!(
+            "[LRAP] Truncating return payload from {} to {} bytes",
+            body_bytes.len(),
+            max_size
+        );
+        &body_bytes[..max_size]
+    } else {
+        &body_bytes
+    };
+    let return_payload = String::from_utf8_lossy(payload_slice).to_string();
     let req = Request::from_parts(parts, Body::from(body_bytes));
 
     let res = passthru_proxy(req).await;
@@ -295,8 +307,7 @@ pub async fn traces(req: Request<Body>) -> Result<Response<Body>, Error> {
     let mut invocation_ids: Vec<String> = Vec::new();
     let mut converted_from_json = false;
 
-    // print the body
-    tracing::info!(
+    tracing::trace!(
         "[LRAP] /v1/traces body: {}",
         String::from_utf8_lossy(&encoded_body)
     );
@@ -357,6 +368,7 @@ pub async fn traces(req: Request<Body>) -> Result<Response<Body>, Error> {
         );
     }
 
+    let seen_invocation_ids = invocation_ids.clone();
     store_trace(StoredTrace {
         method: parts.method,
         path_and_query: parts
@@ -370,8 +382,9 @@ pub async fn traces(req: Request<Body>) -> Result<Response<Body>, Error> {
     });
 
     tracing::info!(
-        "[LRAP] Total handle time for /v1/traces {} ms",
-        start.elapsed().as_millis()
+        "[LRAP] Total handle time for /v1/traces {} ms. seen invocation ids: {:?}",
+        start.elapsed().as_millis(),
+        seen_invocation_ids
     );
     Ok(Response::builder().status(200).body(Body::empty()).unwrap())
 }
@@ -509,7 +522,19 @@ async fn validate_and_mangle_next_event(
         "[LRAP] event payload: {}",
         String::from_utf8_lossy(&body_bytes)
     );
-    store_event_payload(&_aws_request_id, &String::from_utf8_lossy(&body_bytes));
+
+    let max_size = max_event_payload_size();
+    let truncated_bytes = if body_bytes.len() > max_size {
+        tracing::info!(
+            "[LRAP] Truncating event payload from {} to {} bytes.",
+            body_bytes.len(),
+            max_size
+        );
+        &body_bytes[..max_size]
+    } else {
+        &body_bytes
+    };
+    store_event_payload(&_aws_request_id, &String::from_utf8_lossy(truncated_bytes));
 
     // Reconstruct the response with the same parts and body
     let response = Response::from_parts(parts, Body::from(body_bytes));
