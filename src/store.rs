@@ -189,9 +189,23 @@ pub fn take_invocation_data(invocation_id: &str) -> Option<InvocationData> {
     INVOCATION_DATA.lock().remove(invocation_id)
 }
 
+pub fn store_invocation_end(invocation_id: &str, nanos: u64) {
+    INVOCATION_ENDS
+        .lock()
+        .insert(invocation_id.to_string(), nanos);
+}
+
+pub fn take_invocation_end(invocation_id: &str) -> Option<u64> {
+    INVOCATION_ENDS.lock().remove(invocation_id)
+}
+
+static INVOCATION_ENDS: Lazy<Mutex<HashMap<String, u64>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
 pub(crate) fn cleanup_invocation(invocation_id: &str) {
     take_event_payload(invocation_id);
     take_invocation_start(invocation_id);
+    take_invocation_end(invocation_id);
     take_return_payload(invocation_id);
     take_invocation_data(invocation_id);
 }

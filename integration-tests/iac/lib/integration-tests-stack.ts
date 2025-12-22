@@ -26,7 +26,6 @@ function createLambdas(scope: Construct, runtimes: lambda.Runtime[], layer: lamb
             const environment: any = {
               AWS_LAMBDA_EXEC_WRAPPER: "/opt/wrapper",
               DASH0_TOKEN: "auth_oEiAAAy5hZvVsEAADPm4uDyV7OcBmU4B",
-              LUMIGO_ENDPOINT: "http://127.0.0.1:9009/v1/traces",
               x_LUMIGO_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
               OTEL_EXTENSION_LOG_LEVEL: "info",
               SEND_ON_INVOCATION_END: invocationEnd,
@@ -92,8 +91,10 @@ export class IntegrationTestsStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    const pythonLayer = lambda.LayerVersion.fromLayerVersionArn(this, 'pythonLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-python:14');
-    const nodeLayer = lambda.LayerVersion.fromLayerVersionArn(this, 'nodeLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-node:42');
+    const pythonLayer =
+        lambda.LayerVersion.fromLayerVersionArn(this, 'pythonLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-python:26');
+    const nodeLayer =
+        lambda.LayerVersion.fromLayerVersionArn(this, 'nodeLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-node:45');
     const role = new iam.Role(this, 'IntegrationTestsLambdaRole', {
       assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
       managedPolicies: [

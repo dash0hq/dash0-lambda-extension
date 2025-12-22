@@ -222,10 +222,10 @@ fn _build_otlp_request(
             headers.insert(header::CONTENT_LENGTH, len_val);
         }
 
-        if let Ok(token) = std::env::var("DASH0_TOKEN") {
+        if let Ok(token) = std::env::var("LUMIGO_TRACER_TOKEN") {
             if !token.is_empty() {
                 if let Ok(auth_val) =
-                    header::HeaderValue::from_str(format!("Bearer {}", token).as_str())
+                    header::HeaderValue::from_str(format!("LumigoToken {}", token).as_str())
                 {
                     headers.insert(header::AUTHORIZATION, auth_val);
                 }

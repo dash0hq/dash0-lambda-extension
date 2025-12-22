@@ -1,14 +1,3 @@
-//
-// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-// SPDX-License-Identifier: MIT-0
-//
-
-//! Lambda Extension application to proxy Lambda Runtime API requests between
-//! the Application Runtime and the Lambda host.
-//!
-//! This extension uses Hyper, Tokio, and Rust futures
-//!
-//!
 
 #[allow(unused_imports)]
 use std::{
@@ -105,7 +94,6 @@ async fn main() {
     let server_join_handle = tokio::spawn(server);
 
     // Initialize the extension and continually get next extension event.
-    // We ignore extension events because all LRAP capability is in the Proxy.
     tokio::task::spawn(async {
         sandbox::extension::register().await;
         sandbox::extension::register_telemetry().await;

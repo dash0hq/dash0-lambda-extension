@@ -230,6 +230,26 @@ pub mod extension {
                                 tracing::info!(
                                     "[LRAP:Extension] Received platform.runtimeDone signal"
                                 );
+                                if let Some(invocation_id) =
+                                    crate::store::get_current_invocation_id()
+                                {
+                                    if let Some(end_time) =
+                                        crate::store::take_invocation_end(&invocation_id)
+                                    {
+                                        if let Ok(now) = std::time::SystemTime::now()
+                                            .duration_since(std::time::UNIX_EPOCH)
+                                        {
+                                            let duration = now.as_nanos() as u64 - end_time;
+                                            let duration_in_ms = duration as f64 / 1_000_000.0;
+                                            tracing::info!(
+                                                duration = duration_in_ms,
+                                                "metric_name" = "lrap_extension_platform_runtime_done_wait_time",
+                                                "Time waiting for platform.runtimeDone: {} ms",
+                                                duration_in_ms
+                                            );
+                                        }
+                                    }
+                                }
                                 crate::backend_send::flush_traces(true).await;
                                 crate::backend_send::flush_logs(true).await;
                             }

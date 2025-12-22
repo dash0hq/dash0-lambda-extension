@@ -27,7 +27,7 @@ use crate::{
     env, sandbox, stats,
     store::{
         force_init_trace_store, store_current_invocation_id, store_event_payload,
-        store_invocation_start, store_trace, take_traces, StoredTrace,
+        store_invocation_end, store_invocation_start, store_trace, take_traces, StoredTrace,
     },
     util::{
         parsers::{extract_error_invocation_ids, extract_invocation_id_from_path},
@@ -275,6 +275,10 @@ pub async fn invocation_response_proxy(req: Request<Body>) -> Result<Response<Bo
 
     let res = passthru_proxy(req).await;
     if let Some(id) = invocation_id {
+        if let Ok(nanos) = SystemTime::now().duration_since(UNIX_EPOCH) {
+            store_invocation_end(&id, nanos.as_nanos() as u64);
+        }
+
         if is_auto_instrumented_disabled() {
             if let Some(trace) =
                 build_runtime_error_trace(&id, None, Some(return_payload.as_str()), &Vec::new())

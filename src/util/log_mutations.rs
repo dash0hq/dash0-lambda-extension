@@ -214,7 +214,9 @@ pub fn map_logs_to_otlp(logs: &[TelemetryLog], is_invocation_end: bool) -> Vec<L
 fn try_read_env_from_file(key: &str) -> Option<String> {
     let content = std::fs::read_to_string("/tmp/lumigo_env_vars").ok()?;
     let json: serde_json::Value = serde_json::from_str(&content).ok()?;
-    json.get(key).and_then(|v| v.as_str()).map(|s| s.to_string())
+    json.get(key)
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
 }
 
 pub fn get_resources_attributes() -> Vec<opentelemetry_proto::tonic::common::v1::KeyValue> {
@@ -417,7 +419,7 @@ mod tests {
     fn test_get_resources_attributes_structure() {
         let expected_service_name = "test-service-name";
         std::env::set_var("OTEL_SERVICE_NAME", expected_service_name);
-        
+
         let attributes = get_resources_attributes();
 
         let keys: Vec<String> = attributes.iter().map(|kv| kv.key.clone()).collect();
@@ -429,7 +431,7 @@ mod tests {
             .iter()
             .find(|kv| kv.key == "service.name")
             .unwrap();
-        
+
         assert_eq!(
             get_string_value(&service_name_attr.value),
             Some(expected_service_name.to_string())
@@ -444,7 +446,7 @@ mod tests {
         // Ensure env var is unset
         std::env::remove_var("OTEL_SERVICE_NAME");
         std::env::remove_var("OTEL_RESOURCE_ATTRIBUTES");
-        
+
         // Write mock file
         let file_path = "/tmp/lumigo_env_vars";
         let expected_service_name = "service-from-file";
@@ -452,11 +454,12 @@ mod tests {
         let content = json!({
             "OTEL_SERVICE_NAME": expected_service_name,
             "OTEL_RESOURCE_ATTRIBUTES": expected_resource_attrs
-        }).to_string();
+        })
+        .to_string();
         std::fs::write(file_path, content).expect("Failed to write mock file");
 
         let attributes = get_resources_attributes();
-        
+
         // Cleanup file
         std::fs::remove_file(file_path).expect("Failed to cleanup mock file");
 
@@ -470,21 +473,15 @@ mod tests {
             Some(expected_service_name.to_string())
         );
 
-        let key1_attr = attributes
-            .iter()
-            .find(|kv| kv.key == "key1")
-            .unwrap();
-        
+        let key1_attr = attributes.iter().find(|kv| kv.key == "key1").unwrap();
+
         assert_eq!(
             get_string_value(&key1_attr.value),
             Some("value1".to_string())
         );
 
-        let key2_attr = attributes
-            .iter()
-            .find(|kv| kv.key == "key2")
-            .unwrap();
-        
+        let key2_attr = attributes.iter().find(|kv| kv.key == "key2").unwrap();
+
         assert_eq!(
             get_string_value(&key2_attr.value),
             Some("value2".to_string())
