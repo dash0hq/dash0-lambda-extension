@@ -11,13 +11,13 @@ use crate::util::log_mutations::{get_resources_attributes, map_logs_to_otlp};
 use crate::util::parsers::parse_otlp_endpoint;
 use crate::util::span_mutations::merge_telemetry_invocation_data;
 
-pub async fn flush_traces(is_invocation_end: bool) {
+pub async fn flush_traces() {
     let traces = take_traces();
     if traces.is_empty() {
         return;
     }
 
-    send_traces(traces, is_invocation_end).await;
+    send_traces(traces).await;
 }
 
 use crate::store::store_telemetry_logs;
@@ -79,29 +79,19 @@ pub async fn flush_logs(is_invocation_end: bool) {
     }
 }
 
-pub async fn send_traces(traces: Vec<StoredTrace>, is_invocation_end: bool) {
+pub async fn send_traces(traces: Vec<StoredTrace>) {
     if traces.is_empty() {
         return;
     }
     let mut ready_traces = Vec::new();
     for mut trace in traces {
-        let mut store_back = false;
         if let Ok(mut decoded) = ExportTraceServiceRequest::decode(trace.body.as_slice()) {
             let modified = merge_telemetry_invocation_data(&mut decoded);
             if modified > 0 {
                 trace.body = decoded.encode_to_vec();
-                if modified < 3 && !is_invocation_end {
-                    // if we are not in invocation end mode or shutdown event, we wait for report for all data to be present
-                    store_back = true;
-                }
             }
         }
-
-        if store_back {
-            store_traces(vec![trace]);
-        } else {
-            ready_traces.push(trace);
-        }
+        ready_traces.push(trace);
     }
     let traces = ready_traces;
     if traces.is_empty() {
@@ -222,10 +212,10 @@ fn _build_otlp_request(
             headers.insert(header::CONTENT_LENGTH, len_val);
         }
 
-        if let Ok(token) = std::env::var("LUMIGO_TRACER_TOKEN") {
+        if let Ok(token) = std::env::var("DASH0_TOKEN") {
             if !token.is_empty() {
                 if let Ok(auth_val) =
-                    header::HeaderValue::from_str(format!("LumigoToken {}", token).as_str())
+                    header::HeaderValue::from_str(format!("Bearer {}", token).as_str())
                 {
                     headers.insert(header::AUTHORIZATION, auth_val);
                 }

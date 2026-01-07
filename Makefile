@@ -6,10 +6,13 @@
 #-- config vars
 ZIP_NAME_PYTHON = layer-lrap-python.zip
 ZIP_NAME_NODE = layer-lrap-node.zip
+ZIP_NAME_JAVA = layer-lrap-java.zip
 LAYER_NAME_PYTHON = lrap-python
 LAYER_NAME_NODE = lrap-node
+LAYER_NAME_JAVA = lrap-java
 LAMBDA_LAYER_MARKER_PYTHON := .lambda-layer-python
 LAMBDA_LAYER_MARKER_NODE := .lambda-layer-node
+LAMBDA_LAYER_MARKER_JAVA := .lambda-layer-java
 CARGO_FEATURES := 
 PYTHON_DEPS_IMAGE := lrap-python-deps
 
@@ -20,13 +23,13 @@ DOCKER_RUNNING := $(shell docker ps > /dev/null 2>&1 && echo -n yes)
 RS_FILES := $(shell find src -name "*.rs")
 
 
-.phony: build clean cargo zip clean-build clean-cargo deploy-layer doc python node
+.phony: build clean cargo zip clean-build clean-cargo deploy-layer doc python node java
 
 # * Build both x86_64 and aarch64 binaries
 # * create a Layer '.zip'
 # * use AWS CLI to publish Lambda layer
 #
-default: python node
+default: python node java
 
 clean: clean-build clean-cargo
 
@@ -87,9 +90,25 @@ build/$(ZIP_NAME_NODE): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/
 	@cd build/stage-node && zip -r ../$(ZIP_NAME_NODE) *
 
 
+build/$(ZIP_NAME_JAVA): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/java/wrapper
+	@echo Building Java layer
+	@rm -f build/$(ZIP_NAME_JAVA)
+	@rm -rf build/stage-java
+	@mkdir -p build/stage-java/extensions
+	@mkdir -p build/stage-java/java/lib
+	@cp build/lrap_x86_64 build/stage-java/
+	@cp build/lrap_aarch64 build/stage-java/
+	@cp opt/entrypoint build/stage-java/extensions/lrap
+	@cp opt/java/wrapper build/stage-java/wrapper
+	@curl -L -o build/stage-java/java/lib/lumigo-opentelemetry.jar https://github.com/lumigo-io/opentelemetry-java-distro/releases/download/v0.19.1/lumigo-opentelemetry-0.19.1.jar
+	@cd build/stage-java && zip -r ../$(ZIP_NAME_JAVA) *
+
+
 python: $(LAMBDA_LAYER_MARKER_PYTHON)
 
 node: $(LAMBDA_LAYER_MARKER_NODE)
+
+java: $(LAMBDA_LAYER_MARKER_JAVA)
 
 $(LAMBDA_LAYER_MARKER_PYTHON): build/$(ZIP_NAME_PYTHON)
 	@echo "Publishing Lambda Extension to layer \"$(LAYER_NAME_PYTHON)\""
@@ -104,6 +123,13 @@ $(LAMBDA_LAYER_MARKER_NODE): build/$(ZIP_NAME_NODE)
 		--description "Layer to intercept and sanitize Lambda input and output data. Compatible with all runtimes" \
 		--compatible-architectures x86_64 arm64 --no-cli-pager
 	@touch $(LAMBDA_LAYER_MARKER_NODE)
+
+$(LAMBDA_LAYER_MARKER_JAVA): build/$(ZIP_NAME_JAVA)
+	@echo "Publishing Lambda Extension to layer \"$(LAYER_NAME_JAVA)\""
+	@aws lambda publish-layer-version --layer-name $(LAYER_NAME_JAVA) --zip-file fileb://build/$(ZIP_NAME_JAVA) \
+		--description "Layer to intercept and sanitize Lambda input and output data. Compatible with all runtimes" \
+		--compatible-architectures x86_64 arm64 --no-cli-pager
+	@touch $(LAMBDA_LAYER_MARKER_JAVA)
 
 
 

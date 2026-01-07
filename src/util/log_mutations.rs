@@ -211,7 +211,7 @@ pub fn map_logs_to_otlp(logs: &[TelemetryLog], is_invocation_end: bool) -> Vec<L
     log_records
 }
 
-fn try_read_env_from_file(key: &str) -> Option<String> {
+pub fn try_read_env_from_file(key: &str) -> Option<String> {
     let content = std::fs::read_to_string("/tmp/lumigo_env_vars").ok()?;
     let json: serde_json::Value = serde_json::from_str(&content).ok()?;
     json.get(key)

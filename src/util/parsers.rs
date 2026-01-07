@@ -149,16 +149,59 @@ pub fn get_span_id_from_invocation_id(invocation_id: &str) -> Vec<u8> {
     hash[..8].to_vec()
 }
 
+/// Get the name of the instrumentation scope.
+pub fn get_span_scope_name(
+    request: &opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest,
+) -> Option<String> {
+    for resource_span in &request.resource_spans {
+        for scope_span in &resource_span.scope_spans {
+            if let Some(scope) = &scope_span.scope {
+                return Some(scope.name.clone());
+            }
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         extract_error_invocation_ids, extract_invocation_id, extract_invocation_id_from_path,
-        get_span_id_from_invocation_id, get_trace_id_from_invocation_id, parse_otlp_endpoint,
+        get_span_id_from_invocation_id, get_span_scope_name, get_trace_id_from_invocation_id,
+        parse_otlp_endpoint,
     };
+    use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
     use opentelemetry_proto::tonic::common::v1::{any_value::Value, AnyValue, KeyValue};
-    use opentelemetry_proto::tonic::trace::v1::Span;
+    use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span};
     use serial_test::serial;
     use std::env;
+
+    #[test]
+    fn test_get_span_scope_name() {
+        let span = Span {
+            name: "test-span-name".to_string(),
+            ..Default::default()
+        };
+        let request = ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans {
+                scope_spans: vec![ScopeSpans {
+                    scope: Some(
+                        opentelemetry_proto::tonic::common::v1::InstrumentationScope {
+                            name: "test-scope-name".to_string(),
+                            ..Default::default()
+                        },
+                    ),
+                    spans: vec![span],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        assert_eq!(
+            get_span_scope_name(&request),
+            Some("test-scope-name".to_string())
+        );
+    }
 
     // Tests for extract_invocation_id_from_path
     // ============================================================================

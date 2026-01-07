@@ -1,8 +1,9 @@
 import fetch from 'node-fetch';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
-import {DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./config";
+import { DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS } from "./config";
 import {
+    checkException,
     checkHttpSpan,
     checkLogs,
     checkSpanAttributesFromReport,
@@ -13,7 +14,7 @@ import {
 
 
 const verifySuccessInvocation = async (functionName: string, invocationEnd: boolean, traced: boolean) => {
-    const invocationId = await invokeFunction(functionName, invocationEnd, false);
+    const invocationId = await invokeFunction(functionName, invocationEnd, true);
 
     let traceId: string | undefined = undefined;
     let parentSpanId: string | undefined = undefined;
@@ -35,17 +36,19 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             const spanPayload = await spanResponse.json() as any;
             expect(spanPayload?.resourceSpans.length).toEqual(1);
             expect(spanPayload?.resourceSpans[0].scopeSpans.length).toEqual(1);
-            const expectedScopeName = traced ? "@opentelemetry/instrumentation-aws-lambda" : "opentelemetry.instrumentation.aws_lambda";
-            expect(spanPayload?.resourceSpans[0].scopeSpans[0].scope.name).toEqual(expectedScopeName);
+            expect(spanPayload?.resourceSpans[0].scopeSpans[0].scope.name).toEqual("opentelemetry.instrumentation.aws_lambda");
             expect(spanPayload?.resourceSpans[0].scopeSpans[0].spans.length).toEqual(1);
+            const resourceAttributes = getAttributesMap(spanPayload?.resourceSpans[0].resource.attributes);
+            expect(resourceAttributes['service.name'].stringValue).toEqual(functionName);
             // check span attributes
             span = spanPayload.resourceSpans[0].scopeSpans[0].spans[0];
             const spanAttributes = getAttributesMap(span.attributes);
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
             expect(spanAttributes['faas.event'].stringValue).toEqual('{"parameter1":"right"}');
-            expect(spanAttributes['faas.return_value'].stringValue).toEqual('{"statusCode":200,"body":"{\\"message\\":\\"Success\\"}"}');
+            expect(spanAttributes['faas.init_duration'].doubleValue).toBeGreaterThan(0);
             traceId = span.traceId;
             parentSpanId = span.spanId;
+            checkException(span, 'timeout');
             break;
         } catch (error) {
             console.error(`Error fetching spans on attempt ${attempt}:`, error);
@@ -56,27 +59,23 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
     }
     const logsToBeChecked = [
         'START RequestId: ',
-        "Handler invoked with event:",
         'END RequestId: ',
     ]
     if (!invocationEnd) {
-        logsToBeChecked.push('REPORT RequestId: ');
+        logsToBeChecked.push('REPORT RequestId: ', "Status: timeout");
     }
     const reportLog = await checkLogs({
         invocationId: invocationId!,
         functionName,
         traceId: traceId!,
         parentSpanId: parentSpanId!,
-        success: true,
+        success: false,
         logsToBeChecked
     });
-    if (!invocationEnd) {
-        checkSpanAttributesFromReport(reportLog, span);
-    }
 }
 
-describe.concurrent('Lambda invocation', () => {
-    const runtimes = ['nodejs20-x', 'nodejs22-x', 'nodejs24-x'];
+describe.concurrent('Lambdainvocation java timeout', () => {
+    const runtimes = ['java17', 'java21'];
     const architectures = ['x86_64', 'arm64'] as const;
     const invocationEndValues = [true, false] as const;
     const tracedValues = [true, false] as const;
@@ -86,10 +85,7 @@ describe.concurrent('Lambda invocation', () => {
             for (const invocationEnd of invocationEndValues) {
                 for (const traced of tracedValues) {
                     const invocationEndLabel = invocationEnd ? 'true' : 'false';
-                    const functionName = `${runtime}-success-${traced}-invocation-end-${invocationEndLabel}-${architecture}`;
-                    if (functionName !== "nodejs20-x-success-true-invocation-end-true-x86_64") {
-                        continue;
-                    }
+                    const functionName = `${runtime}-timeout-${traced}-invocation-end-${invocationEndLabel}-${architecture}`;
                     it(
                         `invokes ${functionName} successfully`,
                         async () => {

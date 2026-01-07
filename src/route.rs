@@ -20,7 +20,7 @@ use once_cell::sync::Lazy;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 
-use crate::backend_send::flush_logs;
+use crate::backend_send::{flush_logs, flush_traces};
 use crate::config::{is_auto_instrumented_disabled, max_event_payload_size};
 use crate::{
     backend_send::send_traces,
@@ -33,7 +33,7 @@ use crate::{
         parsers::{extract_error_invocation_ids, extract_invocation_id_from_path},
         span_mutations::{
             add_return_payload_to_lambda_server_spans, build_runtime_error_trace,
-            process_trace_request,
+            drop_duplicate_java_instrumenations, process_trace_request,
         },
         LimitedBuffer,
     },
@@ -204,7 +204,20 @@ pub async fn telemetry_sink(req: Request<Body>) -> Result<Response<Body>, Error>
 
     if let Ok(mut logs) = serde_json::from_str::<Vec<crate::store::TelemetryLog>>(&body_text) {
         crate::util::log_processing::process_telemetry_logs(&mut logs);
+
+        let mut report_invocation_ids: Vec<String> = Vec::new();
+        for log in &logs {
+            if log.r#type == "platform.report" {
+                if let Some(id) = &log.invocation_id {
+                    report_invocation_ids.push(id.clone());
+                }
+            }
+        }
         crate::store::store_telemetry_logs(logs);
+
+        if !report_invocation_ids.is_empty() {
+            flush_traces().await;
+        }
     } else {
         tracing::debug!("[LRAP] Failed to deserialize telemetry logs from body");
     }
@@ -245,7 +258,7 @@ pub async fn telemetry_sink(req: Request<Body>) -> Result<Response<Body>, Error>
         }
 
         if !traces_to_send.is_empty() {
-            send_traces(traces_to_send, true).await;
+            send_traces(traces_to_send).await;
         }
         flush_logs(true).await;
     }
@@ -318,6 +331,10 @@ pub async fn traces(req: Request<Body>) -> Result<Response<Body>, Error> {
 
     match ExportTraceServiceRequest::decode(body_bytes.as_ref()) {
         Ok(mut decoded) => {
+            if drop_duplicate_java_instrumenations(&decoded) {
+                return Ok(Response::builder().status(200).body(Body::empty()).unwrap());
+            }
+
             process_trace_request(&mut decoded, &mut invocation_ids, &mut encoded_body);
         }
         Err(err) => {

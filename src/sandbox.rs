@@ -203,10 +203,10 @@ pub mod extension {
                         let is_invocation_end = matches!(event_type, Some("SHUTDOWN"));
                         if is_invocation_end {
                             tokio::time::sleep(Duration::from_millis(200)).await;
+                            crate::backend_send::flush_traces().await;
                         } else {
                             tokio::time::sleep(Duration::from_millis(20)).await;
                         }
-                        crate::backend_send::flush_traces(is_invocation_end).await;
                         crate::backend_send::flush_logs(is_invocation_end).await;
                     }
 
@@ -250,7 +250,7 @@ pub mod extension {
                                         }
                                     }
                                 }
-                                crate::backend_send::flush_traces(true).await;
+                                crate::backend_send::flush_traces().await;
                                 crate::backend_send::flush_logs(true).await;
                             }
                             Ok(Err(_)) => {

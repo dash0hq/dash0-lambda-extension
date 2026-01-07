@@ -27,8 +27,7 @@ if [ -z "$DISABLE_AUTO_INSTRUMENTATION" ] || [ "${DISABLE_AUTO_INSTRUMENTATION,,
 
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-  PACKAGE_PATH="/opt/init.mjs"
-  export NODE_OPTIONS="${NODE_OPTIONS} --import \"${PACKAGE_PATH}\""
+  export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS} -javaagent:/opt/java/lib/lumigo-opentelemetry.jar"
 fi
 
 exec "${args[@]}"

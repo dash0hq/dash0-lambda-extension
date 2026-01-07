@@ -2,8 +2,10 @@ use crate::store::{
     get_event_payload, get_invocation_start, store_return_payload, store_traces,
     take_return_payload, take_traces, StoredTrace,
 };
+use crate::util::log_mutations::try_read_env_from_file;
 use crate::util::parsers::{
-    extract_invocation_id, get_span_id_from_invocation_id, get_trace_id_from_invocation_id,
+    extract_invocation_id, get_span_id_from_invocation_id, get_span_scope_name,
+    get_trace_id_from_invocation_id,
 };
 use hyper::header;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
@@ -16,6 +18,11 @@ use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span, Sta
 use prost::Message;
 use serde_json::Map as JsonMap;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+pub fn drop_duplicate_java_instrumenations(decoded: &ExportTraceServiceRequest) -> bool {
+    let scope_name = get_span_scope_name(decoded);
+    scope_name.as_deref() == Some("io.opentelemetry.aws-lambda-core-1.0")
+}
 
 pub fn build_runtime_error_trace(
     invocation_id: &str,
@@ -120,12 +127,15 @@ pub fn build_runtime_error_trace(
             KeyValue {
                 key: "service.name".to_string(),
                 value: Some(AnyValue {
-                    value: Some(Value::StringValue(
-                        std::env::var("OTEL_SERVICE_NAME")
-                            .ok()
-                            .filter(|v| !v.is_empty())
-                            .unwrap_or_else(|| "unknown_service".to_string()),
-                    )),
+                    value: Some(
+                        opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(
+                            std::env::var("OTEL_SERVICE_NAME")
+                                .ok()
+                                .filter(|v| !v.is_empty())
+                                .or_else(|| try_read_env_from_file("OTEL_SERVICE_NAME"))
+                                .unwrap_or_else(|| "unknown_service".to_string()),
+                        ),
+                    ),
                 }),
             },
             KeyValue {
@@ -294,6 +304,8 @@ fn create_exception_event(
 fn is_lambda_instrumentation_scope(scope_name: &str) -> bool {
     scope_name == "opentelemetry.instrumentation.aws_lambda"
         || scope_name == "@opentelemetry/instrumentation-aws-lambda"
+        || scope_name == "io.opentelemetry.aws-lambda-core-1.0"
+        || scope_name == "io.opentelemetry.aws-lambda-events-2.2"
 }
 
 pub fn add_event_payload_to_lambda_server_spans(

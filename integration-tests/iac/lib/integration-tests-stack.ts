@@ -11,7 +11,14 @@ interface SubStackProps extends cdk.NestedStackProps {
   logGroup: logs.ILogGroup;
 }
 
-function createLambdas(scope: Construct, runtimes: lambda.Runtime[], layer: lambda.ILayerVersion, role: iam.Role, logGroup: logs.ILogGroup) {
+function createLambdas(
+    scope: Construct,
+    runtimes: lambda.Runtime[],
+    layer: lambda.ILayerVersion,
+    role: iam.Role,
+    logGroup: logs.ILogGroup,
+    overrides?: { handler?: string; code?: lambda.Code; memorySize?: number }
+) {
   for (const runtime of runtimes) {
     for (const architecture of [lambda.Architecture.X86_64, lambda.Architecture.ARM_64]) {
       for (const invocationEnd of ["true", "false"]) {
@@ -20,6 +27,9 @@ function createLambdas(scope: Construct, runtimes: lambda.Runtime[], layer: lamb
             if (runtime.family === lambda.RuntimeFamily.NODEJS && scenario === "outofmemory") {
               // seems to be impossible to make nodejs lambda run out of memory in a reliable way
               // essentially it ends up throwing a timeout instead
+              continue;
+            }
+            if (runtime.family === lambda.RuntimeFamily.JAVA && (scenario === "importerror" || scenario === "outofmemory")) {
               continue;
             }
             const runtimeName = runtime.name.replace(/\./g, '-');
@@ -34,16 +44,23 @@ function createLambdas(scope: Construct, runtimes: lambda.Runtime[], layer: lamb
             if (traced === "false") {
               environment["DISABLE_AUTO_INSTRUMENTATION"] = "true";
             }
+            if (scenario === "timeout") {
+              environment["SLEEP_DURATION_MS"] = "20000";
+            }
 
             const functionName = `${runtimeName}-${scenario}-${traced}-invocation-end-${invocationEnd}-${architecture.name}`;
+            const handler = overrides?.handler ?? `${scenario}.handler`;
+            const code = overrides?.code ?? lambda.Code.fromAsset(path.join(__dirname, '../lambdas'));
+            const memorySize = overrides?.memorySize ?? 128;
 
             new lambda.Function(scope, functionName, {
               functionName: functionName,
               runtime: runtime,
-              handler: `${scenario}.handler`,
+              memorySize,
+              handler,
               architecture: architecture,
               timeout: cdk.Duration.seconds(10),
-              code: lambda.Code.fromAsset(path.join(__dirname, '../lambdas')),
+              code,
               layers: [layer],
               role: role,
               environment,
@@ -87,14 +104,34 @@ class NodeStack extends cdk.NestedStack {
   }
 }
 
+class JavaStack extends cdk.NestedStack {
+  constructor(scope: Construct, id: string, props: SubStackProps) {
+    super(scope, id, props);
+
+    createLambdas(this, [lambda.Runtime.JAVA_21], props.layer, props.role, props.logGroup, {
+      handler: 'com.example.App::handleRequest',
+      code: lambda.Code.fromAsset(path.join(__dirname, '../lambdas/java21-success.jar')),
+      memorySize: 512,
+    });
+
+    createLambdas(this, [lambda.Runtime.JAVA_17], props.layer, props.role, props.logGroup, {
+      handler: 'com.example.App::handleRequest',
+      code: lambda.Code.fromAsset(path.join(__dirname, '../lambdas/java17-success.jar')),
+      memorySize: 512,
+    });
+  }
+}
+
 export class IntegrationTestsStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
     const pythonLayer =
-        lambda.LayerVersion.fromLayerVersionArn(this, 'pythonLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-python:26');
+        lambda.LayerVersion.fromLayerVersionArn(this, 'pythonLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-python:32');
     const nodeLayer =
-        lambda.LayerVersion.fromLayerVersionArn(this, 'nodeLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-node:45');
+        lambda.LayerVersion.fromLayerVersionArn(this, 'nodeLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-node:49');
+    const javaLayer =
+        lambda.LayerVersion.fromLayerVersionArn(this, 'javaLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-java:19');
     const role = new iam.Role(this, 'IntegrationTestsLambdaRole', {
       assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
       managedPolicies: [
@@ -116,6 +153,12 @@ export class IntegrationTestsStack extends cdk.Stack {
     new NodeStack(this, 'NodeStack', {
       role,
       layer: nodeLayer,
+      logGroup: sharedLogGroup,
+    });
+
+    new JavaStack(this, 'JavaStack', {
+      role,
+      layer: javaLayer,
       logGroup: sharedLogGroup,
     });
   }

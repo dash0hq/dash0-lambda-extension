@@ -34,8 +34,10 @@ export const getRequestPayload = (invocationId: string) => {
     };
 }
 
-export const invokeFunction = async (functionName: string, invocationEnd: boolean, expectError: boolean) : Promise<string> => {
-    const payload = JSON.stringify({ parameter1: 'right' });
+export const invokeFunction = async (
+    functionName: string, invocationEnd: boolean, expectError: boolean, eventPayload?: string
+) : Promise<string> => {
+    const payload = eventPayload ? eventPayload : JSON.stringify({ parameter1: 'right' });
 
     const response = await lambdaClient.send(
         new InvokeCommand({
