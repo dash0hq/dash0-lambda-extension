@@ -306,6 +306,7 @@ fn is_lambda_instrumentation_scope(scope_name: &str) -> bool {
         || scope_name == "@opentelemetry/instrumentation-aws-lambda"
         || scope_name == "io.opentelemetry.aws-lambda-core-1.0"
         || scope_name == "io.opentelemetry.aws-lambda-events-2.2"
+        || scope_name == "OpenTelemetry.Instrumentation.AWSLambda"
 }
 
 pub fn add_event_payload_to_lambda_server_spans(

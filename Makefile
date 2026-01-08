@@ -7,12 +7,15 @@
 ZIP_NAME_PYTHON = layer-lrap-python.zip
 ZIP_NAME_NODE = layer-lrap-node.zip
 ZIP_NAME_JAVA = layer-lrap-java.zip
+ZIP_NAME_MANUAL = layer-lrap-manual.zip
 LAYER_NAME_PYTHON = lrap-python
 LAYER_NAME_NODE = lrap-node
 LAYER_NAME_JAVA = lrap-java
+LAYER_NAME_MANUAL = lrap-manual
 LAMBDA_LAYER_MARKER_PYTHON := .lambda-layer-python
 LAMBDA_LAYER_MARKER_NODE := .lambda-layer-node
 LAMBDA_LAYER_MARKER_JAVA := .lambda-layer-java
+LAMBDA_LAYER_MARKER_MANUAL := .lambda-layer-manual
 CARGO_FEATURES := 
 PYTHON_DEPS_IMAGE := lrap-python-deps
 
@@ -23,7 +26,7 @@ DOCKER_RUNNING := $(shell docker ps > /dev/null 2>&1 && echo -n yes)
 RS_FILES := $(shell find src -name "*.rs")
 
 
-.phony: build clean cargo zip clean-build clean-cargo deploy-layer doc python node java
+.phony: build clean cargo zip clean-build clean-cargo deploy-layer doc python node java manual
 
 # * Build both x86_64 and aarch64 binaries
 # * create a Layer '.zip'
@@ -104,11 +107,25 @@ build/$(ZIP_NAME_JAVA): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/
 	@cd build/stage-java && zip -r ../$(ZIP_NAME_JAVA) *
 
 
+build/$(ZIP_NAME_MANUAL): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/manual/wrapper
+	@echo Building Manual layer
+	@rm -f build/$(ZIP_NAME_MANUAL)
+	@rm -rf build/stage-manual
+	@mkdir -p build/stage-manual/extensions
+	@cp build/lrap_x86_64 build/stage-manual/
+	@cp build/lrap_aarch64 build/stage-manual/
+	@cp opt/entrypoint build/stage-manual/extensions/lrap
+	@cp opt/manual/wrapper build/stage-manual/wrapper
+	@cd build/stage-manual && zip -r ../$(ZIP_NAME_MANUAL) *
+
+
 python: $(LAMBDA_LAYER_MARKER_PYTHON)
 
 node: $(LAMBDA_LAYER_MARKER_NODE)
 
 java: $(LAMBDA_LAYER_MARKER_JAVA)
+
+manual: $(LAMBDA_LAYER_MARKER_MANUAL)
 
 $(LAMBDA_LAYER_MARKER_PYTHON): build/$(ZIP_NAME_PYTHON)
 	@echo "Publishing Lambda Extension to layer \"$(LAYER_NAME_PYTHON)\""
@@ -130,6 +147,13 @@ $(LAMBDA_LAYER_MARKER_JAVA): build/$(ZIP_NAME_JAVA)
 		--description "Layer to intercept and sanitize Lambda input and output data. Compatible with all runtimes" \
 		--compatible-architectures x86_64 arm64 --no-cli-pager
 	@touch $(LAMBDA_LAYER_MARKER_JAVA)
+
+$(LAMBDA_LAYER_MARKER_MANUAL): build/$(ZIP_NAME_MANUAL)
+	@echo "Publishing Lambda Extension to layer \"$(LAYER_NAME_MANUAL)\""
+	@aws lambda publish-layer-version --layer-name $(LAYER_NAME_MANUAL) --zip-file fileb://build/$(ZIP_NAME_MANUAL) \
+		--description "Layer to intercept and sanitize Lambda input and output data. Compatible with all runtimes" \
+		--compatible-architectures x86_64 arm64 --no-cli-pager
+	@touch $(LAMBDA_LAYER_MARKER_MANUAL)
 
 
 
