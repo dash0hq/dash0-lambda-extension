@@ -177,7 +177,7 @@ pub fn map_logs_to_otlp(logs: &[TelemetryLog], is_invocation_end: bool) -> Vec<L
                 span_id = get_span_id_from_invocation_id(invocation_id);
             } else {
                 tracing::info!(
-                    "[LRAP] trace/span ids not found for invocation_id {}, putting back to store",
+                    "[{}] trace/span ids not found for invocation_id {}, putting back to store", crate::log_prefix(),
                     invocation_id
                 );
                 store_telemetry_logs(vec![log.clone()]);

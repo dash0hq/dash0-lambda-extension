@@ -17,30 +17,67 @@ use std::sync::Arc;
 use std::time::Instant;
 
 pub async fn next(headers: &HeaderMap, path: &str) -> Result<(Arc<String>, Response<Body>), Error> {
-    let uri = hyper::Uri::builder()
+    let uri = match hyper::Uri::builder()
         .scheme("http")
         .authority(crate::env::sandbox_runtime_api())
         .path_and_query(path)
         .build()
-        .expect("[LRAP] Error building Sandbox Lambda Runtime API endpoint URL");
+    {
+        Ok(uri) => uri,
+        Err(e) => {
+            tracing::error!(
+                "[{}] Error building Sandbox Lambda Runtime API endpoint URL: {}",
+                crate::log_prefix(),
+                e
+            );
+            panic!(
+                "[{}] Failed to build Runtime API URI - severe misconfiguration: {}",
+                crate::log_prefix(),
+                e
+            );
+        }
+    };
 
-    let mut req = Request::builder()
+    let mut req = match Request::builder()
         .method("GET")
         .uri(uri)
         .body(Body::empty())
-        .expect("Cannot create Sandbox Lambda Runtime API request");
+    {
+        Ok(req) => req,
+        Err(e) => {
+            tracing::error!(
+                "[{}] Cannot create Sandbox Lambda Runtime API request: {}",
+                crate::log_prefix(),
+                e
+            );
+            panic!(
+                "[{}] Failed to build Runtime API request - severe misconfiguration: {}",
+                crate::log_prefix(),
+                e
+            );
+        }
+    };
 
     *req.headers_mut() = headers.clone();
 
     let response = hyper::Client::new().request(req).await?;
 
     match response.headers().get("lambda-runtime-aws-request-id") {
-        Some(id) => {
-            let id = id.to_str().expect("Error parsing Lambda Runtime API request ID");
-            Ok((Arc::new(id.to_string()), response))
+        Some(id) => match id.to_str() {
+            Ok(id_str) => Ok((Arc::new(id_str.to_string()), response)),
+            Err(e) => {
+                tracing::error!("[{}] Error parsing Lambda Runtime API request ID: {}", crate::log_prefix(), e);
+                panic!(
+                    "[{}] Invalid request ID header from Lambda Runtime API: {}",
+                    crate::log_prefix(),
+                    e
+                );
+            }
         },
-        // PANIC OK: when Lambda Runtime API does not meet its API contract, we kill the application
-        _ => panic!("[LRAP] Sandbox Lambda Runtime API response missing 'lambda-runtime-aws-request-id' header in Lambda Runtime API GET:next response") 
+        None => {
+            tracing::error!("[{}] Sandbox Lambda Runtime API response missing 'lambda-runtime-aws-request-id' header", crate::log_prefix());
+            panic!("[{}] Lambda Runtime API response missing required header - this should never happen", crate::log_prefix());
+        }
     }
 }
 
@@ -51,7 +88,7 @@ pub async fn send_request(request: Request<Body>) -> Result<Response<Body>, Erro
 
 #[allow(dead_code)]
 pub async fn create_invoke_result_request(id: &str, body: Body) -> Result<Request<Body>, Error> {
-    let uri = hyper::Uri::builder()
+    let uri = match hyper::Uri::builder()
         .scheme("http")
         .authority(crate::env::sandbox_runtime_api())
         .path_and_query(format!(
@@ -60,13 +97,29 @@ pub async fn create_invoke_result_request(id: &str, body: Body) -> Result<Reques
             id
         ))
         .build()
-        .expect("[LRAP] Error building Sandbox Lambda Runtime API endpoint URL");
+    {
+        Ok(uri) => uri,
+        Err(e) => {
+            tracing::error!(
+                "[{}] Error building Sandbox Lambda Runtime API endpoint URL: {}",
+                crate::log_prefix(),
+                e
+            );
+            panic!("[{}] Failed to build Runtime API URI for invocation result - severe misconfiguration: {}", crate::log_prefix(), e);
+        }
+    };
 
-    Ok(hyper::Request::builder()
-        .method("POST")
-        .uri(uri)
-        .body(body)
-        .expect("Cannot create Sandbox Lambda Runtime API request"))
+    match hyper::Request::builder().method("POST").uri(uri).body(body) {
+        Ok(req) => Ok(req),
+        Err(e) => {
+            tracing::error!(
+                "[{}] Cannot create Sandbox Lambda Runtime API request: {}",
+                crate::log_prefix(),
+                e
+            );
+            panic!("[{}] Failed to build Runtime API request for invocation result - severe misconfiguration: {}", crate::log_prefix(), e);
+        }
+    }
 }
 
 /// Lambda Extensions API
@@ -91,18 +144,32 @@ pub mod extension {
     }
 
     pub(super) fn extension_id() -> &'static String {
-        LAMBDA_EXTENSION_IDENTIFIER
-            .get()
-            .expect("[LRAP:Extension] Lambda Extension Identifier not set!")
+        match LAMBDA_EXTENSION_IDENTIFIER.get() {
+            Some(id) => id,
+            None => {
+                tracing::error!("[{}] Lambda Extension Identifier not set - extension not registered", crate::log_prefix_with("Extension"));
+                panic!("[{}] Extension must be registered before use", crate::log_prefix_with("Extension"));
+            }
+        }
     }
 
     fn make_uri(path: &str) -> hyper::Uri {
-        hyper::Uri::builder()
+        match hyper::Uri::builder()
             .scheme("http")
             .authority(crate::env::sandbox_runtime_api())
             .path_and_query(format!("/{}/extension{}", EXTENSION_API_VERSION, path))
             .build()
-            .expect("[LRAP:Extension] Error building Lambda Extensions API endpoint URL")
+        {
+            Ok(uri) => uri,
+            Err(e) => {
+                tracing::error!(
+                    "[{}] Error building Lambda Extensions API endpoint URL: {}",
+                    crate::log_prefix_with("Extension"),
+                    e
+                );
+                panic!("[{}] Failed to build Extensions API URI - severe misconfiguration: {}", crate::log_prefix_with("Extension"), e);
+            }
+        }
     }
 
     /// Register the extension with the Lambda Extensions API
@@ -110,32 +177,76 @@ pub mod extension {
         let uri = make_uri("/register");
 
         let body = hyper::Body::from(r#"{"events":["INVOKE","SHUTDOWN"]}"#);
-        let mut request = hyper::Request::builder()
-            .method("POST")
-            .uri(uri)
-            .body(body)
-            .expect("[LRAP:Extension] Cannot create Lambda Extensions API request");
+        let mut request = match hyper::Request::builder().method("POST").uri(uri).body(body) {
+            Ok(req) => req,
+            Err(e) => {
+                tracing::error!(
+                    "[{}] Cannot create Lambda Extensions API request: {}",
+                    crate::log_prefix_with("Extension"),
+                    e
+                );
+                panic!(
+                    "[{}] Failed to create extension registration request: {}",
+                    crate::log_prefix_with("Extension"),
+                    e
+                );
+            }
+        };
 
         // Set Lambda Extension Name header
-        request.headers_mut().append(
-            "Lambda-Extension-Name",
-            find_extension_name().try_into().unwrap(),
-        );
+        match find_extension_name().try_into() {
+            Ok(header_value) => {
+                request
+                    .headers_mut()
+                    .append("Lambda-Extension-Name", header_value);
+            }
+            Err(e) => {
+                tracing::error!("[{}] Invalid extension name: {}", crate::log_prefix_with("Extension"), e);
+                panic!(
+                    "[{}] Cannot register with invalid extension name: {}",
+                    crate::log_prefix_with("Extension"),
+                    e
+                );
+            }
+        }
 
-        let response = super::send_request(request)
-            .await
-            .expect("[LRAP:Extension] Cannot send Lambda Extensions API request to register");
+        let response = match super::send_request(request).await {
+            Ok(resp) => resp,
+            Err(e) => {
+                tracing::error!(
+                    "[{}] Cannot send Lambda Extensions API request to register: {}",
+                    crate::log_prefix_with("Extension"),
+                    e
+                );
+                panic!("[{}] Failed to register extension: {}", crate::log_prefix_with("Extension"), e);
+            }
+        };
 
-        let extension_identifier = response
-            .headers()
-            .get("lambda-extension-identifier")
-            .expect("[LRAP:Extension] Lambda Extensions API response missing 'lambda-extension-identifier' header in Lambda Extensions API POST:register response")
-            .to_str()
-            .unwrap();
+        let extension_identifier = match response.headers().get("lambda-extension-identifier") {
+            Some(header) => match header.to_str() {
+                Ok(id) => id,
+                Err(e) => {
+                    tracing::error!(
+                        "[{}] Invalid extension identifier header: {}",
+                        crate::log_prefix_with("Extension"),
+                        e
+                    );
+                    panic!("[{}] Cannot parse extension identifier: {}", crate::log_prefix_with("Extension"), e);
+                }
+            },
+            None => {
+                tracing::error!("[{}] Lambda Extensions API response missing 'lambda-extension-identifier' header", crate::log_prefix_with("Extension"));
+                panic!(
+                    "[{}] Extension registration failed - missing identifier header",
+                    crate::log_prefix_with("Extension")
+                );
+            }
+        };
 
-        LAMBDA_EXTENSION_IDENTIFIER
-            .set(extension_identifier.to_owned())
-            .expect("[LRAP:Extension] Error setting Lambda Extensions API request ID");
+        if let Err(e) = LAMBDA_EXTENSION_IDENTIFIER.set(extension_identifier.to_owned()) {
+            tracing::error!("[{}] Extension identifier already set: {:?}", crate::log_prefix_with("Extension"), e);
+            panic!("[{}] Cannot register extension twice", crate::log_prefix_with("Extension"));
+        }
     }
 
     /// Get next event from the Lambda Extensions API
@@ -143,16 +254,37 @@ pub mod extension {
     pub async fn get_next() {
         let uri = make_uri("/event/next");
 
-        let mut request = hyper::Request::builder()
+        let mut request = match hyper::Request::builder()
             .method("GET")
             .uri(uri)
             .body(Body::empty())
-            .expect("[LRAP:Extension] Cannot create Lambda Extensions API request");
+        {
+            Ok(req) => req,
+            Err(e) => {
+                tracing::error!(
+                    "[{}] Cannot create Lambda Extensions API request for get_next: {}",
+                    crate::log_prefix_with("Extension"),
+                    e
+                );
+                return;
+            }
+        };
 
-        request.headers_mut().insert(
-            "Lambda-Extension-Identifier",
-            extension_id().try_into().unwrap(),
-        );
+        match extension_id().try_into() {
+            Ok(header_value) => {
+                request
+                    .headers_mut()
+                    .insert("Lambda-Extension-Identifier", header_value);
+            }
+            Err(e) => {
+                tracing::error!(
+                    "[{}] Invalid extension identifier for get_next: {}",
+                    crate::log_prefix_with("Extension"),
+                    e
+                );
+                return;
+            }
+        }
 
         let start = Instant::now();
         match super::send_request(request).await {
@@ -162,7 +294,8 @@ pub mod extension {
                     Ok(bytes) => bytes,
                     Err(err) => {
                         tracing::error!(
-                            "[LRAP:Extension] Failed to read extension event body: {}",
+                            "[{}] Failed to read extension event body: {}",
+                            crate::log_prefix_with("Extension"),
                             err
                         );
                         return;
@@ -170,7 +303,8 @@ pub mod extension {
                 };
 
                 tracing::info!(
-                    "[LRAP:Extension] Event status={} payload={} latency={} ms",
+                    "[{}] Event status={} payload={} latency={} ms",
+                    crate::log_prefix_with("Extension"),
                     status,
                     String::from_utf8_lossy(&body_bytes),
                     start.elapsed().as_millis()
@@ -217,7 +351,7 @@ pub mod extension {
                         let (tx, rx) = tokio::sync::oneshot::channel();
                         crate::store::store_runtime_done_notifier(tx);
 
-                        tracing::info!("[LRAP:Extension] Waiting for platform.runtimeDone");
+                        tracing::info!("[{}] Waiting for platform.runtimeDone", crate::log_prefix_with("Extension"));
 
                         // Wait for the signal with a timeout to prevent indefinite blocking
                         match tokio::time::timeout(
@@ -228,7 +362,8 @@ pub mod extension {
                         {
                             Ok(Ok(())) => {
                                 tracing::info!(
-                                    "[LRAP:Extension] Received platform.runtimeDone signal"
+                                    "[{}] Received platform.runtimeDone signal",
+                                    crate::log_prefix_with("Extension")
                                 );
                                 if let Some(invocation_id) =
                                     crate::store::get_current_invocation_id()
@@ -243,7 +378,7 @@ pub mod extension {
                                             let duration_in_ms = duration as f64 / 1_000_000.0;
                                             tracing::info!(
                                                 duration = duration_in_ms,
-                                                "metric_name" = "lrap_extension_platform_runtime_done_wait_time",
+                                                "metric_name" = "extension_platform_runtime_done_wait_time",
                                                 "Time waiting for platform.runtimeDone: {} ms",
                                                 duration_in_ms
                                             );
@@ -255,12 +390,14 @@ pub mod extension {
                             }
                             Ok(Err(_)) => {
                                 tracing::warn!(
-                                    "[LRAP:Extension] platform.runtimeDone channel closed"
+                                    "[{}] platform.runtimeDone channel closed",
+                                    crate::log_prefix_with("Extension")
                                 );
                             }
                             Err(_) => {
                                 tracing::error!(
-                                    "[LRAP:Extension] Timeout waiting for platform.runtimeDone"
+                                    "[{}] Timeout waiting for platform.runtimeDone",
+                                    crate::log_prefix_with("Extension")
                                 );
                             }
                         }
@@ -269,7 +406,8 @@ pub mod extension {
             }
             Err(err) => {
                 tracing::error!(
-                    "[LRAP:Extension] Error fetching next extension event: {}",
+                    "[{}] Error fetching next extension event: {}",
+                    crate::log_prefix_with("Extension"),
                     err
                 );
             }
@@ -288,21 +426,43 @@ pub mod extension {
         );
         // print the payload
         tracing::trace!(
-            "[LRAP:Extension] Registering telemetry with payload={}",
+            "[{}] Registering telemetry with payload={}",
+            crate::log_prefix_with("Extension"),
             payload
         );
 
-        let mut request = hyper::Request::builder()
+        let mut request = match hyper::Request::builder()
             .method("PUT")
             .uri(uri.clone())
             .header(hyper::header::CONTENT_TYPE, "application/json")
             .body(hyper::Body::from(payload))
-            .expect("[LRAP:Extension] Cannot create Lambda Telemetry API request");
+        {
+            Ok(req) => req,
+            Err(e) => {
+                tracing::error!(
+                    "[{}] Cannot create Lambda Telemetry API request: {}",
+                    crate::log_prefix_with("Extension"),
+                    e
+                );
+                return;
+            }
+        };
 
-        request.headers_mut().insert(
-            "Lambda-Extension-Identifier",
-            extension_id().try_into().unwrap(),
-        );
+        match extension_id().try_into() {
+            Ok(header_value) => {
+                request
+                    .headers_mut()
+                    .insert("Lambda-Extension-Identifier", header_value);
+            }
+            Err(e) => {
+                tracing::error!(
+                    "[{}] Invalid extension identifier for telemetry registration: {}",
+                    crate::log_prefix_with("Extension"),
+                    e
+                );
+                return;
+            }
+        }
 
         match super::send_request(request).await {
             Ok(response) => {
@@ -311,14 +471,16 @@ pub mod extension {
                     Ok(bytes) => bytes,
                     Err(err) => {
                         tracing::error!(
-                            "[LRAP:Extension] Failed to read telemetry registration body: {}",
+                            "[{}] Failed to read telemetry registration body: {}",
+                            crate::log_prefix_with("Extension"),
                             err
                         );
                         return;
                     }
                 };
                 tracing::info!(
-                    "[LRAP:Extension] Telemetry register uri={} status={} body={}",
+                    "[{}] Telemetry register uri={} status={} body={}",
+                    crate::log_prefix_with("Extension"),
                     uri,
                     status,
                     String::from_utf8_lossy(&body_bytes)
@@ -326,7 +488,8 @@ pub mod extension {
             }
             Err(err) => {
                 tracing::error!(
-                    "[LRAP:Extension] Error registering telemetry destination (uri={}): {}",
+                    "[{}] Error registering telemetry destination (uri={}): {}",
+                    crate::log_prefix_with("Extension"),
                     uri,
                     err
                 );
@@ -335,12 +498,22 @@ pub mod extension {
     }
 
     fn make_telemetry_uri() -> hyper::Uri {
-        hyper::Uri::builder()
+        match hyper::Uri::builder()
             .scheme("http")
             .authority(crate::env::sandbox_runtime_api())
             .path_and_query("/2022-07-01/telemetry")
             .build()
-            .expect("[LRAP:Extension] Error building Lambda Telemetry API endpoint URL")
+        {
+            Ok(uri) => uri,
+            Err(e) => {
+                tracing::error!(
+                    "[{}] Error building Lambda Telemetry API endpoint URL: {}",
+                    crate::log_prefix_with("Extension"),
+                    e
+                );
+                panic!("[{}] Failed to build Telemetry API URI - severe misconfiguration: {}", crate::log_prefix_with("Extension"), e);
+            }
+        }
     }
 }
 
@@ -403,18 +576,19 @@ pub async fn fetch_and_cache_account_id() -> Option<String> {
                 let account = account.to_string();
                 *guard = Some(account.clone());
                 tracing::info!(
-                    "[LRAP] Retrieved account ID={} from STS GetCallerIdentity in {} ms",
+                    "[{}] Retrieved account ID={} from STS GetCallerIdentity in {} ms",
+                    crate::log_prefix(),
                     account,
                     start.elapsed().as_millis()
                 );
                 Some(account)
             } else {
-                tracing::error!("[LRAP] STS GetCallerIdentity did not return an account ID");
+                tracing::error!("[{}] STS GetCallerIdentity did not return an account ID", crate::log_prefix());
                 None
             }
         }
         Err(err) => {
-            tracing::error!("[LRAP] Failed calling STS GetCallerIdentity: {}", err);
+            tracing::error!("[{}] Failed calling STS GetCallerIdentity: {}", crate::log_prefix(), err);
             None
         }
     }

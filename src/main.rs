@@ -42,6 +42,18 @@ pub const DEFAULT_PROXY_PORT: u16 = 9009;
 
 pub static LAMBDA_RUNTIME_API_VERSION: &str = "2018-06-01";
 
+/// Returns the log prefix for standard log messages
+#[inline]
+pub fn log_prefix() -> &'static str {
+    "DASH0"
+}
+
+/// Returns the log prefix with a suffix for specialized log messages
+#[inline]
+pub fn log_prefix_with(suffix: &str) -> String {
+    format!("DASH0:{}", suffix)
+}
+
 /// Implement the Runtime API Proxy for Lambda:
 ///
 /// 1. create a hyper server on the LRAP endpoint
@@ -67,12 +79,14 @@ async fn main() {
         .init();
     stats::init_start();
 
+    let exe_path = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.to_str().map(|s| s.to_string()))
+        .unwrap_or_else(|| "<unknown>".to_string());
+    tracing::info!("[{}] start; path={}", crate::log_prefix(), exe_path);
+
     tracing::info!(
-        "[LRAP] start; path={}",
-        std::env::current_exe().unwrap().to_str().unwrap()
-    );
-    tracing::info!(
-        "[LRAP] commandline arguments: {}",
+        "[{}] commandline arguments: {}", crate::log_prefix(),
         std::env::args()
             .map(|v| format!("\"{}\"", v))
             .collect::<Vec<String>>()
@@ -81,10 +95,17 @@ async fn main() {
 
     env::latch_runtime_env();
 
-    let addr: SocketAddr = env::lrap_api()
-        .parse()
-        .expect("Invalid IP specification from Lambda Runtime API endpoint");
-    tracing::info!("[LRAP] listening on {}", addr);
+    let addr: SocketAddr = match env::lrap_api().parse() {
+        Ok(addr) => addr,
+        Err(e) => {
+            tracing::error!(
+                "[{}] Invalid IP specification from Lambda Runtime API endpoint: {}", crate::log_prefix(),
+                e
+            );
+            panic!("[{}] Cannot start without valid listener address", crate::log_prefix());
+        }
+    };
+    tracing::info!("[{}] listening on {}", crate::log_prefix(), addr);
 
     // bind the server to the Lambda Runtime API Router service
     let server = Server::bind(&addr).serve(route::make_route().into_service());
@@ -105,13 +126,16 @@ async fn main() {
         }
     });
 
-    match server_join_handle
-        .await
-        .expect("Failed to join the server task")
-    {
-        Err(e) => {
-            tracing::error!("[LRAP] Hyper server error: {}", e);
+    match server_join_handle.await {
+        Ok(Ok(_)) => {
+            // Server shut down cleanly (should never happen)
+            tracing::info!("[{}] Server shut down cleanly", crate::log_prefix());
         }
-        Ok(_) => { /* never reached */ }
+        Ok(Err(e)) => {
+            tracing::error!("[{}] Hyper server error: {}", crate::log_prefix(), e);
+        }
+        Err(e) => {
+            tracing::error!("[{}] Failed to join server task: {}", crate::log_prefix(), e);
+        }
     }
 }

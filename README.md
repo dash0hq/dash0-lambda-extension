@@ -1,33 +1,22 @@
-# New Lambda Extension
+# Dash0 Lambda Extension
 
-This extension enables auto-instrumentation of lambda function, and captures the logs using Telemetry API.
+An extension for capturing observability data from lambda invocations and shipping to Dash0.
+
+This extension has four main functionalities:
+1. Enable auto-instrumentation for supported runtimes, which currently include Python, Node, Java.
+2. Receive traces from auto/manual instrumentations, enrich with data acquired in the extension, and send to Dash0.
+3. Detect runtime errors such as timeout or out of memory and create synthetic traces for them
+4. Collect all logs and send to Dash0, correlated with the trace id of the invocation.
 
 
+## Configuration
 
-## 🏗️ Building the package
+* `AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper` - This environment variable must be set in order to enable tracing. If this environment variable will not be set, only logs will be collected.
 
-This package uses  *Make* to build binary executables for *aarch64* and *x86_64* using `cargo cross`.
+* `DASH0_AUTH` - the api token for your Dash0 project.
 
-**Targets**: `x86_64-unknown-linux-musl` for x86_64 Lambdas and `aarch64-unknown-linux-musl` for Gravaton-based Lambdas (64-bit ARM) with **musl** libc. Building statically with musl keeps the binary compatible with both Amazon Linux 2 runtimes (Python 3.9–3.11) and Amazon Linux 2023 runtimes (Python 3.12+) so you avoid `GLIBC_2.x` errors at cold start.
+* `DISABLE_AUTO_INSTRUMENTATION` - Auto-instrumentation can be turned off by this environment variable, which will result in creating synthetic traces by the extension for all invocations.
 
-### Dependencies 
+* `SEND_ON_INVOCATION_END` - The extension has two modes of sending to the backend, either on invocation end or on the next invocations. This is controlled by the env var `SEND_ON_INVOCATION_END`. The default is `true`. Sending on invocation end will increase the billed duration of the lambda, but not the response time. Sending on next invocation will decrease the billed duration since the sending will take place in parallel of the regular execution, but might delay the sending up to 7 minutes in case of last invocation in the container. 
 
-* Make tools
-* Rust standard: https://www.rust-lang.org/tools/install (tested with 1.72)
-* Cargo cross (~0.2.5)
-  * cross-compiling to different targets; Docker or podman based
-  * Install with `cargo install cross`
-  * Example usage: `cross build --release --target x86_64-unknown-linux-musl`
-* `zip` tool
-* `aws` CLI tool 
-* `jq` JSON manipulation tool
-
-### Building and Deploying the Extension Layer
-
-With the dependencies installed, run `make` in the base directory 
-to compile the binaries.  The executables and  are copied into `build/`. The extension entrypoint script (`opt/entrypoint`) is copied to `build/extensions/lrap`
-
-If you built earlier revisions with the GNU targets and hit `GLIBC_2.xx not found` errors on Python 3.9–3.11 runtimes, run `make clean` to remove old artifacts before rebuilding with the musl targets.
-
-Run `make deploy` to publish the Lambda Layer (named _lrap_ in the *Makefile*) using the build *zip*-file. Make uses the AWS commandlie utility, which uses credentials stored in `ENV['AWS_*']` or `~/.aws/credentials`.
 

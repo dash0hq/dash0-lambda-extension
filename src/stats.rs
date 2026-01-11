@@ -16,32 +16,36 @@ static APP_START: OnceCell<Instant> = OnceCell::new();
 static EVENT_START: Mutex<Option<Instant>> = Mutex::new(None);
 
 pub fn init_start() {
-    INIT_START.set(Instant::now()).unwrap();
+    if let Err(_) = INIT_START.set(Instant::now()) {
+        tracing::warn!("[{}] init_start() called multiple times", crate::log_prefix());
+    }
 }
 pub fn app_start() {
-    APP_START.set(Instant::now()).unwrap();
+    if let Err(_) = APP_START.set(Instant::now()) {
+        tracing::warn!("[{}] app_start() called multiple times", crate::log_prefix());
+    }
 }
 
 #[allow(dead_code)]
 pub fn get_next_event() {
     match *EVENT_START.lock() {
         None => {
-            tracing::info!(
-                "[LRAP] LRAP init     : {} us",
-                APP_START
-                    .get()
-                    .unwrap()
-                    .duration_since(*INIT_START.get().unwrap())
-                    .as_micros()
-            );
-            tracing::info!(
-                "[LRAP] App  init     : {} us",
-                APP_START.get().unwrap().elapsed().as_micros()
-            );
+            if let (Some(app_start), Some(init_start)) = (APP_START.get(), INIT_START.get()) {
+                tracing::info!(
+                    "[{}] Extension init     : {} us", crate::log_prefix(),
+                    app_start.duration_since(*init_start).as_micros()
+                );
+                tracing::info!(
+                    "[{}] App  init     : {} us", crate::log_prefix(),
+                    app_start.elapsed().as_micros()
+                );
+            } else {
+                tracing::warn!("[{}] Stats not properly initialized", crate::log_prefix());
+            }
         }
         Some(event_start) => {
             tracing::info!(
-                "[LRAP] App run time  : {} us",
+                "[{}] App run time  : {} us", crate::log_prefix(),
                 event_start.elapsed().as_micros()
             );
         }

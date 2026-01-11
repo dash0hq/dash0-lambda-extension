@@ -67,7 +67,7 @@ pub async fn flush_logs(is_invocation_end: bool) {
     let req = match _build_otlp_request("/v1/logs", hyper::Method::POST, body, Some(&headers)) {
         Ok(req) => req,
         Err(err) => {
-            tracing::error!("[LRAP] Failed to build log request: {}", err);
+            tracing::error!("[{}] Failed to build log request: {}", crate::log_prefix(), err);
             store_telemetry_logs(logs);
             return;
         }
@@ -107,10 +107,10 @@ pub async fn send_traces(traces: Vec<StoredTrace>) {
 
     // match ExportTraceServiceRequest::decode(combined_trace.body.as_slice()) {
     //     Ok(decoded_trace) => {
-    //         tracing::info!("[LRAP] Combined trace payload: {:?}", decoded_trace);
+    //         tracing::info!("[{}] Combined trace payload: {:?}", crate::log_prefix(), decoded_trace);
     //     }
     //     Err(err) => {
-    //         tracing::error!("[LRAP] Failed to decode combined trace payload: {}", err);
+    //         tracing::error!("[{}] Failed to decode combined trace payload: {}", crate::log_prefix(), err);
     //     }
     // }
 
@@ -137,7 +137,13 @@ fn _build_traces_request(
     original_traces: &[StoredTrace],
 ) -> Option<(Request<Body>, StoredTrace, Vec<StoredTrace>)> {
     let mut traces_iter = traces.into_iter();
-    let base_trace = traces_iter.next().expect("traces not empty");
+    let base_trace = match traces_iter.next() {
+        Some(trace) => trace,
+        None => {
+            tracing::error!("[{}] _build_traces_request called with empty traces vector", crate::log_prefix());
+            return None;
+        }
+    };
 
     let (combined_resource_spans, all_invocation_ids, failed) =
         combine_traces(&base_trace, traces_iter);
@@ -167,7 +173,7 @@ fn _build_traces_request(
     ) {
         Ok(req) => req,
         Err(err) => {
-            tracing::error!("[LRAP] Failed to build trace request: {}", err);
+            tracing::error!("[{}] Failed to build trace request: {}", crate::log_prefix(), err);
             store_traces(original_traces.to_vec());
             return None;
         }
@@ -243,7 +249,7 @@ async fn send_request(
                 tracing::info!(
                     count = item_count,
                     duration = start.elapsed().as_millis(),
-                    "[LRAP] Sent {} (count={}) in {} ms, status={}",
+                    "[{}] Sent {} (count={}) in {} ms, status={}", crate::log_prefix(),
                     item_type,
                     item_count,
                     start.elapsed().as_millis(),
@@ -252,7 +258,7 @@ async fn send_request(
                 Ok(())
             } else {
                 tracing::error!(
-                    "[LRAP] Error sending {} Non-2xx sending {} in {} ms: status={}",
+                    "[{}] Error sending {} Non-2xx sending {} in {} ms: status={}", crate::log_prefix(),
                     item_type,
                     item_type,
                     start.elapsed().as_millis(),
@@ -263,7 +269,7 @@ async fn send_request(
         }
         Ok(Err(err)) => {
             tracing::error!(
-                "[LRAP] Error sending {} in {} ms: {}",
+                "[{}] Error sending {} in {} ms: {}", crate::log_prefix(),
                 item_type,
                 start.elapsed().as_millis(),
                 err
@@ -272,7 +278,7 @@ async fn send_request(
         }
         Err(_) => {
             tracing::error!(
-                "[LRAP] Error sending {} in {} ms: timeout",
+                "[{}] Error sending {} in {} ms: timeout", crate::log_prefix(),
                 item_type,
                 start.elapsed().as_millis()
             );
@@ -300,7 +306,7 @@ fn combine_traces(
             let decoded = match ExportTraceServiceRequest::decode(trace.body.as_slice()) {
                 Ok(d) => d,
                 Err(err) => {
-                    tracing::error!("[LRAP] Failed to decode trace payload: {}", err);
+                    tracing::error!("[{}] Failed to decode trace payload: {}", crate::log_prefix(), err);
                     failed.push(trace.clone());
                     return;
                 }
@@ -481,7 +487,7 @@ mod tests {
         use std::env;
 
         // Set up environment variable for endpoint
-        env::set_var("x_LUMIGO_ENDPOINT", "https://example.com:443/v1/traces");
+        env::set_var("DASH0_ENDPOINT", "https://example.com:443/v1/traces");
 
         // Create valid traces
         let trace1 = create_valid_trace(vec!["inv-1".to_string()], 2);
@@ -520,6 +526,6 @@ mod tests {
         assert!(failed.is_empty());
 
         // Clean up
-        env::remove_var("x_LUMIGO_ENDPOINT");
+        env::remove_var("DASH0_ENDPOINT");
     }
 }

@@ -86,12 +86,11 @@ pub fn extract_error_invocation_ids(body_bytes: &[u8], body_text: &str) -> Vec<(
     }
 }
 
-/// Parse `x_LUMIGO_ENDPOINT` and return (scheme, authority) for building trace URIs
 pub fn parse_otlp_endpoint() -> Option<(String, String)> {
-    let lumigo_endpoint = match std::env::var("x_LUMIGO_ENDPOINT") {
+    let lumigo_endpoint = match std::env::var("DASH0_ENDPOINT") {
         Ok(val) => val,
         Err(err) => {
-            tracing::warn!("[LRAP] endpoint not set; cannot send traces: {}", err);
+            tracing::warn!("[{}] endpoint not set; cannot send traces: {}", crate::log_prefix(), err);
             return None;
         }
     };
@@ -99,7 +98,7 @@ pub fn parse_otlp_endpoint() -> Option<(String, String)> {
     let base_uri: hyper::Uri = match lumigo_endpoint.parse() {
         Ok(uri) => uri,
         Err(err) => {
-            tracing::error!("[LRAP] Invalid endpoint; cannot send traces: {}", err);
+            tracing::error!("[{}] Invalid endpoint; cannot send traces: {}", crate::log_prefix(), err);
             return None;
         }
     };
@@ -107,7 +106,7 @@ pub fn parse_otlp_endpoint() -> Option<(String, String)> {
     let scheme = match base_uri.scheme_str() {
         Some(s) => s.to_string(),
         None => {
-            tracing::error!("[LRAP] endpoint missing scheme; cannot send traces",);
+            tracing::error!("[{}] endpoint missing scheme; cannot send traces", crate::log_prefix(),);
             return None;
         }
     };
@@ -115,7 +114,7 @@ pub fn parse_otlp_endpoint() -> Option<(String, String)> {
     let authority = match base_uri.authority() {
         Some(a) => a.to_string(),
         None => {
-            tracing::error!("[LRAP] endpoint missing authority; cannot send traces",);
+            tracing::error!("[{}] endpoint missing authority; cannot send traces", crate::log_prefix(),);
             return None;
         }
     };
@@ -404,7 +403,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_parse_otlp_endpoint_success() {
-        env::set_var("x_LUMIGO_ENDPOINT", "https://example.com/v1/traces");
+        env::set_var("DASH0_ENDPOINT", "https://example.com/v1/traces");
         let result = parse_otlp_endpoint();
         assert_eq!(
             result,
@@ -415,7 +414,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_parse_otlp_endpoint_invalid() {
-        env::set_var("x_LUMIGO_ENDPOINT", "example.com/v1/traces");
+        env::set_var("DASH0_ENDPOINT", "example.com/v1/traces");
         let result = parse_otlp_endpoint();
         assert!(result.is_none());
     }
@@ -423,7 +422,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_parse_otlp_endpoint_missing() {
-        env::remove_var("x_LUMIGO_ENDPOINT");
+        env::remove_var("DASH0_ENDPOINT");
         let result = parse_otlp_endpoint();
         assert!(result.is_none());
     }

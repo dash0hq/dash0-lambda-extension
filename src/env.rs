@@ -29,18 +29,22 @@ pub fn latch_runtime_env() {
         };
 
     // Latch in the ORIGIN we should proxy to the application
-    LAMBDA_RUNTIME_API.set(aws_lambda_runtime_api.clone())
-        .expect("Expected that mutate_runtime_env() has not been called before, but AWS_LAMBDA_RUNTIME_API was already set");
+    if let Err(_) = LAMBDA_RUNTIME_API.set(aws_lambda_runtime_api.clone()) {
+        tracing::error!("[{}] AWS_LAMBDA_RUNTIME_API was already set, cannot initialize twice", crate::log_prefix());
+        panic!("[{}] Environment already initialized", crate::log_prefix());
+    }
 
     let listener_port = var("LRAP_LISTENER_PORT")
         .ok()
         .and_then(|v| v.parse::<u16>().ok())
-        .or(Some(crate::DEFAULT_PROXY_PORT))
-        .unwrap();
+        .unwrap_or(crate::DEFAULT_PROXY_PORT);
 
     let lrap_api = format!("0.0.0.0:{}", listener_port);
 
-    LRAP_API.set(lrap_api.clone()).expect("aws_lambda_runtime_api_proxy_rs::env::LRAP_API was previously initialized and should not be");
+    if let Err(_) = LRAP_API.set(lrap_api.clone()) {
+        tracing::error!("[{}] LRAP_API was already set, cannot initialize twice", crate::log_prefix());
+        panic!("[{}] Environment already initialized", crate::log_prefix());
+    }
 }
 
 /// Gets the original AWS_LAMBDA_RUNTIME_API.
@@ -51,9 +55,10 @@ pub fn sandbox_runtime_api() -> &'static str {
         Some(val) => val,
         None => {
             latch_runtime_env();
-            LAMBDA_RUNTIME_API.get().expect(
-                "Error in setting and mutating AWS_LAMBDA_RUNTIME_API environment variables.",
-            )
+            LAMBDA_RUNTIME_API.get().unwrap_or_else(|| {
+                tracing::error!("[{}] Failed to initialize AWS_LAMBDA_RUNTIME_API", crate::log_prefix());
+                panic!("[{}] Cannot proceed without runtime API configuration", crate::log_prefix());
+            })
         }
     }
 }
@@ -65,7 +70,10 @@ pub fn lrap_api() -> &'static str {
         Some(val) => val,
         None => {
             latch_runtime_env();
-            LRAP_API.get().expect("Error in setting and mutating AWS_LAMBDA_RUNTIME_API dependent LRAP_API host:port.")
+            LRAP_API.get().unwrap_or_else(|| {
+                tracing::error!("[{}] Failed to initialize LRAP_API host:port", crate::log_prefix());
+                panic!("[{}] Cannot proceed without proxy listener configuration", crate::log_prefix());
+            })
         }
     }
 }

@@ -1,6 +1,0 @@
-look at @opt/node/init.mjs .
-i'm trying to auto-instrument lambda function using an extension.
-for callback-based handlers it works perfectly. i can see the trace created. look at the logs of the lambda at @tools/logs-lambda-with-callback.csv
-for async-based handlers it doesn't work. i see in the logs it got to "Instrumenting lambda handler", which means the instrumentation started. see the full lambda logs at @tools/logs-lambda-with-async-handler.csv 
-you have any idea what am i missing?
-or suggest something else to check 

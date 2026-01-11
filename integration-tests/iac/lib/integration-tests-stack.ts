@@ -36,10 +36,9 @@ function createLambdas(
             const environment: any = {
               AWS_LAMBDA_EXEC_WRAPPER: "/opt/wrapper",
               DASH0_TOKEN: "auth_oEiAAAy5hZvVsEAADPm4uDyV7OcBmU4B",
-              x_LUMIGO_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
+              DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
               OTEL_EXTENSION_LOG_LEVEL: "info",
               SEND_ON_INVOCATION_END: invocationEnd,
-              LUMIGO_TRACER_TOKEN: "t_xxxx",
             };
             if (traced === "false") {
               environment["DISABLE_AUTO_INSTRUMENTATION"] = "true";
@@ -127,11 +126,11 @@ export class IntegrationTestsStack extends cdk.Stack {
     super(scope, id, props);
 
     const pythonLayer =
-        lambda.LayerVersion.fromLayerVersionArn(this, 'pythonLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-python:32');
+        lambda.LayerVersion.fromLayerVersionArn(this, 'pythonLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-python:48');
     const nodeLayer =
-        lambda.LayerVersion.fromLayerVersionArn(this, 'nodeLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-node:49');
+        lambda.LayerVersion.fromLayerVersionArn(this, 'nodeLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-node:50');
     const javaLayer =
-        lambda.LayerVersion.fromLayerVersionArn(this, 'javaLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-java:19');
+        lambda.LayerVersion.fromLayerVersionArn(this, 'javaLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-java:21');
     const role = new iam.Role(this, 'IntegrationTestsLambdaRole', {
       assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
       managedPolicies: [

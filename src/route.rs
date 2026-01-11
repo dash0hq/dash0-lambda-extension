@@ -54,7 +54,6 @@ pub fn make_route<'a>() -> Router<'a> {
             invocation_response_proxy,
         )
         .post("/:apiver/traces", traces)
-        .post("/:apiver/logs", logs)
         .post("/:apiver/telemetry", telemetry_sink)
         .not_found(notfound_passthru_proxy);
     Lazy::force(&HTTPS_CLIENT);
@@ -66,7 +65,7 @@ pub fn make_route<'a>() -> Router<'a> {
 #[allow(dead_code)]
 pub async fn notfound_passthru_proxy(req: Request<Body>) -> Result<Response<Body>, Error> {
     tracing::error!(
-        "[LRAP] Route not found: path={} method={}",
+        "[{}] Route not found: path={} method={}", crate::log_prefix(),
         &req.uri().path(),
         &req.method()
     );
@@ -79,19 +78,40 @@ pub async fn passthru_proxy(req: Request<Body>) -> Result<Response<Body>, Error>
 
     // Extract and print body
     let (parts, body) = req.into_parts();
-    let body_bytes = hyper::body::to_bytes(body).await.unwrap();
+    let body_bytes = match hyper::body::to_bytes(body).await {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            tracing::error!(
+                "[{}] Failed to read request body in passthru_proxy: {}", crate::log_prefix(),
+                e
+            );
+            return Ok(Response::builder()
+                .status(500)
+                .body("500 - Internal Error: Failed to read request body".into())
+                .unwrap_or_else(|_| Response::new(Body::empty())));
+        }
+    };
 
     // Reconstruct request
     let req = Request::from_parts(parts, Body::from(body_bytes));
 
     // possible improvement: replace with resource pool or persistent connection
     let endpoint_client = hyper::Client::new();
-    let endpoint_uri: Uri = Uri::builder()
+    let endpoint_uri: Uri = match Uri::builder()
         .scheme("http")
         .authority(env::sandbox_runtime_api())
         .path_and_query(req.uri().path())
         .build()
-        .unwrap();
+    {
+        Ok(uri) => uri,
+        Err(e) => {
+            tracing::error!("[{}] Failed to build URI for sandbox runtime API: {}", crate::log_prefix(), e);
+            return Ok(Response::builder()
+                .status(502)
+                .body("502 - Bad Gateway: Invalid runtime API configuration".into())
+                .unwrap_or_else(|_| Response::new(Body::empty())));
+        }
+    };
 
     // remap URI
     let mut endpoint_req: Request<Body> = req.into();
@@ -102,7 +122,7 @@ pub async fn passthru_proxy(req: Request<Body>) -> Result<Response<Body>, Error>
     match endpoint_client.request(endpoint_req).await {
         Ok(res) => {
             tracing::info!(
-                "[LRAP] passthru_proxy - {} {} completed in {} ms",
+                "[{}] passthru_proxy - {} {} completed in {} ms", crate::log_prefix(),
                 method,
                 endpoint_uri,
                 start.elapsed().as_millis()
@@ -111,71 +131,7 @@ pub async fn passthru_proxy(req: Request<Body>) -> Result<Response<Body>, Error>
         }
         Err(e) => {
             tracing::error!(
-                "[LRAP] Error invoking endpoint ({} on {}): {:?}",
-                method,
-                endpoint_uri,
-                e
-            );
-            Ok(Response::builder()
-                .status(502)
-                .body("502 - Bad Gateway: Lambda Runtime API did not process request".into())
-                .unwrap())
-        }
-    }
-}
-
-#[allow(dead_code)]
-pub async fn logs(req: Request<Body>) -> Result<Response<Body>, Error> {
-    let start = Instant::now();
-
-    // Extract and print body
-    let (parts, body) = req.into_parts();
-    let body_bytes = hyper::body::to_bytes(body).await.unwrap();
-
-    // Reconstruct request
-    let req = Request::from_parts(parts, Body::from(body_bytes));
-
-    // use TLS-enabled client for the https target
-    let endpoint_client = HTTPS_CLIENT.clone();
-    let target_authority = "e7ombfy3t62jczfmcfrwdgzlyu0anjhb.lambda-url.us-west-2.on.aws:443";
-    let endpoint_uri: Uri = Uri::builder()
-        .scheme("https")
-        .authority(target_authority)
-        .path_and_query(
-            req.uri()
-                .path_and_query()
-                .map(|pq| pq.as_str())
-                .unwrap_or("/"),
-        )
-        .build()
-        .unwrap();
-
-    // remap URI
-    let mut endpoint_req: Request<Body> = req.into();
-    *endpoint_req.uri_mut() = endpoint_uri.clone();
-    // ensure Host header matches target authority (not the inbound :9009)
-    if let Ok(host_value) = hyper::header::HeaderValue::from_str(target_authority) {
-        endpoint_req
-            .headers_mut()
-            .insert(hyper::header::HOST, host_value);
-    }
-
-    let method = endpoint_req.method().clone();
-
-    match endpoint_client.request(endpoint_req).await {
-        Ok(res) => {
-            tracing::info!(
-                "[LRAP] v1/logs - {} {} completed in {} ms. status code={}",
-                method,
-                endpoint_uri,
-                start.elapsed().as_millis(),
-                res.status()
-            );
-            Ok(res)
-        }
-        Err(e) => {
-            tracing::error!(
-                "[LRAP] Error invoking endpoint ({} on {}): {:?}",
+                "[{}] Error invoking endpoint ({} on {}): {:?}", crate::log_prefix(),
                 method,
                 endpoint_uri,
                 e
@@ -196,7 +152,7 @@ pub async fn telemetry_sink(req: Request<Body>) -> Result<Response<Body>, Error>
     let error_invocation_ids = extract_error_invocation_ids(&body_bytes, body_text.as_ref());
 
     tracing::info!(
-        "[LRAP] telemetry event path={} len={} body={}",
+        "[{}] telemetry event path={} len={} body={}", crate::log_prefix(),
         parts.uri.path(),
         body_bytes.len(),
         body_text
@@ -219,17 +175,17 @@ pub async fn telemetry_sink(req: Request<Body>) -> Result<Response<Body>, Error>
             flush_traces().await;
         }
     } else {
-        tracing::debug!("[LRAP] Failed to deserialize telemetry logs from body");
+        tracing::debug!("[{}] Failed to deserialize telemetry logs from body", crate::log_prefix());
     }
 
     let env_vars: Vec<String> = std::env::vars()
         .map(|(key, value)| format!("{}={}", key, value))
         .collect();
-    tracing::trace!("[LRAP] telemetry environment: {}", env_vars.join(", "));
+    tracing::trace!("[{}] telemetry environment: {}", crate::log_prefix(), env_vars.join(", "));
 
     if !error_invocation_ids.is_empty() {
         tracing::info!(
-            "[LRAP] telemetry runtimeDone error detected for invocations: {:?} body={}",
+            "[{}] telemetry runtimeDone error detected for invocations: {:?} body={}", crate::log_prefix(),
             error_invocation_ids,
             body_text
         );
@@ -250,7 +206,7 @@ pub async fn telemetry_sink(req: Request<Body>) -> Result<Response<Body>, Error>
                 Some(trace) => traces_to_send.push(trace),
                 None => {
                     tracing::error!(
-                        "[LRAP] Failed to build runtimeDone trace for invocation {}",
+                        "[{}] Failed to build runtimeDone trace for invocation {}", crate::log_prefix(),
                         invocation_id
                     );
                 }
@@ -275,7 +231,7 @@ pub async fn invocation_response_proxy(req: Request<Body>) -> Result<Response<Bo
     let max_size = max_event_payload_size();
     let payload_slice = if body_bytes.len() > max_size {
         tracing::info!(
-            "[LRAP] Truncating return payload from {} to {} bytes",
+            "[{}] Truncating return payload from {} to {} bytes", crate::log_prefix(),
             body_bytes.len(),
             max_size
         );
@@ -301,14 +257,14 @@ pub async fn invocation_response_proxy(req: Request<Body>) -> Result<Response<Bo
         } else {
             if !add_return_payload_to_lambda_server_spans(&id, &return_payload) {
                 tracing::info!(
-                    "[LRAP] invocation_response_proxy - no lambda server span found for return value {}",
+                    "[{}] invocation_response_proxy - no lambda server span found for return value {}", crate::log_prefix(),
                     &id
                 );
             }
         }
     }
     tracing::info!(
-        "[LRAP] Total handle time for invocation response: {} ms",
+        "[{}] Total handle time for invocation response: {} ms", crate::log_prefix(),
         start.elapsed().as_millis()
     );
     res
@@ -325,7 +281,7 @@ pub async fn traces(req: Request<Body>) -> Result<Response<Body>, Error> {
     let mut converted_from_json = false;
 
     tracing::trace!(
-        "[LRAP] /v1/traces body: {}",
+        "[{}] /v1/traces body: {}", crate::log_prefix(),
         String::from_utf8_lossy(&encoded_body)
     );
 
@@ -339,7 +295,7 @@ pub async fn traces(req: Request<Body>) -> Result<Response<Body>, Error> {
         }
         Err(err) => {
             tracing::info!(
-                "[LRAP] /v1/traces failed to decode as protobuf, trying JSON: {}",
+                "[{}] /v1/traces failed to decode as protobuf, trying JSON: {}", crate::log_prefix(),
                 err
             );
 
@@ -368,7 +324,7 @@ pub async fn traces(req: Request<Body>) -> Result<Response<Body>, Error> {
                     converted_from_json = true;
                 }
                 Err(json_err) => {
-                    tracing::error!("[LRAP] /v1/traces failed to parse as JSON: {}", json_err);
+                    tracing::error!("[{}] /v1/traces failed to parse as JSON: {}", crate::log_prefix(), json_err);
                 }
             }
         }
@@ -403,7 +359,7 @@ pub async fn traces(req: Request<Body>) -> Result<Response<Body>, Error> {
     });
 
     tracing::info!(
-        "[LRAP] Total handle time for /v1/traces {} ms. seen invocation ids: {:?}",
+        "[{}] Total handle time for /v1/traces {} ms. seen invocation ids: {:?}", crate::log_prefix(),
         start.elapsed().as_millis(),
         seen_invocation_ids
     );
@@ -490,10 +446,10 @@ pub async fn proxy_invocation_next(req: Request<Body>) -> Result<Response<Body>,
             match crate::sandbox::next(req.headers(), req.uri().path()).await {
                 Err(e) => {
                     tracing::error!(
-                        "[LRAP]  Error getting next invocation from Runtime API: {}",
+                        "[{}]  Error getting next invocation from Runtime API: {}", crate::log_prefix(),
                         e
                     );
-                    tracing::trace!("[LRAP] uri: {}", req.uri());
+                    tracing::trace!("[{}] uri: {}", crate::log_prefix(), req.uri());
                     tokio::time::sleep(Duration::from_millis(100)).await;
                     continue 'getNext;
                 }
@@ -509,7 +465,7 @@ pub async fn proxy_invocation_next(req: Request<Body>) -> Result<Response<Body>,
             store_invocation_start(aws_request_id.as_str(), nanos.as_nanos() as u64);
         }
 
-        tracing::info!("[LRAP] Got invocation next: {}", aws_request_id.as_str());
+        tracing::info!("[{}] Got invocation next: {}", crate::log_prefix(), aws_request_id.as_str());
 
         match validate_and_mangle_next_event(aws_request_id, response).await {
             Ok(response) => {
@@ -536,18 +492,25 @@ async fn validate_and_mangle_next_event(
     response: Response<Body>,
 ) -> Result<Response<Body>, Request<Body>> {
     let (parts, body) = response.into_parts();
-    let body_bytes = hyper::body::to_bytes(body).await.unwrap();
+    let body_bytes = match hyper::body::to_bytes(body).await {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            tracing::error!("[{}] Failed to read event payload body: {}", crate::log_prefix(), e);
+            // Return empty body rather than crashing
+            hyper::body::Bytes::new()
+        }
+    };
 
-    tracing::trace!("[LRAP] aws request id: {}", _aws_request_id);
+    tracing::trace!("[{}] aws request id: {}", crate::log_prefix(), _aws_request_id);
     tracing::trace!(
-        "[LRAP] event payload: {}",
+        "[{}] event payload: {}", crate::log_prefix(),
         String::from_utf8_lossy(&body_bytes)
     );
 
     let max_size = max_event_payload_size();
     let truncated_bytes = if body_bytes.len() > max_size {
         tracing::info!(
-            "[LRAP] Truncating event payload from {} to {} bytes.",
+            "[{}] Truncating event payload from {} to {} bytes.", crate::log_prefix(),
             body_bytes.len(),
             max_size
         );
