@@ -53,7 +53,8 @@ fn parse_platform_start(log: &TelemetryLog, current_invocation_id: &mut Option<S
                 });
             } else {
                 tracing::info!(
-                    "[{}] Failed to parse platform.start log time: {}", crate::log_prefix(),
+                    "[{}] Failed to parse platform.start log time: {}",
+                    crate::log_prefix(),
                     log.time
                 );
             }
@@ -77,20 +78,14 @@ fn parse_platform_init_report(log: &TelemetryLog) {
 }
 
 fn parse_platform_runtime_done(log: &TelemetryLog) {
-    // Signal waiting task
-    if let Some(notifier) = crate::store::take_runtime_done_notifier() {
-        tracing::info!("[{}] Signaled platform.runtimeDone", crate::log_prefix());
-        let _ = notifier.send(());
-    }
-
-    // Extract invocation ID from the record
     if let Some(record) = log.record.as_object() {
         if let Some(req_id) = record.get("requestId").and_then(|v| v.as_str()) {
             let end_time = if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&log.time) {
                 dt.timestamp_millis() as f64
             } else {
                 tracing::info!(
-                    "[{}] Failed to parse platform.runtimeDone log time: {}", crate::log_prefix(),
+                    "[{}] Failed to parse platform.runtimeDone log time: {}",
+                    crate::log_prefix(),
                     log.time
                 );
                 0.0
@@ -114,6 +109,10 @@ fn parse_platform_runtime_done(log: &TelemetryLog) {
             }
         }
     }
+    if let Some(notifier) = crate::store::take_runtime_done_notifier() {
+        tracing::info!("[{}] Signaled platform.runtimeDone", crate::log_prefix());
+        let _ = notifier.send(());
+    }
 }
 
 fn parse_platform_report(log: &TelemetryLog) {
@@ -123,7 +122,8 @@ fn parse_platform_report(log: &TelemetryLog) {
                 dt.timestamp_millis() as f64
             } else {
                 tracing::info!(
-                    "[{}] Failed to parse platform.report log time: {}", crate::log_prefix(),
+                    "[{}] Failed to parse platform.report log time: {}",
+                    crate::log_prefix(),
                     log.time
                 );
                 0.0

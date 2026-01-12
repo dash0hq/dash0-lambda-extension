@@ -1,12 +1,12 @@
 /// Return true if SEND_ON_INVOCATION_END is set to a truthy value.
-/// Defaults to false when unset or unrecognized.
+/// Defaults to true when unset or unrecognized.
 pub fn is_send_on_invocation_end() -> bool {
     match std::env::var("SEND_ON_INVOCATION_END") {
         Ok(val) => matches!(
             val.as_str(),
             "1" | "true" | "TRUE" | "True" | "yes" | "YES" | "Yes" | "y" | "Y"
         ),
-        Err(_) => false,
+        Err(_) => true,
     }
 }
 
@@ -36,9 +36,9 @@ mod tests {
     use super::{is_auto_instrumented_disabled, is_send_on_invocation_end, max_event_payload_size};
 
     #[test]
-    fn defaults_to_false_when_missing() {
+    fn defaults_to_true_when_missing() {
         std::env::remove_var("SEND_ON_INVOCATION_END");
-        assert!(!is_send_on_invocation_end());
+        assert!(is_send_on_invocation_end());
     }
 
     #[test]

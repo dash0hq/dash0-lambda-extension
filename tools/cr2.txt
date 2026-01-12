@@ -99,3 +99,24 @@ Top 10 Code Issues
   - Observability: Inconsistent error reporting makes debugging difficult
 
   The most critical issue to fix immediately is #1 (hardcoded endpoint), followed by #2 (panic handling) and #3 (global mutable state architecture).
+
+
+
+
+
+
+
+  -----------
+
+  event payload
+  trace <> init duration
+  return value
+  runtimeDone
+  report
+
+
+  so the logic:
+  everything that comes in > try to find a trace and add to it.
+  if no trace found -> store it
+  when a trace comes in > take from store
+  on report > cleanup

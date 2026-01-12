@@ -13,7 +13,7 @@ This extension has four main functionalities:
 
 * `AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper` - This environment variable must be set in order to enable tracing. If this environment variable will not be set, only logs will be collected.
 
-* `DASH0_AUTH` - the api token for your Dash0 project.
+* `DASH0_TOKEN` - the api token for your Dash0 project.
 
 * `DISABLE_AUTO_INSTRUMENTATION` - Auto-instrumentation can be turned off by this environment variable, which will result in creating synthetic traces by the extension for all invocations.
 

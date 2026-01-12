@@ -1,13 +1,3 @@
-//
-// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-// SPDX-License-Identifier: MIT-0
-//
-
-//! Interact with the Lambda Runtime API, the service managing this sandbox
-//!
-//! Includes helpers for sending request for `next` and posting back responses.
-//!
-
 use aws_config::BehaviorVersion;
 use aws_sdk_sts::Client as StsClient;
 use hyper::{Body, Error, HeaderMap, Request, Response};
@@ -66,7 +56,11 @@ pub async fn next(headers: &HeaderMap, path: &str) -> Result<(Arc<String>, Respo
         Some(id) => match id.to_str() {
             Ok(id_str) => Ok((Arc::new(id_str.to_string()), response)),
             Err(e) => {
-                tracing::error!("[{}] Error parsing Lambda Runtime API request ID: {}", crate::log_prefix(), e);
+                tracing::error!(
+                    "[{}] Error parsing Lambda Runtime API request ID: {}",
+                    crate::log_prefix(),
+                    e
+                );
                 panic!(
                     "[{}] Invalid request ID header from Lambda Runtime API: {}",
                     crate::log_prefix(),
@@ -147,8 +141,14 @@ pub mod extension {
         match LAMBDA_EXTENSION_IDENTIFIER.get() {
             Some(id) => id,
             None => {
-                tracing::error!("[{}] Lambda Extension Identifier not set - extension not registered", crate::log_prefix_with("Extension"));
-                panic!("[{}] Extension must be registered before use", crate::log_prefix_with("Extension"));
+                tracing::error!(
+                    "[{}] Lambda Extension Identifier not set - extension not registered",
+                    crate::log_prefix_with("Extension")
+                );
+                panic!(
+                    "[{}] Extension must be registered before use",
+                    crate::log_prefix_with("Extension")
+                );
             }
         }
     }
@@ -167,7 +167,11 @@ pub mod extension {
                     crate::log_prefix_with("Extension"),
                     e
                 );
-                panic!("[{}] Failed to build Extensions API URI - severe misconfiguration: {}", crate::log_prefix_with("Extension"), e);
+                panic!(
+                    "[{}] Failed to build Extensions API URI - severe misconfiguration: {}",
+                    crate::log_prefix_with("Extension"),
+                    e
+                );
             }
         }
     }
@@ -201,7 +205,11 @@ pub mod extension {
                     .append("Lambda-Extension-Name", header_value);
             }
             Err(e) => {
-                tracing::error!("[{}] Invalid extension name: {}", crate::log_prefix_with("Extension"), e);
+                tracing::error!(
+                    "[{}] Invalid extension name: {}",
+                    crate::log_prefix_with("Extension"),
+                    e
+                );
                 panic!(
                     "[{}] Cannot register with invalid extension name: {}",
                     crate::log_prefix_with("Extension"),
@@ -218,7 +226,11 @@ pub mod extension {
                     crate::log_prefix_with("Extension"),
                     e
                 );
-                panic!("[{}] Failed to register extension: {}", crate::log_prefix_with("Extension"), e);
+                panic!(
+                    "[{}] Failed to register extension: {}",
+                    crate::log_prefix_with("Extension"),
+                    e
+                );
             }
         };
 
@@ -231,7 +243,11 @@ pub mod extension {
                         crate::log_prefix_with("Extension"),
                         e
                     );
-                    panic!("[{}] Cannot parse extension identifier: {}", crate::log_prefix_with("Extension"), e);
+                    panic!(
+                        "[{}] Cannot parse extension identifier: {}",
+                        crate::log_prefix_with("Extension"),
+                        e
+                    );
                 }
             },
             None => {
@@ -244,8 +260,15 @@ pub mod extension {
         };
 
         if let Err(e) = LAMBDA_EXTENSION_IDENTIFIER.set(extension_identifier.to_owned()) {
-            tracing::error!("[{}] Extension identifier already set: {:?}", crate::log_prefix_with("Extension"), e);
-            panic!("[{}] Cannot register extension twice", crate::log_prefix_with("Extension"));
+            tracing::error!(
+                "[{}] Extension identifier already set: {:?}",
+                crate::log_prefix_with("Extension"),
+                e
+            );
+            panic!(
+                "[{}] Cannot register extension twice",
+                crate::log_prefix_with("Extension")
+            );
         }
     }
 
@@ -351,7 +374,10 @@ pub mod extension {
                         let (tx, rx) = tokio::sync::oneshot::channel();
                         crate::store::store_runtime_done_notifier(tx);
 
-                        tracing::info!("[{}] Waiting for platform.runtimeDone", crate::log_prefix_with("Extension"));
+                        tracing::info!(
+                            "[{}] Waiting for platform.runtimeDone",
+                            crate::log_prefix_with("Extension")
+                        );
 
                         // Wait for the signal with a timeout to prevent indefinite blocking
                         match tokio::time::timeout(
@@ -365,26 +391,6 @@ pub mod extension {
                                     "[{}] Received platform.runtimeDone signal",
                                     crate::log_prefix_with("Extension")
                                 );
-                                if let Some(invocation_id) =
-                                    crate::store::get_current_invocation_id()
-                                {
-                                    if let Some(end_time) =
-                                        crate::store::take_invocation_end(&invocation_id)
-                                    {
-                                        if let Ok(now) = std::time::SystemTime::now()
-                                            .duration_since(std::time::UNIX_EPOCH)
-                                        {
-                                            let duration = now.as_nanos() as u64 - end_time;
-                                            let duration_in_ms = duration as f64 / 1_000_000.0;
-                                            tracing::info!(
-                                                duration = duration_in_ms,
-                                                "metric_name" = "extension_platform_runtime_done_wait_time",
-                                                "Time waiting for platform.runtimeDone: {} ms",
-                                                duration_in_ms
-                                            );
-                                        }
-                                    }
-                                }
                                 crate::backend_send::flush_traces().await;
                                 crate::backend_send::flush_logs(true).await;
                             }
@@ -511,7 +517,11 @@ pub mod extension {
                     crate::log_prefix_with("Extension"),
                     e
                 );
-                panic!("[{}] Failed to build Telemetry API URI - severe misconfiguration: {}", crate::log_prefix_with("Extension"), e);
+                panic!(
+                    "[{}] Failed to build Telemetry API URI - severe misconfiguration: {}",
+                    crate::log_prefix_with("Extension"),
+                    e
+                );
             }
         }
     }
@@ -583,12 +593,19 @@ pub async fn fetch_and_cache_account_id() -> Option<String> {
                 );
                 Some(account)
             } else {
-                tracing::error!("[{}] STS GetCallerIdentity did not return an account ID", crate::log_prefix());
+                tracing::error!(
+                    "[{}] STS GetCallerIdentity did not return an account ID",
+                    crate::log_prefix()
+                );
                 None
             }
         }
         Err(err) => {
-            tracing::error!("[{}] Failed calling STS GetCallerIdentity: {}", crate::log_prefix(), err);
+            tracing::error!(
+                "[{}] Failed calling STS GetCallerIdentity: {}",
+                crate::log_prefix(),
+                err
+            );
             None
         }
     }

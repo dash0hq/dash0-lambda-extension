@@ -86,7 +86,8 @@ async fn main() {
     tracing::info!("[{}] start; path={}", crate::log_prefix(), exe_path);
 
     tracing::info!(
-        "[{}] commandline arguments: {}", crate::log_prefix(),
+        "[{}] commandline arguments: {}",
+        crate::log_prefix(),
         std::env::args()
             .map(|v| format!("\"{}\"", v))
             .collect::<Vec<String>>()
@@ -99,10 +100,14 @@ async fn main() {
         Ok(addr) => addr,
         Err(e) => {
             tracing::error!(
-                "[{}] Invalid IP specification from Lambda Runtime API endpoint: {}", crate::log_prefix(),
+                "[{}] Invalid IP specification from Lambda Runtime API endpoint: {}",
+                crate::log_prefix(),
                 e
             );
-            panic!("[{}] Cannot start without valid listener address", crate::log_prefix());
+            panic!(
+                "[{}] Cannot start without valid listener address",
+                crate::log_prefix()
+            );
         }
     };
     tracing::info!("[{}] listening on {}", crate::log_prefix(), addr);
@@ -135,7 +140,11 @@ async fn main() {
             tracing::error!("[{}] Hyper server error: {}", crate::log_prefix(), e);
         }
         Err(e) => {
-            tracing::error!("[{}] Failed to join server task: {}", crate::log_prefix(), e);
+            tracing::error!(
+                "[{}] Failed to join server task: {}",
+                crate::log_prefix(),
+                e
+            );
         }
     }
 }

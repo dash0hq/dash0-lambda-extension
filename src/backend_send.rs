@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::time::Duration;
 
 use hyper::{header, Body, Request, Uri};
@@ -6,7 +5,7 @@ use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 
 use crate::route::HTTPS_CLIENT;
-use crate::store::{store_traces, take_telemetry_logs, take_traces, StoredTrace};
+use crate::store::{take_telemetry_logs, take_traces, StoredTrace};
 use crate::util::log_mutations::{get_resources_attributes, map_logs_to_otlp};
 use crate::util::parsers::parse_otlp_endpoint;
 use crate::util::span_mutations::merge_telemetry_invocation_data;
@@ -67,7 +66,11 @@ pub async fn flush_logs(is_invocation_end: bool) {
     let req = match _build_otlp_request("/v1/logs", hyper::Method::POST, body, Some(&headers)) {
         Ok(req) => req,
         Err(err) => {
-            tracing::error!("[{}] Failed to build log request: {}", crate::log_prefix(), err);
+            tracing::error!(
+                "[{}] Failed to build log request: {}",
+                crate::log_prefix(),
+                err
+            );
             store_telemetry_logs(logs);
             return;
         }
@@ -98,58 +101,34 @@ pub async fn send_traces(traces: Vec<StoredTrace>) {
         return;
     }
 
-    let original_traces = traces.clone();
+    let trace_count = traces.len();
 
-    let (req, combined_trace, mut failed) = match _build_traces_request(traces, &original_traces) {
-        Some(result) => result,
+    let req = match _build_traces_request(traces) {
+        Some(req) => req,
         None => return,
     };
 
-    // match ExportTraceServiceRequest::decode(combined_trace.body.as_slice()) {
-    //     Ok(decoded_trace) => {
-    //         tracing::info!("[{}] Combined trace payload: {:?}", crate::log_prefix(), decoded_trace);
-    //     }
-    //     Err(err) => {
-    //         tracing::error!("[{}] Failed to decode combined trace payload: {}", crate::log_prefix(), err);
-    //     }
-    // }
-
     let client = &*HTTPS_CLIENT;
 
-    if let Err(_err) = send_request(client, req, original_traces.len(), "buffered traces").await {
-        failed.extend(original_traces.clone());
-    }
-
-    if !failed.is_empty() {
-        store_traces(failed)
-    }
-
-    let mut seen = HashSet::new();
-    for id in combined_trace.invocation_ids {
-        if seen.insert(id.clone()) {
-            crate::store::cleanup_invocation(&id);
-        }
-    }
+    let _ = send_request(client, req, trace_count, "buffered traces").await;
 }
 
-fn _build_traces_request(
-    traces: Vec<StoredTrace>,
-    original_traces: &[StoredTrace],
-) -> Option<(Request<Body>, StoredTrace, Vec<StoredTrace>)> {
+fn _build_traces_request(traces: Vec<StoredTrace>) -> Option<Request<Body>> {
     let mut traces_iter = traces.into_iter();
     let base_trace = match traces_iter.next() {
         Some(trace) => trace,
         None => {
-            tracing::error!("[{}] _build_traces_request called with empty traces vector", crate::log_prefix());
+            tracing::error!(
+                "[{}] _build_traces_request called with empty traces vector",
+                crate::log_prefix()
+            );
             return None;
         }
     };
 
-    let (combined_resource_spans, all_invocation_ids, failed) =
-        combine_traces(&base_trace, traces_iter);
+    let combined_resource_spans = combine_traces(&base_trace, traces_iter);
 
     if combined_resource_spans.is_empty() {
-        store_traces(original_traces.to_vec());
         return None;
     }
 
@@ -157,29 +136,26 @@ fn _build_traces_request(
         resource_spans: combined_resource_spans,
     };
 
-    let combined_trace = StoredTrace {
-        method: base_trace.method.clone(),
-        path_and_query: base_trace.path_and_query.clone(),
-        headers: base_trace.headers.clone(),
-        body: combined_export.encode_to_vec(),
-        invocation_ids: all_invocation_ids,
-    };
+    let body = combined_export.encode_to_vec();
 
     let req = match _build_otlp_request(
-        combined_trace.path_and_query.as_str(),
-        combined_trace.method.clone(),
-        combined_trace.body.clone(),
-        Some(&combined_trace.headers),
+        base_trace.path_and_query.as_str(),
+        base_trace.method.clone(),
+        body,
+        Some(&base_trace.headers),
     ) {
         Ok(req) => req,
         Err(err) => {
-            tracing::error!("[{}] Failed to build trace request: {}", crate::log_prefix(), err);
-            store_traces(original_traces.to_vec());
+            tracing::error!(
+                "[{}] Failed to build trace request: {}",
+                crate::log_prefix(),
+                err
+            );
             return None;
         }
     };
 
-    Some((req, combined_trace, failed))
+    Some(req)
 }
 
 fn _build_otlp_request(
@@ -249,7 +225,8 @@ async fn send_request(
                 tracing::info!(
                     count = item_count,
                     duration = start.elapsed().as_millis(),
-                    "[{}] Sent {} (count={}) in {} ms, status={}", crate::log_prefix(),
+                    "[{}] Sent {} (count={}) in {} ms, status={}",
+                    crate::log_prefix(),
                     item_type,
                     item_count,
                     start.elapsed().as_millis(),
@@ -258,7 +235,8 @@ async fn send_request(
                 Ok(())
             } else {
                 tracing::error!(
-                    "[{}] Error sending {} Non-2xx sending {} in {} ms: status={}", crate::log_prefix(),
+                    "[{}] Error sending {} Non-2xx sending {} in {} ms: status={}",
+                    crate::log_prefix(),
                     item_type,
                     item_type,
                     start.elapsed().as_millis(),
@@ -269,7 +247,8 @@ async fn send_request(
         }
         Ok(Err(err)) => {
             tracing::error!(
-                "[{}] Error sending {} in {} ms: {}", crate::log_prefix(),
+                "[{}] Error sending {} in {} ms: {}",
+                crate::log_prefix(),
                 item_type,
                 start.elapsed().as_millis(),
                 err
@@ -278,7 +257,8 @@ async fn send_request(
         }
         Err(_) => {
             tracing::error!(
-                "[{}] Error sending {} in {} ms: timeout", crate::log_prefix(),
+                "[{}] Error sending {} in {} ms: timeout",
+                crate::log_prefix(),
                 item_type,
                 start.elapsed().as_millis()
             );
@@ -290,24 +270,20 @@ async fn send_request(
 fn combine_traces(
     base_trace: &StoredTrace,
     traces_iter: std::vec::IntoIter<StoredTrace>,
-) -> (
-    Vec<opentelemetry_proto::tonic::trace::v1::ResourceSpans>,
-    Vec<String>,
-    Vec<StoredTrace>,
-) {
+) -> Vec<opentelemetry_proto::tonic::trace::v1::ResourceSpans> {
     let mut combined_resource_spans = Vec::new();
-    let mut all_invocation_ids = base_trace.invocation_ids.clone();
-    let mut failed = Vec::new();
 
     let process_trace =
         |trace: &StoredTrace,
-         combined: &mut Vec<opentelemetry_proto::tonic::trace::v1::ResourceSpans>,
-         failed: &mut Vec<StoredTrace>| {
+         combined: &mut Vec<opentelemetry_proto::tonic::trace::v1::ResourceSpans>| {
             let decoded = match ExportTraceServiceRequest::decode(trace.body.as_slice()) {
                 Ok(d) => d,
                 Err(err) => {
-                    tracing::error!("[{}] Failed to decode trace payload: {}", crate::log_prefix(), err);
-                    failed.push(trace.clone());
+                    tracing::error!(
+                        "[{}] Failed to decode trace payload: {}",
+                        crate::log_prefix(),
+                        err
+                    );
                     return;
                 }
             };
@@ -315,14 +291,13 @@ fn combine_traces(
             combined.extend(decoded.resource_spans);
         };
 
-    process_trace(base_trace, &mut combined_resource_spans, &mut failed);
+    process_trace(base_trace, &mut combined_resource_spans);
 
     for trace in traces_iter {
-        all_invocation_ids.extend(trace.invocation_ids.clone());
-        process_trace(&trace, &mut combined_resource_spans, &mut failed);
+        process_trace(&trace, &mut combined_resource_spans);
     }
 
-    (combined_resource_spans, all_invocation_ids, failed)
+    combined_resource_spans
 }
 
 #[cfg(test)]
@@ -362,11 +337,9 @@ mod tests {
         let base_trace = create_valid_trace(vec!["inv-1".to_string()], 2);
         let traces_iter = vec![].into_iter();
 
-        let (resource_spans, invocation_ids, failed) = combine_traces(&base_trace, traces_iter);
+        let resource_spans = combine_traces(&base_trace, traces_iter);
 
         assert_eq!(resource_spans.len(), 2);
-        assert_eq!(invocation_ids, vec!["inv-1".to_string()]);
-        assert!(failed.is_empty());
     }
 
     #[test]
@@ -376,18 +349,9 @@ mod tests {
         let trace3 = create_valid_trace(vec!["inv-3".to_string()], 1);
         let traces_iter = vec![trace2, trace3].into_iter();
 
-        let (resource_spans, invocation_ids, failed) = combine_traces(&base_trace, traces_iter);
+        let resource_spans = combine_traces(&base_trace, traces_iter);
 
         assert_eq!(resource_spans.len(), 6); // 2 + 3 + 1
-        assert_eq!(
-            invocation_ids,
-            vec![
-                "inv-1".to_string(),
-                "inv-2".to_string(),
-                "inv-3".to_string()
-            ]
-        );
-        assert!(failed.is_empty());
     }
 
     #[test]
@@ -396,15 +360,9 @@ mod tests {
         let trace2 = create_valid_trace(vec!["inv-2".to_string()], 2);
         let traces_iter = vec![trace2].into_iter();
 
-        let (resource_spans, invocation_ids, failed) = combine_traces(&base_trace, traces_iter);
+        let resource_spans = combine_traces(&base_trace, traces_iter);
 
         assert_eq!(resource_spans.len(), 2); // Only from trace2
-        assert_eq!(
-            invocation_ids,
-            vec!["inv-1".to_string(), "inv-2".to_string()]
-        );
-        assert_eq!(failed.len(), 1);
-        assert_eq!(failed[0].invocation_ids, vec!["inv-1".to_string()]);
     }
 
     #[test]
@@ -412,21 +370,11 @@ mod tests {
         let base_trace = create_valid_trace(vec!["inv-1".to_string()], 2);
         let trace2 = create_invalid_trace(vec!["inv-2".to_string()]);
         let trace3 = create_valid_trace(vec!["inv-3".to_string()], 1);
-        let traces_iter = vec![trace2.clone(), trace3].into_iter();
+        let traces_iter = vec![trace2, trace3].into_iter();
 
-        let (resource_spans, invocation_ids, failed) = combine_traces(&base_trace, traces_iter);
+        let resource_spans = combine_traces(&base_trace, traces_iter);
 
         assert_eq!(resource_spans.len(), 3); // 2 from base + 1 from trace3
-        assert_eq!(
-            invocation_ids,
-            vec![
-                "inv-1".to_string(),
-                "inv-2".to_string(),
-                "inv-3".to_string()
-            ]
-        );
-        assert_eq!(failed.len(), 1);
-        assert_eq!(failed[0].invocation_ids, vec!["inv-2".to_string()]);
     }
 
     #[test]
@@ -435,14 +383,9 @@ mod tests {
         let trace2 = create_invalid_trace(vec!["inv-2".to_string()]);
         let traces_iter = vec![trace2].into_iter();
 
-        let (resource_spans, invocation_ids, failed) = combine_traces(&base_trace, traces_iter);
+        let resource_spans = combine_traces(&base_trace, traces_iter);
 
         assert!(resource_spans.is_empty());
-        assert_eq!(
-            invocation_ids,
-            vec!["inv-1".to_string(), "inv-2".to_string()]
-        );
-        assert_eq!(failed.len(), 2);
     }
 
     #[test]
@@ -451,19 +394,9 @@ mod tests {
         let trace2 = create_valid_trace(vec!["inv-3".to_string(), "inv-4".to_string()], 1);
         let traces_iter = vec![trace2].into_iter();
 
-        let (resource_spans, invocation_ids, failed) = combine_traces(&base_trace, traces_iter);
+        let resource_spans = combine_traces(&base_trace, traces_iter);
 
         assert_eq!(resource_spans.len(), 2);
-        assert_eq!(
-            invocation_ids,
-            vec![
-                "inv-1".to_string(),
-                "inv-2".to_string(),
-                "inv-3".to_string(),
-                "inv-4".to_string()
-            ]
-        );
-        assert!(failed.is_empty());
     }
 
     #[test]
@@ -472,14 +405,9 @@ mod tests {
         let trace2 = create_valid_trace(vec!["inv-2".to_string()], 0);
         let traces_iter = vec![trace2].into_iter();
 
-        let (resource_spans, invocation_ids, failed) = combine_traces(&base_trace, traces_iter);
+        let resource_spans = combine_traces(&base_trace, traces_iter);
 
         assert!(resource_spans.is_empty());
-        assert_eq!(
-            invocation_ids,
-            vec!["inv-1".to_string(), "inv-2".to_string()]
-        );
-        assert!(failed.is_empty());
     }
 
     #[test]
@@ -492,15 +420,14 @@ mod tests {
         // Create valid traces
         let trace1 = create_valid_trace(vec!["inv-1".to_string()], 2);
         let trace2 = create_valid_trace(vec!["inv-2".to_string()], 3);
-        let traces = vec![trace1.clone(), trace2];
-        let original_traces = traces.clone();
+        let traces = vec![trace1, trace2];
 
         // Call _build_traces_request
-        let result = _build_traces_request(traces, &original_traces);
+        let result = _build_traces_request(traces);
 
         // Verify we got a result
         assert!(result.is_some());
-        let (req, combined_trace, failed) = result.unwrap();
+        let req = result.unwrap();
 
         // Verify the request was built
         assert_eq!(req.method(), &Method::POST);
@@ -512,18 +439,6 @@ mod tests {
         let headers = req.headers();
         assert!(headers.contains_key(header::HOST));
         assert!(headers.contains_key(header::CONTENT_LENGTH));
-
-        // Verify combined trace
-        assert_eq!(combined_trace.invocation_ids.len(), 2);
-        assert_eq!(combined_trace.invocation_ids[0], "inv-1");
-        assert_eq!(combined_trace.invocation_ids[1], "inv-2");
-
-        // Verify the body is valid protobuf
-        let decoded = ExportTraceServiceRequest::decode(combined_trace.body.as_slice()).unwrap();
-        assert_eq!(decoded.resource_spans.len(), 5); // 2 + 3
-
-        // Verify no failures
-        assert!(failed.is_empty());
 
         // Clean up
         env::remove_var("DASH0_ENDPOINT");

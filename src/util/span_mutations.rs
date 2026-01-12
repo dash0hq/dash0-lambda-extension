@@ -72,7 +72,8 @@ pub fn build_runtime_error_trace(
         });
     } else {
         tracing::warn!(
-            "[{}] No stored event payload found for invocation id {}", crate::log_prefix(),
+            "[{}] No stored event payload found for invocation id {}",
+            crate::log_prefix(),
             invocation_id
         );
     }
@@ -342,7 +343,8 @@ fn annotate_server_spans(spans: &mut Vec<Span>, invocation_ids: &mut Vec<String>
                 touched = true;
             } else {
                 tracing::warn!(
-                    "[{}] No stored event payload found for invocation id {}", crate::log_prefix(),
+                    "[{}] No stored event payload found for invocation id {}",
+                    crate::log_prefix(),
                     invocation_id
                 );
             }
@@ -373,7 +375,8 @@ pub fn add_return_payload_to_lambda_server_spans(
             }
             Err(err) => {
                 tracing::error!(
-                    "[{}] Failed to decode trace payload while adding return value for {}: {}", crate::log_prefix(),
+                    "[{}] Failed to decode trace payload while adding return value for {}: {}",
+                    crate::log_prefix(),
                     invocation_id,
                     err
                 );
@@ -493,17 +496,29 @@ pub fn process_trace_request(
     if added {
         *encoded_body = decoded.encode_to_vec();
         tracing::info!(
-            "[{}] /v1/traces added faas.event payload to lambda server span. invocation_ids={:?}", crate::log_prefix(),
+            "[{}] /v1/traces added faas.event payload to lambda server span. invocation_ids={:?}",
+            crate::log_prefix(),
             invocation_ids
         );
         modified = true;
     } else {
-        tracing::info!("[{}] /v1/traces no lambda server span found to annotate", crate::log_prefix());
+        tracing::info!(
+            "[{}] /v1/traces no lambda server span found to annotate",
+            crate::log_prefix()
+        );
     }
 
     match serde_json::to_string(&decoded) {
-        Ok(json) => tracing::trace!("[{}] /v1/traces forward payload (json): {}", crate::log_prefix(), json),
-        Err(err) => tracing::error!("[{}] /v1/traces failed to render json: {}", crate::log_prefix(), err),
+        Ok(json) => tracing::trace!(
+            "[{}] /v1/traces forward payload (json): {}",
+            crate::log_prefix(),
+            json
+        ),
+        Err(err) => tracing::error!(
+            "[{}] /v1/traces failed to render json: {}",
+            crate::log_prefix(),
+            err
+        ),
     }
 
     // If we have pending return payloads for these invocation IDs, apply them now.
@@ -548,7 +563,8 @@ pub fn process_trace_request(
                                     span_id_hex,
                                 );
                                 tracing::debug!(
-                                    "[{}] stored trace/span id for invocation_id={}", crate::log_prefix(),
+                                    "[{}] stored trace/span id for invocation_id={}",
+                                    crate::log_prefix(),
                                     invocation_id
                                 );
                             }
@@ -1423,7 +1439,8 @@ fn get_trace_span_ids(invocation_id: &str, existing_traces: &[StoredTrace]) -> (
         }
         if let Ok(decoded) = ExportTraceServiceRequest::decode(trace.body.as_slice()) {
             tracing::info!(
-                "[{}] found stored trace for invocation id {}", crate::log_prefix(),
+                "[{}] found stored trace for invocation id {}",
+                crate::log_prefix(),
                 invocation_id,
             );
             if let Some(span) = decoded

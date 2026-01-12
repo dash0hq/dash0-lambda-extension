@@ -1,13 +1,3 @@
-//
-// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-// SPDX-License-Identifier: MIT-0
-//
-
-//! Access the ENV for the Extension (and Proxy)
-//!
-//! Utilities and other helper functions for thread-safe access and lazy initializers
-//!
-
 use once_cell::sync::OnceCell;
 
 /// Sandbox's Runtime API endpoint
@@ -30,7 +20,10 @@ pub fn latch_runtime_env() {
 
     // Latch in the ORIGIN we should proxy to the application
     if let Err(_) = LAMBDA_RUNTIME_API.set(aws_lambda_runtime_api.clone()) {
-        tracing::error!("[{}] AWS_LAMBDA_RUNTIME_API was already set, cannot initialize twice", crate::log_prefix());
+        tracing::error!(
+            "[{}] AWS_LAMBDA_RUNTIME_API was already set, cannot initialize twice",
+            crate::log_prefix()
+        );
         panic!("[{}] Environment already initialized", crate::log_prefix());
     }
 
@@ -42,7 +35,10 @@ pub fn latch_runtime_env() {
     let lrap_api = format!("0.0.0.0:{}", listener_port);
 
     if let Err(_) = LRAP_API.set(lrap_api.clone()) {
-        tracing::error!("[{}] LRAP_API was already set, cannot initialize twice", crate::log_prefix());
+        tracing::error!(
+            "[{}] LRAP_API was already set, cannot initialize twice",
+            crate::log_prefix()
+        );
         panic!("[{}] Environment already initialized", crate::log_prefix());
     }
 }
@@ -56,8 +52,14 @@ pub fn sandbox_runtime_api() -> &'static str {
         None => {
             latch_runtime_env();
             LAMBDA_RUNTIME_API.get().unwrap_or_else(|| {
-                tracing::error!("[{}] Failed to initialize AWS_LAMBDA_RUNTIME_API", crate::log_prefix());
-                panic!("[{}] Cannot proceed without runtime API configuration", crate::log_prefix());
+                tracing::error!(
+                    "[{}] Failed to initialize AWS_LAMBDA_RUNTIME_API",
+                    crate::log_prefix()
+                );
+                panic!(
+                    "[{}] Cannot proceed without runtime API configuration",
+                    crate::log_prefix()
+                );
             })
         }
     }
@@ -71,8 +73,14 @@ pub fn lrap_api() -> &'static str {
         None => {
             latch_runtime_env();
             LRAP_API.get().unwrap_or_else(|| {
-                tracing::error!("[{}] Failed to initialize LRAP_API host:port", crate::log_prefix());
-                panic!("[{}] Cannot proceed without proxy listener configuration", crate::log_prefix());
+                tracing::error!(
+                    "[{}] Failed to initialize LRAP_API host:port",
+                    crate::log_prefix()
+                );
+                panic!(
+                    "[{}] Cannot proceed without proxy listener configuration",
+                    crate::log_prefix()
+                );
             })
         }
     }

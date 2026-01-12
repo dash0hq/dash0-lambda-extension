@@ -90,7 +90,11 @@ pub fn parse_otlp_endpoint() -> Option<(String, String)> {
     let lumigo_endpoint = match std::env::var("DASH0_ENDPOINT") {
         Ok(val) => val,
         Err(err) => {
-            tracing::warn!("[{}] endpoint not set; cannot send traces: {}", crate::log_prefix(), err);
+            tracing::warn!(
+                "[{}] endpoint not set; cannot send traces: {}",
+                crate::log_prefix(),
+                err
+            );
             return None;
         }
     };
@@ -98,7 +102,11 @@ pub fn parse_otlp_endpoint() -> Option<(String, String)> {
     let base_uri: hyper::Uri = match lumigo_endpoint.parse() {
         Ok(uri) => uri,
         Err(err) => {
-            tracing::error!("[{}] Invalid endpoint; cannot send traces: {}", crate::log_prefix(), err);
+            tracing::error!(
+                "[{}] Invalid endpoint; cannot send traces: {}",
+                crate::log_prefix(),
+                err
+            );
             return None;
         }
     };
@@ -106,7 +114,10 @@ pub fn parse_otlp_endpoint() -> Option<(String, String)> {
     let scheme = match base_uri.scheme_str() {
         Some(s) => s.to_string(),
         None => {
-            tracing::error!("[{}] endpoint missing scheme; cannot send traces", crate::log_prefix(),);
+            tracing::error!(
+                "[{}] endpoint missing scheme; cannot send traces",
+                crate::log_prefix(),
+            );
             return None;
         }
     };
@@ -114,7 +125,10 @@ pub fn parse_otlp_endpoint() -> Option<(String, String)> {
     let authority = match base_uri.authority() {
         Some(a) => a.to_string(),
         None => {
-            tracing::error!("[{}] endpoint missing authority; cannot send traces", crate::log_prefix(),);
+            tracing::error!(
+                "[{}] endpoint missing authority; cannot send traces",
+                crate::log_prefix(),
+            );
             return None;
         }
     };
