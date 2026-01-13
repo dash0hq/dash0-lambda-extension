@@ -1,6 +1,6 @@
 use crate::store::{
-    get_event_payload, get_invocation_start, store_return_payload, store_traces,
-    take_return_payload, take_traces, StoredTrace,
+    get_event_payload, store_return_payload, store_traces, take_return_payload, take_traces,
+    StoredTrace,
 };
 use crate::util::log_mutations::try_read_env_from_file;
 use crate::util::parsers::{
@@ -36,7 +36,10 @@ pub fn build_runtime_error_trace(
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_nanos() as u64)
         .unwrap_or(0);
-    let start_nanos = get_invocation_start(invocation_id).unwrap_or(now_nanos);
+    let start_nanos = crate::store::get_invocation_data(invocation_id)
+        .map(|data| (data.start_time * 1_000_000.0) as u64)
+        .filter(|&t| t > 0)
+        .unwrap_or(now_nanos);
 
     let mut attributes = vec![
         KeyValue {
@@ -261,7 +264,7 @@ fn create_exception_event(
             }
 
             if let Some(status_code) = json_val.get("statusCode").and_then(|v| v.as_i64()) {
-                if status_code > 400 {
+                if status_code >= 400 {
                     let body = json_val
                         .get("body")
                         .and_then(|v| v.as_str())
@@ -585,8 +588,8 @@ mod tests {
         annotate_return_payload, build_runtime_error_trace, StatusCode,
     };
     use crate::store::{
-        snapshot_traces, store_event_payload, store_invocation_start, store_return_payload,
-        store_trace, take_return_payload, take_traces, StoredTrace,
+        snapshot_traces, store_event_payload, store_return_payload, store_trace,
+        take_return_payload, take_traces, StoredTrace,
     };
     use hyper::{header, Method};
     use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
@@ -609,7 +612,6 @@ mod tests {
     fn builds_trace_with_event_payload_and_invocation_id() {
         let invocation_id = "inv-test-1";
         store_event_payload(invocation_id, r#"{"foo":"bar"}"#);
-        store_invocation_start(invocation_id, 123);
 
         let trace = build_runtime_error_trace(invocation_id, Some("CustomError"), None, &[])
             .expect("trace should build");
@@ -669,7 +671,6 @@ mod tests {
     #[serial]
     fn builds_trace_without_event_payload() {
         let invocation_id = "inv-test-2";
-        store_invocation_start(invocation_id, 456);
 
         let trace = build_runtime_error_trace(invocation_id, Some("error"), None, &[])
             .expect("trace should build");
@@ -1150,7 +1151,6 @@ mod tests {
     #[serial]
     fn builds_trace_with_error_from_return_value() {
         let invocation_id = "inv-error-json";
-        store_invocation_start(invocation_id, 789);
         let error_json = r#"{"errorMessage": "Something went wrong", "errorType": "ValueError", "requestId": "123", "stackTrace": ["line1\n", "line2\n"]}"#;
 
         let trace = build_runtime_error_trace(invocation_id, None, Some(error_json), &[])

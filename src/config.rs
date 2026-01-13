@@ -31,6 +31,20 @@ pub fn max_event_payload_size() -> usize {
     }
 }
 
+pub fn request_timeout_ms() -> u64 {
+    match std::env::var("DASH0_REQUEST_TIMEOUT") {
+        Ok(val) => val.parse::<u64>().unwrap_or(2000),
+        Err(_) => 2000,
+    }
+}
+
+pub fn request_retries() -> usize {
+    match std::env::var("DASH0_REQUEST_RETRIES") {
+        Ok(val) => val.parse::<usize>().unwrap_or(1),
+        Err(_) => 1,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{is_auto_instrumented_disabled, is_send_on_invocation_end, max_event_payload_size};

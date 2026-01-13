@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::time::Instant;
 
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
@@ -19,23 +20,6 @@ pub fn store_event_payload(invocation_id: &str, payload: &str) {
 }
 
 static EVENT_PAYLOADS: Lazy<Mutex<HashMap<String, String>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
-
-pub fn store_invocation_start(invocation_id: &str, nanos: u64) {
-    INVOCATION_STARTS
-        .lock()
-        .insert(invocation_id.to_string(), nanos);
-}
-
-pub fn get_invocation_start(invocation_id: &str) -> Option<u64> {
-    INVOCATION_STARTS.lock().get(invocation_id).cloned()
-}
-
-pub fn take_invocation_start(invocation_id: &str) -> Option<u64> {
-    INVOCATION_STARTS.lock().remove(invocation_id)
-}
-
-static INVOCATION_STARTS: Lazy<Mutex<HashMap<String, u64>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
 pub fn store_trace(trace: StoredTrace) {
@@ -127,16 +111,43 @@ pub fn take_telemetry_logs() -> Vec<TelemetryLog> {
 
 static TELEMETRY_LOGS: Lazy<Mutex<Vec<TelemetryLog>>> = Lazy::new(|| Mutex::new(Vec::new()));
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct SpanId {
     pub trace_id: String,
     pub span_id: String,
+    pub timestamp: Instant,
 }
 
+impl PartialEq for SpanId {
+    fn eq(&self, other: &Self) -> bool {
+        self.trace_id == other.trace_id && self.span_id == other.span_id
+    }
+}
+
+const MAX_INVOCATION_SPAN_IDS: usize = 10;
+
 pub fn store_invocation_span_id(invocation_id: &str, trace_id: String, span_id: String) {
-    INVOCATION_SPAN_IDS
-        .lock()
-        .insert(invocation_id.to_string(), SpanId { trace_id, span_id });
+    let mut store = INVOCATION_SPAN_IDS.lock();
+
+    // If we're at capacity and this is a new key, remove the oldest entry
+    if store.len() >= MAX_INVOCATION_SPAN_IDS && !store.contains_key(invocation_id) {
+        if let Some(oldest_key) = store
+            .iter()
+            .min_by_key(|(_, v)| v.timestamp)
+            .map(|(k, _)| k.clone())
+        {
+            store.remove(&oldest_key);
+        }
+    }
+
+    store.insert(
+        invocation_id.to_string(),
+        SpanId {
+            trace_id,
+            span_id,
+            timestamp: Instant::now(),
+        },
+    );
 }
 
 pub fn get_invocation_span_id(invocation_id: &str) -> Option<SpanId> {
@@ -191,7 +202,6 @@ pub fn take_invocation_data(invocation_id: &str) -> Option<InvocationData> {
 
 pub(crate) fn cleanup_invocation(invocation_id: &str) {
     take_event_payload(invocation_id);
-    take_invocation_start(invocation_id);
     take_return_payload(invocation_id);
     take_invocation_data(invocation_id);
 }
@@ -320,5 +330,115 @@ mod tests {
         let result = get_invocation_data(invocation_id).expect("Should exist");
         assert_eq!(result.start_time, 100.0);
         assert_eq!(result.duration, 50.0);
+    }
+
+    // ============================================================================
+    // Tests for invocation span ID storage functions
+    // ============================================================================
+
+    #[cfg(test)]
+    fn clear_invocation_span_ids() {
+        INVOCATION_SPAN_IDS.lock().clear();
+    }
+
+    #[cfg(test)]
+    fn invocation_span_ids_len() -> usize {
+        INVOCATION_SPAN_IDS.lock().len()
+    }
+
+    #[test]
+    #[serial]
+    fn test_invocation_span_ids_max_capacity() {
+        clear_invocation_span_ids();
+
+        // Store 10 span IDs with small delays to ensure different timestamps
+        for i in 0..10 {
+            store_invocation_span_id(
+                &format!("inv-{}", i),
+                format!("trace-{}", i),
+                format!("span-{}", i),
+            );
+            // Small sleep to ensure distinct timestamps
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+
+        // Verify all 10 are present
+        assert_eq!(invocation_span_ids_len(), 10);
+        for i in 0..10 {
+            assert!(
+                get_invocation_span_id(&format!("inv-{}", i)).is_some(),
+                "inv-{} should exist",
+                i
+            );
+        }
+
+        // Add an 11th item
+        store_invocation_span_id("inv-10", "trace-10".to_string(), "span-10".to_string());
+
+        // Verify the map still has only 10 items
+        assert_eq!(invocation_span_ids_len(), 10);
+
+        // Verify the oldest one (inv-0) was removed
+        assert!(
+            get_invocation_span_id("inv-0").is_none(),
+            "inv-0 should have been evicted"
+        );
+
+        // Verify the newest one exists
+        assert!(
+            get_invocation_span_id("inv-10").is_some(),
+            "inv-10 should exist"
+        );
+
+        // Verify items 1-9 still exist
+        for i in 1..10 {
+            assert!(
+                get_invocation_span_id(&format!("inv-{}", i)).is_some(),
+                "inv-{} should still exist",
+                i
+            );
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn test_invocation_span_ids_update_existing_does_not_evict() {
+        clear_invocation_span_ids();
+
+        // Store 10 span IDs
+        for i in 0..10 {
+            store_invocation_span_id(
+                &format!("inv-{}", i),
+                format!("trace-{}", i),
+                format!("span-{}", i),
+            );
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+
+        assert_eq!(invocation_span_ids_len(), 10);
+
+        // Update an existing key (should not evict anything)
+        store_invocation_span_id(
+            "inv-0",
+            "trace-0-updated".to_string(),
+            "span-0-updated".to_string(),
+        );
+
+        // Verify still 10 items
+        assert_eq!(invocation_span_ids_len(), 10);
+
+        // Verify the update took effect
+        let updated = get_invocation_span_id("inv-0").expect("inv-0 should exist");
+        assert_eq!(updated.trace_id, "trace-0-updated");
+        assert_eq!(updated.span_id, "span-0-updated");
+
+        // Verify all others still exist
+        for i in 1..10 {
+            assert!(
+                get_invocation_span_id(&format!("inv-{}", i)).is_some(),
+                "inv-{} should still exist",
+                i
+            );
+        }
     }
 }

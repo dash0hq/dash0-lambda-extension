@@ -4,6 +4,7 @@ use hyper::{header, Body, Request, Uri};
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 
+use crate::config::{request_retries, request_timeout_ms};
 use crate::route::HTTPS_CLIENT;
 use crate::store::{take_telemetry_logs, take_traces, StoredTrace};
 use crate::util::log_mutations::{get_resources_attributes, map_logs_to_otlp};
@@ -12,14 +13,8 @@ use crate::util::span_mutations::merge_telemetry_invocation_data;
 
 pub async fn flush_traces() {
     let traces = take_traces();
-    if traces.is_empty() {
-        return;
-    }
-
     send_traces(traces).await;
 }
-
-use crate::store::store_telemetry_logs;
 
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 
@@ -57,29 +52,7 @@ pub async fn flush_logs(is_invocation_end: bool) {
 
     let body = export_request.encode_to_vec();
 
-    let mut headers = header::HeaderMap::new();
-    headers.insert(
-        header::CONTENT_TYPE,
-        header::HeaderValue::from_static("application/x-protobuf"),
-    );
-
-    let req = match _build_otlp_request("/v1/logs", hyper::Method::POST, body, Some(&headers)) {
-        Ok(req) => req,
-        Err(err) => {
-            tracing::error!(
-                "[{}] Failed to build log request: {}",
-                crate::log_prefix(),
-                err
-            );
-            store_telemetry_logs(logs);
-            return;
-        }
-    };
-
-    let client = &*HTTPS_CLIENT;
-    if let Err(_err) = send_request(client, req, logs.len(), "logs").await {
-        store_telemetry_logs(logs);
-    }
+    let _ = send_request("/v1/logs", hyper::Method::POST, body, logs.len(), "logs").await;
 }
 
 pub async fn send_traces(traces: Vec<StoredTrace>) {
@@ -103,17 +76,22 @@ pub async fn send_traces(traces: Vec<StoredTrace>) {
 
     let trace_count = traces.len();
 
-    let req = match _build_traces_request(traces) {
+    let body = match _build_traces_request(traces) {
         Some(req) => req,
         None => return,
     };
 
-    let client = &*HTTPS_CLIENT;
-
-    let _ = send_request(client, req, trace_count, "buffered traces").await;
+    let _ = send_request(
+        "/v1/traces",
+        hyper::Method::POST,
+        body,
+        trace_count,
+        "buffered traces",
+    )
+    .await;
 }
 
-fn _build_traces_request(traces: Vec<StoredTrace>) -> Option<Request<Body>> {
+fn _build_traces_request(traces: Vec<StoredTrace>) -> Option<Vec<u8>> {
     let mut traces_iter = traces.into_iter();
     let base_trace = match traces_iter.next() {
         Some(trace) => trace,
@@ -136,33 +114,13 @@ fn _build_traces_request(traces: Vec<StoredTrace>) -> Option<Request<Body>> {
         resource_spans: combined_resource_spans,
     };
 
-    let body = combined_export.encode_to_vec();
-
-    let req = match _build_otlp_request(
-        base_trace.path_and_query.as_str(),
-        base_trace.method.clone(),
-        body,
-        Some(&base_trace.headers),
-    ) {
-        Ok(req) => req,
-        Err(err) => {
-            tracing::error!(
-                "[{}] Failed to build trace request: {}",
-                crate::log_prefix(),
-                err
-            );
-            return None;
-        }
-    };
-
-    Some(req)
+    Some(combined_export.encode_to_vec())
 }
 
 fn _build_otlp_request(
     path: &str,
     method: hyper::Method,
     body: Vec<u8>,
-    headers_to_merge: Option<&header::HeaderMap>,
 ) -> Result<Request<Body>, String> {
     let (scheme, authority) =
         parse_otlp_endpoint().ok_or_else(|| "Failed to parse OTLP endpoint".to_string())?;
@@ -177,15 +135,6 @@ fn _build_otlp_request(
     let mut builder = Request::builder().method(method).uri(target_uri);
 
     if let Some(headers) = builder.headers_mut() {
-        if let Some(h_map) = headers_to_merge {
-            for (k, v) in h_map.iter() {
-                if k == header::HOST || k == header::CONTENT_LENGTH {
-                    continue;
-                }
-                headers.insert(k, v.clone());
-            }
-        }
-
         if let Ok(host_val) = header::HeaderValue::from_str(&authority) {
             headers.insert(header::HOST, host_val);
         }
@@ -193,6 +142,11 @@ fn _build_otlp_request(
         if let Ok(len_val) = header::HeaderValue::from_str(&body.len().to_string()) {
             headers.insert(header::CONTENT_LENGTH, len_val);
         }
+
+        headers.insert(
+            header::CONTENT_TYPE,
+            header::HeaderValue::from_static("application/x-protobuf"),
+        );
 
         if let Ok(token) = std::env::var("DASH0_TOKEN") {
             if !token.is_empty() {
@@ -213,58 +167,87 @@ fn _build_otlp_request(
 }
 
 async fn send_request(
-    client: &hyper::Client<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>,
-    req: Request<Body>,
+    path: &str,
+    method: hyper::Method,
+    body: Vec<u8>,
     item_count: usize,
     item_type: &str,
 ) -> Result<(), ()> {
-    let start = std::time::Instant::now();
-    match tokio::time::timeout(Duration::from_secs(2), client.request(req)).await {
-        Ok(Ok(resp)) => {
-            if resp.status().is_success() {
-                tracing::info!(
-                    count = item_count,
-                    duration = start.elapsed().as_millis(),
-                    "[{}] Sent {} (count={}) in {} ms, status={}",
-                    crate::log_prefix(),
-                    item_type,
-                    item_count,
-                    start.elapsed().as_millis(),
-                    resp.status()
-                );
-                Ok(())
-            } else {
+    let max_attempts = request_retries() + 1;
+
+    for attempt in 1..=max_attempts {
+        let req = match _build_otlp_request(path, method.clone(), body.clone()) {
+            Ok(req) => req,
+            Err(err) => {
                 tracing::error!(
-                    "[{}] Error sending {} Non-2xx sending {} in {} ms: status={}",
+                    "[{}] Failed to build {} request: {}",
                     crate::log_prefix(),
                     item_type,
+                    err
+                );
+                return Err(());
+            }
+        };
+
+        let client = &*HTTPS_CLIENT;
+        let start = std::time::Instant::now();
+        match tokio::time::timeout(
+            Duration::from_millis(request_timeout_ms()),
+            client.request(req),
+        )
+        .await
+        {
+            Ok(Ok(resp)) => {
+                if resp.status().is_success() {
+                    tracing::info!(
+                        count = item_count,
+                        duration = start.elapsed().as_millis(),
+                        "[{}] Sent {} (count={}) in {} ms, status={}",
+                        crate::log_prefix(),
+                        item_type,
+                        item_count,
+                        start.elapsed().as_millis(),
+                        resp.status()
+                    );
+                    return Ok(());
+                } else {
+                    tracing::error!(
+                        "[{}] Error sending {} Non-2xx sending {} in {} ms: status={} (attempt {}/{})",
+                        crate::log_prefix(),
+                        item_type,
+                        item_type,
+                        start.elapsed().as_millis(),
+                        resp.status(),
+                        attempt,
+                        max_attempts
+                    );
+                }
+            }
+            Ok(Err(err)) => {
+                tracing::error!(
+                    "[{}] Error sending {} in {} ms: {} (attempt {}/{})",
+                    crate::log_prefix(),
                     item_type,
                     start.elapsed().as_millis(),
-                    resp.status()
+                    err,
+                    attempt,
+                    max_attempts
                 );
-                Err(())
+            }
+            Err(_) => {
+                tracing::error!(
+                    "[{}] Error sending {} in {} ms: timeout (attempt {}/{})",
+                    crate::log_prefix(),
+                    item_type,
+                    start.elapsed().as_millis(),
+                    attempt,
+                    max_attempts
+                );
             }
         }
-        Ok(Err(err)) => {
-            tracing::error!(
-                "[{}] Error sending {} in {} ms: {}",
-                crate::log_prefix(),
-                item_type,
-                start.elapsed().as_millis(),
-                err
-            );
-            Err(())
-        }
-        Err(_) => {
-            tracing::error!(
-                "[{}] Error sending {} in {} ms: timeout",
-                crate::log_prefix(),
-                item_type,
-                start.elapsed().as_millis()
-            );
-            Err(())
-        }
     }
+
+    Err(())
 }
 
 fn combine_traces(
@@ -427,20 +410,5 @@ mod tests {
 
         // Verify we got a result
         assert!(result.is_some());
-        let req = result.unwrap();
-
-        // Verify the request was built
-        assert_eq!(req.method(), &Method::POST);
-        assert_eq!(req.uri().scheme_str(), Some("https"));
-        assert_eq!(req.uri().authority().unwrap().as_str(), "example.com:443");
-        assert_eq!(req.uri().path(), "/v1/traces");
-
-        // Verify headers
-        let headers = req.headers();
-        assert!(headers.contains_key(header::HOST));
-        assert!(headers.contains_key(header::CONTENT_LENGTH));
-
-        // Clean up
-        env::remove_var("DASH0_ENDPOINT");
     }
 }

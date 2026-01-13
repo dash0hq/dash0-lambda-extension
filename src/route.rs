@@ -1,7 +1,4 @@
-use std::{
-    sync::Arc,
-    time::{Instant, SystemTime, UNIX_EPOCH},
-};
+use std::{sync::Arc, time::Instant};
 
 use httprouter::Router;
 use hyper::{Body, Error, Request, Response, Uri};
@@ -16,8 +13,8 @@ use crate::{
     backend_send::send_traces,
     env, sandbox, stats,
     store::{
-        force_init_trace_store, store_current_invocation_id, store_event_payload,
-        store_invocation_start, store_trace, take_traces, StoredTrace,
+        force_init_trace_store, store_current_invocation_id, store_event_payload, store_trace,
+        take_traces, StoredTrace,
     },
     util::{
         parsers::{extract_error_invocation_ids, extract_invocation_id_from_path},
@@ -84,8 +81,7 @@ pub async fn passthru_proxy(req: Request<Body>) -> Result<Response<Body>, Error>
     // Reconstruct request
     let req = Request::from_parts(parts, Body::from(body_bytes));
 
-    // possible improvement: replace with resource pool or persistent connection
-    let endpoint_client = hyper::Client::new();
+    let endpoint_client = &*HTTP_CLIENT;
     let endpoint_uri: Uri = match Uri::builder()
         .scheme("http")
         .authority(env::sandbox_runtime_api())
@@ -381,6 +377,9 @@ pub(crate) static HTTPS_CLIENT: Lazy<
     hyper::Client::builder().build::<_, Body>(https)
 });
 
+static HTTP_CLIENT: Lazy<hyper::Client<hyper::client::HttpConnector, Body>> =
+    Lazy::new(|| hyper::Client::new());
+
 pub async fn proxy_invocation_next(req: Request<Body>) -> Result<Response<Body>, Error> {
     use std::time::Duration;
 
@@ -409,10 +408,6 @@ pub async fn proxy_invocation_next(req: Request<Body>) -> Result<Response<Body>,
         stats::event_start();
 
         store_current_invocation_id(aws_request_id.as_str());
-
-        if let Ok(nanos) = SystemTime::now().duration_since(UNIX_EPOCH) {
-            store_invocation_start(aws_request_id.as_str(), nanos.as_nanos() as u64);
-        }
 
         tracing::info!(
             "[{}] Got invocation next: {}",
