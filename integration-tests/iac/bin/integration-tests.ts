@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib/core';
 import { IntegrationTestsStack } from '../lib/integration-tests-stack';
+import { RemovalPolicies } from 'aws-cdk-lib/core';
 
 const app = new cdk.App();
-new IntegrationTestsStack(app, 'IntegrationTestsStack', {
+const stack = new IntegrationTestsStack(app, 'IntegrationTestsStack', {
   /* If you don't specify 'env', this stack will be environment-agnostic.
    * Account/Region-dependent features and context lookups will not work,
    * but a single synthesized template can be deployed anywhere. */
@@ -18,3 +19,5 @@ new IntegrationTestsStack(app, 'IntegrationTestsStack', {
 
   /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
 });
+
+RemovalPolicies.of(stack).destroy({});
