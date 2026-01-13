@@ -34,9 +34,20 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: integration-tests/iac/package-lock.json
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ vars.AWS_REGION }}
-      - run: aws sts get-caller-identity
+      - name: Install dependencies
+        working-directory: integration-tests/iac
+        run: npm ci
+      - name: Deploy CDK stack
+        working-directory: integration-tests/iac
+        run: npx cdk deploy --require-approval never
