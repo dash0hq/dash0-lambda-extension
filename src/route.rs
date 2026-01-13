@@ -151,7 +151,7 @@ pub async fn telemetry_sink(req: Request<Body>) -> Result<Response<Body>, Error>
     );
 
     if let Ok(mut logs) = serde_json::from_str::<Vec<crate::store::TelemetryLog>>(&body_text) {
-        crate::util::log_processing::process_telemetry_logs(&mut logs);
+        crate::util::log_processing::process_telemetry_logs(&mut logs).await;
 
         let mut report_invocation_ids: Vec<String> = Vec::new();
         for log in &logs {
@@ -161,12 +161,12 @@ pub async fn telemetry_sink(req: Request<Body>) -> Result<Response<Body>, Error>
                 }
             }
         }
-        crate::store::store_telemetry_logs(logs);
+        crate::store::store_telemetry_logs(logs).await;
 
         if !report_invocation_ids.is_empty() {
             flush_traces().await;
             for id in &report_invocation_ids {
-                crate::store::cleanup_invocation(id);
+                crate::store::cleanup_invocation(id).await;
             }
         }
     } else {
@@ -192,10 +192,10 @@ pub async fn telemetry_sink(req: Request<Body>) -> Result<Response<Body>, Error>
             let _ = tokio::task::spawn(async { sandbox::fetch_and_cache_account_id().await }).await;
         }
 
-        let mut traces_to_send = take_traces();
+        let mut traces_to_send = take_traces().await;
 
         for (invocation_id, error_type) in &error_invocation_ids {
-            match build_runtime_error_trace(invocation_id, Some(error_type), None, &traces_to_send)
+            match build_runtime_error_trace(invocation_id, Some(error_type), None, &traces_to_send).await
             {
                 Some(trace) => traces_to_send.push(trace),
                 None => {
@@ -242,12 +242,12 @@ pub async fn invocation_response_proxy(req: Request<Body>) -> Result<Response<Bo
     if let Some(id) = invocation_id {
         if is_auto_instrumented_disabled() {
             if let Some(trace) =
-                build_runtime_error_trace(&id, None, Some(return_payload.as_str()), &Vec::new())
+                build_runtime_error_trace(&id, None, Some(return_payload.as_str()), &Vec::new()).await
             {
-                store_trace(trace);
+                store_trace(trace).await;
             }
         } else {
-            if !add_return_payload_to_lambda_server_spans(&id, &return_payload) {
+            if !add_return_payload_to_lambda_server_spans(&id, &return_payload).await {
                 tracing::info!(
                     "[{}] invocation_response_proxy - no lambda server span found for return value {}", crate::log_prefix(),
                     &id
@@ -279,13 +279,36 @@ pub async fn traces(req: Request<Body>) -> Result<Response<Body>, Error> {
         String::from_utf8_lossy(&encoded_body)
     );
 
+    // Lazy protobuf decode optimization: only decode if we're not using lazy mode
+    // In lazy mode, we defer decode until backend_send where we check if modifications are needed
+    let use_lazy = crate::config::performance::get_config().use_lazy_protobuf;
+
     match ExportTraceServiceRequest::decode(body_bytes.as_ref()) {
         Ok(mut decoded) => {
             if drop_duplicate_java_instrumenations(&decoded) {
                 return Ok(Response::builder().status(200).body(Body::empty()).unwrap());
             }
 
-            process_trace_request(&mut decoded, &mut invocation_ids, &mut encoded_body);
+            // Only process immediately if not using lazy mode
+            if !use_lazy {
+                process_trace_request(&mut decoded, &mut invocation_ids, &mut encoded_body).await;
+            } else {
+                // In lazy mode, just extract invocation IDs without full processing
+                // We'll process later in backend_send if needed
+                for resource_span in &decoded.resource_spans {
+                    for scope_span in &resource_span.scope_spans {
+                        if let Some(scope) = &scope_span.scope {
+                            if crate::util::span_mutations::is_lambda_instrumentation_scope(&scope.name) {
+                                for span in &scope_span.spans {
+                                    if let Some(inv_id) = crate::util::parsers::extract_invocation_id(span) {
+                                        invocation_ids.push(inv_id);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
         Err(err) => {
             tracing::info!(
@@ -315,7 +338,24 @@ pub async fn traces(req: Request<Body>) -> Result<Response<Body>, Error> {
                     // This ensures encoded_body contains protobuf bytes before calling process_trace_request
                     encoded_body = decoded.encode_to_vec();
 
-                    process_trace_request(&mut decoded, &mut invocation_ids, &mut encoded_body);
+                    if !use_lazy {
+                        process_trace_request(&mut decoded, &mut invocation_ids, &mut encoded_body).await;
+                    } else {
+                        // Extract invocation IDs in lazy mode
+                        for resource_span in &decoded.resource_spans {
+                            for scope_span in &resource_span.scope_spans {
+                                if let Some(scope) = &scope_span.scope {
+                                    if crate::util::span_mutations::is_lambda_instrumentation_scope(&scope.name) {
+                                        for span in &scope_span.spans {
+                                            if let Some(inv_id) = crate::util::parsers::extract_invocation_id(span) {
+                                                invocation_ids.push(inv_id);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     converted_from_json = true;
                 }
                 Err(json_err) => {
@@ -330,8 +370,8 @@ pub async fn traces(req: Request<Body>) -> Result<Response<Body>, Error> {
     }
 
     if invocation_ids.is_empty() {
-        if let Some(current) = crate::store::get_current_invocation_id() {
-            invocation_ids.push(current);
+        if let Some(current) = crate::store::get_current_invocation_id().await {
+            invocation_ids.push(current.to_string());
         }
     }
 
@@ -345,17 +385,17 @@ pub async fn traces(req: Request<Body>) -> Result<Response<Body>, Error> {
     }
 
     let seen_invocation_ids = invocation_ids.clone();
-    store_trace(StoredTrace {
-        method: parts.method,
-        path_and_query: parts
+    store_trace(StoredTrace::new(
+        parts.method,
+        parts
             .uri
             .path_and_query()
             .map(|pq| pq.as_str().to_string())
             .unwrap_or_else(|| "/".to_string()),
         headers,
-        body: encoded_body,
+        encoded_body,
         invocation_ids,
-    });
+    )).await;
 
     tracing::info!(
         "[{}] Total handle time for /v1/traces {} ms. seen invocation ids: {:?}",
@@ -407,7 +447,7 @@ pub async fn proxy_invocation_next(req: Request<Body>) -> Result<Response<Body>,
         // start the counter on the new event
         stats::event_start();
 
-        store_current_invocation_id(aws_request_id.as_str());
+        store_current_invocation_id(aws_request_id.as_str()).await;
 
         tracing::info!(
             "[{}] Got invocation next: {}",
@@ -460,7 +500,7 @@ async fn validate_and_mangle_next_event(
     } else {
         &body_bytes
     };
-    store_event_payload(&_aws_request_id, &String::from_utf8_lossy(truncated_bytes));
+    store_event_payload(&_aws_request_id, &String::from_utf8_lossy(truncated_bytes)).await;
 
     // Reconstruct the response with the same parts and body
     let response = Response::from_parts(parts, Body::from(body_bytes));

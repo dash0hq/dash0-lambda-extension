@@ -96,6 +96,9 @@ async fn main() {
 
     env::latch_runtime_env();
 
+    // Initialize and log performance configuration
+    crate::config::performance::CONFIG.log();
+
     let addr: SocketAddr = match env::lrap_api().parse() {
         Ok(addr) => addr,
         Err(e) => {

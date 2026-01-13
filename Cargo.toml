@@ -51,5 +51,9 @@ harness = false
 name = "protobuf_ops"
 harness = false
 
+[[bench]]
+name = "integration_config_comparison"
+harness = false
+
 [profile.bench]
 debug = true  # Enable debug symbols for flamegraphs

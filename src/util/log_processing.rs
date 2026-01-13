@@ -1,23 +1,23 @@
-use crate::store::TelemetryLog;
+use crate::store::{PayloadValue, TelemetryLog};
 
-pub fn process_telemetry_logs(logs: &mut Vec<TelemetryLog>) {
-    let mut current_invocation_id = crate::store::get_last_seen_invocation_start();
+pub async fn process_telemetry_logs(logs: &mut Vec<TelemetryLog>) {
+    let mut current_invocation_id = crate::store::get_last_seen_invocation_start().await;
 
     for log in logs {
         if log.r#type == "platform.start" {
-            parse_platform_start(log, &mut current_invocation_id);
+            parse_platform_start(log, &mut current_invocation_id).await;
         }
 
         if log.r#type == "platform.initReport" {
-            parse_platform_init_report(log);
+            parse_platform_init_report(log).await;
         }
 
         if log.r#type == "platform.runtimeDone" {
-            parse_platform_runtime_done(log);
+            parse_platform_runtime_done(log).await;
         }
 
         if log.r#type == "platform.report" {
-            parse_platform_report(log);
+            parse_platform_report(log).await;
         }
 
         // For platform logs, extract invocation ID from the log record itself (safer than state)
@@ -31,26 +31,27 @@ pub fn process_telemetry_logs(logs: &mut Vec<TelemetryLog>) {
                 .and_then(|record| record.get("requestId"))
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string())
-                .or_else(|| current_invocation_id.clone())
+                .or_else(|| current_invocation_id.as_ref().map(|v| v.to_string()))
         } else {
-            current_invocation_id.clone()
+            current_invocation_id.as_ref().map(|v| v.to_string())
         };
 
         log.invocation_id = invocation_id;
     }
 }
 
-fn parse_platform_start(log: &TelemetryLog, current_invocation_id: &mut Option<String>) {
+async fn parse_platform_start(log: &TelemetryLog, current_invocation_id: &mut Option<PayloadValue>) {
     if let Some(record) = log.record.as_object() {
         if let Some(req_id) = record.get("requestId").and_then(|v| v.as_str()) {
-            crate::store::store_last_seen_invocation_start(req_id);
-            *current_invocation_id = Some(req_id.to_string());
+            crate::store::store_last_seen_invocation_start(req_id).await;
+            // Update the current invocation ID from store to get the right type (String or Arc)
+            *current_invocation_id = crate::store::get_last_seen_invocation_start().await;
 
             if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&log.time) {
                 let start_time = dt.timestamp_millis() as f64;
                 crate::store::update_invocation_data(req_id, |data| {
                     data.start_time = start_time;
-                });
+                }).await;
             } else {
                 tracing::info!(
                     "[{}] Failed to parse platform.start log time: {}",
@@ -62,22 +63,22 @@ fn parse_platform_start(log: &TelemetryLog, current_invocation_id: &mut Option<S
     }
 }
 
-fn parse_platform_init_report(log: &TelemetryLog) {
+async fn parse_platform_init_report(log: &TelemetryLog) {
     if let Some(duration_ms) = log
         .record
         .get("metrics")
         .and_then(|m| m.get("durationMs"))
         .and_then(|d| d.as_f64())
     {
-        if let Some(req_id) = crate::store::get_current_invocation_id() {
-            crate::store::update_invocation_data(&req_id, |data| {
+        if let Some(req_id) = crate::store::get_current_invocation_id().await {
+            crate::store::update_invocation_data(req_id.as_str(), |data| {
                 data.init_duration = duration_ms;
-            });
+            }).await;
         }
     }
 }
 
-fn parse_platform_runtime_done(log: &TelemetryLog) {
+async fn parse_platform_runtime_done(log: &TelemetryLog) {
     if let Some(record) = log.record.as_object() {
         if let Some(req_id) = record.get("requestId").and_then(|v| v.as_str()) {
             let end_time = if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&log.time) {
@@ -105,17 +106,17 @@ fn parse_platform_runtime_done(log: &TelemetryLog) {
                     if duration > 0.0 {
                         data.duration = duration;
                     }
-                });
+                }).await;
             }
         }
     }
-    if let Some(notifier) = crate::store::take_runtime_done_notifier() {
+    if let Some(notifier) = crate::store::take_runtime_done_notifier().await {
         tracing::info!("[{}] Signaled platform.runtimeDone", crate::log_prefix());
         let _ = notifier.send(());
     }
 }
 
-fn parse_platform_report(log: &TelemetryLog) {
+async fn parse_platform_report(log: &TelemetryLog) {
     if let Some(record) = log.record.as_object() {
         if let Some(req_id) = record.get("requestId").and_then(|v| v.as_str()) {
             let log_timestamp = if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&log.time) {
@@ -160,7 +161,7 @@ fn parse_platform_report(log: &TelemetryLog) {
                     if init_duration > 0.0 {
                         data.init_duration = init_duration;
                     }
-                });
+                }).await;
             }
         }
     }
@@ -187,9 +188,9 @@ mod tests {
         }
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn test_parse_platform_start() {
+    async fn test_parse_platform_start() {
         let req_id = "test-req-start";
         let time_str = "2023-01-01T12:00:00.000Z";
         let logs = vec![create_log(
@@ -200,21 +201,21 @@ mod tests {
         )];
 
         let mut logs = logs;
-        process_telemetry_logs(&mut logs);
+        process_telemetry_logs(&mut logs).await;
 
-        let data = get_invocation_data(req_id).expect("Should have data");
+        let data = get_invocation_data(req_id).await.expect("Should have data");
         let expected_time = chrono::DateTime::parse_from_rfc3339(time_str)
             .unwrap()
             .timestamp_millis() as f64;
         assert_eq!(data.start_time, expected_time);
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn test_parse_platform_init_report() {
+    async fn test_parse_platform_init_report() {
         use crate::store::store_current_invocation_id;
         let req_id = "test-req-init";
-        store_current_invocation_id(req_id); // Set context
+        store_current_invocation_id(req_id).await; // Set context
 
         let logs = vec![create_log(
             "platform.initReport",
@@ -226,15 +227,15 @@ mod tests {
         )];
 
         let mut logs = logs;
-        process_telemetry_logs(&mut logs);
+        process_telemetry_logs(&mut logs).await;
 
-        let data = get_invocation_data(req_id).expect("Should have data");
+        let data = get_invocation_data(req_id).await.expect("Should have data");
         assert_eq!(data.init_duration, 123.45);
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn test_parse_platform_runtime_done() {
+    async fn test_parse_platform_runtime_done() {
         let req_id = "test-req-done";
         let time_str = "2023-01-01T12:00:01.000Z";
         let logs = vec![create_log(
@@ -248,9 +249,9 @@ mod tests {
         )];
 
         let mut logs = logs;
-        process_telemetry_logs(&mut logs);
+        process_telemetry_logs(&mut logs).await;
 
-        let data = get_invocation_data(req_id).expect("Should have data");
+        let data = get_invocation_data(req_id).await.expect("Should have data");
         let expected_end = chrono::DateTime::parse_from_rfc3339(time_str)
             .unwrap()
             .timestamp_millis() as f64;
@@ -258,9 +259,9 @@ mod tests {
         assert_eq!(data.duration, 500.0);
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn test_parse_platform_report() {
+    async fn test_parse_platform_report() {
         let req_id = "test-req-report";
         let time_str = "2023-01-01T12:00:02.000Z";
         let logs = vec![create_log(
@@ -279,9 +280,9 @@ mod tests {
         )];
 
         let mut logs = logs;
-        process_telemetry_logs(&mut logs);
+        process_telemetry_logs(&mut logs).await;
 
-        let data = get_invocation_data(req_id).expect("Should have data");
+        let data = get_invocation_data(req_id).await.expect("Should have data");
         let expected_end = chrono::DateTime::parse_from_rfc3339(time_str)
             .unwrap()
             .timestamp_millis() as f64;
@@ -292,9 +293,9 @@ mod tests {
         assert_eq!(data.init_duration, 50.0);
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn test_process_telemetry_logs_full_flow() {
+    async fn test_process_telemetry_logs_full_flow() {
         let req_id = "test-full-flow";
         let start_time = "2023-01-01T12:00:00.000Z";
         let end_time = "2023-01-01T12:00:01.000Z";
@@ -332,9 +333,9 @@ mod tests {
             ),
         ];
 
-        process_telemetry_logs(&mut logs);
+        process_telemetry_logs(&mut logs).await;
 
-        let data = get_invocation_data(req_id).expect("Should have data");
+        let data = get_invocation_data(req_id).await.expect("Should have data");
         let expected_start = chrono::DateTime::parse_from_rfc3339(start_time)
             .unwrap()
             .timestamp_millis() as f64;

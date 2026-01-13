@@ -12,7 +12,7 @@ use crate::util::parsers::parse_otlp_endpoint;
 use crate::util::span_mutations::merge_telemetry_invocation_data;
 
 pub async fn flush_traces() {
-    let traces = take_traces();
+    let traces = take_traces().await;
     send_traces(traces).await;
 }
 
@@ -21,13 +21,13 @@ use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::logs::v1::{ResourceLogs, ScopeLogs};
 
 pub async fn flush_logs(is_invocation_end: bool) {
-    let logs = take_telemetry_logs();
+    let logs = take_telemetry_logs().await;
 
     if logs.is_empty() {
         return;
     }
 
-    let log_records = map_logs_to_otlp(&logs, is_invocation_end);
+    let log_records = map_logs_to_otlp(&logs, is_invocation_end).await;
 
     if log_records.is_empty() {
         return;
@@ -60,11 +60,38 @@ pub async fn send_traces(traces: Vec<StoredTrace>) {
         return;
     }
     let mut ready_traces = Vec::new();
+    let use_lazy = crate::config::performance::get_config().use_lazy_protobuf;
+
     for mut trace in traces {
-        if let Ok(mut decoded) = ExportTraceServiceRequest::decode(trace.body.as_slice()) {
-            let modified = merge_telemetry_invocation_data(&mut decoded);
-            if modified > 0 {
-                trace.body = decoded.encode_to_vec();
+        if use_lazy {
+            // Lazy decode optimization: only decode if we actually need to modify the trace
+            // Check if any invocation IDs have telemetry data that needs merging
+            let mut has_data = false;
+            for id in &trace.invocation_ids {
+                if crate::store::get_invocation_data(id).await.is_some() {
+                    has_data = true;
+                    break;
+                }
+            }
+
+            if has_data {
+                // Only decode if we have data to merge
+                if let Ok(decoded) = trace.decode_if_needed() {
+                    let modified = merge_telemetry_invocation_data(decoded).await;
+                    if modified > 0 {
+                        // Re-encode the modified trace
+                        let _ = trace.encode_if_modified();
+                    }
+                }
+            }
+            // If no data to merge, skip decode entirely - just use raw bytes
+        } else {
+            // Non-lazy mode: always decode and process (original behavior)
+            if let Ok(mut decoded) = ExportTraceServiceRequest::decode(trace.body.as_slice()) {
+                let modified = merge_telemetry_invocation_data(&mut decoded).await;
+                if modified > 0 {
+                    trace.body = decoded.encode_to_vec();
+                }
             }
         }
         ready_traces.push(trace);
@@ -296,23 +323,23 @@ mod tests {
 
         let export_request = ExportTraceServiceRequest { resource_spans };
 
-        StoredTrace {
-            method: Method::POST,
-            path_and_query: "/v1/traces".to_string(),
-            headers: header::HeaderMap::new(),
-            body: export_request.encode_to_vec(),
+        StoredTrace::new(
+            Method::POST,
+            "/v1/traces".to_string(),
+            header::HeaderMap::new(),
+            export_request.encode_to_vec(),
             invocation_ids,
-        }
+        )
     }
 
     fn create_invalid_trace(invocation_ids: Vec<String>) -> StoredTrace {
-        StoredTrace {
-            method: Method::POST,
-            path_and_query: "/v1/traces".to_string(),
-            headers: header::HeaderMap::new(),
-            body: vec![0xFF, 0xFF, 0xFF], // Invalid protobuf
+        StoredTrace::new(
+            Method::POST,
+            "/v1/traces".to_string(),
+            header::HeaderMap::new(),
+            vec![0xFF, 0xFF, 0xFF], // Invalid protobuf
             invocation_ids,
-        }
+        )
     }
 
     #[test]

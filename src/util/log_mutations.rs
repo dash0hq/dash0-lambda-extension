@@ -93,7 +93,7 @@ fn format_platform_runtime_done_message(
     format!("END RequestId: {}", request_id)
 }
 
-pub fn map_logs_to_otlp(logs: &[TelemetryLog], is_invocation_end: bool) -> Vec<LogRecord> {
+pub async fn map_logs_to_otlp(logs: &[TelemetryLog], is_invocation_end: bool) -> Vec<LogRecord> {
     let mut log_records = Vec::new();
     for log in logs {
         // Determine the log body based on log type
@@ -161,7 +161,7 @@ pub fn map_logs_to_otlp(logs: &[TelemetryLog], is_invocation_end: bool) -> Vec<L
                 }),
             });
 
-            if let Some(span_ids) = get_invocation_span_id(invocation_id) {
+            if let Some(span_ids) = get_invocation_span_id(invocation_id).await {
                 if let Ok(tid) = hex::decode(&span_ids.trace_id) {
                     if tid.len() == 16 {
                         trace_id = tid;
@@ -181,7 +181,7 @@ pub fn map_logs_to_otlp(logs: &[TelemetryLog], is_invocation_end: bool) -> Vec<L
                     crate::log_prefix(),
                     invocation_id
                 );
-                store_telemetry_logs(vec![log.clone()]);
+                store_telemetry_logs(vec![log.clone()]).await;
                 continue;
             }
         }
@@ -297,8 +297,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_map_logs_happy_path() {
+    #[tokio::test]
+    async fn test_map_logs_happy_path() {
         let logs = vec![TelemetryLog {
             time: "2023-10-26T12:00:00.000Z".to_string(),
             r#type: "function".to_string(),
@@ -306,7 +306,7 @@ mod tests {
             invocation_id: Some("inv-123".to_string()),
         }];
 
-        let result = map_logs_to_otlp(&logs, true);
+        let result = map_logs_to_otlp(&logs, true).await;
 
         assert_eq!(result.len(), 1);
         let log = &result[0];
@@ -326,8 +326,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_map_logs_ignores_non_function_type() {
+    #[tokio::test]
+    async fn test_map_logs_ignores_non_function_type() {
         let logs = vec![TelemetryLog {
             time: "2023-10-26T12:00:00.000Z".to_string(),
             r#type: "platform.start".to_string(),
@@ -335,12 +335,12 @@ mod tests {
             invocation_id: Some("inv-123".to_string()),
         }];
 
-        let result = map_logs_to_otlp(&logs, true);
+        let result = map_logs_to_otlp(&logs, true).await;
         assert!(result.is_empty());
     }
 
-    #[test]
-    fn test_map_logs_ignores_non_string_record() {
+    #[tokio::test]
+    async fn test_map_logs_ignores_non_string_record() {
         let logs = vec![TelemetryLog {
             time: "2023-10-26T12:00:00.000Z".to_string(),
             r#type: "function".to_string(),
@@ -348,12 +348,12 @@ mod tests {
             invocation_id: Some("inv-123".to_string()),
         }];
 
-        let result = map_logs_to_otlp(&logs, true);
+        let result = map_logs_to_otlp(&logs, true).await;
         assert!(result.is_empty());
     }
 
-    #[test]
-    fn test_map_logs_invalid_time_defaults_to_zero() {
+    #[tokio::test]
+    async fn test_map_logs_invalid_time_defaults_to_zero() {
         let logs = vec![TelemetryLog {
             time: "invalid-time".to_string(),
             r#type: "function".to_string(),
@@ -361,13 +361,13 @@ mod tests {
             invocation_id: Some("inv-123".to_string()),
         }];
 
-        let result = map_logs_to_otlp(&logs, true);
+        let result = map_logs_to_otlp(&logs, true).await;
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].time_unix_nano, 0);
     }
 
-    #[test]
-    fn test_map_logs_without_invocation_id() {
+    #[tokio::test]
+    async fn test_map_logs_without_invocation_id() {
         let logs = vec![TelemetryLog {
             time: "2023-10-26T12:00:00.000Z".to_string(),
             r#type: "function".to_string(),
@@ -375,13 +375,13 @@ mod tests {
             invocation_id: None,
         }];
 
-        let result = map_logs_to_otlp(&logs, true);
+        let result = map_logs_to_otlp(&logs, true).await;
         assert_eq!(result.len(), 1);
         assert!(result[0].attributes.is_empty());
     }
 
-    #[test]
-    fn test_map_logs_mixed_batch() {
+    #[tokio::test]
+    async fn test_map_logs_mixed_batch() {
         let logs = vec![
             TelemetryLog {
                 time: "2023-10-26T12:00:00.000Z".to_string(),
@@ -403,7 +403,7 @@ mod tests {
             },
         ];
 
-        let result = map_logs_to_otlp(&logs, true);
+        let result = map_logs_to_otlp(&logs, true).await;
         assert_eq!(result.len(), 2);
         assert_eq!(
             get_string_value(&result[0].body),
@@ -489,8 +489,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_map_logs_with_trace_and_span_id_from_store() {
+    #[tokio::test]
+    async fn test_map_logs_with_trace_and_span_id_from_store() {
         use crate::store::store_invocation_span_id;
 
         let invocation_id = "inv-with-trace";
@@ -502,7 +502,7 @@ mod tests {
             invocation_id,
             trace_id_hex.to_string(),
             span_id_hex.to_string(),
-        );
+        ).await;
 
         let logs = vec![TelemetryLog {
             time: "2023-10-26T12:00:00.000Z".to_string(),
@@ -511,7 +511,7 @@ mod tests {
             invocation_id: Some(invocation_id.to_string()),
         }];
 
-        let result = map_logs_to_otlp(&logs, true);
+        let result = map_logs_to_otlp(&logs, true).await;
 
         assert_eq!(result.len(), 1);
         let log = &result[0];
@@ -525,8 +525,8 @@ mod tests {
         assert_eq!(log.span_id, expected_span_id);
     }
 
-    #[test]
-    fn test_map_logs_platform_report_with_init_duration() {
+    #[tokio::test]
+    async fn test_map_logs_platform_report_with_init_duration() {
         let logs = vec![TelemetryLog {
             time: "2025-12-07T12:09:10.254Z".to_string(),
             r#type: "platform.report".to_string(),
@@ -543,7 +543,7 @@ mod tests {
             invocation_id: Some("inv-report-1".to_string()),
         }];
 
-        let result = map_logs_to_otlp(&logs, true);
+        let result = map_logs_to_otlp(&logs, true).await;
 
         assert_eq!(result.len(), 1);
         let log = &result[0];
@@ -565,8 +565,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_map_logs_platform_report_without_init_duration() {
+    #[tokio::test]
+    async fn test_map_logs_platform_report_without_init_duration() {
         let logs = vec![TelemetryLog {
             time: "2025-12-07T12:09:10.254Z".to_string(),
             r#type: "platform.report".to_string(),
@@ -582,7 +582,7 @@ mod tests {
             invocation_id: Some("inv-report-2".to_string()),
         }];
 
-        let result = map_logs_to_otlp(&logs, true);
+        let result = map_logs_to_otlp(&logs, true).await;
 
         assert_eq!(result.len(), 1);
         let log = &result[0];
@@ -599,8 +599,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_map_logs_platform_report_with_timeout_status() {
+    #[tokio::test]
+    async fn test_map_logs_platform_report_with_timeout_status() {
         let logs = vec![TelemetryLog {
             time: "2025-12-08T10:24:35.486Z".to_string(),
             r#type: "platform.report".to_string(),
@@ -618,7 +618,7 @@ mod tests {
             invocation_id: Some("inv-timeout-1".to_string()),
         }];
 
-        let result = map_logs_to_otlp(&logs, true);
+        let result = map_logs_to_otlp(&logs, true).await;
 
         assert_eq!(result.len(), 1);
         let log = &result[0];
@@ -645,8 +645,8 @@ mod tests {
         assert_eq!(log.severity_text, "INFO");
     }
 
-    #[test]
-    fn test_map_logs_platform_report_with_success_status() {
+    #[tokio::test]
+    async fn test_map_logs_platform_report_with_success_status() {
         let logs = vec![TelemetryLog {
             time: "2025-12-08T10:24:35.486Z".to_string(),
             r#type: "platform.report".to_string(),
@@ -664,7 +664,7 @@ mod tests {
             invocation_id: Some("inv-success-1".to_string()),
         }];
 
-        let result = map_logs_to_otlp(&logs, true);
+        let result = map_logs_to_otlp(&logs, true).await;
 
         assert_eq!(result.len(), 1);
         let log = &result[0];
@@ -683,8 +683,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_map_logs_platform_report_with_error_status() {
+    #[tokio::test]
+    async fn test_map_logs_platform_report_with_error_status() {
         let logs = vec![TelemetryLog {
             time: "2025-12-08T10:24:35.486Z".to_string(),
             r#type: "platform.report".to_string(),
@@ -702,7 +702,7 @@ mod tests {
             invocation_id: Some("inv-error-1".to_string()),
         }];
 
-        let result = map_logs_to_otlp(&logs, true);
+        let result = map_logs_to_otlp(&logs, true).await;
 
         assert_eq!(result.len(), 1);
         let log = &result[0];
@@ -717,8 +717,8 @@ mod tests {
         assert!(body.contains("Error Type: Runtime.OutOfMemory"));
     }
 
-    #[test]
-    fn test_map_logs_mixed_function_and_platform_report() {
+    #[tokio::test]
+    async fn test_map_logs_mixed_function_and_platform_report() {
         let logs = vec![
             TelemetryLog {
                 time: "2025-12-07T12:09:09.000Z".to_string(),
@@ -743,7 +743,7 @@ mod tests {
             },
         ];
 
-        let result = map_logs_to_otlp(&logs, true);
+        let result = map_logs_to_otlp(&logs, true).await;
 
         assert_eq!(result.len(), 2);
 
@@ -759,8 +759,8 @@ mod tests {
         assert!(report_body.contains("Duration: 1000.00 ms"));
     }
 
-    #[test]
-    fn test_map_logs_platform_start() {
+    #[tokio::test]
+    async fn test_map_logs_platform_start() {
         let logs = vec![TelemetryLog {
             time: "2025-12-07T12:09:06.523Z".to_string(),
             r#type: "platform.start".to_string(),
@@ -771,7 +771,7 @@ mod tests {
             invocation_id: Some("inv-start-1".to_string()),
         }];
 
-        let result = map_logs_to_otlp(&logs, true);
+        let result = map_logs_to_otlp(&logs, true).await;
 
         assert_eq!(result.len(), 1);
         let log = &result[0];
@@ -791,8 +791,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_map_logs_platform_runtime_done() {
+    #[tokio::test]
+    async fn test_map_logs_platform_runtime_done() {
         let logs = vec![TelemetryLog {
             time: "2025-12-07T12:09:10.252Z".to_string(),
             r#type: "platform.runtimeDone".to_string(),
@@ -812,7 +812,7 @@ mod tests {
             invocation_id: Some("inv-end-1".to_string()),
         }];
 
-        let result = map_logs_to_otlp(&logs, true);
+        let result = map_logs_to_otlp(&logs, true).await;
 
         assert_eq!(result.len(), 1);
         let log = &result[0];
@@ -829,8 +829,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_map_logs_complete_invocation_lifecycle() {
+    #[tokio::test]
+    async fn test_map_logs_complete_invocation_lifecycle() {
         let logs = vec![
             TelemetryLog {
                 time: "2025-12-07T12:09:06.523Z".to_string(),
@@ -872,7 +872,7 @@ mod tests {
             },
         ];
 
-        let result = map_logs_to_otlp(&logs, true);
+        let result = map_logs_to_otlp(&logs, true).await;
 
         assert_eq!(result.len(), 4);
 
@@ -895,8 +895,8 @@ mod tests {
         assert!(report_body.starts_with("REPORT RequestId: test-lifecycle"));
     }
 
-    #[test]
-    fn test_platform_logs_have_info_severity() {
+    #[tokio::test]
+    async fn test_platform_logs_have_info_severity() {
         let logs = vec![
             TelemetryLog {
                 time: "2025-12-07T12:09:06.523Z".to_string(),
@@ -938,7 +938,7 @@ mod tests {
             },
         ];
 
-        let result = map_logs_to_otlp(&logs, true);
+        let result = map_logs_to_otlp(&logs, true).await;
 
         assert_eq!(result.len(), 4);
 
@@ -958,8 +958,8 @@ mod tests {
         assert_eq!(result[3].severity_number, 9); // INFO
         assert_eq!(result[3].severity_text, "INFO");
     }
-    #[test]
-    fn test_map_logs_not_invocation_end() {
+    #[tokio::test]
+    async fn test_map_logs_not_invocation_end() {
         let logs = vec![TelemetryLog {
             time: "2023-10-26T12:00:00.000Z".to_string(),
             r#type: "function".to_string(),
@@ -969,7 +969,7 @@ mod tests {
 
         // When is_invocation_end is false, and no trace/span ID is stored,
         // it should put the log back to store and return empty list (retry later).
-        let result = map_logs_to_otlp(&logs, false);
+        let result = map_logs_to_otlp(&logs, false).await;
 
         assert_eq!(result.len(), 0);
     }

@@ -24,19 +24,20 @@ pub fn drop_duplicate_java_instrumenations(decoded: &ExportTraceServiceRequest) 
     scope_name.as_deref() == Some("io.opentelemetry.aws-lambda-core-1.0")
 }
 
-pub fn build_runtime_error_trace(
+pub async fn build_runtime_error_trace(
     invocation_id: &str,
     error_type: Option<&str>,
     return_value: Option<&str>,
     existing_traces: &[StoredTrace],
 ) -> Option<StoredTrace> {
-    let (trace_id, span_id) = get_trace_span_ids(invocation_id, existing_traces);
+    let (trace_id, span_id) = get_trace_span_ids(invocation_id, existing_traces).await;
 
     let now_nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_nanos() as u64)
         .unwrap_or(0);
     let start_nanos = crate::store::get_invocation_data(invocation_id)
+        .await
         .map(|data| (data.start_time * 1_000_000.0) as u64)
         .filter(|&t| t > 0)
         .unwrap_or(now_nanos);
@@ -66,11 +67,11 @@ pub fn build_runtime_error_trace(
         },
     ];
 
-    if let Some(event_payload) = get_event_payload(invocation_id) {
+    if let Some(event_payload) = get_event_payload(invocation_id).await {
         attributes.push(KeyValue {
             key: "faas.event".to_string(),
             value: Some(AnyValue {
-                value: Some(Value::StringValue(event_payload)),
+                value: Some(Value::StringValue(event_payload.to_string())),
             }),
         });
     } else {
@@ -166,13 +167,13 @@ pub fn build_runtime_error_trace(
         header::HeaderValue::from_static("application/x-protobuf"),
     );
 
-    Some(StoredTrace {
-        method: hyper::Method::POST,
-        path_and_query: "/v1/traces".to_string(),
+    Some(StoredTrace::new(
+        hyper::Method::POST,
+        "/v1/traces".to_string(),
         headers,
-        body: export.encode_to_vec(),
-        invocation_ids: vec![invocation_id.to_string()],
-    })
+        export.encode_to_vec(),
+        vec![invocation_id.to_string()],
+    ))
 }
 
 fn create_exception_event(
@@ -305,7 +306,7 @@ fn create_exception_event(
     None
 }
 
-fn is_lambda_instrumentation_scope(scope_name: &str) -> bool {
+pub fn is_lambda_instrumentation_scope(scope_name: &str) -> bool {
     scope_name == "opentelemetry.instrumentation.aws_lambda"
         || scope_name == "@opentelemetry/instrumentation-aws-lambda"
         || scope_name == "io.opentelemetry.aws-lambda-core-1.0"
@@ -313,7 +314,7 @@ fn is_lambda_instrumentation_scope(scope_name: &str) -> bool {
         || scope_name == "OpenTelemetry.Instrumentation.AWSLambda"
 }
 
-pub fn add_event_payload_to_lambda_server_spans(
+pub async fn add_event_payload_to_lambda_server_spans(
     request: &mut ExportTraceServiceRequest,
     invocation_ids: &mut Vec<String>,
 ) -> bool {
@@ -322,7 +323,7 @@ pub fn add_event_payload_to_lambda_server_spans(
         for scope_span in &mut resource_span.scope_spans {
             if let Some(scope) = &scope_span.scope {
                 if is_lambda_instrumentation_scope(&scope.name) {
-                    added |= annotate_server_spans(&mut scope_span.spans, invocation_ids);
+                    added |= annotate_server_spans(&mut scope_span.spans, invocation_ids).await;
                 }
             }
         }
@@ -330,17 +331,17 @@ pub fn add_event_payload_to_lambda_server_spans(
     added
 }
 
-fn annotate_server_spans(spans: &mut Vec<Span>, invocation_ids: &mut Vec<String>) -> bool {
+async fn annotate_server_spans(spans: &mut Vec<Span>, invocation_ids: &mut Vec<String>) -> bool {
     let mut touched = false;
     for span in spans {
         if let Some(invocation_id) = extract_invocation_id(span) {
             invocation_ids.push(invocation_id.clone());
 
-            if let Some(event_payload) = get_event_payload(&invocation_id) {
+            if let Some(event_payload) = get_event_payload(&invocation_id).await {
                 span.attributes.push(KeyValue {
                     key: "faas.event".to_string(),
                     value: Some(AnyValue {
-                        value: Some(Value::StringValue(event_payload)),
+                        value: Some(Value::StringValue(event_payload.to_string())),
                     }),
                 });
                 touched = true;
@@ -356,11 +357,11 @@ fn annotate_server_spans(spans: &mut Vec<Span>, invocation_ids: &mut Vec<String>
     touched
 }
 
-pub fn add_return_payload_to_lambda_server_spans(
+pub async fn add_return_payload_to_lambda_server_spans(
     invocation_id: &str,
     return_payload: &str,
 ) -> bool {
-    let mut traces = take_traces();
+    let mut traces = take_traces().await;
     let mut updated_traces: Vec<StoredTrace> = Vec::new();
     let mut added = false;
 
@@ -389,12 +390,12 @@ pub fn add_return_payload_to_lambda_server_spans(
         updated_traces.push(trace);
     }
 
-    store_traces(updated_traces);
+    store_traces(updated_traces).await;
     if added {
         // Clean up any pending payload stored earlier for this invocation.
-        let _ = take_return_payload(invocation_id);
+        let _ = take_return_payload(invocation_id).await;
     } else {
-        store_return_payload(invocation_id, return_payload);
+        store_return_payload(invocation_id, return_payload).await;
     }
     added
 }
@@ -429,7 +430,7 @@ pub fn annotate_return_payload(
     modified
 }
 
-pub fn merge_telemetry_invocation_data(request: &mut ExportTraceServiceRequest) -> i32 {
+pub async fn merge_telemetry_invocation_data(request: &mut ExportTraceServiceRequest) -> i32 {
     let mut modified = 0;
     for resource_span in &mut request.resource_spans {
         for scope_span in &mut resource_span.scope_spans {
@@ -437,7 +438,7 @@ pub fn merge_telemetry_invocation_data(request: &mut ExportTraceServiceRequest) 
                 if is_lambda_instrumentation_scope(&scope.name) {
                     for span in &mut scope_span.spans {
                         if let Some(invocation_id) = extract_invocation_id(span) {
-                            if let Some(data) = crate::store::get_invocation_data(&invocation_id) {
+                            if let Some(data) = crate::store::get_invocation_data(&invocation_id).await {
                                 if data.init_duration > 0.0 {
                                     span.attributes.push(KeyValue {
                                         key: "faas.init_duration".to_string(),
@@ -487,7 +488,7 @@ pub fn merge_telemetry_invocation_data(request: &mut ExportTraceServiceRequest) 
 
 /// Process a decoded trace request by adding event payloads, return payloads, and storing invocation span IDs.
 /// Returns true if the request was modified and needs to be re-encoded.
-pub fn process_trace_request(
+pub async fn process_trace_request(
     decoded: &mut ExportTraceServiceRequest,
     invocation_ids: &mut Vec<String>,
     encoded_body: &mut Vec<u8>,
@@ -495,7 +496,7 @@ pub fn process_trace_request(
     let mut modified = false;
 
     // Add event payload to lambda server spans
-    let added = add_event_payload_to_lambda_server_spans(decoded, invocation_ids);
+    let added = add_event_payload_to_lambda_server_spans(decoded, invocation_ids).await;
     if added {
         *encoded_body = decoded.encode_to_vec();
         tracing::info!(
@@ -527,8 +528,8 @@ pub fn process_trace_request(
     // If we have pending return payloads for these invocation IDs, apply them now.
     let mut updated_with_return = false;
     for id in invocation_ids.iter() {
-        if let Some(payload) = crate::store::take_return_payload(id) {
-            if annotate_return_payload(decoded, id, &payload) {
+        if let Some(payload) = crate::store::take_return_payload(id).await {
+            if annotate_return_payload(decoded, id, payload.as_str()) {
                 updated_with_return = true;
             }
         }
@@ -564,7 +565,7 @@ pub fn process_trace_request(
                                     invocation_id,
                                     trace_id_hex,
                                     span_id_hex,
-                                );
+                                ).await;
                                 tracing::debug!(
                                     "[{}] stored trace/span id for invocation_id={}",
                                     crate::log_prefix(),
@@ -607,13 +608,14 @@ mod tests {
             .and_then(|kv| kv.value.as_ref())
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn builds_trace_with_event_payload_and_invocation_id() {
+    async fn builds_trace_with_event_payload_and_invocation_id() {
         let invocation_id = "inv-test-1";
-        store_event_payload(invocation_id, r#"{"foo":"bar"}"#);
+        store_event_payload(invocation_id, r#"{"foo":"bar"}"#).await;
 
         let trace = build_runtime_error_trace(invocation_id, Some("CustomError"), None, &[])
+            .await
             .expect("trace should build");
 
         assert_eq!(trace.method, Method::POST);
@@ -667,12 +669,13 @@ mod tests {
         );
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn builds_trace_without_event_payload() {
+    async fn builds_trace_without_event_payload() {
         let invocation_id = "inv-test-2";
 
         let trace = build_runtime_error_trace(invocation_id, Some("error"), None, &[])
+            .await
             .expect("trace should build");
 
         let decoded = ExportTraceServiceRequest::decode(trace.body.as_slice())
@@ -732,16 +735,16 @@ mod tests {
         }
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn add_event_payload_adds_attribute_and_invocation_id() {
+    async fn add_event_payload_adds_attribute_and_invocation_id() {
         let invocation_id = "inv-event-1";
-        store_event_payload(invocation_id, r#"{"hello":"world"}"#);
+        store_event_payload(invocation_id, r#"{"hello":"world"}"#).await;
         let span = make_span_with_invocation(invocation_id);
         let mut request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
         let mut invocation_ids = Vec::new();
 
-        let added = add_event_payload_to_lambda_server_spans(&mut request, &mut invocation_ids);
+        let added = add_event_payload_to_lambda_server_spans(&mut request, &mut invocation_ids).await;
 
         assert!(added, "expected faas.event to be added");
         assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
@@ -750,15 +753,15 @@ mod tests {
         assert!(event_attr.is_some(), "faas.event attribute should exist");
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn add_event_payload_handles_missing_payload() {
+    async fn add_event_payload_handles_missing_payload() {
         let invocation_id = "inv-event-2";
         let span = make_span_with_invocation(invocation_id);
         let mut request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
         let mut invocation_ids = Vec::new();
 
-        let added = add_event_payload_to_lambda_server_spans(&mut request, &mut invocation_ids);
+        let added = add_event_payload_to_lambda_server_spans(&mut request, &mut invocation_ids).await;
 
         assert!(!added, "no faas.event should be added without payload");
         assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
@@ -770,15 +773,15 @@ mod tests {
         );
     }
 
-    #[test]
-    fn add_event_payload_ignores_other_scopes() {
+    #[tokio::test]
+    async fn add_event_payload_ignores_other_scopes() {
         let invocation_id = "inv-event-3";
-        store_event_payload(invocation_id, r#"{"foo":"bar"}"#);
+        store_event_payload(invocation_id, r#"{"foo":"bar"}"#).await;
         let span = make_span_with_invocation(invocation_id);
         let mut request = make_request_with_scope("other.scope", span);
         let mut invocation_ids = Vec::new();
 
-        let added = add_event_payload_to_lambda_server_spans(&mut request, &mut invocation_ids);
+        let added = add_event_payload_to_lambda_server_spans(&mut request, &mut invocation_ids).await;
 
         assert!(
             !added,
@@ -796,26 +799,26 @@ mod tests {
         );
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn add_return_payload_adds_attribute_for_matching_server_span() {
-        take_traces();
+    async fn add_return_payload_adds_attribute_for_matching_server_span() {
+        take_traces().await;
         let invocation_id = "inv-return-1";
         let mut span = make_span_with_invocation(invocation_id);
         span.kind = SpanKind::Server as i32;
         let request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
-        let trace = StoredTrace {
-            method: Method::POST,
-            path_and_query: "/v1/traces".to_string(),
-            headers: hyper::HeaderMap::new(),
-            body: request.encode_to_vec(),
-            invocation_ids: vec![invocation_id.to_string()],
-        };
-        store_trace(trace);
+        let trace = StoredTrace::new(
+            Method::POST,
+            "/v1/traces".to_string(),
+            hyper::HeaderMap::new(),
+            request.encode_to_vec(),
+            vec![invocation_id.to_string()],
+        );
+        store_trace(trace).await;
 
-        add_return_payload_to_lambda_server_spans(invocation_id, "result");
+        add_return_payload_to_lambda_server_spans(invocation_id, "result").await;
 
-        let traces = take_traces();
+        let traces = take_traces().await;
         assert_eq!(traces.len(), 1);
         let decoded = ExportTraceServiceRequest::decode(traces[0].body.as_slice())
             .expect("should decode updated trace");
@@ -824,25 +827,25 @@ mod tests {
         assert!(attr.is_some(), "faas.return_value should be added");
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn add_return_payload_ignores_non_matching_invocation() {
-        take_traces();
+    async fn add_return_payload_ignores_non_matching_invocation() {
+        take_traces().await;
         let mut span = make_span_with_invocation("other-inv");
         span.kind = SpanKind::Server as i32;
         let request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
-        let trace = StoredTrace {
-            method: Method::POST,
-            path_and_query: "/v1/traces".to_string(),
-            headers: hyper::HeaderMap::new(),
-            body: request.encode_to_vec(),
-            invocation_ids: vec!["other-inv".to_string()],
-        };
-        store_trace(trace);
+        let trace = StoredTrace::new(
+            Method::POST,
+            "/v1/traces".to_string(),
+            hyper::HeaderMap::new(),
+            request.encode_to_vec(),
+            vec!["other-inv".to_string()],
+        );
+        store_trace(trace).await;
 
-        add_return_payload_to_lambda_server_spans("inv-return-2", "result");
+        add_return_payload_to_lambda_server_spans("inv-return-2", "result").await;
 
-        let traces = take_traces();
+        let traces = take_traces().await;
         assert_eq!(traces.len(), 1);
         let decoded = ExportTraceServiceRequest::decode(traces[0].body.as_slice())
             .expect("should decode updated trace");
@@ -854,33 +857,34 @@ mod tests {
         );
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn add_return_payload_stores_when_trace_not_found() {
-        take_traces();
+    async fn add_return_payload_stores_when_trace_not_found() {
+        take_traces().await;
         let invocation_id = "inv-return-store";
 
-        let added = add_return_payload_to_lambda_server_spans(invocation_id, "result");
+        let added = add_return_payload_to_lambda_server_spans(invocation_id, "result").await;
 
         assert!(
             !added,
             "should not mark as added when no trace is available to annotate"
         );
-        let stored = take_return_payload(invocation_id);
-        assert_eq!(stored, Some("result".to_string()));
+        let stored = take_return_payload(invocation_id).await;
+        assert!(stored.is_some());
+        assert_eq!(stored.unwrap().as_str(), "result");
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn annotate_return_payload_applies_pending_and_clears_store() {
+    async fn annotate_return_payload_applies_pending_and_clears_store() {
         let invocation_id = "inv-return-late";
-        store_return_payload(invocation_id, "late_result");
-        let payload = take_return_payload(invocation_id).expect("payload should be stored");
+        store_return_payload(invocation_id, "late_result").await;
+        let payload = take_return_payload(invocation_id).await.expect("payload should be stored");
         let mut span = make_span_with_invocation(invocation_id);
         span.kind = SpanKind::Server as i32;
         let mut request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
 
-        let added = annotate_return_payload(&mut request, invocation_id, &payload);
+        let added = annotate_return_payload(&mut request, invocation_id, payload.as_str());
 
         assert!(added, "pending return payload should be applied");
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
@@ -890,15 +894,15 @@ mod tests {
             "faas.return_value attribute should be present after applying pending payload"
         );
         assert!(
-            take_return_payload(invocation_id).is_none(),
+            take_return_payload(invocation_id).await.is_none(),
             "pending payload should be cleared after applying"
         );
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn build_runtime_error_trace_uses_existing_trace_and_parent_ids() {
-        take_traces();
+    async fn build_runtime_error_trace_uses_existing_trace_and_parent_ids() {
+        take_traces().await;
         let invocation_id = "inv-trace-copy";
         let trace_id = vec![1u8; 16];
         let parent_span_id = vec![2u8; 8];
@@ -908,18 +912,19 @@ mod tests {
         span.parent_span_id = parent_span_id.clone();
 
         let request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
-        let trace = StoredTrace {
-            method: Method::POST,
-            path_and_query: "/v1/traces".to_string(),
-            headers: hyper::HeaderMap::new(),
-            body: request.encode_to_vec(),
-            invocation_ids: vec![invocation_id.to_string()],
-        };
-        store_trace(trace);
+        let trace = StoredTrace::new(
+            Method::POST,
+            "/v1/traces".to_string(),
+            hyper::HeaderMap::new(),
+            request.encode_to_vec(),
+            vec![invocation_id.to_string()],
+        );
+        store_trace(trace).await;
 
-        let traces = snapshot_traces();
+        let traces = snapshot_traces().await;
         let synthetic =
             build_runtime_error_trace(invocation_id, Some("CopiedError"), None, &traces)
+                .await
                 .expect("trace should build");
 
         let decoded = ExportTraceServiceRequest::decode(synthetic.body.as_slice())
@@ -929,11 +934,11 @@ mod tests {
         assert_eq!(span.span_id, parent_span_id);
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn process_trace_request_adds_event_payload() {
+    async fn process_trace_request_adds_event_payload() {
         let invocation_id = "inv-process-1";
-        store_event_payload(invocation_id, r#"{"test":"data"}"#);
+        store_event_payload(invocation_id, r#"{"test":"data"}"#).await;
 
         let span = make_span_with_invocation(invocation_id);
         let mut request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
@@ -941,7 +946,7 @@ mod tests {
         let mut encoded_body = Vec::new();
 
         let modified =
-            super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+            super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body).await;
 
         assert!(
             modified,
@@ -955,12 +960,12 @@ mod tests {
         assert!(event_attr.is_some(), "faas.event should be added");
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn process_trace_request_applies_pending_return_payload() {
+    async fn process_trace_request_applies_pending_return_payload() {
         let invocation_id = "inv-process-2";
-        store_event_payload(invocation_id, r#"{"test":"data"}"#);
-        store_return_payload(invocation_id, r#"{"result":"success"}"#);
+        store_event_payload(invocation_id, r#"{"test":"data"}"#).await;
+        store_return_payload(invocation_id, r#"{"result":"success"}"#).await;
 
         let span = make_span_with_invocation(invocation_id);
         let mut request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
@@ -968,7 +973,7 @@ mod tests {
         let mut encoded_body = Vec::new();
 
         let modified =
-            super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+            super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body).await;
 
         assert!(
             modified,
@@ -982,14 +987,14 @@ mod tests {
 
         // Verify the pending payload was consumed
         assert!(
-            take_return_payload(invocation_id).is_none(),
+            take_return_payload(invocation_id).await.is_none(),
             "pending return payload should be consumed"
         );
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn process_trace_request_stores_invocation_span_ids() {
+    async fn process_trace_request_stores_invocation_span_ids() {
         let invocation_id = "inv-process-3";
         let trace_id = vec![1u8, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
         let span_id = vec![1u8, 2, 3, 4, 5, 6, 7, 8];
@@ -1002,10 +1007,10 @@ mod tests {
         let mut invocation_ids = Vec::new();
         let mut encoded_body = Vec::new();
 
-        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body).await;
 
         // Verify the span IDs were stored
-        let stored = crate::store::get_invocation_span_id(invocation_id);
+        let stored = crate::store::get_invocation_span_id(invocation_id).await;
         assert!(stored.is_some(), "invocation span IDs should be stored");
 
         let stored = stored.unwrap();
@@ -1022,15 +1027,15 @@ mod tests {
         assert_eq!(stored.span_id, expected_span_id);
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn process_trace_request_handles_multiple_invocation_ids() {
+    async fn process_trace_request_handles_multiple_invocation_ids() {
         let invocation_id_1 = "inv-process-4a";
         let invocation_id_2 = "inv-process-4b";
 
-        store_event_payload(invocation_id_1, r#"{"test":"data1"}"#);
-        store_event_payload(invocation_id_2, r#"{"test":"data2"}"#);
-        store_return_payload(invocation_id_2, r#"{"result":"success2"}"#);
+        store_event_payload(invocation_id_1, r#"{"test":"data1"}"#).await;
+        store_event_payload(invocation_id_2, r#"{"test":"data2"}"#).await;
+        store_return_payload(invocation_id_2, r#"{"result":"success2"}"#).await;
 
         let span1 = make_span_with_invocation(invocation_id_1);
         let span2 = make_span_with_invocation(invocation_id_2);
@@ -1054,7 +1059,7 @@ mod tests {
         let mut encoded_body = Vec::new();
 
         let modified =
-            super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+            super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body).await;
 
         assert!(modified, "request should be modified");
         assert_eq!(invocation_ids.len(), 2);
@@ -1078,9 +1083,9 @@ mod tests {
         );
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn process_trace_request_returns_false_when_no_modifications() {
+    async fn process_trace_request_returns_false_when_no_modifications() {
         let invocation_id = "inv-process-5";
 
         // Don't store any event payload or return payload
@@ -1090,7 +1095,7 @@ mod tests {
         let mut encoded_body = Vec::new();
 
         let modified =
-            super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+            super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body).await;
 
         assert!(
             !modified,
@@ -1100,11 +1105,11 @@ mod tests {
         assert!(encoded_body.is_empty(), "encoded_body should remain empty");
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn process_trace_request_ignores_non_lambda_scopes() {
+    async fn process_trace_request_ignores_non_lambda_scopes() {
         let invocation_id = "inv-process-6";
-        store_event_payload(invocation_id, r#"{"test":"data"}"#);
+        store_event_payload(invocation_id, r#"{"test":"data"}"#).await;
 
         let span = make_span_with_invocation(invocation_id);
         let mut request = make_request_with_scope("other.instrumentation.scope", span);
@@ -1112,7 +1117,7 @@ mod tests {
         let mut encoded_body = Vec::new();
 
         let modified =
-            super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+            super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body).await;
 
         assert!(!modified, "non-lambda scopes should not be modified");
         assert!(
@@ -1121,18 +1126,18 @@ mod tests {
         );
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn process_trace_request_updates_encoded_body_correctly() {
+    async fn process_trace_request_updates_encoded_body_correctly() {
         let invocation_id = "inv-process-7";
-        store_event_payload(invocation_id, r#"{"test":"data"}"#);
+        store_event_payload(invocation_id, r#"{"test":"data"}"#).await;
 
         let span = make_span_with_invocation(invocation_id);
         let mut request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
         let mut invocation_ids = Vec::new();
         let mut encoded_body = Vec::new();
 
-        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body).await;
 
         // Verify the encoded body can be decoded and matches the request
         let decoded = ExportTraceServiceRequest::decode(encoded_body.as_slice())
@@ -1147,13 +1152,14 @@ mod tests {
         assert!(event_attr.is_some(), "decoded span should have faas.event");
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn builds_trace_with_error_from_return_value() {
+    async fn builds_trace_with_error_from_return_value() {
         let invocation_id = "inv-error-json";
         let error_json = r#"{"errorMessage": "Something went wrong", "errorType": "ValueError", "requestId": "123", "stackTrace": ["line1\n", "line2\n"]}"#;
 
         let trace = build_runtime_error_trace(invocation_id, None, Some(error_json), &[])
+            .await
             .expect("trace should build");
 
         let decoded = ExportTraceServiceRequest::decode(trace.body.as_slice())
@@ -1324,17 +1330,17 @@ mod tests {
         assert_eq!(escaped_attr, Some("False".to_string()));
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn add_event_payload_support_nodejs_scope() {
+    async fn add_event_payload_support_nodejs_scope() {
         let invocation_id = "inv-event-node";
-        store_event_payload(invocation_id, r#"{"hello":"node"}"#);
+        store_event_payload(invocation_id, r#"{"hello":"node"}"#).await;
         let span = make_span_with_invocation(invocation_id);
         let mut request =
             make_request_with_scope("@opentelemetry/instrumentation-aws-lambda", span);
         let mut invocation_ids = Vec::new();
 
-        let added = add_event_payload_to_lambda_server_spans(&mut request, &mut invocation_ids);
+        let added = add_event_payload_to_lambda_server_spans(&mut request, &mut invocation_ids).await;
 
         assert!(added, "expected faas.event to be added for nodejs scope");
         assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
@@ -1343,26 +1349,26 @@ mod tests {
         assert!(event_attr.is_some(), "faas.event attribute should exist");
     }
 
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn add_return_payload_support_nodejs_scope() {
-        take_traces();
+    async fn add_return_payload_support_nodejs_scope() {
+        take_traces().await;
         let invocation_id = "inv-return-node";
         let mut span = make_span_with_invocation(invocation_id);
         span.kind = SpanKind::Server as i32;
         let request = make_request_with_scope("@opentelemetry/instrumentation-aws-lambda", span);
-        let trace = StoredTrace {
-            method: Method::POST,
-            path_and_query: "/v1/traces".to_string(),
-            headers: hyper::HeaderMap::new(),
-            body: request.encode_to_vec(),
-            invocation_ids: vec![invocation_id.to_string()],
-        };
-        store_trace(trace);
+        let trace = StoredTrace::new(
+            Method::POST,
+            "/v1/traces".to_string(),
+            hyper::HeaderMap::new(),
+            request.encode_to_vec(),
+            vec![invocation_id.to_string()],
+        );
+        store_trace(trace).await;
 
-        add_return_payload_to_lambda_server_spans(invocation_id, "node_result");
+        add_return_payload_to_lambda_server_spans(invocation_id, "node_result").await;
 
-        let traces = take_traces();
+        let traces = take_traces().await;
         assert_eq!(traces.len(), 1);
         let decoded = ExportTraceServiceRequest::decode(traces[0].body.as_slice())
             .expect("should decode updated trace");
@@ -1373,9 +1379,9 @@ mod tests {
             "faas.return_value should be added for nodejs scope"
         );
     }
-    #[test]
+    #[tokio::test]
     #[serial]
-    fn test_merge_telemetry_invocation_data_updates_span() {
+    async fn test_merge_telemetry_invocation_data_updates_span() {
         let invocation_id = "inv-merge-data";
 
         // Setup InvocationData
@@ -1385,12 +1391,12 @@ mod tests {
             data.memory_usage = 128;
             data.start_time = 1_000.0; // 1 second
             data.end_time = 2_000.0; // 2 seconds
-        });
+        }).await;
 
         let span = make_span_with_invocation(invocation_id);
         let mut request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
 
-        let modified = super::merge_telemetry_invocation_data(&mut request);
+        let modified = super::merge_telemetry_invocation_data(&mut request).await;
 
         assert!(modified > 0, "request should be modified");
 
@@ -1429,7 +1435,7 @@ fn env_as_json_string() -> String {
     serde_json::Value::Object(map).to_string()
 }
 
-fn get_trace_span_ids(invocation_id: &str, existing_traces: &[StoredTrace]) -> (Vec<u8>, Vec<u8>) {
+async fn get_trace_span_ids(invocation_id: &str, existing_traces: &[StoredTrace]) -> (Vec<u8>, Vec<u8>) {
     let mut found_trace_id: Option<Vec<u8>> = None;
     let mut found_parent_span_id: Option<Vec<u8>> = None;
 
@@ -1460,7 +1466,7 @@ fn get_trace_span_ids(invocation_id: &str, existing_traces: &[StoredTrace]) -> (
                     invocation_id,
                     hex::encode(&span.trace_id),
                     hex::encode(&span.parent_span_id),
-                );
+                ).await;
                 if found_trace_id.is_some() {
                     break;
                 }

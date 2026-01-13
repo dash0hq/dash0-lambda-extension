@@ -1,3 +1,5 @@
+/// General configuration functions for Dash0 Lambda extension
+
 /// Return true if SEND_ON_INVOCATION_END is set to a truthy value.
 /// Defaults to true when unset or unrecognized.
 pub fn is_send_on_invocation_end() -> bool {
