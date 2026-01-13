@@ -158,7 +158,62 @@ $(LAMBDA_LAYER_MARKER_MANUAL): build/$(ZIP_NAME_MANUAL)
 
 
 
-doc: 
+doc:
 	@cargo doc
 	@echo
 	@echo "Docs are located in target/doc/aws_lambda_runtime_api_proxy_rs/index.html"
+
+# ============================================================================
+# Performance Testing and Benchmarking
+# ============================================================================
+
+.PHONY: bench bench-baseline bench-compare profile-cpu profile-memory perf-test
+.PHONY: bench-cloning bench-mutex bench-http bench-protobuf
+
+# Run all benchmarks
+bench:
+	@echo "Running all benchmarks..."
+	@cargo bench --no-fail-fast
+
+# Create baseline for comparison
+bench-baseline:
+	@echo "Creating benchmark baseline..."
+	@cargo bench --no-fail-fast -- --save-baseline master
+	@echo "✅ Baseline 'master' created"
+	@echo "   Compare future changes with: make bench-compare"
+
+# Compare current changes against baseline
+bench-compare:
+	@echo "Comparing against baseline..."
+	@./scripts/bench_compare.sh master
+
+# Individual benchmark categories
+bench-cloning:
+	@echo "Running String cloning benchmarks..."
+	@cargo bench --bench store_cloning
+
+bench-mutex:
+	@echo "Running Mutex contention benchmarks..."
+	@cargo bench --bench store_mutex
+
+bench-http:
+	@echo "Running HTTP client benchmarks..."
+	@cargo bench --bench http_client
+
+bench-protobuf:
+	@echo "Running Protobuf benchmarks..."
+	@cargo bench --bench protobuf_ops
+
+# Profiling
+profile-cpu:
+	@./scripts/profile_cpu.sh
+
+profile-memory:
+	@./scripts/profile_memory.sh
+
+# Combined performance test suite
+perf-test: bench profile-cpu
+	@echo ""
+	@echo "✅ Performance testing complete"
+	@echo "   View benchmark report: open target/criterion/report/index.html"
+	@echo "   View flamegraph: open target/profiling/flamegraph-store_cloning.svg"

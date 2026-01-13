@@ -32,3 +32,24 @@ default = []
 [dev-dependencies]
 tokio-test = "0.4"
 serial_test = "3.0"
+criterion = { version = "0.5", features = ["html_reports"] }
+dhat = "0.3"
+
+[[bench]]
+name = "store_cloning"
+harness = false
+
+[[bench]]
+name = "store_mutex"
+harness = false
+
+[[bench]]
+name = "http_client"
+harness = false
+
+[[bench]]
+name = "protobuf_ops"
+harness = false
+
+[profile.bench]
+debug = true  # Enable debug symbols for flamegraphs
