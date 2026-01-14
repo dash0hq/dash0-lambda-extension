@@ -21,7 +21,6 @@ pub mod state;
 pub mod util;
 
 pub mod backend_send;
-pub(crate) mod sandbox;
 pub(crate) mod stats;
 pub(crate) mod store;
 
@@ -102,7 +101,7 @@ async fn main() {
 
         loop {
             // Lambda Extension API requires we wait for next extension event
-            sandbox::extension::get_next().await;
+            extension::events::get_next().await;
         }
     });
 

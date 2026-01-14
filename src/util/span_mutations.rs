@@ -52,7 +52,8 @@ pub fn build_runtime_error_trace(
             key: "cloud.resource_id".to_string(),
             value: Some(AnyValue {
                 value: Some(Value::StringValue(
-                    crate::state::global::get_function_arn().unwrap_or_else(|| "unknown".to_string()),
+                    crate::state::global::get_function_arn()
+                        .unwrap_or_else(|| "unknown".to_string()),
                 )),
             }),
         },

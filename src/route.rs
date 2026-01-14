@@ -8,12 +8,12 @@ use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 
 use crate::backend_send::{flush_logs, flush_traces, send_traces};
+use crate::state;
 use crate::store::{force_init_trace_store, store_trace, take_traces, StoredTrace};
 use crate::util::parsers::extract_error_invocation_ids;
 use crate::util::span_mutations::{
     build_runtime_error_trace, drop_duplicate_java_instrumenations, process_trace_request,
 };
-use crate::{sandbox, state};
 
 pub fn make_route<'a>() -> Router<'a> {
     let router = Router::default()
