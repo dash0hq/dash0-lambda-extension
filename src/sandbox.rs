@@ -10,42 +10,6 @@ pub async fn send_request(request: Request<Body>) -> Result<Response<Body>, Erro
     hyper::Client::new().request(request).await
 }
 
-#[allow(dead_code)]
-pub async fn create_invoke_result_request(id: &str, body: Body) -> Result<Request<Body>, Error> {
-    let uri = match hyper::Uri::builder()
-        .scheme("http")
-        .authority(crate::config::endpoints::sandbox_runtime_api())
-        .path_and_query(format!(
-            "/{}/runtime/invocation/{}/response",
-            crate::LAMBDA_RUNTIME_API_VERSION,
-            id
-        ))
-        .build()
-    {
-        Ok(uri) => uri,
-        Err(e) => {
-            tracing::error!(
-                "[{}] Error building Sandbox Lambda Runtime API endpoint URL: {}",
-                crate::log_prefix(),
-                e
-            );
-            panic!("[{}] Failed to build Runtime API URI for invocation result - severe misconfiguration: {}", crate::log_prefix(), e);
-        }
-    };
-
-    match hyper::Request::builder().method("POST").uri(uri).body(body) {
-        Ok(req) => Ok(req),
-        Err(e) => {
-            tracing::error!(
-                "[{}] Cannot create Sandbox Lambda Runtime API request: {}",
-                crate::log_prefix(),
-                e
-            );
-            panic!("[{}] Failed to build Runtime API request for invocation result - severe misconfiguration: {}", crate::log_prefix(), e);
-        }
-    }
-}
-
 /// Lambda Extensions API
 ///
 /// Interact with the Lambda sandbox as a Lambda Extension
