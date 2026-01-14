@@ -40,22 +40,10 @@ pub fn make_route<'a>() -> Router<'a> {
         )
         .post("/:apiver/traces", traces)
         .post("/:apiver/telemetry", telemetry_sink)
-        .not_found(notfound_passthru_proxy);
+        .not_found(crate::extension::runtime_proxy::notfound_passthru_proxy);
     Lazy::force(&HTTPS_CLIENT);
     force_init_trace_store();
     router
-}
-
-/// Pass-through the request, but log the unhandled path and method
-#[allow(dead_code)]
-pub async fn notfound_passthru_proxy(req: Request<Body>) -> Result<Response<Body>, Error> {
-    tracing::info!(
-        "[{}] Route not found: path={} method={}",
-        crate::log_prefix(),
-        &req.uri().path(),
-        &req.method()
-    );
-    passthru_proxy(req).await
 }
 
 #[allow(dead_code)]

@@ -14,8 +14,8 @@ use tokio::{self};
 use tracing_subscriber::EnvFilter;
 
 pub mod config;
-
-mod route;
+pub mod extension;
+pub mod route;
 
 pub mod util;
 
