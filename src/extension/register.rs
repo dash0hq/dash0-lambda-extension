@@ -32,7 +32,7 @@ fn make_uri(path: &str) -> hyper::Uri {
     match hyper::Uri::builder()
         .scheme("http")
         .authority(endpoints::sandbox_runtime_api())
-        .path_and_query(format!("/{}/extension{}", EXTENSION_API_VERSION, path))
+        .path_and_query(path)
         .build()
     {
         Ok(uri) => uri,
@@ -53,7 +53,7 @@ fn make_uri(path: &str) -> hyper::Uri {
 
 /// Register the extension with the Lambda Extensions API
 pub async fn register() {
-    let uri = make_uri("/register");
+    let uri = make_uri(&format!("/{}/extension/register", EXTENSION_API_VERSION));
 
     let body = Body::from(r#"{"events":["INVOKE","SHUTDOWN"]}"#);
     let mut request = match hyper::Request::builder().method("POST").uri(uri).body(body) {
@@ -147,7 +147,7 @@ pub async fn register() {
 }
 
 pub async fn register_telemetry() {
-    let uri = make_telemetry_uri();
+    let uri = make_uri("/2022-07-01/telemetry");
     let destination = format!(
         "http://sandbox.localdomain:{}/v1/telemetry",
         crate::DEFAULT_PROXY_PORT
@@ -224,29 +224,6 @@ pub async fn register_telemetry() {
                 crate::log_prefix_with("Extension"),
                 uri,
                 err
-            );
-        }
-    }
-}
-
-fn make_telemetry_uri() -> hyper::Uri {
-    match hyper::Uri::builder()
-        .scheme("http")
-        .authority(endpoints::sandbox_runtime_api())
-        .path_and_query("/2022-07-01/telemetry")
-        .build()
-    {
-        Ok(uri) => uri,
-        Err(e) => {
-            tracing::error!(
-                "[{}] Error building Lambda Telemetry API endpoint URL: {}",
-                crate::log_prefix_with("Extension"),
-                e
-            );
-            panic!(
-                "[{}] Failed to build Telemetry API URI - severe misconfiguration: {}",
-                crate::log_prefix_with("Extension"),
-                e
             );
         }
     }
