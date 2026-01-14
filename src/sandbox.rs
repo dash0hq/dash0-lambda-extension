@@ -18,48 +18,13 @@ pub async fn send_request(request: Request<Body>) -> Result<Response<Body>, Erro
 pub mod extension {
     use crate::DEFAULT_PROXY_PORT;
     use hyper::Body;
-    use once_cell::sync::OnceCell;
     use std::time::{Duration, Instant};
-    /// Cannonical Lambda Extensions API version
+
+    /// Canonical Lambda Extensions API version
     ///
     /// Documentation: https://docs.aws.amazon.com/lambda/latest/dg/runtimes-extensions-api.html
     ///
     const EXTENSION_API_VERSION: &str = "2020-01-01";
-    static LAMBDA_EXTENSION_IDENTIFIER: OnceCell<String> = OnceCell::new();
-
-    fn find_extension_name() -> String {
-        crate::EXTENSION_NAME.to_owned()
-    }
-
-    pub(super) fn extension_id() -> &'static String {
-        match LAMBDA_EXTENSION_IDENTIFIER.get() {
-            Some(id) => id,
-            None => {
-                tracing::error!(
-                    "[{}] Lambda Extension Identifier not set - extension not registered",
-                    crate::log_prefix_with("Extension")
-                );
-                panic!(
-                    "[{}] Extension must be registered before use",
-                    crate::log_prefix_with("Extension")
-                );
-            }
-        }
-    }
-
-    pub fn set_extension_identifier(identifier: &str) {
-        if let Err(e) = LAMBDA_EXTENSION_IDENTIFIER.set(identifier.to_owned()) {
-            tracing::error!(
-                "[{}] Extension identifier already set: {:?}",
-                crate::log_prefix_with("Extension"),
-                e
-            );
-            panic!(
-                "[{}] Cannot register extension twice",
-                crate::log_prefix_with("Extension")
-            );
-        }
-    }
 
     fn make_uri(path: &str) -> hyper::Uri {
         match hyper::Uri::builder()
@@ -105,7 +70,7 @@ pub mod extension {
             }
         };
 
-        match extension_id().try_into() {
+        match crate::extension::register::extension_id().try_into() {
             Ok(header_value) => {
                 request
                     .headers_mut()
@@ -266,7 +231,7 @@ pub mod extension {
             }
         };
 
-        match extension_id().try_into() {
+        match crate::extension::register::extension_id().try_into() {
             Ok(header_value) => {
                 request
                     .headers_mut()

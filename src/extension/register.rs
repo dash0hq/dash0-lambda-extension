@@ -1,9 +1,28 @@
 use hyper::Body;
+use once_cell::sync::OnceCell;
 
 use crate::config::endpoints;
 
 /// Canonical Lambda Extensions API version
 const EXTENSION_API_VERSION: &str = "2020-01-01";
+
+static LAMBDA_EXTENSION_IDENTIFIER: OnceCell<String> = OnceCell::new();
+
+pub fn extension_id() -> &'static String {
+    match LAMBDA_EXTENSION_IDENTIFIER.get() {
+        Some(id) => id,
+        None => {
+            tracing::error!(
+                "[{}] Lambda Extension Identifier not set - extension not registered",
+                crate::log_prefix_with("Extension")
+            );
+            panic!(
+                "[{}] Extension must be registered before use",
+                crate::log_prefix_with("Extension")
+            );
+        }
+    }
+}
 
 fn find_extension_name() -> String {
     crate::EXTENSION_NAME.to_owned()
@@ -37,11 +56,7 @@ pub async fn register() {
     let uri = make_uri("/register");
 
     let body = Body::from(r#"{"events":["INVOKE","SHUTDOWN"]}"#);
-    let mut request = match hyper::Request::builder()
-        .method("POST")
-        .uri(uri)
-        .body(body)
-    {
+    let mut request = match hyper::Request::builder().method("POST").uri(uri).body(body) {
         Ok(req) => req,
         Err(e) => {
             tracing::error!(
@@ -111,7 +126,10 @@ pub async fn register() {
             }
         },
         None => {
-            tracing::error!("[{}] Lambda Extensions API response missing 'lambda-extension-identifier' header", crate::log_prefix_with("Extension"));
+            tracing::error!(
+                "[{}] Lambda Extensions API response missing 'lambda-extension-identifier' header",
+                crate::log_prefix_with("Extension")
+            );
             panic!(
                 "[{}] Extension registration failed - missing identifier header",
                 crate::log_prefix_with("Extension")
@@ -119,5 +137,11 @@ pub async fn register() {
         }
     };
 
-    crate::sandbox::extension::set_extension_identifier(extension_identifier);
+    if let Err(e) = LAMBDA_EXTENSION_IDENTIFIER.set(extension_identifier.to_owned()) {
+        tracing::warn!(
+            "[{}] Extension identifier already set: {:?}",
+            crate::log_prefix_with("Extension"),
+            e
+        );
+    }
 }
