@@ -1,5 +1,5 @@
 use crate::config::is_auto_instrumented_disabled;
-use crate::store::{get_invocation_span_id, store_telemetry_logs, TelemetryLog};
+use crate::state::invocation_data::{get_invocation_span_id, store_telemetry_logs, TelemetryLog};
 use crate::util::parsers::{get_span_id_from_invocation_id, get_trace_id_from_invocation_id};
 use chrono::DateTime;
 use opentelemetry_proto::tonic::common::v1::AnyValue;
@@ -493,7 +493,7 @@ mod tests {
 
     #[test]
     fn test_map_logs_with_trace_and_span_id_from_store() {
-        use crate::store::store_invocation_span_id;
+        use crate::state::invocation_data::store_invocation_span_id;
 
         let invocation_id = "inv-with-trace";
         let trace_id_hex = "5b8eff129842a1b9c9283745a23f54b1";

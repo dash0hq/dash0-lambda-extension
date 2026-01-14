@@ -1,7 +1,7 @@
-use crate::store::TelemetryLog;
+use crate::state::invocation_data::TelemetryLog;
 
 pub fn process_telemetry_logs(logs: &mut Vec<TelemetryLog>) {
-    let mut current_invocation_id = crate::store::get_last_seen_invocation_start();
+    let mut current_invocation_id = crate::state::invocation_data::get_last_seen_invocation_start();
 
     for log in logs {
         if log.r#type == "platform.start" {
@@ -43,12 +43,12 @@ pub fn process_telemetry_logs(logs: &mut Vec<TelemetryLog>) {
 fn parse_platform_start(log: &TelemetryLog, current_invocation_id: &mut Option<String>) {
     if let Some(record) = log.record.as_object() {
         if let Some(req_id) = record.get("requestId").and_then(|v| v.as_str()) {
-            crate::store::store_last_seen_invocation_start(req_id);
+            crate::state::invocation_data::store_last_seen_invocation_start(req_id);
             *current_invocation_id = Some(req_id.to_string());
 
             if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&log.time) {
                 let start_time = dt.timestamp_millis() as f64;
-                crate::store::update_invocation_data(req_id, |data| {
+                crate::state::invocation_data::update_invocation_data(req_id, |data| {
                     data.start_time = start_time;
                 });
             } else {
@@ -69,8 +69,8 @@ fn parse_platform_init_report(log: &TelemetryLog) {
         .and_then(|m| m.get("durationMs"))
         .and_then(|d| d.as_f64())
     {
-        if let Some(req_id) = crate::store::get_current_invocation_id() {
-            crate::store::update_invocation_data(&req_id, |data| {
+        if let Some(req_id) = crate::state::invocation_data::get_current_invocation_id() {
+            crate::state::invocation_data::update_invocation_data(&req_id, |data| {
                 data.init_duration = duration_ms;
             });
         }
@@ -98,7 +98,7 @@ fn parse_platform_runtime_done(log: &TelemetryLog) {
                 .unwrap_or(0.0);
 
             if end_time > 0.0 || duration > 0.0 {
-                crate::store::update_invocation_data(req_id, |data| {
+                crate::state::invocation_data::update_invocation_data(req_id, |data| {
                     if end_time > 0.0 {
                         data.end_time = end_time;
                     }
@@ -109,7 +109,7 @@ fn parse_platform_runtime_done(log: &TelemetryLog) {
             }
         }
     }
-    if let Some(notifier) = crate::store::take_runtime_done_notifier() {
+    if let Some(notifier) = crate::state::invocation_data::take_runtime_done_notifier() {
         tracing::info!("[{}] Signaled platform.runtimeDone", crate::log_prefix());
         let _ = notifier.send(());
     }
@@ -147,7 +147,7 @@ fn parse_platform_report(log: &TelemetryLog) {
                     .and_then(|v| v.as_f64())
                     .unwrap_or(0.0);
 
-                crate::store::update_invocation_data(req_id, |data| {
+                crate::state::invocation_data::update_invocation_data(req_id, |data| {
                     if data.start_time > 0.0 {
                         data.end_time = data.start_time + duration;
                     } else if log_timestamp > 0.0 {
@@ -169,7 +169,7 @@ fn parse_platform_report(log: &TelemetryLog) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::store::{get_invocation_data, TelemetryLog};
+    use crate::state::invocation_data::{get_invocation_data, TelemetryLog};
     use serde_json::json;
     use serial_test::serial;
 
@@ -212,7 +212,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_parse_platform_init_report() {
-        use crate::store::store_current_invocation_id;
+        use crate::state::invocation_data::store_current_invocation_id;
         let req_id = "test-req-init";
         store_current_invocation_id(req_id); // Set context
 

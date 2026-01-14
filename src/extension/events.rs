@@ -128,7 +128,7 @@ pub async fn get_next() {
                 {
                     // Block execution until platform.runtimeDone is received
                     let (tx, rx) = tokio::sync::oneshot::channel();
-                    crate::store::store_runtime_done_notifier(tx);
+                    crate::state::invocation_data::store_runtime_done_notifier(tx);
 
                     tracing::info!(
                         "[{}] Waiting for platform.runtimeDone",

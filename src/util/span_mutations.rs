@@ -1,4 +1,4 @@
-use crate::store::{
+use crate::state::invocation_data::{
     get_event_payload, store_return_payload, store_traces, take_return_payload, take_traces,
     StoredTrace,
 };
@@ -36,7 +36,7 @@ pub fn build_runtime_error_trace(
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_nanos() as u64)
         .unwrap_or(0);
-    let start_nanos = crate::store::get_invocation_data(invocation_id)
+    let start_nanos = crate::state::invocation_data::get_invocation_data(invocation_id)
         .map(|data| (data.start_time * 1_000_000.0) as u64)
         .filter(|&t| t > 0)
         .unwrap_or(now_nanos);
@@ -438,7 +438,9 @@ pub fn merge_telemetry_invocation_data(request: &mut ExportTraceServiceRequest) 
                 if is_lambda_instrumentation_scope(&scope.name) {
                     for span in &mut scope_span.spans {
                         if let Some(invocation_id) = extract_invocation_id(span) {
-                            if let Some(data) = crate::store::get_invocation_data(&invocation_id) {
+                            if let Some(data) =
+                                crate::state::invocation_data::get_invocation_data(&invocation_id)
+                            {
                                 if data.init_duration > 0.0 {
                                     span.attributes.push(KeyValue {
                                         key: "faas.init_duration".to_string(),
@@ -528,7 +530,7 @@ pub fn process_trace_request(
     // If we have pending return payloads for these invocation IDs, apply them now.
     let mut updated_with_return = false;
     for id in invocation_ids.iter() {
-        if let Some(payload) = crate::store::take_return_payload(id) {
+        if let Some(payload) = crate::state::invocation_data::take_return_payload(id) {
             if annotate_return_payload(decoded, id, &payload) {
                 updated_with_return = true;
             }
@@ -561,7 +563,7 @@ pub fn process_trace_request(
                                     .iter()
                                     .map(|b| format!("{:02x}", b))
                                     .collect::<String>();
-                                crate::store::store_invocation_span_id(
+                                crate::state::invocation_data::store_invocation_span_id(
                                     invocation_id,
                                     trace_id_hex,
                                     span_id_hex,
@@ -588,7 +590,7 @@ mod tests {
         add_event_payload_to_lambda_server_spans, add_return_payload_to_lambda_server_spans,
         annotate_return_payload, build_runtime_error_trace, StatusCode,
     };
-    use crate::store::{
+    use crate::state::invocation_data::{
         snapshot_traces, store_event_payload, store_return_payload, store_trace,
         take_return_payload, take_traces, StoredTrace,
     };
@@ -1006,7 +1008,7 @@ mod tests {
         super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
 
         // Verify the span IDs were stored
-        let stored = crate::store::get_invocation_span_id(invocation_id);
+        let stored = crate::state::invocation_data::get_invocation_span_id(invocation_id);
         assert!(stored.is_some(), "invocation span IDs should be stored");
 
         let stored = stored.unwrap();
@@ -1380,7 +1382,7 @@ mod tests {
         let invocation_id = "inv-merge-data";
 
         // Setup InvocationData
-        crate::store::update_invocation_data(invocation_id, |data| {
+        crate::state::invocation_data::update_invocation_data(invocation_id, |data| {
             data.init_duration = 100.0;
             data.billed_duration = 200.0;
             data.memory_usage = 128;
@@ -1457,7 +1459,7 @@ fn get_trace_span_ids(invocation_id: &str, existing_traces: &[StoredTrace]) -> (
                 if !span.parent_span_id.is_empty() {
                     found_parent_span_id = Some(span.parent_span_id.clone());
                 }
-                crate::store::store_invocation_span_id(
+                crate::state::invocation_data::store_invocation_span_id(
                     invocation_id,
                     hex::encode(&span.trace_id),
                     hex::encode(&span.parent_span_id),

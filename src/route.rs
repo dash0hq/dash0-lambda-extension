@@ -9,7 +9,9 @@ use prost::Message;
 
 use crate::backend_send::{flush_logs, flush_traces, send_traces};
 use crate::state;
-use crate::store::{force_init_trace_store, store_trace, take_traces, StoredTrace};
+use crate::state::invocation_data::{
+    force_init_trace_store, store_trace, take_traces, StoredTrace,
+};
 use crate::util::parsers::extract_error_invocation_ids;
 use crate::util::span_mutations::{
     build_runtime_error_trace, drop_duplicate_java_instrumenations, process_trace_request,
@@ -53,7 +55,9 @@ pub async fn telemetry_sink(req: Request<Body>) -> Result<Response<Body>, Error>
         body_text
     );
 
-    if let Ok(mut logs) = serde_json::from_str::<Vec<crate::store::TelemetryLog>>(&body_text) {
+    if let Ok(mut logs) =
+        serde_json::from_str::<Vec<crate::state::invocation_data::TelemetryLog>>(&body_text)
+    {
         crate::util::log_processing::process_telemetry_logs(&mut logs);
 
         let mut report_invocation_ids: Vec<String> = Vec::new();
@@ -64,12 +68,12 @@ pub async fn telemetry_sink(req: Request<Body>) -> Result<Response<Body>, Error>
                 }
             }
         }
-        crate::store::store_telemetry_logs(logs);
+        crate::state::invocation_data::store_telemetry_logs(logs);
 
         if !report_invocation_ids.is_empty() {
             flush_traces().await;
             for id in &report_invocation_ids {
-                crate::store::cleanup_invocation(id);
+                crate::state::invocation_data::cleanup_invocation(id);
             }
         }
     } else {
@@ -188,7 +192,7 @@ pub async fn traces(req: Request<Body>) -> Result<Response<Body>, Error> {
     }
 
     if invocation_ids.is_empty() {
-        if let Some(current) = crate::store::get_current_invocation_id() {
+        if let Some(current) = crate::state::invocation_data::get_current_invocation_id() {
             invocation_ids.push(current);
         }
     }
