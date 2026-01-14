@@ -20,7 +20,6 @@ pub mod state;
 
 pub mod util;
 
-pub mod backend_send;
 pub(crate) mod stats;
 pub mod otlp;
 

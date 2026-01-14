@@ -7,7 +7,7 @@ use once_cell::sync::Lazy;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 
-use crate::backend_send::{flush_logs, flush_traces, send_traces};
+use crate::otlp::exporter::{flush_logs, flush_traces, send_traces};
 use crate::state;
 use crate::state::invocation_data::{
     force_init_trace_store, store_trace, take_traces, StoredTrace,
