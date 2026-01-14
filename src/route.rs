@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Instant};
+use std::time::Instant;
 
 use httprouter::Router;
 use hyper::{Body, Error, Request, Response, Uri};
@@ -12,11 +12,8 @@ use crate::config::{is_auto_instrumented_disabled, max_event_payload_size};
 use crate::{
     backend_send::send_traces,
     config::endpoints,
-    sandbox, stats,
-    store::{
-        force_init_trace_store, store_current_invocation_id, store_event_payload, store_trace,
-        take_traces, StoredTrace,
-    },
+    sandbox,
+    store::{force_init_trace_store, store_trace, take_traces, StoredTrace},
     util::{
         parsers::{extract_error_invocation_ids, extract_invocation_id_from_path},
         span_mutations::{
@@ -29,7 +26,10 @@ use crate::{
 pub fn make_route<'a>() -> Router<'a> {
     let router = Router::default()
         .get("/", passthru_proxy)
-        .get("/:apiver/runtime/invocation/next", proxy_invocation_next)
+        .get(
+            "/:apiver/runtime/invocation/next",
+            crate::extension::runtime_proxy::proxy_invocation_next,
+        )
         .post(
             "/:apiver/runtime/invocation/:id/response",
             invocation_response_proxy,
@@ -368,91 +368,3 @@ pub(crate) static HTTPS_CLIENT: Lazy<
 
 static HTTP_CLIENT: Lazy<hyper::Client<hyper::client::HttpConnector, Body>> =
     Lazy::new(|| hyper::Client::new());
-
-pub async fn proxy_invocation_next(req: Request<Body>) -> Result<Response<Body>, Error> {
-    use std::time::Duration;
-
-    'getNext: loop {
-        // track either initialization  -or-
-        // how long it took to process the event and request next
-        //
-        stats::get_next_event();
-
-        let (aws_request_id, response) =
-            match crate::sandbox::next(req.headers(), req.uri().path()).await {
-                Err(e) => {
-                    tracing::error!(
-                        "[{}]  Error getting next invocation from Runtime API: {}",
-                        crate::log_prefix(),
-                        e
-                    );
-                    tracing::trace!("[{}] uri: {}", crate::log_prefix(), req.uri());
-                    tokio::time::sleep(Duration::from_millis(100)).await;
-                    continue 'getNext;
-                }
-                Ok(response) => response,
-            };
-
-        // start the counter on the new event
-        stats::event_start();
-
-        store_current_invocation_id(aws_request_id.as_str());
-
-        tracing::info!(
-            "[{}] Got invocation next: {}",
-            crate::log_prefix(),
-            aws_request_id.as_str()
-        );
-
-        match validate_and_mangle_next_event(aws_request_id, response).await {
-            Ok(response) => {
-                return Ok(response);
-            }
-            Err(req) => {
-                sandbox::send_request(req).await.ok();
-                continue 'getNext;
-            }
-        }
-    }
-}
-
-async fn validate_and_mangle_next_event(
-    _aws_request_id: Arc<String>,
-    response: Response<Body>,
-) -> Result<Response<Body>, Request<Body>> {
-    let (parts, body) = response.into_parts();
-    let body_bytes = hyper::body::to_bytes(body).await.unwrap_or_else(|e| {
-        tracing::error!(
-            "[{}] Failed to read event payload body: {}",
-            crate::log_prefix(),
-            e
-        );
-        hyper::body::Bytes::new()
-    });
-
-    tracing::trace!(
-        "[{}] event payload: {} for aws request: {}",
-        crate::log_prefix(),
-        String::from_utf8_lossy(&body_bytes),
-        _aws_request_id
-    );
-
-    let max_size = max_event_payload_size();
-    let truncated_bytes = if body_bytes.len() > max_size {
-        tracing::info!(
-            "[{}] Truncating event payload from {} to {} bytes.",
-            crate::log_prefix(),
-            body_bytes.len(),
-            max_size
-        );
-        &body_bytes[..max_size]
-    } else {
-        &body_bytes
-    };
-    store_event_payload(&_aws_request_id, &String::from_utf8_lossy(truncated_bytes));
-
-    // Reconstruct the response with the same parts and body
-    let response = Response::from_parts(parts, Body::from(body_bytes));
-
-    Ok(response)
-}
