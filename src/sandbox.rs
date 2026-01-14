@@ -16,7 +16,6 @@ pub async fn send_request(request: Request<Body>) -> Result<Response<Body>, Erro
 ///
 #[allow(dead_code)]
 pub mod extension {
-    use crate::DEFAULT_PROXY_PORT;
     use hyper::Body;
     use std::time::{Duration, Instant};
 
@@ -192,112 +191,6 @@ pub mod extension {
                     "[{}] Error fetching next extension event: {}",
                     crate::log_prefix_with("Extension"),
                     err
-                );
-            }
-        }
-    }
-
-    pub async fn register_telemetry() {
-        let uri = make_telemetry_uri();
-        let destination = format!(
-            "http://sandbox.localdomain:{}/v1/telemetry",
-            DEFAULT_PROXY_PORT
-        );
-        let payload = format!(
-            r#"{{"schemaVersion":"2022-07-01","destination":{{"protocol":"HTTP","URI":"{}"}},"types":["platform","function"]}}"#,
-            destination
-        );
-        // print the payload
-        tracing::trace!(
-            "[{}] Registering telemetry with payload={}",
-            crate::log_prefix_with("Extension"),
-            payload
-        );
-
-        let mut request = match hyper::Request::builder()
-            .method("PUT")
-            .uri(uri.clone())
-            .header(hyper::header::CONTENT_TYPE, "application/json")
-            .body(hyper::Body::from(payload))
-        {
-            Ok(req) => req,
-            Err(e) => {
-                tracing::error!(
-                    "[{}] Cannot create Lambda Telemetry API request: {}",
-                    crate::log_prefix_with("Extension"),
-                    e
-                );
-                return;
-            }
-        };
-
-        match crate::extension::register::extension_id().try_into() {
-            Ok(header_value) => {
-                request
-                    .headers_mut()
-                    .insert("Lambda-Extension-Identifier", header_value);
-            }
-            Err(e) => {
-                tracing::error!(
-                    "[{}] Invalid extension identifier for telemetry registration: {}",
-                    crate::log_prefix_with("Extension"),
-                    e
-                );
-                return;
-            }
-        }
-
-        match super::send_request(request).await {
-            Ok(response) => {
-                let status = response.status();
-                let body_bytes = match hyper::body::to_bytes(response.into_body()).await {
-                    Ok(bytes) => bytes,
-                    Err(err) => {
-                        tracing::error!(
-                            "[{}] Failed to read telemetry registration body: {}",
-                            crate::log_prefix_with("Extension"),
-                            err
-                        );
-                        return;
-                    }
-                };
-                tracing::info!(
-                    "[{}] Telemetry register uri={} status={} body={}",
-                    crate::log_prefix_with("Extension"),
-                    uri,
-                    status,
-                    String::from_utf8_lossy(&body_bytes)
-                );
-            }
-            Err(err) => {
-                tracing::error!(
-                    "[{}] Error registering telemetry destination (uri={}): {}",
-                    crate::log_prefix_with("Extension"),
-                    uri,
-                    err
-                );
-            }
-        }
-    }
-
-    fn make_telemetry_uri() -> hyper::Uri {
-        match hyper::Uri::builder()
-            .scheme("http")
-            .authority(crate::config::endpoints::sandbox_runtime_api())
-            .path_and_query("/2022-07-01/telemetry")
-            .build()
-        {
-            Ok(uri) => uri,
-            Err(e) => {
-                tracing::error!(
-                    "[{}] Error building Lambda Telemetry API endpoint URL: {}",
-                    crate::log_prefix_with("Extension"),
-                    e
-                );
-                panic!(
-                    "[{}] Failed to build Telemetry API URI - severe misconfiguration: {}",
-                    crate::log_prefix_with("Extension"),
-                    e
                 );
             }
         }

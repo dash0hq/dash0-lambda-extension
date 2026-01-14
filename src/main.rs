@@ -95,7 +95,7 @@ async fn main() {
     // Initialize the extension and continually get next extension event.
     tokio::task::spawn(async {
         extension::register::register().await;
-        sandbox::extension::register_telemetry().await;
+        extension::register::register_telemetry().await;
         // Lambda Application runtime will start once our extension is registered
         stats::app_start();
 
