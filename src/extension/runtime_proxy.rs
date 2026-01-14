@@ -1,12 +1,19 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use hyper::{Body, Error, Request, Response};
+use hyper::{Body, Error, Request, Response, Uri};
+use once_cell::sync::Lazy;
 
+use crate::config::endpoints;
 use crate::config::{is_auto_instrumented_disabled, max_event_payload_size};
 use crate::store::{store_current_invocation_id, store_event_payload, store_trace};
 use crate::util::parsers::extract_invocation_id_from_path;
-use crate::util::span_mutations::{add_return_payload_to_lambda_server_spans, build_runtime_error_trace};
+use crate::util::span_mutations::{
+    add_return_payload_to_lambda_server_spans, build_runtime_error_trace,
+};
+
+static HTTP_CLIENT: Lazy<hyper::Client<hyper::client::HttpConnector, Body>> =
+    Lazy::new(|| hyper::Client::new());
 
 /// Pass-through the request, but log the unhandled path and method
 #[allow(dead_code)]
@@ -17,7 +24,85 @@ pub async fn notfound_passthru_proxy(req: Request<Body>) -> Result<Response<Body
         &req.uri().path(),
         &req.method()
     );
-    crate::route::passthru_proxy(req).await
+    passthru_proxy(req).await
+}
+
+#[allow(dead_code)]
+pub async fn passthru_proxy(req: Request<Body>) -> Result<Response<Body>, Error> {
+    let start = Instant::now();
+
+    // Extract and print body
+    let (parts, body) = req.into_parts();
+    let body_bytes = match hyper::body::to_bytes(body).await {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            tracing::error!(
+                "[{}] Failed to read request body in passthru_proxy: {}",
+                crate::log_prefix(),
+                e
+            );
+            return Ok(Response::builder()
+                .status(500)
+                .body("500 - Internal Error: Failed to read request body".into())
+                .unwrap_or_else(|_| Response::new(Body::empty())));
+        }
+    };
+
+    // Reconstruct request
+    let req = Request::from_parts(parts, Body::from(body_bytes));
+
+    let endpoint_client = &*HTTP_CLIENT;
+    let endpoint_uri: Uri = match Uri::builder()
+        .scheme("http")
+        .authority(endpoints::sandbox_runtime_api())
+        .path_and_query(req.uri().path())
+        .build()
+    {
+        Ok(uri) => uri,
+        Err(e) => {
+            tracing::error!(
+                "[{}] Failed to build URI for sandbox runtime API: {}",
+                crate::log_prefix(),
+                e
+            );
+            return Ok(Response::builder()
+                .status(502)
+                .body("502 - Bad Gateway: Invalid runtime API configuration".into())
+                .unwrap_or_else(|_| Response::new(Body::empty())));
+        }
+    };
+
+    // remap URI
+    let mut endpoint_req: Request<Body> = req.into();
+    *endpoint_req.uri_mut() = endpoint_uri.clone();
+
+    let method = endpoint_req.method().clone();
+
+    match endpoint_client.request(endpoint_req).await {
+        Ok(res) => {
+            tracing::info!(
+                "[{}] passthru_proxy - {} {} completed in {} ms",
+                crate::log_prefix(),
+                method,
+                endpoint_uri,
+                start.elapsed().as_millis()
+            );
+            Ok(res)
+        }
+        Err(e) => {
+            tracing::error!(
+                "[{}] Error invoking endpoint ({} on {}): {:?}",
+                crate::log_prefix(),
+                method,
+                endpoint_uri,
+                e
+            );
+            Ok(Response::builder()
+                .status(502)
+                .body("502 - Bad Gateway: Lambda Runtime API did not process request".into())
+                .unwrap())
+        }
+    }
 }
 
 pub async fn proxy_invocation_next(req: Request<Body>) -> Result<Response<Body>, Error> {
@@ -86,7 +171,7 @@ pub async fn invocation_response_proxy(req: Request<Body>) -> Result<Response<Bo
     let return_payload = String::from_utf8_lossy(payload_slice).to_string();
     let req = Request::from_parts(parts, Body::from(body_bytes));
 
-    let res = crate::route::passthru_proxy(req).await;
+    let res = passthru_proxy(req).await;
     if let Some(id) = invocation_id {
         if is_auto_instrumented_disabled() {
             if let Some(trace) =
