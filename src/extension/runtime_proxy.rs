@@ -1,10 +1,12 @@
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use hyper::{Body, Error, Request, Response};
 
-use crate::config::max_event_payload_size;
-use crate::store::{store_current_invocation_id, store_event_payload};
+use crate::config::{is_auto_instrumented_disabled, max_event_payload_size};
+use crate::store::{store_current_invocation_id, store_event_payload, store_trace};
+use crate::util::parsers::extract_invocation_id_from_path;
+use crate::util::span_mutations::{add_return_payload_to_lambda_server_spans, build_runtime_error_trace};
 
 /// Pass-through the request, but log the unhandled path and method
 #[allow(dead_code)]
@@ -61,6 +63,52 @@ pub async fn proxy_invocation_next(req: Request<Body>) -> Result<Response<Body>,
             }
         }
     }
+}
+
+pub async fn invocation_response_proxy(req: Request<Body>) -> Result<Response<Body>, Error> {
+    let start = Instant::now();
+    let invocation_id = extract_invocation_id_from_path(req.uri().path());
+    let (parts, body) = req.into_parts();
+    let body_bytes = hyper::body::to_bytes(body).await?;
+
+    let max_size = max_event_payload_size();
+    let payload_slice = if body_bytes.len() > max_size {
+        tracing::info!(
+            "[{}] Truncating return payload from {} to {} bytes",
+            crate::log_prefix(),
+            body_bytes.len(),
+            max_size
+        );
+        &body_bytes[..max_size]
+    } else {
+        &body_bytes
+    };
+    let return_payload = String::from_utf8_lossy(payload_slice).to_string();
+    let req = Request::from_parts(parts, Body::from(body_bytes));
+
+    let res = crate::route::passthru_proxy(req).await;
+    if let Some(id) = invocation_id {
+        if is_auto_instrumented_disabled() {
+            if let Some(trace) =
+                build_runtime_error_trace(&id, None, Some(return_payload.as_str()), &Vec::new())
+            {
+                store_trace(trace);
+            }
+        } else {
+            if !add_return_payload_to_lambda_server_spans(&id, &return_payload) {
+                tracing::info!(
+                    "[{}] invocation_response_proxy - no lambda server span found for return value {}", crate::log_prefix(),
+                    &id
+                );
+            }
+        }
+    }
+    tracing::info!(
+        "[{}] Total handle time for invocation response: {} ms",
+        crate::log_prefix(),
+        start.elapsed().as_millis()
+    );
+    res
 }
 
 async fn validate_and_mangle_next_event(

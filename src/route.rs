@@ -7,20 +7,13 @@ use once_cell::sync::Lazy;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 
-use crate::backend_send::{flush_logs, flush_traces};
-use crate::config::{is_auto_instrumented_disabled, max_event_payload_size};
-use crate::{
-    backend_send::send_traces,
-    config::endpoints,
-    sandbox,
-    store::{force_init_trace_store, store_trace, take_traces, StoredTrace},
-    util::{
-        parsers::{extract_error_invocation_ids, extract_invocation_id_from_path},
-        span_mutations::{
-            add_return_payload_to_lambda_server_spans, build_runtime_error_trace,
-            drop_duplicate_java_instrumenations, process_trace_request,
-        },
-    },
+use crate::backend_send::{flush_logs, flush_traces, send_traces};
+use crate::config::endpoints;
+use crate::sandbox;
+use crate::store::{force_init_trace_store, store_trace, take_traces, StoredTrace};
+use crate::util::parsers::extract_error_invocation_ids;
+use crate::util::span_mutations::{
+    build_runtime_error_trace, drop_duplicate_java_instrumenations, process_trace_request,
 };
 
 pub fn make_route<'a>() -> Router<'a> {
@@ -32,11 +25,11 @@ pub fn make_route<'a>() -> Router<'a> {
         )
         .post(
             "/:apiver/runtime/invocation/:id/response",
-            invocation_response_proxy,
+            crate::extension::runtime_proxy::invocation_response_proxy,
         )
         .post(
             "/:apiver/runtime/invocation/:id/error",
-            invocation_response_proxy,
+            crate::extension::runtime_proxy::invocation_response_proxy,
         )
         .post("/:apiver/traces", traces)
         .post("/:apiver/telemetry", telemetry_sink)
@@ -204,52 +197,6 @@ pub async fn telemetry_sink(req: Request<Body>) -> Result<Response<Body>, Error>
     }
 
     Ok(Response::builder().status(200).body(Body::empty()).unwrap())
-}
-
-pub async fn invocation_response_proxy(req: Request<Body>) -> Result<Response<Body>, Error> {
-    let start = Instant::now();
-    let invocation_id = extract_invocation_id_from_path(req.uri().path());
-    let (parts, body) = req.into_parts();
-    let body_bytes = hyper::body::to_bytes(body).await?;
-
-    let max_size = max_event_payload_size();
-    let payload_slice = if body_bytes.len() > max_size {
-        tracing::info!(
-            "[{}] Truncating return payload from {} to {} bytes",
-            crate::log_prefix(),
-            body_bytes.len(),
-            max_size
-        );
-        &body_bytes[..max_size]
-    } else {
-        &body_bytes
-    };
-    let return_payload = String::from_utf8_lossy(payload_slice).to_string();
-    let req = Request::from_parts(parts, Body::from(body_bytes));
-
-    let res = passthru_proxy(req).await;
-    if let Some(id) = invocation_id {
-        if is_auto_instrumented_disabled() {
-            if let Some(trace) =
-                build_runtime_error_trace(&id, None, Some(return_payload.as_str()), &Vec::new())
-            {
-                store_trace(trace);
-            }
-        } else {
-            if !add_return_payload_to_lambda_server_spans(&id, &return_payload) {
-                tracing::info!(
-                    "[{}] invocation_response_proxy - no lambda server span found for return value {}", crate::log_prefix(),
-                    &id
-                );
-            }
-        }
-    }
-    tracing::info!(
-        "[{}] Total handle time for invocation response: {} ms",
-        crate::log_prefix(),
-        start.elapsed().as_millis()
-    );
-    res
 }
 
 pub async fn traces(req: Request<Body>) -> Result<Response<Body>, Error> {
