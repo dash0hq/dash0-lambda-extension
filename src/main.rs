@@ -14,7 +14,6 @@ use tokio::{self};
 use tracing_subscriber::EnvFilter;
 
 pub mod config;
-mod env;
 
 mod route;
 
@@ -69,9 +68,9 @@ async fn main() {
         .init();
     stats::init_start();
 
-    env::latch_runtime_env();
+    config::endpoints::latch_runtime_env();
 
-    let addr: SocketAddr = match env::lrap_api().parse() {
+    let addr: SocketAddr = match config::endpoints::lrap_api().parse() {
         Ok(addr) => addr,
         Err(e) => {
             tracing::error!(
