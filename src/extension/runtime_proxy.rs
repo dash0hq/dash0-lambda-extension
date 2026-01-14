@@ -143,7 +143,7 @@ pub async fn proxy_invocation_next(req: Request<Body>) -> Result<Response<Body>,
                 return Ok(response);
             }
             Err(req) => {
-                crate::sandbox::send_request(req).await.ok();
+                HTTP_CLIENT.request(req).await.ok();
                 continue 'getNext;
             }
         }
