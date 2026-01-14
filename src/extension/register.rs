@@ -93,7 +93,7 @@ pub async fn register() {
         }
     }
 
-    let response = match crate::sandbox::send_request(request).await {
+    let response = match hyper::Client::new().request(request).await {
         Ok(resp) => resp,
         Err(e) => {
             tracing::error!(
