@@ -1,79 +1,9 @@
 use aws_config::BehaviorVersion;
 use aws_sdk_sts::Client as StsClient;
-use hyper::{Body, Error, HeaderMap, Request, Response};
+use hyper::{Body, Error, Request, Response};
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
-use std::sync::Arc;
 use std::time::Instant;
-
-pub async fn next(headers: &HeaderMap, path: &str) -> Result<(Arc<String>, Response<Body>), Error> {
-    let uri = match hyper::Uri::builder()
-        .scheme("http")
-        .authority(crate::config::endpoints::sandbox_runtime_api())
-        .path_and_query(path)
-        .build()
-    {
-        Ok(uri) => uri,
-        Err(e) => {
-            tracing::error!(
-                "[{}] Error building Sandbox Lambda Runtime API endpoint URL: {}",
-                crate::log_prefix(),
-                e
-            );
-            panic!(
-                "[{}] Failed to build Runtime API URI - severe misconfiguration: {}",
-                crate::log_prefix(),
-                e
-            );
-        }
-    };
-
-    let mut req = match Request::builder()
-        .method("GET")
-        .uri(uri)
-        .body(Body::empty())
-    {
-        Ok(req) => req,
-        Err(e) => {
-            tracing::error!(
-                "[{}] Cannot create Sandbox Lambda Runtime API request: {}",
-                crate::log_prefix(),
-                e
-            );
-            panic!(
-                "[{}] Failed to build Runtime API request - severe misconfiguration: {}",
-                crate::log_prefix(),
-                e
-            );
-        }
-    };
-
-    *req.headers_mut() = headers.clone();
-
-    let response = hyper::Client::new().request(req).await?;
-
-    match response.headers().get("lambda-runtime-aws-request-id") {
-        Some(id) => match id.to_str() {
-            Ok(id_str) => Ok((Arc::new(id_str.to_string()), response)),
-            Err(e) => {
-                tracing::error!(
-                    "[{}] Error parsing Lambda Runtime API request ID: {}",
-                    crate::log_prefix(),
-                    e
-                );
-                panic!(
-                    "[{}] Invalid request ID header from Lambda Runtime API: {}",
-                    crate::log_prefix(),
-                    e
-                );
-            }
-        },
-        None => {
-            tracing::error!("[{}] Sandbox Lambda Runtime API response missing 'lambda-runtime-aws-request-id' header", crate::log_prefix());
-            panic!("[{}] Lambda Runtime API response missing required header - this should never happen", crate::log_prefix());
-        }
-    }
-}
 
 /// Send a request through a {hyper::Client}
 pub async fn send_request(request: Request<Body>) -> Result<Response<Body>, Error> {

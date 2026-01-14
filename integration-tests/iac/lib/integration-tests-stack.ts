@@ -126,11 +126,11 @@ export class IntegrationTestsStack extends cdk.Stack {
     super(scope, id, props);
 
     const pythonLayer =
-        lambda.LayerVersion.fromLayerVersionArn(this, 'pythonLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-python:70');
+        lambda.LayerVersion.fromLayerVersionArn(this, 'pythonLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-python:71');
     const nodeLayer =
-        lambda.LayerVersion.fromLayerVersionArn(this, 'nodeLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-node:58');
+        lambda.LayerVersion.fromLayerVersionArn(this, 'nodeLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-node:59');
     const javaLayer =
-        lambda.LayerVersion.fromLayerVersionArn(this, 'javaLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-java:29');
+        lambda.LayerVersion.fromLayerVersionArn(this, 'javaLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-java:30');
     const role = new iam.Role(this, 'IntegrationTestsLambdaRole', {
       assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
       managedPolicies: [

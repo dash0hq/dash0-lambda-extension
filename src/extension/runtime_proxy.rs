@@ -4,6 +4,8 @@ use std::time::{Duration, Instant};
 use hyper::{Body, Error, Request, Response, Uri};
 use once_cell::sync::Lazy;
 
+use hyper::HeaderMap;
+
 use crate::config::endpoints;
 use crate::config::{is_auto_instrumented_disabled, max_event_payload_size};
 use crate::store::{store_current_invocation_id, store_event_payload, store_trace};
@@ -14,6 +16,75 @@ use crate::util::span_mutations::{
 
 static HTTP_CLIENT: Lazy<hyper::Client<hyper::client::HttpConnector, Body>> =
     Lazy::new(|| hyper::Client::new());
+
+pub async fn next(headers: &HeaderMap, path: &str) -> Result<(Arc<String>, Response<Body>), Error> {
+    let uri = match hyper::Uri::builder()
+        .scheme("http")
+        .authority(endpoints::sandbox_runtime_api())
+        .path_and_query(path)
+        .build()
+    {
+        Ok(uri) => uri,
+        Err(e) => {
+            tracing::error!(
+                "[{}] Error building Sandbox Lambda Runtime API endpoint URL: {}",
+                crate::log_prefix(),
+                e
+            );
+            panic!(
+                "[{}] Failed to build Runtime API URI - severe misconfiguration: {}",
+                crate::log_prefix(),
+                e
+            );
+        }
+    };
+
+    let mut req = match Request::builder()
+        .method("GET")
+        .uri(uri)
+        .body(Body::empty())
+    {
+        Ok(req) => req,
+        Err(e) => {
+            tracing::error!(
+                "[{}] Cannot create Sandbox Lambda Runtime API request: {}",
+                crate::log_prefix(),
+                e
+            );
+            panic!(
+                "[{}] Failed to build Runtime API request - severe misconfiguration: {}",
+                crate::log_prefix(),
+                e
+            );
+        }
+    };
+
+    *req.headers_mut() = headers.clone();
+
+    let response = HTTP_CLIENT.request(req).await?;
+
+    match response.headers().get("lambda-runtime-aws-request-id") {
+        Some(id) => match id.to_str() {
+            Ok(id_str) => Ok((Arc::new(id_str.to_string()), response)),
+            Err(e) => {
+                tracing::error!(
+                    "[{}] Error parsing Lambda Runtime API request ID: {}",
+                    crate::log_prefix(),
+                    e
+                );
+                panic!(
+                    "[{}] Invalid request ID header from Lambda Runtime API: {}",
+                    crate::log_prefix(),
+                    e
+                );
+            }
+        },
+        None => {
+            tracing::error!("[{}] Sandbox Lambda Runtime API response missing 'lambda-runtime-aws-request-id' header", crate::log_prefix());
+            panic!("[{}] Lambda Runtime API response missing required header - this should never happen", crate::log_prefix());
+        }
+    }
+}
 
 /// Pass-through the request, but log the unhandled path and method
 #[allow(dead_code)]
@@ -112,20 +183,19 @@ pub async fn proxy_invocation_next(req: Request<Body>) -> Result<Response<Body>,
         //
         crate::stats::get_next_event();
 
-        let (aws_request_id, response) =
-            match crate::sandbox::next(req.headers(), req.uri().path()).await {
-                Err(e) => {
-                    tracing::error!(
-                        "[{}]  Error getting next invocation from Runtime API: {}",
-                        crate::log_prefix(),
-                        e
-                    );
-                    tracing::trace!("[{}] uri: {}", crate::log_prefix(), req.uri());
-                    tokio::time::sleep(Duration::from_millis(100)).await;
-                    continue 'getNext;
-                }
-                Ok(response) => response,
-            };
+        let (aws_request_id, response) = match next(req.headers(), req.uri().path()).await {
+            Err(e) => {
+                tracing::error!(
+                    "[{}]  Error getting next invocation from Runtime API: {}",
+                    crate::log_prefix(),
+                    e
+                );
+                tracing::trace!("[{}] uri: {}", crate::log_prefix(), req.uri());
+                tokio::time::sleep(Duration::from_millis(100)).await;
+                continue 'getNext;
+            }
+            Ok(response) => response,
+        };
 
         // start the counter on the new event
         crate::stats::event_start();
