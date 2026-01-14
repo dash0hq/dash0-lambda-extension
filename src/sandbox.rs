@@ -47,6 +47,20 @@ pub mod extension {
         }
     }
 
+    pub fn set_extension_identifier(identifier: &str) {
+        if let Err(e) = LAMBDA_EXTENSION_IDENTIFIER.set(identifier.to_owned()) {
+            tracing::error!(
+                "[{}] Extension identifier already set: {:?}",
+                crate::log_prefix_with("Extension"),
+                e
+            );
+            panic!(
+                "[{}] Cannot register extension twice",
+                crate::log_prefix_with("Extension")
+            );
+        }
+    }
+
     fn make_uri(path: &str) -> hyper::Uri {
         match hyper::Uri::builder()
             .scheme("http")
@@ -67,102 +81,6 @@ pub mod extension {
                     e
                 );
             }
-        }
-    }
-
-    /// Register the extension with the Lambda Extensions API
-    pub async fn register() {
-        let uri = make_uri("/register");
-
-        let body = hyper::Body::from(r#"{"events":["INVOKE","SHUTDOWN"]}"#);
-        let mut request = match hyper::Request::builder().method("POST").uri(uri).body(body) {
-            Ok(req) => req,
-            Err(e) => {
-                tracing::error!(
-                    "[{}] Cannot create Lambda Extensions API request: {}",
-                    crate::log_prefix_with("Extension"),
-                    e
-                );
-                panic!(
-                    "[{}] Failed to create extension registration request: {}",
-                    crate::log_prefix_with("Extension"),
-                    e
-                );
-            }
-        };
-
-        // Set Lambda Extension Name header
-        match find_extension_name().try_into() {
-            Ok(header_value) => {
-                request
-                    .headers_mut()
-                    .append("Lambda-Extension-Name", header_value);
-            }
-            Err(e) => {
-                tracing::error!(
-                    "[{}] Invalid extension name: {}",
-                    crate::log_prefix_with("Extension"),
-                    e
-                );
-                panic!(
-                    "[{}] Cannot register with invalid extension name: {}",
-                    crate::log_prefix_with("Extension"),
-                    e
-                );
-            }
-        }
-
-        let response = match super::send_request(request).await {
-            Ok(resp) => resp,
-            Err(e) => {
-                tracing::error!(
-                    "[{}] Cannot send Lambda Extensions API request to register: {}",
-                    crate::log_prefix_with("Extension"),
-                    e
-                );
-                panic!(
-                    "[{}] Failed to register extension: {}",
-                    crate::log_prefix_with("Extension"),
-                    e
-                );
-            }
-        };
-
-        let extension_identifier = match response.headers().get("lambda-extension-identifier") {
-            Some(header) => match header.to_str() {
-                Ok(id) => id,
-                Err(e) => {
-                    tracing::error!(
-                        "[{}] Invalid extension identifier header: {}",
-                        crate::log_prefix_with("Extension"),
-                        e
-                    );
-                    panic!(
-                        "[{}] Cannot parse extension identifier: {}",
-                        crate::log_prefix_with("Extension"),
-                        e
-                    );
-                }
-            },
-            None => {
-                tracing::error!("[{}] Lambda Extensions API response missing 'lambda-extension-identifier' header", crate::log_prefix_with("Extension"));
-                panic!(
-                    "[{}] Extension registration failed - missing identifier header",
-                    crate::log_prefix_with("Extension")
-                );
-            }
-        };
-
-        if let Err(e) = LAMBDA_EXTENSION_IDENTIFIER.set(extension_identifier.to_owned()) {
-            tracing::error!(
-                "[{}] Extension identifier already set: {:?}",
-                crate::log_prefix_with("Extension"),
-                e
-            );
-            panic!(
-                "[{}] Cannot register extension twice",
-                crate::log_prefix_with("Extension")
-            );
         }
     }
 
