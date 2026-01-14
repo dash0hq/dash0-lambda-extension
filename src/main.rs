@@ -22,6 +22,7 @@ pub mod util;
 
 pub mod backend_send;
 pub(crate) mod stats;
+pub mod otlp;
 
 /// Name to register with the Lambda Extension API.
 ///
