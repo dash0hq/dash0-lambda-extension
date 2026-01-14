@@ -14,17 +14,13 @@ use tokio::{self};
 use tracing_subscriber::EnvFilter;
 
 pub mod config;
-/// ENV references to API endpoints (host:port)
-mod env;
+pub mod extension;
+pub mod route;
+pub mod state;
 
-/// Routes for Lambda Runtime API
-mod route;
-
-/// Common utilities
 pub mod util;
 
 pub mod backend_send;
-pub(crate) mod sandbox;
 pub(crate) mod stats;
 pub(crate) mod store;
 
@@ -34,10 +30,7 @@ pub(crate) mod store;
 /// entrypoint script destination in the Lambda layer (eg, **extensions/lrap**)
 pub const EXTENSION_NAME: &str = "lrap";
 
-/// Default port to listen on, overriden by LRAP_LISTENER_PORT environment variable
-///
-/// NOTE: this must be the same port as listed in **opt/wrapper** script that launches
-/// the Application runtime with the modified `AWS_LAMBDA_RUNTIME_API` env variable.
+/// Default port to listen on, overriden by DASH0_LISTENER_PORT environment variable
 pub const DEFAULT_PROXY_PORT: u16 = 9009;
 
 pub static LAMBDA_RUNTIME_API_VERSION: &str = "2018-06-01";
@@ -54,20 +47,16 @@ pub fn log_prefix_with(suffix: &str) -> String {
     format!("DASH0:{}", suffix)
 }
 
-/// Implement the Runtime API Proxy for Lambda:
+/// Four initialization tasks:
 ///
-/// 1. create a hyper server on the LRAP endpoint
-///
+/// 1. create a hyper server
 /// 2. create a Tower service for the Lambda Runtime API to serve HTTP requests
-///
 /// 3. register as an Extension, allowing Application runtime to begin initializing
-///
 /// 4. request `next` event from Extension API, fulfilling lifecycle contract
-///   
 ///
 #[tokio::main]
 async fn main() {
-    let filter = EnvFilter::try_from_env("OTEL_EXTENSION_LOG_LEVEL")
+    let filter = EnvFilter::try_from_env("DASH0_EXTENSION_LOG_LEVEL")
         .unwrap_or_else(|_| EnvFilter::new("warn"));
     tracing_subscriber::fmt()
         .json()
@@ -79,24 +68,9 @@ async fn main() {
         .init();
     stats::init_start();
 
-    let exe_path = std::env::current_exe()
-        .ok()
-        .and_then(|p| p.to_str().map(|s| s.to_string()))
-        .unwrap_or_else(|| "<unknown>".to_string());
-    tracing::info!("[{}] start; path={}", crate::log_prefix(), exe_path);
+    config::endpoints::latch_runtime_env();
 
-    tracing::info!(
-        "[{}] commandline arguments: {}",
-        crate::log_prefix(),
-        std::env::args()
-            .map(|v| format!("\"{}\"", v))
-            .collect::<Vec<String>>()
-            .join(", ")
-    );
-
-    env::latch_runtime_env();
-
-    let addr: SocketAddr = match env::lrap_api().parse() {
+    let addr: SocketAddr = match config::endpoints::lrap_api().parse() {
         Ok(addr) => addr,
         Err(e) => {
             tracing::error!(
@@ -120,14 +94,14 @@ async fn main() {
 
     // Initialize the extension and continually get next extension event.
     tokio::task::spawn(async {
-        sandbox::extension::register().await;
-        sandbox::extension::register_telemetry().await;
+        extension::register::register().await;
+        extension::register::register_telemetry().await;
         // Lambda Application runtime will start once our extension is registered
         stats::app_start();
 
         loop {
             // Lambda Extension API requires we wait for next extension event
-            sandbox::extension::get_next().await;
+            extension::events::get_next().await;
         }
     });
 

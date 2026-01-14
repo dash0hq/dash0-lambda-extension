@@ -227,7 +227,8 @@ pub fn get_resources_attributes() -> Vec<opentelemetry_proto::tonic::common::v1:
             value: Some(AnyValue {
                 value: Some(
                     opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(
-                        crate::sandbox::get_function_arn().unwrap_or_else(|| "unknown".to_string()),
+                        crate::state::global::get_function_arn()
+                            .unwrap_or_else(|| "unknown".to_string()),
                     ),
                 ),
             }),
@@ -237,7 +238,8 @@ pub fn get_resources_attributes() -> Vec<opentelemetry_proto::tonic::common::v1:
             value: Some(AnyValue {
                 value: Some(
                     opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(
-                        crate::sandbox::get_account_id().unwrap_or_else(|| "unknown".to_string()),
+                        crate::state::global::get_account_id()
+                            .unwrap_or_else(|| "unknown".to_string()),
                     ),
                 ),
             }),

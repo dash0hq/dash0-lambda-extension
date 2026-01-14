@@ -52,7 +52,8 @@ pub fn build_runtime_error_trace(
             key: "cloud.resource_id".to_string(),
             value: Some(AnyValue {
                 value: Some(Value::StringValue(
-                    crate::sandbox::get_function_arn().unwrap_or_else(|| "unknown".to_string()),
+                    crate::state::global::get_function_arn()
+                        .unwrap_or_else(|| "unknown".to_string()),
                 )),
             }),
         },
@@ -60,7 +61,7 @@ pub fn build_runtime_error_trace(
             key: "cloud.account.id".to_string(),
             value: Some(AnyValue {
                 value: Some(Value::StringValue(
-                    crate::sandbox::get_account_id().unwrap_or_else(|| "unknown".to_string()),
+                    crate::state::global::get_account_id().unwrap_or_else(|| "unknown".to_string()),
                 )),
             }),
         },

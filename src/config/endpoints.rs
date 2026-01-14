@@ -6,6 +6,16 @@ static LAMBDA_RUNTIME_API: OnceCell<String> = OnceCell::new();
 /// Lambda Runtime API Proxy (LRAP), this endpoint
 static LRAP_API: OnceCell<String> = OnceCell::new();
 
+/// Get the extension port from environment variable or use default
+pub fn extension_port() -> u16 {
+    use std::env::var;
+
+    var("DASH0_LISTENER_PORT")
+        .ok()
+        .and_then(|v| v.parse::<u16>().ok())
+        .unwrap_or(crate::DEFAULT_PROXY_PORT)
+}
+
 /// Latch in the API endpoints defined in ENV variables
 ///
 #[allow(dead_code)]
@@ -20,26 +30,19 @@ pub fn latch_runtime_env() {
 
     // Latch in the ORIGIN we should proxy to the application
     if let Err(_) = LAMBDA_RUNTIME_API.set(aws_lambda_runtime_api.clone()) {
-        tracing::error!(
-            "[{}] AWS_LAMBDA_RUNTIME_API was already set, cannot initialize twice",
+        tracing::warn!(
+            "[{}] AWS_LAMBDA_RUNTIME_API was already set, skipping",
             crate::log_prefix()
         );
-        panic!("[{}] Environment already initialized", crate::log_prefix());
     }
 
-    let listener_port = var("LRAP_LISTENER_PORT")
-        .ok()
-        .and_then(|v| v.parse::<u16>().ok())
-        .unwrap_or(crate::DEFAULT_PROXY_PORT);
-
-    let lrap_api = format!("0.0.0.0:{}", listener_port);
+    let lrap_api = format!("0.0.0.0:{}", extension_port());
 
     if let Err(_) = LRAP_API.set(lrap_api.clone()) {
-        tracing::error!(
-            "[{}] LRAP_API was already set, cannot initialize twice",
+        tracing::warn!(
+            "[{}] LRAP_API was already set, skipping",
             crate::log_prefix()
         );
-        panic!("[{}] Environment already initialized", crate::log_prefix());
     }
 }
 

@@ -37,7 +37,7 @@ function createLambdas(
               AWS_LAMBDA_EXEC_WRAPPER: "/opt/wrapper",
               DASH0_TOKEN: "auth_oEiAAAy5hZvVsEAADPm4uDyV7OcBmU4B",
               DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
-              OTEL_EXTENSION_LOG_LEVEL: "info",
+              DASH0_EXTENSION_LOG_LEVEL: "info",
               SEND_ON_INVOCATION_END: invocationEnd,
             };
             if (traced === "false") {
@@ -126,11 +126,11 @@ export class IntegrationTestsStack extends cdk.Stack {
     super(scope, id, props);
 
     const pythonLayer =
-        lambda.LayerVersion.fromLayerVersionArn(this, 'pythonLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-python:68');
+        lambda.LayerVersion.fromLayerVersionArn(this, 'pythonLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-python:75');
     const nodeLayer =
-        lambda.LayerVersion.fromLayerVersionArn(this, 'nodeLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-node:56');
+        lambda.LayerVersion.fromLayerVersionArn(this, 'nodeLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-node:63');
     const javaLayer =
-        lambda.LayerVersion.fromLayerVersionArn(this, 'javaLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-java:27');
+        lambda.LayerVersion.fromLayerVersionArn(this, 'javaLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-java:34');
     const role = new iam.Role(this, 'IntegrationTestsLambdaRole', {
       assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
       managedPolicies: [
