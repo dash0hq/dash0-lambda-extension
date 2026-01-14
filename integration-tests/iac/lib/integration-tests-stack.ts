@@ -37,7 +37,7 @@ function createLambdas(
               AWS_LAMBDA_EXEC_WRAPPER: "/opt/wrapper",
               DASH0_TOKEN: "auth_oEiAAAy5hZvVsEAADPm4uDyV7OcBmU4B",
               DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
-              OTEL_EXTENSION_LOG_LEVEL: "info",
+              DASH0_EXTENSION_LOG_LEVEL: "info",
               SEND_ON_INVOCATION_END: invocationEnd,
             };
             if (traced === "false") {

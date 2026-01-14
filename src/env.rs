@@ -27,7 +27,7 @@ pub fn latch_runtime_env() {
         panic!("[{}] Environment already initialized", crate::log_prefix());
     }
 
-    let listener_port = var("LRAP_LISTENER_PORT")
+    let listener_port = var("DASH0_LISTENER_PORT")
         .ok()
         .and_then(|v| v.parse::<u16>().ok())
         .unwrap_or(crate::DEFAULT_PROXY_PORT);

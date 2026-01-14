@@ -14,13 +14,10 @@ use tokio::{self};
 use tracing_subscriber::EnvFilter;
 
 pub mod config;
-/// ENV references to API endpoints (host:port)
 mod env;
 
-/// Routes for Lambda Runtime API
 mod route;
 
-/// Common utilities
 pub mod util;
 
 pub mod backend_send;
@@ -34,10 +31,7 @@ pub(crate) mod store;
 /// entrypoint script destination in the Lambda layer (eg, **extensions/lrap**)
 pub const EXTENSION_NAME: &str = "lrap";
 
-/// Default port to listen on, overriden by LRAP_LISTENER_PORT environment variable
-///
-/// NOTE: this must be the same port as listed in **opt/wrapper** script that launches
-/// the Application runtime with the modified `AWS_LAMBDA_RUNTIME_API` env variable.
+/// Default port to listen on, overriden by DASH0_LISTENER_PORT environment variable
 pub const DEFAULT_PROXY_PORT: u16 = 9009;
 
 pub static LAMBDA_RUNTIME_API_VERSION: &str = "2018-06-01";
@@ -54,20 +48,16 @@ pub fn log_prefix_with(suffix: &str) -> String {
     format!("DASH0:{}", suffix)
 }
 
-/// Implement the Runtime API Proxy for Lambda:
+/// Four initialization tasks:
 ///
-/// 1. create a hyper server on the LRAP endpoint
-///
+/// 1. create a hyper server
 /// 2. create a Tower service for the Lambda Runtime API to serve HTTP requests
-///
 /// 3. register as an Extension, allowing Application runtime to begin initializing
-///
 /// 4. request `next` event from Extension API, fulfilling lifecycle contract
-///   
 ///
 #[tokio::main]
 async fn main() {
-    let filter = EnvFilter::try_from_env("OTEL_EXTENSION_LOG_LEVEL")
+    let filter = EnvFilter::try_from_env("DASH0_EXTENSION_LOG_LEVEL")
         .unwrap_or_else(|_| EnvFilter::new("warn"));
     tracing_subscriber::fmt()
         .json()
@@ -78,21 +68,6 @@ async fn main() {
         .flatten_event(true)
         .init();
     stats::init_start();
-
-    let exe_path = std::env::current_exe()
-        .ok()
-        .and_then(|p| p.to_str().map(|s| s.to_string()))
-        .unwrap_or_else(|| "<unknown>".to_string());
-    tracing::info!("[{}] start; path={}", crate::log_prefix(), exe_path);
-
-    tracing::info!(
-        "[{}] commandline arguments: {}",
-        crate::log_prefix(),
-        std::env::args()
-            .map(|v| format!("\"{}\"", v))
-            .collect::<Vec<String>>()
-            .join(", ")
-    );
 
     env::latch_runtime_env();
 
