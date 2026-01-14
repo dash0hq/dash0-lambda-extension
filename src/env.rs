@@ -20,11 +20,10 @@ pub fn latch_runtime_env() {
 
     // Latch in the ORIGIN we should proxy to the application
     if let Err(_) = LAMBDA_RUNTIME_API.set(aws_lambda_runtime_api.clone()) {
-        tracing::error!(
-            "[{}] AWS_LAMBDA_RUNTIME_API was already set, cannot initialize twice",
+        tracing::warn!(
+            "[{}] AWS_LAMBDA_RUNTIME_API was already set, skipping",
             crate::log_prefix()
         );
-        panic!("[{}] Environment already initialized", crate::log_prefix());
     }
 
     let listener_port = var("DASH0_LISTENER_PORT")
@@ -35,11 +34,10 @@ pub fn latch_runtime_env() {
     let lrap_api = format!("0.0.0.0:{}", listener_port);
 
     if let Err(_) = LRAP_API.set(lrap_api.clone()) {
-        tracing::error!(
-            "[{}] LRAP_API was already set, cannot initialize twice",
+        tracing::warn!(
+            "[{}] LRAP_API was already set, skipping",
             crate::log_prefix()
         );
-        panic!("[{}] Environment already initialized", crate::log_prefix());
     }
 }
 
