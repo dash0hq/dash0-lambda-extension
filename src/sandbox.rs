@@ -9,7 +9,7 @@ use std::time::Instant;
 pub async fn next(headers: &HeaderMap, path: &str) -> Result<(Arc<String>, Response<Body>), Error> {
     let uri = match hyper::Uri::builder()
         .scheme("http")
-        .authority(crate::env::sandbox_runtime_api())
+        .authority(crate::config::endpoints::sandbox_runtime_api())
         .path_and_query(path)
         .build()
     {
@@ -84,7 +84,7 @@ pub async fn send_request(request: Request<Body>) -> Result<Response<Body>, Erro
 pub async fn create_invoke_result_request(id: &str, body: Body) -> Result<Request<Body>, Error> {
     let uri = match hyper::Uri::builder()
         .scheme("http")
-        .authority(crate::env::sandbox_runtime_api())
+        .authority(crate::config::endpoints::sandbox_runtime_api())
         .path_and_query(format!(
             "/{}/runtime/invocation/{}/response",
             crate::LAMBDA_RUNTIME_API_VERSION,
@@ -156,7 +156,7 @@ pub mod extension {
     fn make_uri(path: &str) -> hyper::Uri {
         match hyper::Uri::builder()
             .scheme("http")
-            .authority(crate::env::sandbox_runtime_api())
+            .authority(crate::config::endpoints::sandbox_runtime_api())
             .path_and_query(format!("/{}/extension{}", EXTENSION_API_VERSION, path))
             .build()
         {
@@ -506,7 +506,7 @@ pub mod extension {
     fn make_telemetry_uri() -> hyper::Uri {
         match hyper::Uri::builder()
             .scheme("http")
-            .authority(crate::env::sandbox_runtime_api())
+            .authority(crate::config::endpoints::sandbox_runtime_api())
             .path_and_query("/2022-07-01/telemetry")
             .build()
         {

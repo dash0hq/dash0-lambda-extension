@@ -11,7 +11,8 @@ use crate::backend_send::{flush_logs, flush_traces};
 use crate::config::{is_auto_instrumented_disabled, max_event_payload_size};
 use crate::{
     backend_send::send_traces,
-    env, sandbox, stats,
+    config::endpoints,
+    sandbox, stats,
     store::{
         force_init_trace_store, store_current_invocation_id, store_event_payload, store_trace,
         take_traces, StoredTrace,
@@ -84,7 +85,7 @@ pub async fn passthru_proxy(req: Request<Body>) -> Result<Response<Body>, Error>
     let endpoint_client = &*HTTP_CLIENT;
     let endpoint_uri: Uri = match Uri::builder()
         .scheme("http")
-        .authority(env::sandbox_runtime_api())
+        .authority(endpoints::sandbox_runtime_api())
         .path_and_query(req.uri().path())
         .build()
     {
