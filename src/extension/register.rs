@@ -150,7 +150,7 @@ pub async fn register_telemetry() {
     let uri = make_uri("/2022-07-01/telemetry");
     let destination = format!(
         "http://sandbox.localdomain:{}/v1/telemetry",
-        crate::DEFAULT_PROXY_PORT
+        endpoints::extension_port()
     );
     let payload = format!(
         r#"{{"schemaVersion":"2022-07-01","destination":{{"protocol":"HTTP","URI":"{}"}},"types":["platform","function"]}}"#,
