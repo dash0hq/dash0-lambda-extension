@@ -8,12 +8,12 @@ use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 
 use crate::backend_send::{flush_logs, flush_traces, send_traces};
-use crate::sandbox;
 use crate::store::{force_init_trace_store, store_trace, take_traces, StoredTrace};
 use crate::util::parsers::extract_error_invocation_ids;
 use crate::util::span_mutations::{
     build_runtime_error_trace, drop_duplicate_java_instrumenations, process_trace_request,
 };
+use crate::{sandbox, state};
 
 pub fn make_route<'a>() -> Router<'a> {
     let router = Router::default()
@@ -88,11 +88,12 @@ pub async fn telemetry_sink(req: Request<Body>) -> Result<Response<Body>, Error>
         );
 
         // Fetch account ID if not already cached
-        if sandbox::get_account_id()
+        if state::global::get_account_id()
             .map(|id| id.is_empty())
             .unwrap_or(true)
         {
-            let _ = tokio::task::spawn(async { sandbox::fetch_and_cache_account_id().await }).await;
+            let _ = tokio::task::spawn(async { state::global::fetch_and_cache_account_id().await })
+                .await;
         }
 
         let mut traces_to_send = take_traces();

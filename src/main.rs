@@ -16,6 +16,7 @@ use tracing_subscriber::EnvFilter;
 pub mod config;
 pub mod extension;
 pub mod route;
+pub mod state;
 
 pub mod util;
 
