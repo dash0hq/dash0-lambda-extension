@@ -1,8 +1,8 @@
+use crate::otlp::log_mutations::try_read_env_from_file;
 use crate::state::invocation_data::{
     get_event_payload, store_return_payload, store_traces, take_return_payload, take_traces,
     StoredTrace,
 };
-use crate::util::log_mutations::try_read_env_from_file;
 use crate::util::parsers::{
     extract_invocation_id, get_span_id_from_invocation_id, get_span_scope_name,
     get_trace_id_from_invocation_id,

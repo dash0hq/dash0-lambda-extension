@@ -4,8 +4,8 @@ use hyper::{Body, Error, Request, Response};
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 
+use crate::otlp::span_mutations::{drop_duplicate_java_instrumenations, process_trace_request};
 use crate::state::invocation_data::{store_trace, StoredTrace};
-use crate::util::span_mutations::{drop_duplicate_java_instrumenations, process_trace_request};
 
 pub async fn traces(req: Request<Body>) -> Result<Response<Body>, Error> {
     let start = Instant::now();

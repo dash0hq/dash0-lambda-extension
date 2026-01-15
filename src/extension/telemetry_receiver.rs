@@ -1,10 +1,10 @@
 use hyper::{Body, Error, Request, Response};
 
 use crate::otlp::exporter::{flush_logs, flush_traces, send_traces};
+use crate::otlp::span_mutations::build_runtime_error_trace;
 use crate::state;
 use crate::state::invocation_data::take_traces;
 use crate::util::parsers::extract_error_invocation_ids;
-use crate::util::span_mutations::build_runtime_error_trace;
 
 pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
     let (parts, body) = req.into_parts();
