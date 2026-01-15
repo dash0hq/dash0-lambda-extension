@@ -20,8 +20,8 @@ pub mod state;
 
 pub mod util;
 
-pub(crate) mod stats;
 pub mod otlp;
+pub(crate) mod stats;
 
 /// Name to register with the Lambda Extension API.
 ///
