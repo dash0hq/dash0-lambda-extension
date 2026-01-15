@@ -116,11 +116,11 @@ pub async fn get_next() {
                     let is_invocation_end = matches!(event_type, Some("SHUTDOWN"));
                     if is_invocation_end {
                         tokio::time::sleep(Duration::from_millis(200)).await;
-                        crate::backend_send::flush_traces().await;
+                        crate::otlp::exporter::flush_traces().await;
                     } else {
                         tokio::time::sleep(Duration::from_millis(20)).await;
                     }
-                    crate::backend_send::flush_logs(is_invocation_end).await;
+                    crate::otlp::exporter::flush_logs(is_invocation_end).await;
                 }
 
                 if matches!(event_type, Some("INVOKE"))
@@ -128,7 +128,7 @@ pub async fn get_next() {
                 {
                     // Block execution until platform.runtimeDone is received
                     let (tx, rx) = tokio::sync::oneshot::channel();
-                    crate::store::store_runtime_done_notifier(tx);
+                    crate::state::invocation_data::store_runtime_done_notifier(tx);
 
                     tracing::info!(
                         "[{}] Waiting for platform.runtimeDone",
@@ -147,8 +147,8 @@ pub async fn get_next() {
                                 "[{}] Received platform.runtimeDone signal",
                                 crate::log_prefix_with("Extension")
                             );
-                            crate::backend_send::flush_traces().await;
-                            crate::backend_send::flush_logs(true).await;
+                            crate::otlp::exporter::flush_traces().await;
+                            crate::otlp::exporter::flush_logs(true).await;
                         }
                         Ok(Err(_)) => {
                             tracing::warn!(

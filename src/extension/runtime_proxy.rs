@@ -8,11 +8,13 @@ use hyper::HeaderMap;
 
 use crate::config::endpoints;
 use crate::config::{is_auto_instrumented_disabled, max_event_payload_size};
-use crate::store::{store_current_invocation_id, store_event_payload, store_trace};
-use crate::util::parsers::extract_invocation_id_from_path;
-use crate::util::span_mutations::{
+use crate::otlp::span_mutations::{
     add_return_payload_to_lambda_server_spans, build_runtime_error_trace,
 };
+use crate::state::invocation_data::{
+    store_current_invocation_id, store_event_payload, store_trace,
+};
+use crate::util::parsers::extract_invocation_id_from_path;
 
 static HTTP_CLIENT: Lazy<hyper::Client<hyper::client::HttpConnector, Body>> =
     Lazy::new(|| hyper::Client::new());

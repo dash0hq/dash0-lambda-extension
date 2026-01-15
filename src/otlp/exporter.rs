@@ -5,11 +5,11 @@ use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 
 use crate::config::{request_retries, request_timeout_ms};
+use crate::otlp::log_mutations::{get_resources_attributes, map_logs_to_otlp};
+use crate::otlp::span_mutations::merge_telemetry_invocation_data;
 use crate::route::HTTPS_CLIENT;
-use crate::store::{take_telemetry_logs, take_traces, StoredTrace};
-use crate::util::log_mutations::{get_resources_attributes, map_logs_to_otlp};
+use crate::state::invocation_data::{take_telemetry_logs, take_traces, StoredTrace};
 use crate::util::parsers::parse_otlp_endpoint;
-use crate::util::span_mutations::merge_telemetry_invocation_data;
 
 pub async fn flush_traces() {
     let traces = take_traces();
