@@ -1,10 +1,3 @@
-//
-// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-// SPDX-License-Identifier: MIT-0
-//
-
-//! Hold global-state of timing metrics for Application processing event and LRAP extension latency
-//!
 use std::time::Instant;
 
 use once_cell::sync::OnceCell;
