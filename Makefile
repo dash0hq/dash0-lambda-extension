@@ -1,17 +1,11 @@
-# 
-# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-# SPDX-License-Identifier: MIT-0
-#
-#
-#-- config vars
 ZIP_NAME_PYTHON = layer-lrap-python.zip
 ZIP_NAME_NODE = layer-lrap-node.zip
 ZIP_NAME_JAVA = layer-lrap-java.zip
 ZIP_NAME_MANUAL = layer-lrap-manual.zip
-LAYER_NAME_PYTHON = lrap-python
-LAYER_NAME_NODE = lrap-node
-LAYER_NAME_JAVA = lrap-java
-LAYER_NAME_MANUAL = lrap-manual
+LAYER_NAME_PYTHON = dash0-extension-python
+LAYER_NAME_NODE = dash0-extension-node
+LAYER_NAME_JAVA = dash0-extension-java
+LAYER_NAME_MANUAL = dash0-extension-manual
 LAMBDA_LAYER_MARKER_PYTHON := .lambda-layer-python
 LAMBDA_LAYER_MARKER_NODE := .lambda-layer-node
 LAMBDA_LAYER_MARKER_JAVA := .lambda-layer-java

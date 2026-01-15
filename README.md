@@ -15,8 +15,8 @@ This extension has four main functionalities:
 
 * `DASH0_TOKEN` - the api token for your Dash0 project.
 
-* `DISABLE_AUTO_INSTRUMENTATION` - Auto-instrumentation can be turned off by this environment variable, which will result in creating synthetic traces by the extension for all invocations.
+* `DASH0_DISABLE_AUTO_INSTRUMENTATION` - Auto-instrumentation can be turned off by this environment variable, which will result in creating synthetic traces by the extension for all invocations.
 
-* `SEND_ON_INVOCATION_END` - The extension has two modes of sending to the backend, either on invocation end or on the next invocations. This is controlled by the env var `SEND_ON_INVOCATION_END`. The default is `true`. Sending on invocation end will increase the billed duration of the lambda, but not the response time. Sending on next invocation will decrease the billed duration since the sending will take place in parallel of the regular execution, but might delay the sending up to 7 minutes in case of last invocation in the container. 
+* `DASH0_SEND_ON_INVOCATION_END` - The extension has two modes of sending to the backend, either on invocation end or on the next invocations. This is controlled by the env var `SEND_ON_INVOCATION_END`. The default is `true`. Sending on invocation end will increase the billed duration of the lambda, but not the response time. Sending on next invocation will decrease the billed duration since the sending will take place in parallel of the regular execution, but might delay the sending up to 7 minutes in case of last invocation in the container. 
 
 
