@@ -47,7 +47,6 @@ pub fn log_prefix_with(suffix: &str) -> String {
 }
 
 /// Four initialization tasks:
-///
 /// 1. create a hyper server
 /// 2. create a Tower service for the Lambda Runtime API to serve HTTP requests
 /// 3. register as an Extension, allowing Application runtime to begin initializing

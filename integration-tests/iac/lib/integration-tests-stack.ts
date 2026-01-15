@@ -3,7 +3,31 @@ import { Construct } from 'constructs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as cr from 'aws-cdk-lib/custom-resources';
 import * as path from 'path';
+
+function getLatestLayerVersion(scope: Construct, id: string, layerName: string): lambda.ILayerVersion {
+  const stack = cdk.Stack.of(scope);
+
+  const latestVersion = new cr.AwsCustomResource(scope, `${id}LatestVersion`, {
+    onUpdate: {
+      service: 'Lambda',
+      action: 'listLayerVersions',
+      parameters: {
+        LayerName: `arn:aws:lambda:${stack.region}:${stack.account}:layer:${layerName}`,
+        MaxItems: 1,
+      },
+      physicalResourceId: cr.PhysicalResourceId.of(Date.now().toString()),
+    },
+    policy: cr.AwsCustomResourcePolicy.fromSdkCalls({
+      resources: cr.AwsCustomResourcePolicy.ANY_RESOURCE,
+    }),
+  });
+
+  const layerArn = `arn:aws:lambda:${stack.region}:${stack.account}:layer:${layerName}:${latestVersion.getResponseField('LayerVersions.0.Version')}`;
+
+  return lambda.LayerVersion.fromLayerVersionArn(scope, id, layerArn);
+}
 
 interface SubStackProps extends cdk.NestedStackProps {
   role: iam.Role;
@@ -125,12 +149,9 @@ export class IntegrationTestsStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    const pythonLayer =
-        lambda.LayerVersion.fromLayerVersionArn(this, 'pythonLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-python:79');
-    const nodeLayer =
-        lambda.LayerVersion.fromLayerVersionArn(this, 'nodeLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-node:67');
-    const javaLayer =
-        lambda.LayerVersion.fromLayerVersionArn(this, 'javaLrapLayer', 'arn:aws:lambda:us-west-2:285732642181:layer:lrap-java:38');
+    const pythonLayer = getLatestLayerVersion(this, 'pythonLrapLayer', 'dash0-extension-python');
+    const nodeLayer = getLatestLayerVersion(this, 'nodeLrapLayer', 'dash0-extension-node');
+    const javaLayer = getLatestLayerVersion(this, 'javaLrapLayer', 'dash0-extension-java');
     const role = new iam.Role(this, 'IntegrationTestsLambdaRole', {
       assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
       managedPolicies: [
