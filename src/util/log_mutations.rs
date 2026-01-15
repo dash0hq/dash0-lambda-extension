@@ -289,6 +289,7 @@ mod tests {
     use super::*;
     use opentelemetry_proto::tonic::common::v1::any_value::Value;
     use serde_json::json;
+    use serial_test::serial;
 
     fn get_string_value(any_value: &Option<AnyValue>) -> Option<String> {
         match any_value {
@@ -961,7 +962,13 @@ mod tests {
         assert_eq!(result[3].severity_text, "INFO");
     }
     #[test]
+    #[serial]
     fn test_map_logs_not_invocation_end() {
+        // Set AWS_LAMBDA_EXEC_WRAPPER so is_auto_instrumented_disabled() returns false
+        // This is required for the "put back to store" branch to be taken
+        std::env::set_var("AWS_LAMBDA_EXEC_WRAPPER", "/opt/wrapper");
+        std::env::remove_var("DISABLE_AUTO_INSTRUMENTATION");
+
         let logs = vec![TelemetryLog {
             time: "2023-10-26T12:00:00.000Z".to_string(),
             r#type: "function".to_string(),
@@ -974,5 +981,7 @@ mod tests {
         let result = map_logs_to_otlp(&logs, false);
 
         assert_eq!(result.len(), 0);
+
+        std::env::remove_var("AWS_LAMBDA_EXEC_WRAPPER");
     }
 }
