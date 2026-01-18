@@ -43,8 +43,12 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             span = spanPayload.resourceSpans[0].scopeSpans[0].spans[0];
             const spanAttributes = getAttributesMap(span.attributes);
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
-            compareJsonStrings(spanAttributes['faas.event'].stringValue, '{"parameter1":"right","masked_field":"******"}');
+            compareJsonStrings(spanAttributes['faas.event'].stringValue, '{"parameter1":"right","masked_field":"****"}');
             compareJsonStrings(spanAttributes['faas.return_value'].stringValue, '{"statusCode":200,"body":"{\\"message\\":\\"Success\\"}"}');
+
+            const resourceAttributes = getAttributesMap(spanPayload.resourceSpans[0].resource.attributes);
+            expect(JSON.parse(resourceAttributes['process.environ'].stringValue)['MASKED_FIELD']).toEqual('****');
+
             traceId = span.traceId;
             parentSpanId = span.spanId;
             break;

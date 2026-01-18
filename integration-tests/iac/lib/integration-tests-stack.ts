@@ -64,6 +64,7 @@ function createLambdas(
               DASH0_EXTENSION_LOG_LEVEL: "info",
               SEND_ON_INVOCATION_END: invocationEnd,
               DASH0_MASK_RULES: '[".*masked_field.*"]',
+              MASKED_FIELD: "sensitive information",
             };
             if (traced === "false") {
               environment["DISABLE_AUTO_INSTRUMENTATION"] = "true";

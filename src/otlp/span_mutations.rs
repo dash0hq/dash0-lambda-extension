@@ -921,9 +921,8 @@ mod tests {
         store_trace(trace);
 
         let traces = snapshot_traces();
-        let synthetic =
-            build_synthetic_trace(invocation_id, Some("CopiedError"), None, &traces)
-                .expect("trace should build");
+        let synthetic = build_synthetic_trace(invocation_id, Some("CopiedError"), None, &traces)
+            .expect("trace should build");
 
         let decoded = ExportTraceServiceRequest::decode(synthetic.body.as_slice())
             .expect("decode synthetic trace");

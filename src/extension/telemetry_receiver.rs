@@ -71,8 +71,7 @@ pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
         let mut traces_to_send = take_traces();
 
         for (invocation_id, error_type) in &error_invocation_ids {
-            match build_synthetic_trace(invocation_id, Some(error_type), None, &traces_to_send)
-            {
+            match build_synthetic_trace(invocation_id, Some(error_type), None, &traces_to_send) {
                 Some(trace) => traces_to_send.push(trace),
                 None => {
                     tracing::error!(

@@ -4,6 +4,7 @@ use std::env;
 use tracing::warn;
 
 const DASH0_MASK_RULES_ENV: &str = "DASH0_MASK_RULES";
+const DASH0_MASK_ENV_VARS_ENV: &str = "DASH0_MASK_ENV_VARS";
 
 pub struct MaskingRules {
     pub global: Vec<Regex>,
@@ -18,6 +19,7 @@ static DEFAULT_MASKING_PATTERNS: &[&str] = &[
 ];
 
 static MASKING_RULES: OnceCell<MaskingRules> = OnceCell::new();
+static ENV_VAR_MASKING_RULES: OnceCell<MaskingRules> = OnceCell::new();
 
 fn patterns_to_rules(patterns: &[&str]) -> MaskingRules {
     let global = patterns
@@ -49,13 +51,30 @@ pub fn init_masking_rules() {
         },
         Err(_) => default_masking_rules(),
     });
+
+    ENV_VAR_MASKING_RULES.get_or_init(|| match env::var(DASH0_MASK_ENV_VARS_ENV) {
+        Ok(value) => match serde_json::from_str::<Vec<String>>(&value) {
+            Ok(patterns) => {
+                let pattern_refs: Vec<&str> = patterns.iter().map(|s| s.as_str()).collect();
+                patterns_to_rules(&pattern_refs)
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to parse {} as JSON array of strings: {}. Will use general masking rules.",
+                    DASH0_MASK_ENV_VARS_ENV, e
+                );
+                MaskingRules { global: vec![] }
+            }
+        },
+        Err(_) => MaskingRules { global: vec![] },
+    });
 }
 
 pub fn get_masking_rules() -> &'static MaskingRules {
     MASKING_RULES.get_or_init(default_masking_rules)
 }
 
-const MASKED_VALUE: &str = "******";
+const MASKED_VALUE: &str = "****";
 
 fn should_mask(key: &str, rules: &MaskingRules) -> bool {
     rules.global.iter().any(|r| r.is_match(key))
@@ -93,8 +112,17 @@ pub fn mask_json_string(json_str: &str) -> String {
     }
 }
 
+fn get_env_var_masking_rules() -> &'static MaskingRules {
+    ENV_VAR_MASKING_RULES.get_or_init(|| MaskingRules { global: vec![] })
+}
+
 pub fn mask_env_vars(env_map: serde_json::Map<String, serde_json::Value>) -> String {
-    let rules = get_masking_rules();
+    let env_rules = get_env_var_masking_rules();
+    let rules = if env_rules.global.is_empty() {
+        get_masking_rules()
+    } else {
+        env_rules
+    };
 
     let masked_map: serde_json::Map<String, serde_json::Value> = env_map
         .into_iter()
@@ -189,7 +217,7 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
 
         assert_eq!(parsed["username"], "john");
-        assert_eq!(parsed["password"], "******");
+        assert_eq!(parsed["password"], "****");
     }
 
     #[test]
@@ -199,7 +227,7 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
 
         assert_eq!(parsed["user"]["name"], "john");
-        assert_eq!(parsed["user"]["api_key"], "******");
+        assert_eq!(parsed["user"]["api_key"], "****");
     }
 
     #[test]
@@ -208,7 +236,7 @@ mod tests {
         let result = mask_json_string(input);
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
 
-        assert_eq!(parsed["secrets"], "******");
+        assert_eq!(parsed["secrets"], "****");
         assert!(parsed["names"].is_array());
     }
 
@@ -219,7 +247,7 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
 
         assert_eq!(parsed["items"][0]["name"], "item1");
-        assert_eq!(parsed["items"][0]["secret_code"], "******");
+        assert_eq!(parsed["items"][0]["secret_code"], "****");
     }
 
     #[test]
@@ -235,7 +263,7 @@ mod tests {
         let result = mask_json_string(input);
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
 
-        assert_eq!(parsed["level1"]["level2"]["level3"]["password"], "******");
+        assert_eq!(parsed["level1"]["level2"]["level3"]["password"], "****");
     }
 
     #[test]
@@ -262,8 +290,8 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
 
         assert_eq!(parsed["PATH"], "/usr/bin");
-        assert_eq!(parsed["AWS_SECRET_ACCESS_KEY"], "******");
-        assert_eq!(parsed["API_KEY"], "******");
+        assert_eq!(parsed["AWS_SECRET_ACCESS_KEY"], "****");
+        assert_eq!(parsed["API_KEY"], "****");
         assert_eq!(parsed["HOME"], "/home/user");
     }
 
@@ -293,8 +321,36 @@ mod tests {
         let result = mask_env_vars(env_map);
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
 
-        assert_eq!(parsed["DB_PASSWORD"], "******");
-        assert_eq!(parsed["MY_PASSPHRASE"], "******");
-        assert_eq!(parsed["CREDENTIAL_FILE"], "******");
+        assert_eq!(parsed["DB_PASSWORD"], "****");
+        assert_eq!(parsed["MY_PASSPHRASE"], "****");
+        assert_eq!(parsed["CREDENTIAL_FILE"], "****");
+    }
+
+    #[test]
+    fn test_mask_env_vars_falls_back_to_global_rules_when_env_rules_empty() {
+        // Verify that ENV_VAR_MASKING_RULES is empty (no custom rules set)
+        let env_rules = get_env_var_masking_rules();
+        assert!(
+            env_rules.global.is_empty(),
+            "ENV_VAR_MASKING_RULES should be empty for this test"
+        );
+
+        // Create env map with keys that match global MASKING_RULES patterns
+        let mut env_map = serde_json::Map::new();
+        env_map.insert(
+            "AWS_SECRET_ACCESS_KEY".to_string(),
+            serde_json::Value::String("secret-value".to_string()),
+        );
+        env_map.insert(
+            "SAFE_VAR".to_string(),
+            serde_json::Value::String("visible".to_string()),
+        );
+
+        let result = mask_env_vars(env_map);
+        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+
+        // Should be masked using global rules (fallback)
+        assert_eq!(parsed["AWS_SECRET_ACCESS_KEY"], "****");
+        assert_eq!(parsed["SAFE_VAR"], "visible");
     }
 }
