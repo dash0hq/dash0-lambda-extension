@@ -5,7 +5,7 @@ import { DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS } from "./con
 import {
     checkHttpSpan,
     checkLogs,
-    checkSpanAttributesFromReport,
+    checkSpanAttributesFromReport, compareJsonStrings,
     getAttributesMap,
     getRequestPayload,
     invokeFunction
@@ -42,7 +42,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             const spanAttributes = getAttributesMap(span.attributes);
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
             expect(spanAttributes['faas.event'].stringValue).toEqual('{"parameter1":"right"}');
-            expect(spanAttributes['faas.return_value'].stringValue).toEqual('{"statusCode": 200, "body": "\\"Hello from Lambda!\\""}');
+            compareJsonStrings(spanAttributes['faas.return_value'].stringValue, '{"statusCode": 200, "body": "\\"Hello from Lambda!\\""}');
             expect(spanAttributes['faas.init_duration'].doubleValue).toBeGreaterThan(0);
             traceId = span.traceId;
             parentSpanId = span.spanId;

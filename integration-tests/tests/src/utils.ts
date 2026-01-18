@@ -230,3 +230,9 @@ export const checkSpanAttributesFromReport = (reportLog: string, span: any) => {
         throw new Error("Failed to parse REPORT log: " + reportLog);
     }
 }
+
+export const compareJsonStrings = (json1: string, json2: string) => {
+    const obj1 = JSON.parse(json1);
+    const obj2 = JSON.parse(json2);
+    expect(obj1).toEqual(obj2);
+}

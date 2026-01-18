@@ -63,6 +63,7 @@ function createLambdas(
               DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
               DASH0_EXTENSION_LOG_LEVEL: "info",
               SEND_ON_INVOCATION_END: invocationEnd,
+              DASH0_MASK_RULES: '[".*masked_field.*"]',
             };
             if (traced === "false") {
               environment["DISABLE_AUTO_INSTRUMENTATION"] = "true";
