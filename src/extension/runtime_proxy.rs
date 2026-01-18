@@ -8,6 +8,7 @@ use hyper::HeaderMap;
 
 use crate::config::endpoints;
 use crate::config::{is_auto_instrumented_disabled, max_event_payload_size};
+use crate::otlp::masking::mask_json_string;
 use crate::otlp::span_mutations::{
     add_return_payload_to_lambda_server_spans, build_runtime_error_trace,
 };
@@ -294,7 +295,9 @@ async fn validate_and_mangle_next_event(
     } else {
         &body_bytes
     };
-    store_event_payload(&_aws_request_id, &String::from_utf8_lossy(truncated_bytes));
+    let payload_str = String::from_utf8_lossy(truncated_bytes);
+    let masked_payload = mask_json_string(&payload_str);
+    store_event_payload(&_aws_request_id, &masked_payload);
 
     // Reconstruct the response with the same parts and body
     let response = Response::from_parts(parts, Body::from(body_bytes));
