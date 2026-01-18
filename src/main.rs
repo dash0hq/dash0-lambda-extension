@@ -12,6 +12,7 @@ use hyper::{Body, Request, Response, Server};
 
 use tokio::{self};
 use tracing_subscriber::EnvFilter;
+use crate::otlp::masking::init_masking_rules;
 
 pub mod config;
 pub mod extension;
@@ -68,6 +69,8 @@ async fn main() {
     stats::init_start();
 
     config::endpoints::latch_runtime_env();
+
+    init_masking_rules();
 
     let addr: SocketAddr = match config::endpoints::lrap_api().parse() {
         Ok(addr) => addr,
