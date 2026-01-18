@@ -20,6 +20,24 @@ use crate::util::parsers::extract_invocation_id_from_path;
 static HTTP_CLIENT: Lazy<hyper::Client<hyper::client::HttpConnector, Body>> =
     Lazy::new(|| hyper::Client::new());
 
+fn process_payload(payload_bytes: &[u8]) -> String {
+    let payload_str = String::from_utf8_lossy(payload_bytes);
+    let masked_payload = mask_json_string(&payload_str);
+
+    let max_size = max_event_payload_size();
+    if masked_payload.len() > max_size {
+        tracing::info!(
+            "[{}] Truncating payload from {} to {} bytes.",
+            crate::log_prefix(),
+            masked_payload.len(),
+            max_size
+        );
+        masked_payload[..max_size].to_string()
+    } else {
+        masked_payload
+    }
+}
+
 pub async fn next(headers: &HeaderMap, path: &str) -> Result<(Arc<String>, Response<Body>), Error> {
     let uri = match hyper::Uri::builder()
         .scheme("http")
@@ -229,19 +247,7 @@ pub async fn invocation_response_proxy(req: Request<Body>) -> Result<Response<Bo
     let (parts, body) = req.into_parts();
     let body_bytes = hyper::body::to_bytes(body).await?;
 
-    let max_size = max_event_payload_size();
-    let payload_slice = if body_bytes.len() > max_size {
-        tracing::info!(
-            "[{}] Truncating return payload from {} to {} bytes",
-            crate::log_prefix(),
-            body_bytes.len(),
-            max_size
-        );
-        &body_bytes[..max_size]
-    } else {
-        &body_bytes
-    };
-    let return_payload = String::from_utf8_lossy(payload_slice).to_string();
+    let return_payload = process_payload(&body_bytes);
     let req = Request::from_parts(parts, Body::from(body_bytes));
 
     let res = passthru_proxy(req).await;
@@ -283,22 +289,8 @@ async fn validate_and_mangle_next_event(
         hyper::body::Bytes::new()
     });
 
-    let payload_str = String::from_utf8_lossy(&body_bytes);
-    let masked_payload = mask_json_string(&payload_str);
-
-    let max_size = max_event_payload_size();
-    let truncated_payload = if masked_payload.len() > max_size {
-        tracing::info!(
-            "[{}] Truncating event payload from {} to {} bytes.",
-            crate::log_prefix(),
-            masked_payload.len(),
-            max_size
-        );
-        &masked_payload[..max_size]
-    } else {
-        &masked_payload
-    };
-    store_event_payload(&_aws_request_id, truncated_payload);
+    let processed_payload = process_payload(&body_bytes);
+    store_event_payload(&_aws_request_id, &processed_payload);
 
     // Reconstruct the response with the same parts and body
     let response = Response::from_parts(parts, Body::from(body_bytes));
