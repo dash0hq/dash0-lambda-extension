@@ -37,7 +37,9 @@ pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
         crate::state::invocation_data::store_telemetry_logs(logs);
 
         if !report_invocation_ids.is_empty() {
-            flush_traces().await;
+            if !crate::config::is_send_on_invocation_end() {
+                flush_traces().await;
+            }
             for id in &report_invocation_ids {
                 crate::state::invocation_data::cleanup_invocation(id);
             }
