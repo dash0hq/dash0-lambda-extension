@@ -8,7 +8,7 @@ import {
     checkSpanAttributesFromReport,
     getAttributesMap,
     getRequestPayload,
-    invokeFunction
+    invokeFunction, runAllTests
 } from "./utils";
 
 
@@ -79,26 +79,5 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
 
 describe.concurrent('Lambdainvocation', () => {
     const runtimes = ['java17', 'java21'];
-    const architectures = ['x86_64', 'arm64'] as const;
-    const invocationEndValues = [true, false] as const;
-    const tracedValues = [true, false] as const;
-
-    for (const runtime of runtimes) {
-        for (const architecture of architectures) {
-            for (const invocationEnd of invocationEndValues) {
-                for (const traced of tracedValues) {
-                    const invocationEndLabel = invocationEnd ? 'true' : 'false';
-                    const functionName = `${runtime}-success-${traced}-invocation-end-${invocationEndLabel}-${architecture}`;
-                    it(
-                        `invokes ${functionName} successfully`,
-                        async () => {
-                            console.log(`Starting test for ${functionName}`, new Date().toISOString());
-                            await verifySuccessInvocation(functionName, invocationEnd, traced);
-                        },
-                        120_000
-                    );
-                }
-            }
-        }
-    }
+    runAllTests('success', runtimes, verifySuccessInvocation);
 });

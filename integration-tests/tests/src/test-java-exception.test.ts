@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./config";
 import {
     checkException, checkHttpSpan, checkLogs,
-    checkSpanAttributesFromReport, getAttributesMap, getRequestPayload, invokeFunction
+    checkSpanAttributesFromReport, getAttributesMap, getRequestPayload, invokeFunction, runAllTests
 } from "./utils";
 
 
@@ -95,26 +95,5 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
 
 describe.concurrent('Lambda invocation', () => {
     const runtimes = ['java17', 'java21'];
-    const architectures = ['x86_64', 'arm64'] as const;
-    const invocationEndValues = [true, false] as const;
-    const tracedValues = [true, false] as const;
-
-    for (const runtime of runtimes) {
-        for (const architecture of architectures) {
-            for (const invocationEnd of invocationEndValues) {
-                for (const traced of tracedValues) {
-                    const invocationEndLabel = invocationEnd ? 'true' : 'false';
-                    const functionName = `${runtime}-exception-${traced}-invocation-end-${invocationEndLabel}-${architecture}`;
-                    it(
-                        `invokes ${functionName} successfully`,
-                        async () => {
-                            console.log(`Starting test for ${functionName}`, new Date().toISOString());
-                            await verifySuccessInvocation(functionName, invocationEnd, traced);
-                        },
-                        120_000
-                    );
-                }
-            }
-        }
-    }
+    runAllTests('exception', runtimes, verifySuccessInvocation);
 });

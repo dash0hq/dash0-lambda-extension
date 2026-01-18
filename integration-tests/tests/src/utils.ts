@@ -1,6 +1,6 @@
 import {setTimeout as delay} from "timers/promises";
 import fetch from "node-fetch";
-import {expect} from "vitest";
+import {expect, it} from "vitest";
 import {DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./config";
 import {InvokeCommand, LambdaClient} from "@aws-sdk/client-lambda";
 
@@ -235,4 +235,29 @@ export const compareJsonStrings = (json1: string, json2: string) => {
     const obj1 = JSON.parse(json1);
     const obj2 = JSON.parse(json2);
     expect(obj1).toEqual(obj2);
+}
+
+export const runAllTests = (scenario: string, runtimes: string[], verifySuccessInvocation: Function) => {
+    const architectures = ['x86_64', 'arm64'] as const;
+    const invocationEndValues = [true, false] as const;
+    const tracedValues = [true, false] as const;
+
+    for (const runtime of runtimes) {
+        for (const architecture of architectures) {
+            for (const invocationEnd of invocationEndValues) {
+                for (const traced of tracedValues) {
+                    const invocationEndLabel = invocationEnd ? 'true' : 'false';
+                    const functionName = `${runtime}-${scenario}-${traced}-invocation-end-${invocationEndLabel}-${architecture}`;
+                    it(
+                        `invokes ${functionName} successfully`,
+                        async () => {
+                            console.log(`Starting test for ${functionName}`, new Date().toISOString());
+                            await verifySuccessInvocation(functionName, invocationEnd, traced);
+                        },
+                        120_000
+                    );
+                }
+            }
+        }
+    }
 }
