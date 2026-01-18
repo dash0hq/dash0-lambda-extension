@@ -6,7 +6,7 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "vitest run",
+    "test": "vitest run --pool=threads --poolOptions.threads.minThreads=8 --poolOptions.threads.maxThreads=12",
     "vitest": "vitest"
   },
   "keywords": [],
