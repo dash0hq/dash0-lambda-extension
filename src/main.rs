@@ -10,9 +10,9 @@ use std::{
 #[allow(unused_imports)]
 use hyper::{Body, Request, Response, Server};
 
+use crate::otlp::masking::init_masking_rules;
 use tokio::{self};
 use tracing_subscriber::EnvFilter;
-use crate::otlp::masking::init_masking_rules;
 
 pub mod config;
 pub mod extension;

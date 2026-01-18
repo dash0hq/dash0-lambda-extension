@@ -33,25 +33,21 @@ fn default_masking_rules() -> MaskingRules {
 }
 
 pub fn init_masking_rules() {
-    MASKING_RULES.get_or_init(|| {
-        match env::var(DASH0_MASK_RULES_ENV) {
-            Ok(value) => {
-                match serde_json::from_str::<Vec<String>>(&value) {
-                    Ok(patterns) => {
-                        let pattern_refs: Vec<&str> = patterns.iter().map(|s| s.as_str()).collect();
-                        patterns_to_rules(&pattern_refs)
-                    }
-                    Err(e) => {
-                        warn!(
-                            "Failed to parse {} as JSON array of strings: {}. Using default masking rules.",
-                            DASH0_MASK_RULES_ENV, e
-                        );
-                        default_masking_rules()
-                    }
-                }
+    MASKING_RULES.get_or_init(|| match env::var(DASH0_MASK_RULES_ENV) {
+        Ok(value) => match serde_json::from_str::<Vec<String>>(&value) {
+            Ok(patterns) => {
+                let pattern_refs: Vec<&str> = patterns.iter().map(|s| s.as_str()).collect();
+                patterns_to_rules(&pattern_refs)
             }
-            Err(_) => default_masking_rules(),
-        }
+            Err(e) => {
+                warn!(
+                    "Failed to parse {} as JSON array of strings: {}. Using default masking rules.",
+                    DASH0_MASK_RULES_ENV, e
+                );
+                default_masking_rules()
+            }
+        },
+        Err(_) => default_masking_rules(),
     });
 }
 
