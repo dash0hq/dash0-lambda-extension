@@ -10,7 +10,7 @@ use crate::config::endpoints;
 use crate::config::{is_auto_instrumented_disabled, max_event_payload_size};
 use crate::otlp::masking::mask_json_string;
 use crate::otlp::span_mutations::{
-    add_return_payload_to_lambda_server_spans, build_runtime_error_trace,
+    add_return_payload_to_lambda_server_spans, build_synthetic_trace,
 };
 use crate::state::invocation_data::{
     store_current_invocation_id, store_event_payload, store_trace,
@@ -254,7 +254,7 @@ pub async fn invocation_response_proxy(req: Request<Body>) -> Result<Response<Bo
     if let Some(id) = invocation_id {
         if is_auto_instrumented_disabled() {
             if let Some(trace) =
-                build_runtime_error_trace(&id, None, Some(return_payload.as_str()), &Vec::new())
+                build_synthetic_trace(&id, None, Some(return_payload.as_str()), &Vec::new())
             {
                 store_trace(trace);
             }

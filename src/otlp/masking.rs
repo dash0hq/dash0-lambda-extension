@@ -93,6 +93,23 @@ pub fn mask_json_string(json_str: &str) -> String {
     }
 }
 
+pub fn mask_env_vars(env_map: serde_json::Map<String, serde_json::Value>) -> String {
+    let rules = get_masking_rules();
+
+    let masked_map: serde_json::Map<String, serde_json::Value> = env_map
+        .into_iter()
+        .map(|(key, value)| {
+            if should_mask(&key, rules) {
+                (key, serde_json::Value::String(MASKED_VALUE.to_string()))
+            } else {
+                (key, value)
+            }
+        })
+        .collect();
+
+    serde_json::Value::Object(masked_map).to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -219,5 +236,65 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
 
         assert_eq!(parsed["level1"]["level2"]["level3"]["password"], "******");
+    }
+
+    #[test]
+    fn test_mask_env_vars_masks_sensitive_keys() {
+        let mut env_map = serde_json::Map::new();
+        env_map.insert(
+            "PATH".to_string(),
+            serde_json::Value::String("/usr/bin".to_string()),
+        );
+        env_map.insert(
+            "AWS_SECRET_ACCESS_KEY".to_string(),
+            serde_json::Value::String("super-secret".to_string()),
+        );
+        env_map.insert(
+            "API_KEY".to_string(),
+            serde_json::Value::String("my-api-key".to_string()),
+        );
+        env_map.insert(
+            "HOME".to_string(),
+            serde_json::Value::String("/home/user".to_string()),
+        );
+
+        let result = mask_env_vars(env_map);
+        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+
+        assert_eq!(parsed["PATH"], "/usr/bin");
+        assert_eq!(parsed["AWS_SECRET_ACCESS_KEY"], "******");
+        assert_eq!(parsed["API_KEY"], "******");
+        assert_eq!(parsed["HOME"], "/home/user");
+    }
+
+    #[test]
+    fn test_mask_env_vars_handles_empty_map() {
+        let env_map = serde_json::Map::new();
+        let result = mask_env_vars(env_map);
+        assert_eq!(result, "{}");
+    }
+
+    #[test]
+    fn test_mask_env_vars_masks_password_variations() {
+        let mut env_map = serde_json::Map::new();
+        env_map.insert(
+            "DB_PASSWORD".to_string(),
+            serde_json::Value::String("dbpass123".to_string()),
+        );
+        env_map.insert(
+            "MY_PASSPHRASE".to_string(),
+            serde_json::Value::String("phrase123".to_string()),
+        );
+        env_map.insert(
+            "CREDENTIAL_FILE".to_string(),
+            serde_json::Value::String("/path/to/creds".to_string()),
+        );
+
+        let result = mask_env_vars(env_map);
+        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+
+        assert_eq!(parsed["DB_PASSWORD"], "******");
+        assert_eq!(parsed["MY_PASSPHRASE"], "******");
+        assert_eq!(parsed["CREDENTIAL_FILE"], "******");
     }
 }
