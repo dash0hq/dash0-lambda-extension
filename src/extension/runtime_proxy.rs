@@ -283,21 +283,22 @@ async fn validate_and_mangle_next_event(
         hyper::body::Bytes::new()
     });
 
+    let payload_str = String::from_utf8_lossy(&body_bytes);
+    let masked_payload = mask_json_string(&payload_str);
+
     let max_size = max_event_payload_size();
-    let truncated_bytes = if body_bytes.len() > max_size {
+    let truncated_payload = if masked_payload.len() > max_size {
         tracing::info!(
             "[{}] Truncating event payload from {} to {} bytes.",
             crate::log_prefix(),
-            body_bytes.len(),
+            masked_payload.len(),
             max_size
         );
-        &body_bytes[..max_size]
+        &masked_payload[..max_size]
     } else {
-        &body_bytes
+        &masked_payload
     };
-    let payload_str = String::from_utf8_lossy(truncated_bytes);
-    let masked_payload = mask_json_string(&payload_str);
-    store_event_payload(&_aws_request_id, &masked_payload);
+    store_event_payload(&_aws_request_id, truncated_payload);
 
     // Reconstruct the response with the same parts and body
     let response = Response::from_parts(parts, Body::from(body_bytes));
