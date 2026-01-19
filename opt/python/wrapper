@@ -47,5 +47,5 @@ if [ -z "$DISABLE_AUTO_INSTRUMENTATION" ] || [ "${DISABLE_AUTO_INSTRUMENTATION,,
 fi
 
 # Unset _LAMBDA_TELEMETRY_LOG_FD so runtime falls back to stdout/stderr
-env -u _LAMBDA_TELEMETRY_LOG_FD "${args[@]}" 2>&1 | awk '{print; print "[wrapper] " $0; fflush()}'
+env -u _LAMBDA_TELEMETRY_LOG_FD "${args[@]}" 2>&1 | awk '{print; print >> "/tmp/stdout-logs"; fflush()}'
 exit ${PIPESTATUS[0]}
