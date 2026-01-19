@@ -4,6 +4,7 @@ use hyper_rustls::HttpsConnectorBuilder;
 use once_cell::sync::Lazy;
 
 use crate::extension::telemetry_receiver::telemetry;
+use crate::otlp::logs_receiver::logs;
 use crate::otlp::receiver::traces;
 use crate::state::invocation_data::force_init_trace_store;
 
@@ -23,6 +24,7 @@ pub fn make_route<'a>() -> Router<'a> {
             crate::extension::runtime_proxy::invocation_response_proxy,
         )
         .post("/:apiver/traces", traces)
+        .post("/:apiver/traces", logs)
         .post("/:apiver/telemetry", telemetry)
         .not_found(crate::extension::runtime_proxy::notfound_passthru_proxy);
     Lazy::force(&HTTPS_CLIENT);
