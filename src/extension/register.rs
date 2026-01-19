@@ -94,9 +94,10 @@ pub async fn register() {
     }
 
     // Request accountId feature
-    request
-        .headers_mut()
-        .append("Lambda-Extension-Accept-Feature", "accountId".try_into().unwrap());
+    request.headers_mut().append(
+        "Lambda-Extension-Accept-Feature",
+        "accountId".try_into().unwrap(),
+    );
 
     let response = match hyper::Client::new().request(request).await {
         Ok(resp) => resp,
@@ -147,6 +148,7 @@ pub async fn register() {
     if let Ok(body_bytes) = hyper::body::to_bytes(response.into_body()).await {
         if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&body_bytes) {
             if let Some(account_id) = json.get("accountId").and_then(|v| v.as_str()) {
+                crate::state::global::store_account_id(account_id);
                 tracing::info!(
                     "[{}] Registered with accountId: {}",
                     crate::log_prefix_with("Extension"),

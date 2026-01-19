@@ -1,7 +1,6 @@
 use crate::config::user::is_logs_instrumentation_enabled;
 use crate::otlp::exporter::{flush_telemetry_logs, flush_traces, send_traces};
 use crate::otlp::span_mutations::build_synthetic_trace;
-use crate::state;
 use crate::state::invocation_data::take_traces;
 use crate::util::parsers::extract_error_invocation_ids;
 use hyper::{Body, Error, Request, Response};
@@ -61,15 +60,6 @@ pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
             error_invocation_ids,
             body_text
         );
-
-        // Fetch account ID if not already cached
-        if state::global::get_account_id()
-            .map(|id| id.is_empty())
-            .unwrap_or(true)
-        {
-            let _ = tokio::task::spawn(async { state::global::fetch_and_cache_account_id().await })
-                .await;
-        }
 
         let mut traces_to_send = take_traces();
 
