@@ -24,7 +24,7 @@ pub fn drop_duplicate_java_instrumenations(decoded: &ExportTraceServiceRequest) 
     scope_name.as_deref() == Some("io.opentelemetry.aws-lambda-core-1.0")
 }
 
-pub fn build_runtime_error_trace(
+pub fn build_synthetic_trace(
     invocation_id: &str,
     error_type: Option<&str>,
     return_value: Option<&str>,
@@ -588,7 +588,7 @@ pub fn process_trace_request(
 mod tests {
     use super::{
         add_event_payload_to_lambda_server_spans, add_return_payload_to_lambda_server_spans,
-        annotate_return_payload, build_runtime_error_trace, StatusCode,
+        annotate_return_payload, build_synthetic_trace, StatusCode,
     };
     use crate::state::invocation_data::{
         snapshot_traces, store_event_payload, store_return_payload, store_trace,
@@ -616,7 +616,7 @@ mod tests {
         let invocation_id = "inv-test-1";
         store_event_payload(invocation_id, r#"{"foo":"bar"}"#);
 
-        let trace = build_runtime_error_trace(invocation_id, Some("CustomError"), None, &[])
+        let trace = build_synthetic_trace(invocation_id, Some("CustomError"), None, &[])
             .expect("trace should build");
 
         assert_eq!(trace.method, Method::POST);
@@ -675,7 +675,7 @@ mod tests {
     fn builds_trace_without_event_payload() {
         let invocation_id = "inv-test-2";
 
-        let trace = build_runtime_error_trace(invocation_id, Some("error"), None, &[])
+        let trace = build_synthetic_trace(invocation_id, Some("error"), None, &[])
             .expect("trace should build");
 
         let decoded = ExportTraceServiceRequest::decode(trace.body.as_slice())
@@ -900,7 +900,7 @@ mod tests {
 
     #[test]
     #[serial]
-    fn build_runtime_error_trace_uses_existing_trace_and_parent_ids() {
+    fn build_synthetic_trace_uses_existing_trace_and_parent_ids() {
         take_traces();
         let invocation_id = "inv-trace-copy";
         let trace_id = vec![1u8; 16];
@@ -921,9 +921,8 @@ mod tests {
         store_trace(trace);
 
         let traces = snapshot_traces();
-        let synthetic =
-            build_runtime_error_trace(invocation_id, Some("CopiedError"), None, &traces)
-                .expect("trace should build");
+        let synthetic = build_synthetic_trace(invocation_id, Some("CopiedError"), None, &traces)
+            .expect("trace should build");
 
         let decoded = ExportTraceServiceRequest::decode(synthetic.body.as_slice())
             .expect("decode synthetic trace");
@@ -1156,7 +1155,7 @@ mod tests {
         let invocation_id = "inv-error-json";
         let error_json = r#"{"errorMessage": "Something went wrong", "errorType": "ValueError", "requestId": "123", "stackTrace": ["line1\n", "line2\n"]}"#;
 
-        let trace = build_runtime_error_trace(invocation_id, None, Some(error_json), &[])
+        let trace = build_synthetic_trace(invocation_id, None, Some(error_json), &[])
             .expect("trace should build");
 
         let decoded = ExportTraceServiceRequest::decode(trace.body.as_slice())
@@ -1429,7 +1428,7 @@ fn env_as_json_string() -> String {
     let map: JsonMap<String, serde_json::Value> = std::env::vars()
         .map(|(k, v)| (k, serde_json::Value::String(v)))
         .collect();
-    serde_json::Value::Object(map).to_string()
+    crate::otlp::masking::mask_env_vars(map)
 }
 
 fn get_trace_span_ids(invocation_id: &str, existing_traces: &[StoredTrace]) -> (Vec<u8>, Vec<u8>) {

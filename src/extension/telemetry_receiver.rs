@@ -1,7 +1,7 @@
 use hyper::{Body, Error, Request, Response};
 
 use crate::otlp::exporter::{flush_logs, flush_traces, send_traces};
-use crate::otlp::span_mutations::build_runtime_error_trace;
+use crate::otlp::span_mutations::build_synthetic_trace;
 use crate::state;
 use crate::state::invocation_data::take_traces;
 use crate::util::parsers::extract_error_invocation_ids;
@@ -37,7 +37,9 @@ pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
         crate::state::invocation_data::store_telemetry_logs(logs);
 
         if !report_invocation_ids.is_empty() {
-            flush_traces().await;
+            if !crate::config::is_send_on_invocation_end() {
+                flush_traces().await;
+            }
             for id in &report_invocation_ids {
                 crate::state::invocation_data::cleanup_invocation(id);
             }
@@ -69,8 +71,7 @@ pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
         let mut traces_to_send = take_traces();
 
         for (invocation_id, error_type) in &error_invocation_ids {
-            match build_runtime_error_trace(invocation_id, Some(error_type), None, &traces_to_send)
-            {
+            match build_synthetic_trace(invocation_id, Some(error_type), None, &traces_to_send) {
                 Some(trace) => traces_to_send.push(trace),
                 None => {
                     tracing::error!(

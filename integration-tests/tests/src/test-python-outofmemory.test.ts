@@ -2,7 +2,7 @@ import fetch from 'node-fetch';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
 import {DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./config";
-import {checkLogs, getAttributesMap, getRequestPayload, invokeFunction} from "./utils";
+import {checkLogs, getAttributesMap, getRequestPayload, invokeFunction, runAllTests} from "./utils";
 
 
 const verifySuccessInvocation = async (functionName: string, invocationEnd: boolean, traced: boolean) => {
@@ -73,25 +73,5 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
 
 describe.concurrent('Lambda invocations with outofmemory', {retry: 1}, () => {
     const runtimes = ['python3-10', 'python3-11', 'python3-12', 'python3-13', 'python3-14'];
-    const architectures = ['x86_64', 'arm64'] as const;
-    const tracedValues = [true, false] as const;
-    const invocationEndValues = [true, false] as const;
-
-    for (const runtime of runtimes) {
-        for (const architecture of architectures) {
-            for (const traced of tracedValues) {
-                for (const invocationEnd of invocationEndValues) {
-                    const functionName = `${runtime}-outofmemory-${traced}-invocation-end-${invocationEnd}-${architecture}`;
-                    it(
-                        `invokes ${functionName} successfully`,
-                        async () => {
-                            console.log(`Starting test for ${functionName}`, new Date().toISOString());
-                            await verifySuccessInvocation(functionName, invocationEnd, traced);
-                        },
-                        120_000
-                    );
-                }
-            }
-        }
-    }
+    runAllTests('outofmemory', runtimes, verifySuccessInvocation);
 });

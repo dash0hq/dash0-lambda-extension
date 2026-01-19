@@ -25,6 +25,7 @@ tracing-subscriber = { version = "0.3", features = ["fmt", "json", "env-filter"]
 aws-config = { version = "1.8", features = ["behavior-version-latest"] }
 aws-sdk-sts = "1.9"
 hex = "0.4.3"
+regex = "1.12.2"
 
 [features]
 default = []

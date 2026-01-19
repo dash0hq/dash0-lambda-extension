@@ -8,8 +8,9 @@ use hyper::HeaderMap;
 
 use crate::config::endpoints;
 use crate::config::{is_auto_instrumented_disabled, max_event_payload_size};
+use crate::otlp::masking::mask_json_string;
 use crate::otlp::span_mutations::{
-    add_return_payload_to_lambda_server_spans, build_runtime_error_trace,
+    add_return_payload_to_lambda_server_spans, build_synthetic_trace,
 };
 use crate::state::invocation_data::{
     store_current_invocation_id, store_event_payload, store_trace,
@@ -18,6 +19,24 @@ use crate::util::parsers::extract_invocation_id_from_path;
 
 static HTTP_CLIENT: Lazy<hyper::Client<hyper::client::HttpConnector, Body>> =
     Lazy::new(|| hyper::Client::new());
+
+fn process_payload(payload_bytes: &[u8]) -> String {
+    let payload_str = String::from_utf8_lossy(payload_bytes);
+    let masked_payload = mask_json_string(&payload_str);
+
+    let max_size = max_event_payload_size();
+    if masked_payload.len() > max_size {
+        tracing::info!(
+            "[{}] Truncating payload from {} to {} bytes.",
+            crate::log_prefix(),
+            masked_payload.len(),
+            max_size
+        );
+        masked_payload[..max_size].to_string()
+    } else {
+        masked_payload
+    }
+}
 
 pub async fn next(headers: &HeaderMap, path: &str) -> Result<(Arc<String>, Response<Body>), Error> {
     let uri = match hyper::Uri::builder()
@@ -228,26 +247,14 @@ pub async fn invocation_response_proxy(req: Request<Body>) -> Result<Response<Bo
     let (parts, body) = req.into_parts();
     let body_bytes = hyper::body::to_bytes(body).await?;
 
-    let max_size = max_event_payload_size();
-    let payload_slice = if body_bytes.len() > max_size {
-        tracing::info!(
-            "[{}] Truncating return payload from {} to {} bytes",
-            crate::log_prefix(),
-            body_bytes.len(),
-            max_size
-        );
-        &body_bytes[..max_size]
-    } else {
-        &body_bytes
-    };
-    let return_payload = String::from_utf8_lossy(payload_slice).to_string();
+    let return_payload = process_payload(&body_bytes);
     let req = Request::from_parts(parts, Body::from(body_bytes));
 
     let res = passthru_proxy(req).await;
     if let Some(id) = invocation_id {
         if is_auto_instrumented_disabled() {
             if let Some(trace) =
-                build_runtime_error_trace(&id, None, Some(return_payload.as_str()), &Vec::new())
+                build_synthetic_trace(&id, None, Some(return_payload.as_str()), &Vec::new())
             {
                 store_trace(trace);
             }
@@ -282,19 +289,8 @@ async fn validate_and_mangle_next_event(
         hyper::body::Bytes::new()
     });
 
-    let max_size = max_event_payload_size();
-    let truncated_bytes = if body_bytes.len() > max_size {
-        tracing::info!(
-            "[{}] Truncating event payload from {} to {} bytes.",
-            crate::log_prefix(),
-            body_bytes.len(),
-            max_size
-        );
-        &body_bytes[..max_size]
-    } else {
-        &body_bytes
-    };
-    store_event_payload(&_aws_request_id, &String::from_utf8_lossy(truncated_bytes));
+    let processed_payload = process_payload(&body_bytes);
+    store_event_payload(&_aws_request_id, &processed_payload);
 
     // Reconstruct the response with the same parts and body
     let response = Response::from_parts(parts, Body::from(body_bytes));

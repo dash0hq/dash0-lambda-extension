@@ -5,10 +5,10 @@ import { DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS } from "./con
 import {
     checkHttpSpan,
     checkLogs,
-    checkSpanAttributesFromReport,
+    checkSpanAttributesFromReport, compareJsonStrings,
     getAttributesMap,
     getRequestPayload,
-    invokeFunction
+    invokeFunction, runAllTests
 } from "./utils";
 
 
@@ -42,7 +42,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             const spanAttributes = getAttributesMap(span.attributes);
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
             expect(spanAttributes['faas.event'].stringValue).toEqual('{"parameter1":"right"}');
-            expect(spanAttributes['faas.return_value'].stringValue).toEqual('{"statusCode": 200, "body": "\\"Hello from Lambda!\\""}');
+            compareJsonStrings(spanAttributes['faas.return_value'].stringValue, '{"statusCode": 200, "body": "\\"Hello from Lambda!\\""}');
             expect(spanAttributes['faas.init_duration'].doubleValue).toBeGreaterThan(0);
             traceId = span.traceId;
             parentSpanId = span.spanId;
@@ -85,26 +85,5 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
 
 describe.concurrent('Lambdainvocation', () => {
     const runtimes = ['python3-10', 'python3-11', 'python3-12', 'python3-13', 'python3-14'];
-    const architectures = ['x86_64', 'arm64'] as const;
-    const invocationEndValues = [true, false] as const;
-    const tracedValues = [true, false] as const;
-
-    for (const runtime of runtimes) {
-        for (const architecture of architectures) {
-            for (const invocationEnd of invocationEndValues) {
-                for (const traced of tracedValues) {
-                    const invocationEndLabel = invocationEnd ? 'true' : 'false';
-                    const functionName = `${runtime}-success-${traced}-invocation-end-${invocationEndLabel}-${architecture}`;
-                    it(
-                        `invokes ${functionName} successfully`,
-                        async () => {
-                            console.log(`Starting test for ${functionName}`, new Date().toISOString());
-                            await verifySuccessInvocation(functionName, invocationEnd, traced);
-                        },
-                        120_000
-                    );
-                }
-            }
-        }
-    }
+    runAllTests('success', runtimes, verifySuccessInvocation);
 });

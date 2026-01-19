@@ -10,6 +10,7 @@ use std::{
 #[allow(unused_imports)]
 use hyper::{Body, Request, Response, Server};
 
+use crate::otlp::masking::init_masking_rules;
 use tokio::{self};
 use tracing_subscriber::EnvFilter;
 
@@ -68,6 +69,8 @@ async fn main() {
     stats::init_start();
 
     config::endpoints::latch_runtime_env();
+
+    init_masking_rules();
 
     let addr: SocketAddr = match config::endpoints::lrap_api().parse() {
         Ok(addr) => addr,
