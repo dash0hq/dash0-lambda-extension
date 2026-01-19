@@ -120,7 +120,7 @@ pub async fn get_next() {
                     } else {
                         tokio::time::sleep(Duration::from_millis(20)).await;
                     }
-                    crate::otlp::exporter::flush_logs(is_invocation_end).await;
+                    crate::otlp::exporter::flush_telemetry_logs(is_invocation_end).await;
                 }
 
                 if matches!(event_type, Some("INVOKE"))
@@ -148,7 +148,7 @@ pub async fn get_next() {
                                 crate::log_prefix_with("Extension")
                             );
                             crate::otlp::exporter::flush_traces().await;
-                            crate::otlp::exporter::flush_logs(true).await;
+                            crate::otlp::exporter::flush_telemetry_logs(true).await;
                         }
                         Ok(Err(_)) => {
                             tracing::warn!(

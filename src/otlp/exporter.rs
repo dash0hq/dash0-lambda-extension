@@ -20,7 +20,7 @@ use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 
 use opentelemetry_proto::tonic::logs::v1::{ResourceLogs, ScopeLogs};
 
-pub async fn flush_logs(is_invocation_end: bool) {
+pub async fn flush_telemetry_logs(is_invocation_end: bool) {
     let logs = take_telemetry_logs();
 
     if logs.is_empty() {

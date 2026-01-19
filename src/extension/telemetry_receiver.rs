@@ -1,6 +1,6 @@
 use hyper::{Body, Error, Request, Response};
 use crate::config::user::is_logs_instrumentation_enabled;
-use crate::otlp::exporter::{flush_logs, flush_traces, send_traces};
+use crate::otlp::exporter::{flush_telemetry_logs, flush_traces, send_traces};
 use crate::otlp::span_mutations::build_synthetic_trace;
 use crate::state;
 use crate::state::invocation_data::take_traces;
@@ -89,7 +89,7 @@ pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
         if !traces_to_send.is_empty() {
             send_traces(traces_to_send).await;
         }
-        flush_logs(true).await;
+        flush_telemetry_logs(true).await;
     }
 
     Ok(Response::builder().status(200).body(Body::empty()).unwrap())
