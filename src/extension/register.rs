@@ -93,6 +93,11 @@ pub async fn register() {
         }
     }
 
+    // Request accountId feature
+    request
+        .headers_mut()
+        .append("Lambda-Extension-Accept-Feature", "accountId".try_into().unwrap());
+
     let response = match hyper::Client::new().request(request).await {
         Ok(resp) => resp,
         Err(e) => {
@@ -109,9 +114,10 @@ pub async fn register() {
         }
     };
 
+    // Extract extension identifier from header before consuming response body
     let extension_identifier = match response.headers().get("lambda-extension-identifier") {
         Some(header) => match header.to_str() {
-            Ok(id) => id,
+            Ok(id) => id.to_owned(),
             Err(e) => {
                 tracing::error!(
                     "[{}] Invalid extension identifier header: {}",
@@ -137,7 +143,30 @@ pub async fn register() {
         }
     };
 
-    if let Err(e) = LAMBDA_EXTENSION_IDENTIFIER.set(extension_identifier.to_owned()) {
+    // Parse response body to extract accountId
+    if let Ok(body_bytes) = hyper::body::to_bytes(response.into_body()).await {
+        if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&body_bytes) {
+            if let Some(account_id) = json.get("accountId").and_then(|v| v.as_str()) {
+                tracing::info!(
+                    "[{}] Registered with accountId: {}",
+                    crate::log_prefix_with("Extension"),
+                    account_id
+                );
+            } else {
+                tracing::debug!(
+                    "[{}] Registration response did not contain accountId",
+                    crate::log_prefix_with("Extension")
+                );
+            }
+        } else {
+            tracing::debug!(
+                "[{}] Could not parse registration response as JSON",
+                crate::log_prefix_with("Extension")
+            );
+        }
+    }
+
+    if let Err(e) = LAMBDA_EXTENSION_IDENTIFIER.set(extension_identifier) {
         tracing::warn!(
             "[{}] Extension identifier already set: {:?}",
             crate::log_prefix_with("Extension"),
