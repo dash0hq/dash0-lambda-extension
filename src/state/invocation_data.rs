@@ -54,6 +54,29 @@ pub fn force_init_trace_store() {
 
 static TRACE_STORE: Lazy<Mutex<Vec<StoredTrace>>> = Lazy::new(|| Mutex::new(Vec::new()));
 
+#[derive(Clone)]
+pub struct StoredLog {
+    pub method: hyper::Method,
+    pub path_and_query: String,
+    pub headers: hyper::HeaderMap,
+    pub body: Vec<u8>,
+}
+
+pub fn store_log(log: StoredLog) {
+    LOG_STORE.lock().push(log);
+}
+
+pub fn take_logs() -> Vec<StoredLog> {
+    std::mem::take(&mut *LOG_STORE.lock())
+}
+
+#[allow(dead_code)]
+pub fn snapshot_logs() -> Vec<StoredLog> {
+    LOG_STORE.lock().clone()
+}
+
+static LOG_STORE: Lazy<Mutex<Vec<StoredLog>>> = Lazy::new(|| Mutex::new(Vec::new()));
+
 pub fn store_return_payload(invocation_id: &str, payload: &str) {
     RETURN_PAYLOADS
         .lock()
