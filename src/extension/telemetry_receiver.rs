@@ -1,5 +1,5 @@
 use hyper::{Body, Error, Request, Response};
-
+use crate::config::user::is_logs_instrumentation_enabled;
 use crate::otlp::exporter::{flush_logs, flush_traces, send_traces};
 use crate::otlp::span_mutations::build_synthetic_trace;
 use crate::state;
@@ -34,8 +34,10 @@ pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
                 }
             }
         }
-        
-        crate::state::invocation_data::store_telemetry_logs(logs);
+
+        if !is_logs_instrumentation_enabled() {
+            crate::state::invocation_data::store_telemetry_logs(logs);
+        }
 
         if !report_invocation_ids.is_empty() {
             if !crate::config::is_send_on_invocation_end() {

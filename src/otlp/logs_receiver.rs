@@ -14,7 +14,7 @@ pub async fn logs(req: Request<Body>) -> Result<Response<Body>, Error> {
     let mut encoded_body: Vec<u8> = body_bytes.to_vec();
     let mut converted_from_json = false;
 
-    tracing::trace!(
+    tracing::info!(
         "[{}] /v1/logs body: {}",
         crate::log_prefix(),
         String::from_utf8_lossy(&encoded_body)

@@ -45,9 +45,22 @@ pub fn request_retries() -> usize {
     }
 }
 
+pub fn is_logs_instrumentation_enabled() -> bool {
+    match std::env::var("LUMIGO_ENABLE_LOGS") {
+        Ok(val) => matches!(
+            val.as_str(),
+            "1" | "true" | "TRUE" | "True" | "yes" | "YES" | "Yes" | "y" | "Y"
+        ),
+        Err(_) => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{is_auto_instrumented_disabled, is_send_on_invocation_end, max_event_payload_size};
+    use super::{
+        is_auto_instrumented_disabled, is_logs_instrumentation_enabled, is_send_on_invocation_end,
+        max_event_payload_size,
+    };
     use serial_test::serial;
 
     #[test]
@@ -124,5 +137,32 @@ mod tests {
         std::env::set_var("MAX_EVENT_PAYLOAD", "not_a_number");
         assert_eq!(max_event_payload_size(), 20 * 1024);
         std::env::remove_var("MAX_EVENT_PAYLOAD");
+    }
+
+    #[test]
+    #[serial]
+    fn logs_instrumentation_disabled_by_default() {
+        std::env::remove_var("LUMIGO_ENABLE_LOGS");
+        assert!(!is_logs_instrumentation_enabled());
+    }
+
+    #[test]
+    #[serial]
+    fn logs_instrumentation_enabled_with_truthy_values() {
+        for val in ["1", "true", "TRUE", "True", "yes", "YES", "Yes", "y", "Y"] {
+            std::env::set_var("LUMIGO_ENABLE_LOGS", val);
+            assert!(is_logs_instrumentation_enabled(), "value {}", val);
+        }
+        std::env::remove_var("LUMIGO_ENABLE_LOGS");
+    }
+
+    #[test]
+    #[serial]
+    fn logs_instrumentation_disabled_with_falsy_values() {
+        for val in ["0", "false", "no", "maybe", ""] {
+            std::env::set_var("LUMIGO_ENABLE_LOGS", val);
+            assert!(!is_logs_instrumentation_enabled(), "value {}", val);
+        }
+        std::env::remove_var("LUMIGO_ENABLE_LOGS");
     }
 }

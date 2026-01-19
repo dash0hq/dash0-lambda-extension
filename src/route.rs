@@ -24,7 +24,7 @@ pub fn make_route<'a>() -> Router<'a> {
             crate::extension::runtime_proxy::invocation_response_proxy,
         )
         .post("/:apiver/traces", traces)
-        .post("/:apiver/traces", logs)
+        .post("/:apiver/logs", logs)
         .post("/:apiver/telemetry", telemetry)
         .not_found(crate::extension::runtime_proxy::notfound_passthru_proxy);
     Lazy::force(&HTTPS_CLIENT);
