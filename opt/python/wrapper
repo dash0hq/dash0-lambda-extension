@@ -52,18 +52,21 @@ if [ -n "$_LAMBDA_TELEMETRY_LOG_FD" ]; then
     # Duplicate original FD to FD 7
     eval "exec 7>&${_LAMBDA_TELEMETRY_LOG_FD}"
 
-    # Create named pipe for interception
-    TELEMETRY_PIPE="/tmp/lumigo_telemetry_$$"
-    mkfifo "$TELEMETRY_PIPE"
+    # Create two named pipes
+    PIPE_IN="/tmp/lumigo_in_$$"
+    PIPE_OUT="/tmp/lumigo_out_$$"
+    mkfifo "$PIPE_IN" "$PIPE_OUT"
 
-    # Background: tee writes to /dev/fd/7 (original dest), pipes to awk for prefixed stdout
-    ( tee /dev/fd/7 < "$TELEMETRY_PIPE" | awk '{print "[wrapper-telemetry] " $0; fflush()}' ) 7>&7 &
+    # Forward from PIPE_OUT to original destination (FD 7)
+    cat "$PIPE_OUT" >&7 &
 
-    # Redirect the telemetry FD to the pipe
-    eval "exec ${_LAMBDA_TELEMETRY_LOG_FD}>'$TELEMETRY_PIPE'"
+    # Tee from PIPE_IN: one copy to PIPE_OUT (original dest), one to awk (debug)
+    ( tee "$PIPE_OUT" | awk '{print "[wrapper-telemetry] " $0; fflush()}' ) < "$PIPE_IN" &
 
-    # Remove pipe file (open handles keep it working)
-    rm -f "$TELEMETRY_PIPE"
+    # Redirect telemetry FD to PIPE_IN
+    eval "exec ${_LAMBDA_TELEMETRY_LOG_FD}>'$PIPE_IN'"
+
+    rm -f "$PIPE_IN" "$PIPE_OUT"
 fi
 
 "${args[@]}" 2>&1 | awk '{print; print "[wrapper] " $0; fflush()}'
