@@ -46,5 +46,25 @@ if [ -z "$DISABLE_AUTO_INSTRUMENTATION" ] || [ "${DISABLE_AUTO_INSTRUMENTATION,,
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 fi
 
+
+# Intercept telemetry FD if set - duplicate to stdout with prefix while keeping original destination
+if [ -n "$_LAMBDA_TELEMETRY_LOG_FD" ]; then
+    # Duplicate original FD to FD 7
+    eval "exec 7>&${_LAMBDA_TELEMETRY_LOG_FD}"
+
+    # Create named pipe for interception
+    TELEMETRY_PIPE="/tmp/lumigo_telemetry_$$"
+    mkfifo "$TELEMETRY_PIPE"
+
+    # Background: tee writes to /dev/fd/7 (original dest), pipes to awk for prefixed stdout
+    ( tee /dev/fd/7 < "$TELEMETRY_PIPE" | awk '{print "[wrapper-telemetry] " $0; fflush()}' ) 7>&7 &
+
+    # Redirect the telemetry FD to the pipe
+    eval "exec ${_LAMBDA_TELEMETRY_LOG_FD}>'$TELEMETRY_PIPE'"
+
+    # Remove pipe file (open handles keep it working)
+    rm -f "$TELEMETRY_PIPE"
+fi
+
 "${args[@]}" 2>&1 | awk '{print; print "[wrapper] " $0; fflush()}'
 exit ${PIPESTATUS[0]}
