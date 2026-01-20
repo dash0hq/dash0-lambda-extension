@@ -46,24 +46,5 @@ if [ -z "$DISABLE_AUTO_INSTRUMENTATION" ] || [ "${DISABLE_AUTO_INSTRUMENTATION,,
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 fi
 
-# Intercept the Lambda telemetry log fd to capture logs while preserving original behavior
-if [ -n "$_LAMBDA_TELEMETRY_LOG_FD" ]; then
-    fd=$_LAMBDA_TELEMETRY_LOG_FD
-    pipe="/tmp/telemetry_pipe_$$"
-    mkfifo "$pipe"
-
-    # Save original fd to fd 100
-    eval "exec 100>&$fd"
-
-    # Background: read from pipe, print with prefix to stdout, and write to original fd
-    (while IFS= read -r line; do
-        echo "[wrapper] $line"
-        echo "$line" >&100
-    done < "$pipe") &
-
-    # Redirect telemetry fd to the pipe
-    eval "exec $fd>$pipe"
-fi
-
 "${args[@]}" 2>&1 | awk '{print; print "[wrapper] " $0; fflush()}'
 exit ${PIPESTATUS[0]}
