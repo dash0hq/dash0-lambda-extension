@@ -24,11 +24,8 @@ use crate::config::user::is_logs_instrumentation_enabled;
 use opentelemetry_proto::tonic::logs::v1::{ResourceLogs, ScopeLogs};
 
 pub async fn flush_logs(is_invocation_end: bool) {
-    if is_logs_instrumentation_enabled() {
-        flush_otlp_logs().await;
-    } else {
-        flush_telemetry_logs(is_invocation_end).await;
-    }
+    flush_otlp_logs().await;
+    flush_telemetry_logs(is_invocation_end).await;
 }
 
 pub async fn flush_telemetry_logs(is_invocation_end: bool) {
