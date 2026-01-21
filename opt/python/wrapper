@@ -61,7 +61,8 @@ if [ -n "$_LAMBDA_TELEMETRY_LOG_FD" ]; then
     cat "$PIPE_OUT" >&7 &
 
     # Tee from PIPE_IN: one copy to PIPE_OUT (original dest), one to awk (debug)
-    ( tee "$PIPE_OUT" | awk '{print "[wrapper-telemetry] " $0; fflush()}' ) < "$PIPE_IN" &
+    # Strip non-printable characters (keep only ASCII 0x20-0x7E, newlines, tabs)
+    ( tee "$PIPE_OUT" | LC_ALL=C awk '{gsub(/[^\x20-\x7E\t]/, ""); print "[wrapper-telemetry] " $0; fflush()}' ) < "$PIPE_IN" &
 
     # Redirect telemetry FD to PIPE_IN
     eval "exec ${_LAMBDA_TELEMETRY_LOG_FD}>'$PIPE_IN'"
