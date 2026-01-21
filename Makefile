@@ -84,6 +84,7 @@ build/$(ZIP_NAME_NODE): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/
 	@cd opt/node && npm install
 	@cp -r opt/node/node_modules build/stage-node/
 	@cp opt/node/init.mjs build/stage-node/
+	@cp opt/node/timing-loader.mjs build/stage-node/
 	@cd build/stage-node && zip -r ../$(ZIP_NAME_NODE) *
 
 
