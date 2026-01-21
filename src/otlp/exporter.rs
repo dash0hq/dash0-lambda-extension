@@ -20,7 +20,6 @@ pub async fn flush_traces() {
 
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 
-use crate::config::user::is_logs_instrumentation_enabled;
 use opentelemetry_proto::tonic::logs::v1::{ResourceLogs, ScopeLogs};
 
 pub async fn flush_logs(is_invocation_end: bool) {

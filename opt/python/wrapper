@@ -46,29 +46,4 @@ if [ -z "$DISABLE_AUTO_INSTRUMENTATION" ] || [ "${DISABLE_AUTO_INSTRUMENTATION,,
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 fi
 
-
-# Intercept telemetry FD if set - duplicate to stdout with prefix while keeping original destination
-if [ -n "$_LAMBDA_TELEMETRY_LOG_FD" ]; then
-    # Duplicate original FD to FD 7
-    eval "exec 7>&${_LAMBDA_TELEMETRY_LOG_FD}"
-
-    # Create two named pipes
-    PIPE_IN="/tmp/lumigo_in_$$"
-    PIPE_OUT="/tmp/lumigo_out_$$"
-    mkfifo "$PIPE_IN" "$PIPE_OUT"
-
-    # Forward from PIPE_OUT to original destination (FD 7)
-    cat "$PIPE_OUT" >&7 &
-
-    # Tee from PIPE_IN: one copy to PIPE_OUT (original dest), one to awk (debug)
-    # Strip non-printable characters (keep only ASCII 0x20-0x7E, newlines, tabs)
-    ( tee "$PIPE_OUT" | LC_ALL=C awk '{gsub(/[^\x20-\x7E\t]/, ""); print "[wrapper-telemetry] " $0; fflush()}' ) < "$PIPE_IN" &
-
-    # Redirect telemetry FD to PIPE_IN
-    eval "exec ${_LAMBDA_TELEMETRY_LOG_FD}>'$PIPE_IN'"
-
-    rm -f "$PIPE_IN" "$PIPE_OUT"
-fi
-
-"${args[@]}" 2>&1 | awk '{print; print "[wrapper] " $0; fflush()}'
-exit ${PIPESTATUS[0]}
+exec "${args[@]}"
