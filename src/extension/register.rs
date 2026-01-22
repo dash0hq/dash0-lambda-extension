@@ -184,7 +184,7 @@ pub async fn register_telemetry() {
         endpoints::extension_port()
     );
     let payload = format!(
-        r#"{{"schemaVersion":"2022-07-01","destination":{{"protocol":"HTTP","URI":"{}"}},"types":["platform","function"]}}"#,
+        r#"{{"schemaVersion":"2022-07-01","destination":{{"protocol":"HTTP","URI":"{}"}},"types":["platform","function"],"buffering":{{"timeoutMs":50}}}}"#,
         destination
     );
     // print the payload
