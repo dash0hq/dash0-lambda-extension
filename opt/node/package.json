@@ -5,7 +5,7 @@
   "description": "Layer including OpenTelemetry SDK for use with AWS Lambda.",
   "repository": "open-telemetry/opentelemetry-lambda",
   "scripts": {
-    "build": "node build.mjs"
+    "build": "webpack --config webpack.config.mjs"
   },
   "keywords": [
     "opentelemetry",
@@ -28,6 +28,7 @@
   },
   "sideEffects": false,
   "devDependencies": {
-    "esbuild": "^0.24.0"
+    "webpack": "^5.90.0",
+    "webpack-cli": "^5.1.4"
   }
 }
