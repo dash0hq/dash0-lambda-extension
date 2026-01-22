@@ -1,8 +1,5 @@
-use aws_config::BehaviorVersion;
-use aws_sdk_sts::Client as StsClient;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
-use std::time::Instant;
 
 static FUNCTION_ARN: Lazy<Mutex<Option<String>>> = Lazy::new(|| Mutex::new(None));
 static ACCOUNT_ID: Lazy<Mutex<Option<String>>> = Lazy::new(|| Mutex::new(None));
@@ -11,12 +8,13 @@ pub fn store_function_arn(arn: &str) {
     let mut guard = FUNCTION_ARN.lock();
     if guard.is_none() {
         *guard = Some(arn.to_string());
-        if let Some(account) = parse_account_id_from_arn(arn) {
-            let mut acct_guard = ACCOUNT_ID.lock();
-            if acct_guard.is_none() {
-                *acct_guard = Some(account);
-            }
-        }
+    }
+}
+
+pub fn store_account_id(account_id: &str) {
+    let mut guard = ACCOUNT_ID.lock();
+    if guard.is_none() {
+        *guard = Some(account_id.to_string());
     }
 }
 
@@ -47,55 +45,6 @@ pub fn get_function_arn() -> Option<String> {
 
 pub fn get_account_id() -> Option<String> {
     ACCOUNT_ID.lock().clone()
-}
-
-pub async fn fetch_and_cache_account_id() -> Option<String> {
-    let start = Instant::now();
-    let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
-    let client = StsClient::new(&config);
-    match client.get_caller_identity().send().await {
-        Ok(output) => {
-            if let Some(account) = output.account() {
-                let mut guard = ACCOUNT_ID.lock();
-                if guard.as_ref().map(|id| !id.is_empty()).unwrap_or(false) {
-                    return guard.clone();
-                }
-                let account = account.to_string();
-                *guard = Some(account.clone());
-                tracing::info!(
-                    "[{}] Retrieved account ID={} from STS GetCallerIdentity in {} ms",
-                    crate::log_prefix(),
-                    account,
-                    start.elapsed().as_millis()
-                );
-                Some(account)
-            } else {
-                tracing::error!(
-                    "[{}] STS GetCallerIdentity did not return an account ID",
-                    crate::log_prefix()
-                );
-                None
-            }
-        }
-        Err(err) => {
-            tracing::error!(
-                "[{}] Failed calling STS GetCallerIdentity: {}",
-                crate::log_prefix(),
-                err
-            );
-            None
-        }
-    }
-}
-
-fn parse_account_id_from_arn(arn: &str) -> Option<String> {
-    // arn:partition:service:region:account-id:resource
-    let parts: Vec<&str> = arn.split(':').collect();
-    if parts.len() >= 5 {
-        Some(parts[4].to_string())
-    } else {
-        None
-    }
 }
 
 #[cfg(test)]

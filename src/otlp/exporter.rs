@@ -8,7 +8,9 @@ use crate::config::{request_retries, request_timeout_ms};
 use crate::otlp::log_mutations::{get_resources_attributes, map_logs_to_otlp};
 use crate::otlp::span_mutations::merge_telemetry_invocation_data;
 use crate::route::HTTPS_CLIENT;
-use crate::state::invocation_data::{take_telemetry_logs, take_traces, StoredTrace};
+use crate::state::invocation_data::{
+    take_logs, take_telemetry_logs, take_traces, StoredLog, StoredTrace,
+};
 use crate::util::parsers::parse_otlp_endpoint;
 
 pub async fn flush_traces() {
@@ -21,6 +23,11 @@ use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::logs::v1::{ResourceLogs, ScopeLogs};
 
 pub async fn flush_logs(is_invocation_end: bool) {
+    flush_otlp_logs().await;
+    flush_telemetry_logs(is_invocation_end).await;
+}
+
+pub async fn flush_telemetry_logs(is_invocation_end: bool) {
     let logs = take_telemetry_logs();
 
     if logs.is_empty() {
@@ -53,6 +60,89 @@ pub async fn flush_logs(is_invocation_end: bool) {
     let body = export_request.encode_to_vec();
 
     let _ = send_request("/v1/logs", hyper::Method::POST, body, logs.len(), "logs").await;
+}
+
+pub async fn flush_otlp_logs() {
+    let logs = take_logs();
+
+    if logs.is_empty() {
+        return;
+    }
+
+    let log_count = logs.len();
+
+    let body = match build_logs_request(logs) {
+        Some(req) => req,
+        None => return,
+    };
+
+    let _ = send_request(
+        "/v1/logs",
+        hyper::Method::POST,
+        body,
+        log_count,
+        "otlp logs",
+    )
+    .await;
+}
+
+fn build_logs_request(logs: Vec<StoredLog>) -> Option<Vec<u8>> {
+    let mut logs_iter = logs.into_iter();
+    let base_log = match logs_iter.next() {
+        Some(log) => log,
+        None => {
+            tracing::error!(
+                "[{}] build_logs_request called with empty logs vector",
+                crate::log_prefix()
+            );
+            return None;
+        }
+    };
+
+    let combined_resource_logs = combine_logs(&base_log, logs_iter);
+
+    if combined_resource_logs.is_empty() {
+        return None;
+    }
+
+    let combined_export = ExportLogsServiceRequest {
+        resource_logs: combined_resource_logs,
+    };
+
+    Some(combined_export.encode_to_vec())
+}
+
+fn combine_logs(
+    base_log: &StoredLog,
+    logs_iter: std::vec::IntoIter<StoredLog>,
+) -> Vec<opentelemetry_proto::tonic::logs::v1::ResourceLogs> {
+    let mut combined_resource_logs = Vec::new();
+
+    let process_log =
+        |log: &StoredLog,
+         combined: &mut Vec<opentelemetry_proto::tonic::logs::v1::ResourceLogs>| {
+            let decoded = match ExportLogsServiceRequest::decode(log.body.as_slice()) {
+                Ok(d) => d,
+                Err(err) => {
+                    tracing::error!(
+                        "[{}] Failed to decode log payload: {}",
+                        crate::log_prefix(),
+                        err
+                    );
+                    return;
+                }
+            };
+
+            combined.extend(decoded.resource_logs);
+        };
+
+    process_log(base_log, &mut combined_resource_logs);
+
+    for log in logs_iter {
+        process_log(&log, &mut combined_resource_logs);
+    }
+
+    combined_resource_logs
 }
 
 pub async fn send_traces(traces: Vec<StoredTrace>) {

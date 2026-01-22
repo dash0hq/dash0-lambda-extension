@@ -1,10 +1,9 @@
-use hyper::{Body, Error, Request, Response};
-
-use crate::otlp::exporter::{flush_logs, flush_traces, send_traces};
+use crate::config::user::is_logs_instrumentation_enabled;
+use crate::otlp::exporter::{flush_telemetry_logs, flush_traces, send_traces};
 use crate::otlp::span_mutations::build_synthetic_trace;
-use crate::state;
 use crate::state::invocation_data::take_traces;
 use crate::util::parsers::extract_error_invocation_ids;
+use hyper::{Body, Error, Request, Response};
 
 pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
     let (parts, body) = req.into_parts();
@@ -34,7 +33,10 @@ pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
                 }
             }
         }
-        crate::state::invocation_data::store_telemetry_logs(logs);
+
+        if !is_logs_instrumentation_enabled() {
+            crate::state::invocation_data::store_telemetry_logs(logs);
+        }
 
         if !report_invocation_ids.is_empty() {
             if !crate::config::is_send_on_invocation_end() {
@@ -59,15 +61,6 @@ pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
             body_text
         );
 
-        // Fetch account ID if not already cached
-        if state::global::get_account_id()
-            .map(|id| id.is_empty())
-            .unwrap_or(true)
-        {
-            let _ = tokio::task::spawn(async { state::global::fetch_and_cache_account_id().await })
-                .await;
-        }
-
         let mut traces_to_send = take_traces();
 
         for (invocation_id, error_type) in &error_invocation_ids {
@@ -86,7 +79,7 @@ pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
         if !traces_to_send.is_empty() {
             send_traces(traces_to_send).await;
         }
-        flush_logs(true).await;
+        flush_telemetry_logs(true).await;
     }
 
     Ok(Response::builder().status(200).body(Body::empty()).unwrap())
