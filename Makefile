@@ -72,7 +72,7 @@ build/$(ZIP_NAME_PYTHON): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint op
 	@cd build/stage-python && zip -r ../$(ZIP_NAME_PYTHON) *
 
 
-build/$(ZIP_NAME_NODE): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/node/package.json opt/node/wrapper opt/node/init.mjs
+build/$(ZIP_NAME_NODE): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/node/package.json opt/node/wrapper opt/node/build.mjs opt/node/init.mjs
 	@echo Building Node.js layer
 	@rm -f build/$(ZIP_NAME_NODE)
 	@rm -rf build/stage-node
@@ -81,10 +81,18 @@ build/$(ZIP_NAME_NODE): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/
 	@cp build/lrap_aarch64 build/stage-node/
 	@cp opt/entrypoint build/stage-node/extensions/lrap
 	@cp opt/node/wrapper build/stage-node/wrapper
-	@cd opt/node && npm install
-	@cp -r opt/node/node_modules build/stage-node/
-	@cp opt/node/init.mjs build/stage-node/
-	@cp opt/node/timing-loader.mjs build/stage-node/
+	@cd opt/node && npm install && npm run build
+	@cp opt/node/dist/init.mjs build/stage-node/
+	@# Copy only the external dependencies needed at runtime
+	@mkdir -p build/stage-node/node_modules
+	@cp -r opt/node/node_modules/require-in-the-middle build/stage-node/node_modules/
+	@cp -r opt/node/node_modules/import-in-the-middle build/stage-node/node_modules/
+	@cp -r opt/node/node_modules/module-details-from-path build/stage-node/node_modules/
+	@cp -r opt/node/node_modules/debug build/stage-node/node_modules/
+	@cp -r opt/node/node_modules/ms build/stage-node/node_modules/
+	@cp -r opt/node/node_modules/acorn build/stage-node/node_modules/
+	@cp -r opt/node/node_modules/acorn-import-attributes build/stage-node/node_modules/ 2>/dev/null || true
+	@cp -r opt/node/node_modules/cjs-module-lexer build/stage-node/node_modules/
 	@cd build/stage-node && zip -r ../$(ZIP_NAME_NODE) *
 
 

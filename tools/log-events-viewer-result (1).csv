@@ -1,674 +1,440 @@
 timestamp,message
-1769004168208,"INIT_START Runtime Version: nodejs:24.v27	Runtime Version ARN: arn:aws:lambda:us-west-2::runtime:2fada9df902022a65c4ba098836cd6754ac2c6d6407669cd728227413346057b
+1769073487797,"INIT_START Runtime Version: nodejs:24.v27	Runtime Version ARN: arn:aws:lambda:us-west-2::runtime:2fada9df902022a65c4ba098836cd6754ac2c6d6407669cd728227413346057b
 "
-1769004168274,"{""timestamp"":""2026-01-21T14:02:48.274651Z"",""level"":""INFO"",""message"":""[DASH0] listening on 0.0.0.0:9009"",""target"":""aws_lambda_runtime_api_proxy_rs""}
+1769073487866,"{""timestamp"":""2026-01-22T09:18:07.866559Z"",""level"":""INFO"",""message"":""[DASH0] listening on 0.0.0.0:9009"",""target"":""aws_lambda_runtime_api_proxy_rs""}
 "
-1769004168287,"{""timestamp"":""2026-01-21T14:02:48.287045Z"",""level"":""INFO"",""message"":""[DASH0:Extension] Registered with accountId: 285732642181"",""target"":""aws_lambda_runtime_api_proxy_rs::extension::register""}
+1769073487879,"{""timestamp"":""2026-01-22T09:18:07.879423Z"",""level"":""INFO"",""message"":""[DASH0:Extension] Registered with accountId: 285732642181"",""target"":""aws_lambda_runtime_api_proxy_rs::extension::register""}
 "
-1769004168303,"TELEMETRY	Name: lrap	State: Subscribed	Types: [Platform, Function]
+1769073487881,"TELEMETRY	Name: lrap	State: Subscribed	Types: [Platform, Function]
 "
-1769004168304,"{""timestamp"":""2026-01-21T14:02:48.304431Z"",""level"":""INFO"",""message"":""[DASH0:Extension] Telemetry register uri=http://127.0.0.1:9001/2022-07-01/telemetry status=200 OK body=\""OK\"""",""target"":""aws_lambda_runtime_api_proxy_rs::extension::register""}
+1769073487881,"{""timestamp"":""2026-01-22T09:18:07.881956Z"",""level"":""INFO"",""message"":""[DASH0:Extension] Telemetry register uri=http://127.0.0.1:9001/2022-07-01/telemetry status=200 OK body=\""OK\"""",""target"":""aws_lambda_runtime_api_proxy_rs::extension::register""}
 "
-1769004168312,"starting execution of user handler
+1769073487892,"starting execution of user handler
 "
-1769004168434,"[timing-loader] Initialized
+1769073488017,"[timing-loader] Initialized
 "
-1769004168506,"[timing] 36.7ms [new]	@opentelemetry/api@1.4.1	node_modules/@opentelemetry/api/build/src/index.js
+1769073488060,"[timing] 10.0ms [new]	./baggage/utils	
 "
-1769004168510,"[timing] 47.5ms [new]	./baggage/propagation/W3CBaggagePropagator	
+1769073488084,"[timing] 35.2ms [new]	@opentelemetry/api@1.4.1	node_modules/@opentelemetry/api/build/src/index.js
 "
-1769004168526,"[timing] 11.3ms [new]	./environment	
+1769073488089,"[timing] 47.0ms [new]	./baggage/propagation/W3CBaggagePropagator	
 "
-1769004168548,"[timing] 15.9ms [new]	@opentelemetry/semantic-conventions@1.17.1	node_modules/@opentelemetry/semantic-conventions/build/src/index.js
+1769073488107,"[timing] 11.7ms [new]	../../utils/environment	
 "
-1769004168548,"[timing] 18.2ms [new]	./sdk-info	
+1769073488107,"[timing] 12.8ms [new]	./environment	
 "
-1769004168549,"[timing] 34.8ms [new]	./node	
+1769073488124,"[timing] 11.5ms [new]	@opentelemetry/semantic-conventions@1.17.1	node_modules/@opentelemetry/semantic-conventions/build/src/index.js
 "
-1769004168549,"[timing] 35.5ms [new]	../platform	
+1769073488124,"[timing] 13.7ms [new]	./sdk-info	
 "
-1769004168550,"[timing] 36.2ms [new]	./common/time	
+1769073488127,"[timing] 33.2ms [new]	./node	
 "
-1769004168566,"[timing] 109.6ms [new]	@opentelemetry/core@1.17.1	node_modules/@opentelemetry/core/build/src/index.js
+1769073488127,"[timing] 34.0ms [new]	../platform	
 "
-1769004168603,"[timing] 13.8ms [new]	@opentelemetry/semantic-conventions@1.17.1	node_modules/@opentelemetry/semantic-conventions/build/src/index.js
+1769073488128,"[timing] 35.0ms [new]	./common/time	
 "
-1769004168603,"[timing] 15.3ms [new]	./sdk-info	
+1769073488150,"[timing] 109.2ms [new]	@opentelemetry/core@1.17.1	node_modules/@opentelemetry/core/build/src/index.js
 "
-1769004168605,"[timing] 26.9ms [new]	./node	
+1769073488181,"[timing] 10.9ms [new]	./sdk-info	
 "
-1769004168605,"[timing] 27.4ms [new]	../platform	
+1769073488182,"[timing] 19.1ms [new]	./node	
 "
-1769004168605,"[timing] 27.9ms [new]	./common/time	
+1769073488182,"[timing] 19.6ms [new]	../platform	
 "
-1769004168617,"[timing] 45.4ms [new]	@opentelemetry/core@1.17.1	node_modules/@opentelemetry/core/build/src/index.js
+1769073488182,"[timing] 20.0ms [new]	./common/time	
 "
-1769004168618,"[timing] 48.0ms [new]	../../OTLPExporterBase	
+1769073488194,"[timing] 37.1ms [new]	@opentelemetry/core@1.17.1	node_modules/@opentelemetry/core/build/src/index.js
 "
-1769004168640,"[timing] 14.1ms [new]	https	https
+1769073488195,"[timing] 40.0ms [new]	../../OTLPExporterBase	
 "
-1769004168644,"[timing] 25.7ms [new]	./util	
+1769073488219,"[timing] 14.5ms [new]	https	https
 "
-1769004168644,"[timing] 74.5ms [new]	./OTLPExporterNodeBase	
+1769073488223,"[timing] 27.8ms [new]	./util	
 "
-1769004168644,"[timing] 75.2ms [new]	./node	
+1769073488223,"[timing] 68.6ms [new]	./OTLPExporterNodeBase	
 "
-1769004168648,"[timing] 79.0ms [new]	./platform	
+1769073488224,"[timing] 69.3ms [new]	./node	
 "
-1769004168649,"[timing] 80.6ms [new]	@opentelemetry/otlp-exporter-base@0.51.0	node_modules/@opentelemetry/otlp-exporter-base/build/src/index.js
+1769073488226,"[timing] 71.6ms [new]	./platform	
 "
-1769004168676,"[timing] 15.8ms [new]	./node	
+1769073488228,"[timing] 75.0ms [new]	@opentelemetry/otlp-exporter-base@0.51.0	node_modules/@opentelemetry/otlp-exporter-base/build/src/index.js
 "
-1769004168676,"[timing] 16.3ms [new]	../platform	
+1769073488259,"[timing] 19.0ms [new]	./node	
 "
-1769004168676,"[timing] 16.8ms [new]	./common/time	
+1769073488259,"[timing] 19.5ms [new]	../platform	
 "
-1769004168689,"[timing] 35.7ms [new]	@opentelemetry/core@1.17.1	node_modules/@opentelemetry/core/build/src/index.js
+1769073488259,"[timing] 20.0ms [new]	./common/time	
 "
-1769004168689,"[timing] 36.3ms [new]	./common	
+1769073488272,"[timing] 39.3ms [new]	@opentelemetry/core@1.17.1	node_modules/@opentelemetry/core/build/src/index.js
 "
-1769004168747,"[timing] 17.5ms [new]	./node	
+1769073488272,"[timing] 40.0ms [new]	./common	
 "
-1769004168747,"[timing] 18.0ms [new]	../platform	
+1769073488331,"[timing] 10.3ms [new]	./sdk-info	
 "
-1769004168747,"[timing] 18.5ms [new]	./common/time	
+1769073488332,"[timing] 17.7ms [new]	./node	
 "
-1769004168759,"[timing] 43.1ms [new]	@opentelemetry/core@1.17.1	node_modules/@opentelemetry/core/build/src/index.js
+1769073488332,"[timing] 18.2ms [new]	../platform	
 "
-1769004168759,"[timing] 43.9ms [new]	./LastValue	
+1769073488332,"[timing] 18.7ms [new]	./common/time	
 "
-1769004168764,"[timing] 56.9ms [new]	../aggregator	
+1769073488347,"[timing] 44.3ms [new]	@opentelemetry/core@1.17.1	node_modules/@opentelemetry/core/build/src/index.js
 "
-1769004168764,"[timing] 58.2ms [new]	../view/Aggregation	
+1769073488347,"[timing] 45.1ms [new]	./LastValue	
 "
-1769004168764,"[timing] 58.9ms [new]	./AggregationSelector	
+1769073488349,"[timing] 56.4ms [new]	../aggregator	
 "
-1769004168764,"[timing] 61.3ms [new]	./export/MetricReader	
+1769073488349,"[timing] 57.8ms [new]	../view/Aggregation	
 "
-1769004168789,"[timing] 18.2ms [new]	@opentelemetry/resources@1.17.1	node_modules/@opentelemetry/resources/build/src/index.js
+1769073488349,"[timing] 58.6ms [new]	./AggregationSelector	
 "
-1769004168801,"[timing] 11.8ms [new]	./state/MeterProviderSharedState	
+1769073488350,"[timing] 61.1ms [new]	./export/MetricReader	
 "
-1769004168801,"[timing] 33.9ms [new]	./MeterProvider	
+1769073488375,"[timing] 20.2ms [new]	@opentelemetry/resources@1.17.1	node_modules/@opentelemetry/resources/build/src/index.js
 "
-1769004168805,"[timing] 107.7ms [new]	@opentelemetry/sdk-metrics@1.24.0	node_modules/@opentelemetry/sdk-metrics/build/src/index.js
+1769073488387,"[timing] 11.6ms [new]	./state/MeterProviderSharedState	
 "
-1769004168806,"[timing] 110.4ms [new]	./internal	
+1769073488388,"[timing] 35.4ms [new]	./MeterProvider	
 "
-1769004168806,"[timing] 110.8ms [new]	./metrics	
+1769073488390,"[timing] 103.9ms [new]	@opentelemetry/sdk-metrics@1.24.0	node_modules/@opentelemetry/sdk-metrics/build/src/index.js
 "
-1769004168808,"[timing] 157.2ms [new]	@opentelemetry/otlp-transformer@0.51.0	node_modules/@opentelemetry/otlp-transformer/build/src/index.js
+1769073488392,"[timing] 111.8ms [new]	./internal	
 "
-1769004168809,"[timing] 355.0ms [new]	./OTLPTraceExporter	
+1769073488392,"[timing] 112.1ms [new]	./metrics	
 "
-1769004168809,"[timing] 355.6ms [new]	./node	
+1769073488394,"[timing] 164.5ms [new]	@opentelemetry/otlp-transformer@0.51.0	node_modules/@opentelemetry/otlp-transformer/build/src/index.js
 "
-1769004168809,"[timing] 356.7ms [new]	./platform	
+1769073488396,"[timing] 356.9ms [new]	./OTLPTraceExporter	
 "
-1769004168809,"[timing] 358.2ms [new]	@opentelemetry/exporter-trace-otlp-http@0.51.0	node_modules/@opentelemetry/exporter-trace-otlp-http/build/src/index.js
+1769073488396,"[timing] 357.5ms [new]	./node	
 "
-1769004168838,"[timing] 10.1ms [new]	./sdk-info	
+1769073488396,"[timing] 358.7ms [new]	./platform	
 "
-1769004168839,"[timing] 19.3ms [new]	./node	
+1769073488396,"[timing] 360.2ms [new]	@opentelemetry/exporter-trace-otlp-http@0.51.0	node_modules/@opentelemetry/exporter-trace-otlp-http/build/src/index.js
 "
-1769004168839,"[timing] 19.8ms [new]	../platform	
+1769073488426,"[timing] 20.2ms [new]	./node	
 "
-1769004168839,"[timing] 20.3ms [new]	./common/time	
+1769073488426,"[timing] 20.8ms [new]	../platform	
 "
-1769004168851,"[timing] 37.9ms [new]	@opentelemetry/core@1.17.1	node_modules/@opentelemetry/core/build/src/index.js
+1769073488426,"[timing] 21.2ms [new]	./common/time	
 "
-1769004168854,"[timing] 40.5ms [new]	./OTLPLogExporter	
+1769073488438,"[timing] 38.8ms [new]	@opentelemetry/core@1.17.1	node_modules/@opentelemetry/core/build/src/index.js
 "
-1769004168854,"[timing] 41.1ms [new]	./node	
+1769073488440,"[timing] 40.8ms [new]	./OTLPLogExporter	
 "
-1769004168854,"[timing] 41.4ms [new]	./platform	
+1769073488440,"[timing] 41.4ms [new]	./node	
 "
-1769004168854,"[timing] 42.3ms [new]	@opentelemetry/exporter-logs-otlp-http@0.51.0	node_modules/@opentelemetry/exporter-logs-otlp-http/build/src/index.js
+1769073488440,"[timing] 41.7ms [new]	./platform	
 "
-1769004168867,"[timing] 10.3ms [new]	./autoLoader	
+1769073488440,"[timing] 42.6ms [new]	@opentelemetry/exporter-logs-otlp-http@0.51.0	node_modules/@opentelemetry/exporter-logs-otlp-http/build/src/index.js
 "
-1769004168894,"[timing] 23.5ms [new]	semver@7.7.3	node_modules/semver/index.js
+1769073488454,"[timing] 10.8ms [new]	./autoLoader	
 "
-1769004168914,"[timing] 18.9ms [new]	./RequireInTheMiddleSingleton	
+1769073488489,"[timing] 31.4ms [new]	semver@7.7.3	node_modules/semver/index.js
 "
-1769004168917,"[timing] 49.0ms [new]	./instrumentation	
+1769073488502,"[timing] 12.0ms [new]	./RequireInTheMiddleSingleton	
 "
-1769004168918,"[timing] 50.2ms [new]	./node	
+1769073488505,"[timing] 50.0ms [new]	./instrumentation	
 "
-1769004168918,"[timing] 50.5ms [new]	./platform/index	
+1769073488506,"[timing] 51.2ms [new]	./node	
 "
-1769004168921,"[timing] 65.1ms [new]	@opentelemetry/instrumentation@0.51.0	node_modules/@opentelemetry/instrumentation/build/src/index.js
+1769073488506,"[timing] 51.5ms [new]	./platform/index	
 "
-1769004168953,"[timing] 23.7ms [new]	@opentelemetry/core@1.17.1	node_modules/@opentelemetry/core/build/src/index.js
+1769073488509,"[timing] 66.5ms [new]	@opentelemetry/instrumentation@0.51.0	node_modules/@opentelemetry/instrumentation/build/src/index.js
 "
-1769004168961,"[timing] 39.1ms [new]	./Resource	
+1769073488540,"[timing] 22.5ms [new]	@opentelemetry/core@1.17.1	node_modules/@opentelemetry/core/build/src/index.js
 "
-1769004168968,"[timing] 46.6ms [new]	@opentelemetry/resources@1.17.1	node_modules/@opentelemetry/resources/build/src/index.js
+1769073488548,"[timing] 37.8ms [new]	./Resource	
 "
-1769004168996,"[timing] 15.0ms [new]	./node	
+1769073488555,"[timing] 45.3ms [new]	@opentelemetry/resources@1.17.1	node_modules/@opentelemetry/resources/build/src/index.js
 "
-1769004168996,"[timing] 15.6ms [new]	../platform	
+1769073488582,"[timing] 14.9ms [new]	./node	
 "
-1769004168997,"[timing] 16.2ms [new]	./common/time	
+1769073488582,"[timing] 15.5ms [new]	../platform	
 "
-1769004169009,"[timing] 36.4ms [CACHED!]	@opentelemetry/core@1.17.1	node_modules/@opentelemetry/core/build/src/index.js
+1769073488582,"[timing] 16.0ms [new]	./common/time	
 "
-1769004169024,"[timing] 53.0ms [new]	./Tracer	
+1769073488594,"[timing] 35.2ms [CACHED!]	@opentelemetry/core@1.17.1	node_modules/@opentelemetry/core/build/src/index.js
 "
-1769004169042,"[timing] 16.5ms [CACHED!]	@opentelemetry/resources@1.17.1	node_modules/@opentelemetry/resources/build/src/index.js
+1769073488608,"[timing] 50.0ms [new]	./Tracer	
 "
-1769004169045,"[timing] 20.4ms [new]	./BasicTracerProvider	
+1769073488622,"[timing] 12.6ms [CACHED!]	@opentelemetry/resources@1.17.1	node_modules/@opentelemetry/resources/build/src/index.js
 "
-1769004169050,"[timing] 80.5ms [new]	@opentelemetry/sdk-trace-base@1.9.1	node_modules/@opentelemetry/sdk-trace-base/build/src/index.js
+1769073488624,"[timing] 16.6ms [new]	./BasicTracerProvider	
 "
-1769004169076,"[timing] 17.2ms [new]	../platform	
+1769073488631,"[timing] 74.9ms [new]	@opentelemetry/sdk-trace-base@1.9.1	node_modules/@opentelemetry/sdk-trace-base/build/src/index.js
 "
-1769004169076,"[timing] 17.7ms [new]	../internal/global-utils	
+1769073488654,"[timing] 10.6ms [CACHED!]	@opentelemetry/semantic-conventions@1.17.1	node_modules/@opentelemetry/semantic-conventions/build/src/index.js
 "
-1769004169076,"[timing] 18.3ms [new]	./api/logs	
+1769073488674,"[timing] 10.4ms [new]	../platform	
 "
-1769004169077,"[timing] 22.5ms [new]	@opentelemetry/api-logs@0.52.1	node_modules/@opentelemetry/api-logs/build/src/index.js
+1769073488674,"[timing] 10.9ms [new]	./common/time	
 "
-1769004169109,"[timing] 10.9ms [new]	./common/time	
+1769073488691,"[timing] 36.4ms [CACHED!]	@opentelemetry/core@1.17.1	node_modules/@opentelemetry/core/build/src/index.js
 "
-1769004169134,"[timing] 33.9ms [CACHED!]	@opentelemetry/core@1.17.1	node_modules/@opentelemetry/core/build/src/index.js
+1769073488699,"[timing] 56.1ms [new]	./Resource	
 "
-1769004169142,"[timing] 17.9ms [new]	./platform	
+1769073488706,"[timing] 65.1ms [CACHED!]	@opentelemetry/resources@1.17.1	node_modules/@opentelemetry/resources/build/src/index.js
 "
-1769004169142,"[timing] 63.1ms [new]	./Resource	
+1769073488711,"[timing] 76.5ms [new]	./LoggerProvider	
 "
-1769004169149,"[timing] 72.3ms [CACHED!]	@opentelemetry/resources@1.17.1	node_modules/@opentelemetry/resources/build/src/index.js
+1769073488714,"[timing] 80.4ms [new]	@opentelemetry/sdk-logs@0.50.0	node_modules/@opentelemetry/sdk-logs/build/src/index.js
 "
-1769004169154,"[timing] 100.4ms [new]	./LoggerProvider	
+1769073488747,"[timing] 15.0ms [new]	./node	
 "
-1769004169157,"[timing] 104.4ms [new]	@opentelemetry/sdk-logs@0.50.0	node_modules/@opentelemetry/sdk-logs/build/src/index.js
+1769073488747,"[timing] 15.5ms [new]	../platform	
 "
-1769004169191,"[timing] 14.1ms [new]	./node	
+1769073488747,"[timing] 16.0ms [new]	./common/time	
 "
-1769004169191,"[timing] 14.7ms [new]	../platform	
+1769073488760,"[timing] 36.0ms [CACHED!]	@opentelemetry/core@1.17.1	node_modules/@opentelemetry/core/build/src/index.js
 "
-1769004169191,"[timing] 15.1ms [new]	./common/time	
+1769073488764,"[timing] 40.4ms [new]	./B3Propagator	
 "
-1769004169203,"[timing] 33.5ms [CACHED!]	@opentelemetry/core@1.17.1	node_modules/@opentelemetry/core/build/src/index.js
+1769073488765,"[timing] 41.9ms [new]	@opentelemetry/propagator-b3@1.9.1	node_modules/@opentelemetry/propagator-b3/build/src/index.js
 "
-1769004169206,"[timing] 37.2ms [new]	./B3Propagator	
+1769073488792,"[timing] 15.4ms [new]	./node	
 "
-1769004169206,"[timing] 38.7ms [new]	@opentelemetry/propagator-b3@1.9.1	node_modules/@opentelemetry/propagator-b3/build/src/index.js
+1769073488792,"[timing] 16.0ms [new]	../platform	
 "
-1769004169231,"[timing] 14.3ms [new]	./node	
+1769073488793,"[timing] 16.6ms [new]	./common/time	
 "
-1769004169232,"[timing] 14.8ms [new]	../platform	
+1769073488805,"[timing] 36.0ms [CACHED!]	@opentelemetry/core@1.17.1	node_modules/@opentelemetry/core/build/src/index.js
 "
-1769004169232,"[timing] 15.3ms [new]	./common/time	
+1769073488805,"[timing] 37.0ms [new]	./JaegerPropagator	
 "
-1769004169234,"{""timestamp"":""2026-01-21T14:02:49.234027Z"",""level"":""INFO"",""message"":""[DASH0] telemetry event path=/v1/telemetry len=12408 body=[{\""time\"":\""2026-01-21T14:02:48.208Z\"",\""type\"":\""platform.initStart\"",\""record\"":{\""initializationType\"":\""on-demand\"",\""phase\"":\""init\"",\""runtimeVersion\"":\""nodejs:24.v27\"",\""runtimeVersionArn\"":\""arn:aws:lambda:us-west-2::runtime:2fada9df902022a65c4ba098836cd6754ac2c6d6407669cd728227413346057b\""}},{\""time\"":\""2026-01-21T14:02:48.303Z\"",\""type\"":\""platform.telemetrySubscription\"",\""record\"":{\""name\"":\""lrap\"",\""state\"":\""Subscribed\"",\""types\"":[\""platform\"",\""function\""]}},{\""time\"":\""2026-01-21T14:02:48.312Z\"",\""type\"":\""function\"",\""record\"":\""starting execution of user handler\
-\""},{\""time\"":\""2026-01-21T14:02:48.434Z\"",\""type\"":\""function\"",\""record\"":\""[timing-loader] Initialized\
-\""},{\""time\"":\""2026-01-21T14:02:48.506Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 36.7ms [new]\\t@opentelemetry/api@1.4.1\\tnode_modules/@opentelemetry/api/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:48.510Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 47.5ms [new]\\t./baggage/propagation/W3CBaggagePropagator\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.526Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 11.3ms [new]\\t./environment\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.548Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 15.9ms [new]\\t@opentelemetry/semantic-conventions@1.17.1\\tnode_modules/@opentelemetry/semantic-conventions/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:48.548Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 18.2ms [new]\\t./sdk-info\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.549Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 34.8ms [new]\\t./node\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.549Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 35.5ms [new]\\t../platform\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.550Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 36.2ms [new]\\t./common/time\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.566Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 109.6ms [new]\\t@opentelemetry/core@1.17.1\\tnode_modules/@opentelemetry/core/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:48.603Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 13.8ms [new]\\t@opentelemetry/semantic-conventions@1.17.1\\tnode_modules/@opentelemetry/semantic-conventions/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:48.603Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 15.3ms [new]\\t./sdk-info\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.605Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 26.9ms [new]\\t./node\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.605Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 27.4ms [new]\\t../platform\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.605Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 27.9ms [new]\\t./common/time\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.617Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 45.4ms [new]\\t@opentelemetry/core@1.17.1\\tnode_modules/@opentelemetry/core/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:48.618Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 48.0ms [new]\\t../../OTLPExporterBase\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.640Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 14.1ms [new]\\thttps\\thttps\
-\""},{\""time\"":\""2026-01-21T14:02:48.644Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 25.7ms [new]\\t./util\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.644Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 74.5ms [new]\\t./OTLPExporterNodeBase\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.644Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 75.2ms [new]\\t./node\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.648Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 79.0ms [new]\\t./platform\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.649Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 80.6ms [new]\\t@opentelemetry/otlp-exporter-base@0.51.0\\tnode_modules/@opentelemetry/otlp-exporter-base/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:48.676Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 15.8ms [new]\\t./node\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.676Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 16.3ms [new]\\t../platform\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.676Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 16.8ms [new]\\t./common/time\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.689Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 35.7ms [new]\\t@opentelemetry/core@1.17.1\\tnode_modules/@opentelemetry/core/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:48.689Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 36.3ms [new]\\t./common\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.747Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 17.5ms [new]\\t./node\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.747Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 18.0ms [new]\\t../platform\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.747Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 18.5ms [new]\\t./common/time\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.759Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 43.1ms [new]\\t@opentelemetry/core@1.17.1\\tnode_modules/@opentelemetry/core/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:48.759Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 43.9ms [new]\\t./LastValue\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.764Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 56.9ms [new]\\t../aggregator\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.764Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 58.2ms [new]\\t../view/Aggregation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.764Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 58.9ms [new]\\t./AggregationSelector\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.764Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 61.3ms [new]\\t./export/MetricReader\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.789Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 18.2ms [new]\\t@opentelemetry/resources@1.17.1\\tnode_modules/@opentelemetry/resources/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:48.801Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 11.8ms [new]\\t./state/MeterProviderSharedState\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.801Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 33.9ms [new]\\t./MeterProvider\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.805Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 107.7ms [new]\\t@opentelemetry/sdk-metrics@1.24.0\\tnode_modules/@opentelemetry/sdk-metrics/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:48.806Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 110.4ms [new]\\t./internal\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.806Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 110.8ms [new]\\t./metrics\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.808Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 157.2ms [new]\\t@opentelemetry/otlp-transformer@0.51.0\\tnode_modules/@opentelemetry/otlp-transformer/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:48.809Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 355.0ms [new]\\t./OTLPTraceExporter\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.809Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 355.6ms [new]\\t./node\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.809Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 356.7ms [new]\\t./platform\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.809Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 358.2ms [new]\\t@opentelemetry/exporter-trace-otlp-http@0.51.0\\tnode_modules/@opentelemetry/exporter-trace-otlp-http/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:48.838Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 10.1ms [new]\\t./sdk-info\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.839Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 19.3ms [new]\\t./node\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.839Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 19.8ms [new]\\t../platform\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.839Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 20.3ms [new]\\t./common/time\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.851Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 37.9ms [new]\\t@opentelemetry/core@1.17.1\\tnode_modules/@opentelemetry/core/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:48.854Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 40.5ms [new]\\t./OTLPLogExporter\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.854Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 41.1ms [new]\\t./node\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.854Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 41.4ms [new]\\t./platform\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.854Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 42.3ms [new]\\t@opentelemetry/exporter-logs-otlp-http@0.51.0\\tnode_modules/@opentelemetry/exporter-logs-otlp-http/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:48.867Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 10.3ms [new]\\t./autoLoader\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.894Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 23.5ms [new]\\tsemver@7.7.3\\tnode_modules/semver/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:48.914Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 18.9ms [new]\\t./RequireInTheMiddleSingleton\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.917Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 49.0ms [new]\\t./instrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.918Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 50.2ms [new]\\t./node\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.918Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 50.5ms [new]\\t./platform/index\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.921Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 65.1ms [new]\\t@opentelemetry/instrumentation@0.51.0\\tnode_modules/@opentelemetry/instrumentation/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:48.953Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 23.7ms [new]\\t@opentelemetry/core@1.17.1\\tnode_modules/@opentelemetry/core/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:48.961Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 39.1ms [new]\\t./Resource\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.968Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 46.6ms [new]\\t@opentelemetry/resources@1.17.1\\tnode_modules/@opentelemetry/resources/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:48.996Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 15.0ms [new]\\t./node\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.996Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 15.6ms [new]\\t../platform\\t\
-\""},{\""time\"":\""2026-01-21T14:02:48.997Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 16.2ms [new]\\t./common/time\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.009Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 36.4ms [CACHED!]\\t@opentelemetry/core@1.17.1\\tnode_modules/@opentelemetry/core/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.024Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 53.0ms [new]\\t./Tracer\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.042Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 16.5ms [CACHED!]\\t@opentelemetry/resources@1.17.1\\tnode_modules/@opentelemetry/resources/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.045Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 20.4ms [new]\\t./BasicTracerProvider\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.050Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 80.5ms [new]\\t@opentelemetry/sdk-trace-base@1.9.1\\tnode_modules/@opentelemetry/sdk-trace-base/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.076Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 17.2ms [new]\\t../platform\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.076Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 17.7ms [new]\\t../internal/global-utils\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.076Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 18.3ms [new]\\t./api/logs\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.077Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 22.5ms [new]\\t@opentelemetry/api-logs@0.52.1\\tnode_modules/@opentelemetry/api-logs/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.109Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 10.9ms [new]\\t./common/time\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.134Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 33.9ms [CACHED!]\\t@opentelemetry/core@1.17.1\\tnode_modules/@opentelemetry/core/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.142Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 17.9ms [new]\\t./platform\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.142Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 63.1ms [new]\\t./Resource\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.149Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 72.3ms [CACHED!]\\t@opentelemetry/resources@1.17.1\\tnode_modules/@opentelemetry/resources/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.154Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 100.4ms [new]\\t./LoggerProvider\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.157Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 104.4ms [new]\\t@opentelemetry/sdk-logs@0.50.0\\tnode_modules/@opentelemetry/sdk-logs/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.191Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 14.1ms [new]\\t./node\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.191Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 14.7ms [new]\\t../platform\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.191Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 15.1ms [new]\\t./common/time\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.203Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 33.5ms [CACHED!]\\t@opentelemetry/core@1.17.1\\tnode_modules/@opentelemetry/core/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.206Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 37.2ms [new]\\t./B3Propagator\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.206Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 38.7ms [new]\\t@opentelemetry/propagator-b3@1.9.1\\tnode_modules/@opentelemetry/propagator-b3/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.231Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 14.3ms [new]\\t./node\\t\
+1769073488806,"[timing] 37.8ms [new]	@opentelemetry/propagator-jaeger@1.9.1	node_modules/@opentelemetry/propagator-jaeger/build/src/index.js
+"
+1769073488806,"[timing] 89.4ms [new]	./NodeTracerProvider	
+"
+1769073488806,"[timing] 90.1ms [new]	@opentelemetry/sdk-trace-node@1.9.1	node_modules/@opentelemetry/sdk-trace-node/build/src/index.js
+"
+1769073488808,"{""timestamp"":""2026-01-22T09:18:08.808241Z"",""level"":""INFO"",""message"":""[DASH0] telemetry event path=/v1/telemetry len=12517 body=[{\""time\"":\""2026-01-22T09:18:07.797Z\"",\""type\"":\""platform.initStart\"",\""record\"":{\""initializationType\"":\""on-demand\"",\""phase\"":\""init\"",\""runtimeVersion\"":\""nodejs:24.v27\"",\""runtimeVersionArn\"":\""arn:aws:lambda:us-west-2::runtime:2fada9df902022a65c4ba098836cd6754ac2c6d6407669cd728227413346057b\""}},{\""time\"":\""2026-01-22T09:18:07.881Z\"",\""type\"":\""platform.telemetrySubscription\"",\""record\"":{\""name\"":\""lrap\"",\""state\"":\""Subscribed\"",\""types\"":[\""platform\"",\""function\""]}},{\""time\"":\""2026-01-22T09:18:07.892Z\"",\""type\"":\""function\"",\""record\"":\""starting execution of user handler\
+\""},{\""time\"":\""2026-01-22T09:18:08.017Z\"",\""type\"":\""function\"",\""record\"":\""[timing-loader] Initialized\
+\""},{\""time\"":\""2026-01-22T09:18:08.060Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 10.0ms [new]\\t./baggage/utils\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.084Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 35.2ms [new]\\t@opentelemetry/api@1.4.1\\tnode_modules/@opentelemetry/api/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.089Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 47.0ms [new]\\t./baggage/propagation/W3CBaggagePropagator\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.107Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 11.7ms [new]\\t../../utils/environment\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.107Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 12.8ms [new]\\t./environment\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.124Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 11.5ms [new]\\t@opentelemetry/semantic-conventions@1.17.1\\tnode_modules/@opentelemetry/semantic-conventions/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.124Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 13.7ms [new]\\t./sdk-info\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.127Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 33.2ms [new]\\t./node\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.127Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 34.0ms [new]\\t../platform\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.128Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 35.0ms [new]\\t./common/time\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.150Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 109.2ms [new]\\t@opentelemetry/core@1.17.1\\tnode_modules/@opentelemetry/core/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.181Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 10.9ms [new]\\t./sdk-info\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.182Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 19.1ms [new]\\t./node\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.182Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 19.6ms [new]\\t../platform\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.182Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 20.0ms [new]\\t./common/time\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.194Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 37.1ms [new]\\t@opentelemetry/core@1.17.1\\tnode_modules/@opentelemetry/core/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.195Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 40.0ms [new]\\t../../OTLPExporterBase\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.219Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 14.5ms [new]\\thttps\\thttps\
+\""},{\""time\"":\""2026-01-22T09:18:08.223Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 27.8ms [new]\\t./util\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.223Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 68.6ms [new]\\t./OTLPExporterNodeBase\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.224Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 69.3ms [new]\\t./node\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.226Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 71.6ms [new]\\t./platform\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.228Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 75.0ms [new]\\t@opentelemetry/otlp-exporter-base@0.51.0\\tnode_modules/@opentelemetry/otlp-exporter-base/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.259Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 19.0ms [new]\\t./node\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.259Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 19.5ms [new]\\t../platform\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.259Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 20.0ms [new]\\t./common/time\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.272Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 39.3ms [new]\\t@opentelemetry/core@1.17.1\\tnode_modules/@opentelemetry/core/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.272Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 40.0ms [new]\\t./common\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.331Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 10.3ms [new]\\t./sdk-info\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.332Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 17.7ms [new]\\t./node\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.332Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 18.2ms [new]\\t../platform\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.332Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 18.7ms [new]\\t./common/time\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.347Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 44.3ms [new]\\t@opentelemetry/core@1.17.1\\tnode_modules/@opentelemetry/core/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.347Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 45.1ms [new]\\t./LastValue\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.349Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 56.4ms [new]\\t../aggregator\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.349Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 57.8ms [new]\\t../view/Aggregation\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.349Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 58.6ms [new]\\t./AggregationSelector\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.350Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 61.1ms [new]\\t./export/MetricReader\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.375Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 20.2ms [new]\\t@opentelemetry/resources@1.17.1\\tnode_modules/@opentelemetry/resources/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.387Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 11.6ms [new]\\t./state/MeterProviderSharedState\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.388Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 35.4ms [new]\\t./MeterProvider\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.390Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 103.9ms [new]\\t@opentelemetry/sdk-metrics@1.24.0\\tnode_modules/@opentelemetry/sdk-metrics/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.392Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 111.8ms [new]\\t./internal\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.392Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 112.1ms [new]\\t./metrics\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.394Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 164.5ms [new]\\t@opentelemetry/otlp-transformer@0.51.0\\tnode_modules/@opentelemetry/otlp-transformer/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.396Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 356.9ms [new]\\t./OTLPTraceExporter\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.396Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 357.5ms [new]\\t./node\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.396Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 358.7ms [new]\\t./platform\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.396Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 360.2ms [new]\\t@opentelemetry/exporter-trace-otlp-http@0.51.0\\tnode_modules/@opentelemetry/exporter-trace-otlp-http/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.426Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 20.2ms [new]\\t./node\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.426Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 20.8ms [new]\\t../platform\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.426Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 21.2ms [new]\\t./common/time\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.438Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 38.8ms [new]\\t@opentelemetry/core@1.17.1\\tnode_modules/@opentelemetry/core/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.440Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 40.8ms [new]\\t./OTLPLogExporter\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.440Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 41.4ms [new]\\t./node\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.440Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 41.7ms [new]\\t./platform\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.440Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 42.6ms [new]\\t@opentelemetry/exporter-logs-otlp-http@0.51.0\\tnode_modules/@opentelemetry/exporter-logs-otlp-http/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.454Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 10.8ms [new]\\t./autoLoader\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.489Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 31.4ms [new]\\tsemver@7.7.3\\tnode_modules/semver/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.502Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 12.0ms [new]\\t./RequireInTheMiddleSingleton\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.505Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 50.0ms [new]\\t./instrumentation\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.506Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 51.2ms [new]\\t./node\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.506Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 51.5ms [new]\\t./platform/index\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.509Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 66.5ms [new]\\t@opentelemetry/instrumentation@0.51.0\\tnode_modules/@opentelemetry/instrumentation/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.540Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 22.5ms [new]\\t@opentelemetry/core@1.17.1\\tnode_modules/@opentelemetry/core/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.548Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 37.8ms [new]\\t./Resource\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.555Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 45.3ms [new]\\t@opentelemetry/resources@1.17.1\\tnode_modules/@opentelemetry/resources/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.582Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 14.9ms [new]\\t./node\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.582Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 15.5ms [new]\\t../platform\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.582Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 16.0ms [new]\\t./common/time\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.594Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 35.2ms [CACHED!]\\t@opentelemetry/core@1.17.1\\tnode_modules/@opentelemetry/core/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.608Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 50.0ms [new]\\t./Tracer\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.622Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 12.6ms [CACHED!]\\t@opentelemetry/resources@1.17.1\\tnode_modules/@opentelemetry/resources/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.624Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 16.6ms [new]\\t./BasicTracerProvider\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.631Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 74.9ms [new]\\t@opentelemetry/sdk-trace-base@1.9.1\\tnode_modules/@opentelemetry/sdk-trace-base/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.654Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 10.6ms [CACHED!]\\t@opentelemetry/semantic-conventions@1.17.1\\tnode_modules/@opentelemetry/semantic-conventions/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.674Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 10.4ms [new]\\t../platform\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.674Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 10.9ms [new]\\t./common/time\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.691Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 36.4ms [CACHED!]\\t@opentelemetry/core@1.17.1\\tnode_modules/@opentelemetry/core/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.699Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 56.1ms [new]\\t./Resource\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.706Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 65.1ms [CACHED!]\\t@opentelemetry/resources@1.17.1\\tnode_modules/@opentelemetry/resources/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.711Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 76.5ms [new]\\t./LoggerProvider\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.714Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 80.4ms [new]\\t@opentelemetry/sdk-logs@0.50.0\\tnode_modules/@opentelemetry/sdk-logs/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.747Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 15.0ms [new]\\t./node\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.747Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 15.5ms [new]\\t../platform\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.747Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 16.0ms [new]\\t./common/time\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.760Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 36.0ms [CACHED!]\\t@opentelemetry/core@1.17.1\\tnode_modules/@opentelemetry/core/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.764Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 40.4ms [new]\\t./B3Propagator\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.765Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 41.9ms [new]\\t@opentelemetry/propagator-b3@1.9.1\\tnode_modules/@opentelemetry/propagator-b3/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.792Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 15.4ms [new]\\t./node\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.792Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 16.0ms [new]\\t../platform\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.793Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 16.6ms [new]\\t./common/time\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.805Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 36.0ms [CACHED!]\\t@opentelemetry/core@1.17.1\\tnode_modules/@opentelemetry/core/build/src/index.js\
 \""}]"",""target"":""aws_lambda_runtime_api_proxy_rs::extension::telemetry_receiver""}
 "
-1769004169244,"[timing] 34.2ms [CACHED!]	@opentelemetry/core@1.17.1	node_modules/@opentelemetry/core/build/src/index.js
+1769073488836,"[timing] 17.8ms [new]	../utils	
 "
-1769004169244,"[timing] 35.1ms [new]	./JaegerPropagator	
+1769073488846,"[timing] 28.8ms [new]	./report	
 "
-1769004169244,"[timing] 35.7ms [new]	@opentelemetry/propagator-jaeger@1.9.1	node_modules/@opentelemetry/propagator-jaeger/build/src/index.js
+1769073488846,"[timing] 31.0ms [new]	./dependencies	
 "
-1769004169244,"[timing] 84.0ms [new]	./NodeTracerProvider	
+1769073488887,"[timing] 19.5ms [new]	@lumigo/node-core@1.14.0	node_modules/@lumigo/node-core/lib/index.js
 "
-1769004169245,"[timing] 84.8ms [new]	@opentelemetry/sdk-trace-node@1.9.1	node_modules/@opentelemetry/sdk-trace-node/build/src/index.js
+1769073488887,"[timing] 26.7ms [new]	./resources/detectors/ProcessEnvironmentDetector	
 "
-1769004169281,"[timing] 10.8ms [new]	./platform/index	
+1769073488892,"[timing] 859.6ms [new]	./bootstrap	
 "
-1769004169283,"[timing] 14.7ms [CACHED!]	@opentelemetry/instrumentation@0.51.0	node_modules/@opentelemetry/instrumentation/build/src/index.js
+1769073488894,"[timing] 863.5ms [CACHED!]	/opt/node_modules/@lumigo/opentelemetry/dist/src/distro.js@1.53.0	node_modules/@lumigo/opentelemetry/dist/src/distro.js
 "
-1769004169302,"[timing] 29.8ms [new]	./grpc-js	
+1769073488894,"init.mjs line 1
 "
-1769004169302,"[timing] 31.3ms [new]	./instrumentation	
+1769073488894,"init.mjs line 4
 "
-1769004169302,"[timing] 32.5ms [new]	@opentelemetry/instrumentation-grpc@0.41.2	node_modules/@opentelemetry/instrumentation-grpc/build/src/index.js
+1769073488930,"[timing] 21.3ms [new]	./node	
 "
-1769004169324,"[timing] 25.9ms [new]	../../instrumentor	
+1769073488930,"[timing] 21.8ms [new]	../platform	
 "
-1769004169333,"[timing] 69.3ms [new]	./instrumentations/@grpc/grpc-js/GrpcInstrumentation	
+1769073488930,"[timing] 22.4ms [new]	./common/time	
 "
-1769004169355,"[timing] 18.3ms [CACHED!]	@opentelemetry/instrumentation@0.51.0	node_modules/@opentelemetry/instrumentation/build/src/index.js
+1769073488948,"[timing] 47.7ms [CACHED!]	@opentelemetry/core@1.17.1	node_modules/@opentelemetry/core/build/src/index.js
 "
-1769004169357,"[timing] 21.8ms [new]	./instrumentation	
+1769073488983,"[timing] 11.6ms [new]	resolve@1.22.11	node_modules/resolve/index.js
 "
-1769004169358,"[timing] 22.8ms [new]	@opentelemetry/instrumentation-nestjs-core@0.34.0	node_modules/@opentelemetry/instrumentation-nestjs-core/build/src/index.js
+1769073488983,"[timing] 16.1ms [new]	require-in-the-middle@8.0.1	node_modules/require-in-the-middle/index.js
 "
-1769004169358,"[timing] 25.3ms [new]	./instrumentations/@nestjs/core/NestInstrumentation	
+1769073488985,"[timing] 18.0ms [new]	./RequireInTheMiddleSingleton	
 "
-1769004169377,"[timing] 17.1ms [new]	@lumigo/node-core@1.14.0	node_modules/@lumigo/node-core/lib/index.js
+1769073488985,"[timing] 19.7ms [new]	./instrumentation	
 "
-1769004169395,"[timing] 13.3ms [CACHED!]	@opentelemetry/instrumentation@0.51.0	node_modules/@opentelemetry/instrumentation/build/src/index.js
+1769073488988,"[timing] 22.8ms [new]	./node	
 "
-1769004169397,"[timing] 17.3ms [new]	./amqplib	
+1769073488988,"[timing] 23.8ms [new]	./platform/index	
 "
-1769004169397,"[timing] 18.7ms [new]	@opentelemetry/instrumentation-amqplib@0.33.2	node_modules/@opentelemetry/instrumentation-amqplib/build/src/index.js
+1769073488990,"[timing] 28.4ms [CACHED!]	@opentelemetry/instrumentation@0.51.0	node_modules/@opentelemetry/instrumentation/build/src/index.js
 "
-1769004169398,"[timing] 39.7ms [new]	./instrumentations/amqplib/AmqplibInstrumentation	
+1769073488990,"[timing] 91.4ms [new]	./http	
 "
-1769004169419,"[timing] 14.1ms [CACHED!]	@opentelemetry/instrumentation@0.51.0	node_modules/@opentelemetry/instrumentation/build/src/index.js
+1769073488992,"[timing] 94.4ms [new]	@opentelemetry/instrumentation-http@0.38.0	node_modules/@opentelemetry/instrumentation-http/build/src/index.js
 "
-1769004169424,"[timing] 20.5ms [new]	./express	
+1769073489001,"[timing] 106.8ms [new]	./instrumentations/https/HttpInstrumentation	
 "
-1769004169425,"[timing] 21.7ms [new]	opentelemetry-instrumentation-express@0.39.1	node_modules/opentelemetry-instrumentation-express/dist/src/index.js
+1769073489076,"[timing] 27.6ms [CACHED!]	@opentelemetry/instrumentation@0.51.0	node_modules/@opentelemetry/instrumentation/build/src/index.js
 "
-1769004169425,"[timing] 26.9ms [new]	./instrumentations/express/ExpressInstrumentation	
+1769073489076,"[timing] 40.9ms [new]	./aws-sdk	
 "
-1769004169443,"[timing] 12.7ms [CACHED!]	@opentelemetry/instrumentation@0.51.0	node_modules/@opentelemetry/instrumentation/build/src/index.js
+1769073489077,"[timing] 43.2ms [new]	@opentelemetry/instrumentation-aws-sdk@0.38.1	node_modules/@opentelemetry/instrumentation-aws-sdk/build/src/index.js
 "
-1769004169445,"[timing] 15.4ms [new]	./instrumentation	
+1769073489079,"[timing] 48.0ms [new]	./LumigoAwsSdkLibInstrumentation	
 "
-1769004169445,"[timing] 17.2ms [new]	@opentelemetry/instrumentation-fastify@0.32.6	node_modules/@opentelemetry/instrumentation-fastify/build/src/index.js
+1769073489079,"[timing] 48.4ms [new]	./LumigoAwsSdkV2LibInstrumentation	
 "
-1769004169446,"[timing] 20.7ms [new]	./instrumentations/fastify/FastifyInstrumentation	
+1769073489080,"[timing] 49.7ms [new]	./instrumentations/aws-sdk	
 "
-1769004169470,"[timing] 12.5ms [new]	./node	
+1769073489098,'"@lumigo/opentelemetry Logging is disabled (the ""LUMIGO_ENABLE_LOGS"" environment variable is not set to ""true""): no logs will be sent to Lumigo.
 "
-1769004169470,"[timing] 13.0ms [new]	../platform	
+1769073489100,'"@lumigo/opentelemetry Lumigo OpenTelemetry Distro v1.53.0 started.
 "
-1769004169470,"[timing] 13.5ms [new]	./common/time	
+1769073489123,"{""timestamp"":""2026-01-22T09:18:09.123591Z"",""level"":""INFO"",""message"":""[DASH0] Extension init     : 28363 us"",""target"":""aws_lambda_runtime_api_proxy_rs::stats""}
 "
-1769004169481,"[timing] 30.6ms [CACHED!]	@opentelemetry/core@1.17.1	node_modules/@opentelemetry/core/build/src/index.js
+1769073489123,"{""timestamp"":""2026-01-22T09:18:09.123621Z"",""level"":""INFO"",""message"":""[DASH0] App  init     : 1241555 us"",""target"":""aws_lambda_runtime_api_proxy_rs::stats""}
 "
-1769004169503,"[timing] 12.4ms [new]	require-in-the-middle@8.0.1	node_modules/require-in-the-middle/index.js
+1769073489124,"EXTENSION	Name: lrap	State: Ready	Events: [INVOKE, SHUTDOWN]
 "
-1769004169504,"[timing] 14.1ms [new]	./RequireInTheMiddleSingleton	
+1769073489127,"START RequestId: e30078db-ea80-4e83-858c-5e66b9023dea Version: $LATEST
 "
-1769004169504,"[timing] 15.4ms [new]	./instrumentation	
+1769073489128,"{""timestamp"":""2026-01-22T09:18:09.128379Z"",""level"":""INFO"",""message"":""[DASH0] Got invocation next: e30078db-ea80-4e83-858c-5e66b9023dea"",""target"":""aws_lambda_runtime_api_proxy_rs::extension::runtime_proxy""}
 "
-1769004169507,"[timing] 18.2ms [new]	./node	
+1769073489128,"{""timestamp"":""2026-01-22T09:18:09.128775Z"",""level"":""INFO"",""message"":""[DASH0:Extension] Event status=200 OK payload={\""eventType\"":\""INVOKE\"",\""deadlineMs\"":1769073492127,\""requestId\"":\""e30078db-ea80-4e83-858c-5e66b9023dea\"",\""invokedFunctionArn\"":\""arn:aws:lambda:us-west-2:285732642181:function:testing-node-extension-24\"",\""tracing\"":{\""type\"":\""X-Amzn-Trace-Id\"",\""value\"":\""Root=1-6971eb4f-2e05069d1f35e339363dd330;Parent=18624357ca22d87c;Sampled=0;Lineage=1:33abc111:0\""}} latency=1246 ms"",""target"":""aws_lambda_runtime_api_proxy_rs::extension::events""}
 "
-1769004169507,"[timing] 19.2ms [new]	./platform/index	
+1769073489128,"{""timestamp"":""2026-01-22T09:18:09.128803Z"",""level"":""INFO"",""message"":""[DASH0:Extension] Waiting for platform.runtimeDone"",""target"":""aws_lambda_runtime_api_proxy_rs::extension::events""}
 "
-1769004169509,"[timing] 23.2ms [CACHED!]	@opentelemetry/instrumentation@0.51.0	node_modules/@opentelemetry/instrumentation/build/src/index.js
+1769073489130,"2026-01-22T09:18:09.130Z	e30078db-ea80-4e83-858c-5e66b9023dea	INFO	checking
 "
-1769004169509,"[timing] 59.3ms [new]	./http	
+1769073489136,"{""timestamp"":""2026-01-22T09:18:09.136821Z"",""level"":""INFO"",""message"":""[DASH0] passthru_proxy - POST http://127.0.0.1:9001/2018-06-01/runtime/invocation/e30078db-ea80-4e83-858c-5e66b9023dea/response completed in 0 ms"",""target"":""aws_lambda_runtime_api_proxy_rs::extension::runtime_proxy""}
 "
-1769004169510,"[timing] 62.0ms [new]	@opentelemetry/instrumentation-http@0.38.0	node_modules/@opentelemetry/instrumentation-http/build/src/index.js
+1769073489136,"{""timestamp"":""2026-01-22T09:18:09.136930Z"",""level"":""INFO"",""message"":""[DASH0] invocation_response_proxy - no lambda server span found for return value e30078db-ea80-4e83-858c-5e66b9023dea"",""target"":""aws_lambda_runtime_api_proxy_rs::extension::runtime_proxy""}
 "
-1769004169518,"[timing] 72.2ms [new]	./instrumentations/https/HttpInstrumentation	
+1769073489137,"{""timestamp"":""2026-01-22T09:18:09.136966Z"",""level"":""INFO"",""message"":""[DASH0] Total handle time for invocation response: 0 ms"",""target"":""aws_lambda_runtime_api_proxy_rs::extension::runtime_proxy""}
 "
-1769004169543,"[timing] 11.0ms [new]	./types_internal	
+1769073489146,"{""timestamp"":""2026-01-22T09:18:09.146501Z"",""level"":""INFO"",""message"":""[DASH0] App run time  : 18127 us"",""target"":""aws_lambda_runtime_api_proxy_rs::stats""}
 "
-1769004169545,"[timing] 23.6ms [CACHED!]	@opentelemetry/instrumentation@0.51.0	node_modules/@opentelemetry/instrumentation/build/src/index.js
-"
-1769004169549,"[timing] 28.8ms [new]	./instrumentation	
-"
-1769004169550,"[timing] 30.2ms [new]	@opentelemetry/instrumentation-ioredis@0.35.3	node_modules/@opentelemetry/instrumentation-ioredis/build/src/index.js
-"
-1769004169550,"[timing] 32.5ms [new]	./instrumentations/ioredis/IORedisInstrumentation	
-"
-1769004169569,"[timing] 13.2ms [CACHED!]	@opentelemetry/instrumentation@0.51.0	node_modules/@opentelemetry/instrumentation/build/src/index.js
-"
-1769004169569,"[timing] 14.7ms [new]	./kafkajs	
-"
-1769004169570,"[timing] 16.0ms [new]	opentelemetry-instrumentation-kafkajs@0.39.1	node_modules/opentelemetry-instrumentation-kafkajs/dist/src/index.js
-"
-1769004169570,"[timing] 19.5ms [new]	./instrumentations/kafkajs/KafkaJsInstrumentation	
-"
-1769004169601,"[timing] 13.8ms [new]	./instrumentation	
-"
-1769004169605,"[timing] 15.9ms [new]	./node	
-"
-1769004169605,"[timing] 17.0ms [new]	./platform/index	
-"
-1769004169606,"[timing] 30.7ms [CACHED!]	@opentelemetry/instrumentation@0.51.0	node_modules/@opentelemetry/instrumentation/build/src/index.js
-"
-1769004169620,"[timing] 13.8ms [CACHED!]	@opentelemetry/semantic-conventions@1.17.1	node_modules/@opentelemetry/semantic-conventions/build/src/index.js
-"
-1769004169622,"[timing] 47.7ms [new]	./instrumentation	
-"
-1769004169623,"[timing] 49.2ms [new]	@opentelemetry/instrumentation-mongodb@0.51.0	node_modules/@opentelemetry/instrumentation-mongodb/build/src/index.js
-"
-1769004169623,"[timing] 52.6ms [new]	./instrumentations/mongodb/MongoDBInstrumentation	
-"
-1769004169641,"[timing] 13.7ms [CACHED!]	@opentelemetry/instrumentation@0.51.0	node_modules/@opentelemetry/instrumentation/build/src/index.js
-"
-1769004169647,"[timing] 20.5ms [new]	./instrumentation	
-"
-1769004169649,"[timing] 23.1ms [new]	@opentelemetry/instrumentation-pg@0.38.0	node_modules/@opentelemetry/instrumentation-pg/build/src/index.js
-"
-1769004169649,"[timing] 26.4ms [new]	./instrumentations/pg/PgInstrumentation	
-"
-1769004169668,"[timing] 13.9ms [CACHED!]	@opentelemetry/instrumentation@0.51.0	node_modules/@opentelemetry/instrumentation/build/src/index.js
-"
-1769004169694,"[timing] 13.0ms [new]	./node	
-"
-1769004169694,"[timing] 13.5ms [new]	../platform	
-"
-1769004169694,"[timing] 14.0ms [new]	./common/time	
-"
-1769004169707,"[timing] 34.9ms [CACHED!]	@opentelemetry/core@1.17.1	node_modules/@opentelemetry/core/build/src/index.js
-"
-1769004169719,"[timing] 47.7ms [new]	./Tracer	
-"
-1769004169741,"[timing] 19.7ms [CACHED!]	@opentelemetry/resources@1.17.1	node_modules/@opentelemetry/resources/build/src/index.js
-"
-1769004169747,"[timing] 27.2ms [new]	./BasicTracerProvider	
-"
-1769004169753,"[timing] 82.8ms [CACHED!]	@opentelemetry/sdk-trace-base@1.9.1	node_modules/@opentelemetry/sdk-trace-base/build/src/index.js
-"
-1769004169753,"[timing] 84.6ms [new]	./ActiveTracingHelper	
-"
-1769004169754,"[timing] 100.9ms [new]	./PrismaInstrumentation	
-"
-1769004169755,"[timing] 102.2ms [new]	@prisma/instrumentation@4.16.2	node_modules/@prisma/instrumentation/dist/index.js
-"
-1769004169755,"[timing] 105.4ms [new]	./instrumentations/prisma/PrismaInstrumentation	
-"
-1769004169775,"[timing] 14.2ms [CACHED!]	@opentelemetry/instrumentation@0.51.0	node_modules/@opentelemetry/instrumentation/build/src/index.js
-"
-1769004169776,"[timing] 17.3ms [new]	./instrumentation	
-"
-1769004169777,"[timing] 19.2ms [new]	@opentelemetry/instrumentation-redis-4@0.35.6	node_modules/@opentelemetry/instrumentation-redis-4/build/src/index.js
-"
-1769004169778,"[timing] 22.8ms [new]	./instrumentations/redis/RedisInstrumentation	
-"
-1769004169804,"[timing] 14.0ms [CACHED!]	@opentelemetry/instrumentation@0.51.0	node_modules/@opentelemetry/instrumentation/build/src/index.js
-"
-1769004169807,"[timing] 24.8ms [new]	./aws-sdk	
-"
-1769004169808,"[timing] 26.3ms [new]	@opentelemetry/instrumentation-aws-sdk@0.38.1	node_modules/@opentelemetry/instrumentation-aws-sdk/build/src/index.js
-"
-1769004169810,"[timing] 30.8ms [new]	./LumigoAwsSdkLibInstrumentation	
-"
-1769004169810,"[timing] 31.3ms [new]	./LumigoAwsSdkV2LibInstrumentation	
-"
-1769004169811,"[timing] 33.0ms [new]	./instrumentations/aws-sdk	
-"
-1769004169837,"[timing] 20.7ms [CACHED!]	@opentelemetry/instrumentation@0.51.0	node_modules/@opentelemetry/instrumentation/build/src/index.js
-"
-1769004169838,"[timing] 23.0ms [new]	./instrumentation	
-"
-1769004169839,"[timing] 25.4ms [new]	@opentelemetry/instrumentation-winston@0.36.0	node_modules/@opentelemetry/instrumentation-winston/build/src/index.js
-"
-1769004169839,"[timing] 28.7ms [new]	./instrumentations/winston/WinstonInstrumentation	
-"
-1769004169866,"[timing] 20.3ms [CACHED!]	@opentelemetry/instrumentation@0.51.0	node_modules/@opentelemetry/instrumentation/build/src/index.js
-"
-1769004169869,"[timing] 23.9ms [new]	./instrumentation	
-"
-1769004169870,"[timing] 26.4ms [new]	@opentelemetry/instrumentation-bunyan@0.37.0	node_modules/@opentelemetry/instrumentation-bunyan/build/src/index.js
-"
-1769004169870,"[timing] 30.6ms [new]	./instrumentations/bunyan/BunyanInstrumentation	
-"
-1769004169896,"[timing] 10.4ms [new]	./platform/index	
-"
-1769004169897,"[timing] 21.2ms [CACHED!]	@opentelemetry/instrumentation@0.51.0	node_modules/@opentelemetry/instrumentation/build/src/index.js
-"
-1769004169936,"[timing] 11.7ms [CACHED!]	@opentelemetry/semantic-conventions@1.17.1	node_modules/@opentelemetry/semantic-conventions/build/src/index.js
-"
-1769004169936,"[timing] 21.3ms [new]	./sdk-info	
-"
-1769004169943,"[timing] 33.8ms [new]	./node	
-"
-1769004169943,"[timing] 34.3ms [new]	../platform	
-"
-1769004169943,"[timing] 34.8ms [new]	./common/time	
-"
-1769004169957,"[timing] 57.2ms [CACHED!]	@opentelemetry/core@1.17.1	node_modules/@opentelemetry/core/build/src/index.js
-"
-1769004169957,"[timing] 58.8ms [new]	./log-sending-utils	
-"
-1769004169957,"[timing] 83.3ms [new]	./instrumentation	
-"
-1769004169959,"[timing] 85.7ms [new]	@opentelemetry/instrumentation-pino@0.42.0	node_modules/@opentelemetry/instrumentation-pino/build/src/index.js
-"
-1769004169959,"[timing] 88.8ms [new]	./instrumentations/pino/PinoInstrumentation	
-"
-1769004169968,"[timing] 1519.9ms [new]	./bootstrap	
-"
-1769004169988,"[timing] 1542.5ms [CACHED!]	/opt/node_modules/@lumigo/opentelemetry/dist/src/distro.js@1.53.0	node_modules/@lumigo/opentelemetry/dist/src/distro.js
-"
-1769004169988,"init.mjs line 1
-"
-1769004169988,"init.mjs line 4
-"
-1769004169999,'"@lumigo/opentelemetry Logging is disabled (the ""LUMIGO_ENABLE_LOGS"" environment variable is not set to ""true""): no logs will be sent to Lumigo.
-"
-1769004170000,'"@lumigo/opentelemetry Lumigo OpenTelemetry Distro v1.53.0 started.
-"
-1769004170011,"{""timestamp"":""2026-01-21T14:02:50.011747Z"",""level"":""INFO"",""message"":""[DASH0] Extension init     : 42365 us"",""target"":""aws_lambda_runtime_api_proxy_rs::stats""}
-"
-1769004170011,"{""timestamp"":""2026-01-21T14:02:50.011777Z"",""level"":""INFO"",""message"":""[DASH0] App  init     : 1707255 us"",""target"":""aws_lambda_runtime_api_proxy_rs::stats""}
-"
-1769004170012,"EXTENSION	Name: lrap	State: Ready	Events: [INVOKE, SHUTDOWN]
-"
-1769004170015,"START RequestId: 745b6ed7-4541-48ff-86a3-0aac7a89605b Version: $LATEST
-"
-1769004170016,"{""timestamp"":""2026-01-21T14:02:50.016208Z"",""level"":""INFO"",""message"":""[DASH0] Got invocation next: 745b6ed7-4541-48ff-86a3-0aac7a89605b"",""target"":""aws_lambda_runtime_api_proxy_rs::extension::runtime_proxy""}
-"
-1769004170016,"{""timestamp"":""2026-01-21T14:02:50.016425Z"",""level"":""INFO"",""message"":""[DASH0:Extension] Event status=200 OK payload={\""eventType\"":\""INVOKE\"",\""deadlineMs\"":1769004173015,\""requestId\"":\""745b6ed7-4541-48ff-86a3-0aac7a89605b\"",\""invokedFunctionArn\"":\""arn:aws:lambda:us-west-2:285732642181:function:testing-node-extension-24\"",\""tracing\"":{\""type\"":\""X-Amzn-Trace-Id\"",\""value\"":\""Root=1-6970dc87-0de0478475eb7841184b288c;Parent=548cd0863d0967c0;Sampled=0;Lineage=1:33abc111:0\""}} latency=1711 ms"",""target"":""aws_lambda_runtime_api_proxy_rs::extension::events""}
-"
-1769004170016,"{""timestamp"":""2026-01-21T14:02:50.016453Z"",""level"":""INFO"",""message"":""[DASH0:Extension] Waiting for platform.runtimeDone"",""target"":""aws_lambda_runtime_api_proxy_rs::extension::events""}
-"
-1769004170017,"2026-01-21T14:02:50.017Z	745b6ed7-4541-48ff-86a3-0aac7a89605b	INFO	checking
-"
-1769004170022,"{""timestamp"":""2026-01-21T14:02:50.022160Z"",""level"":""INFO"",""message"":""[DASH0] passthru_proxy - POST http://127.0.0.1:9001/2018-06-01/runtime/invocation/745b6ed7-4541-48ff-86a3-0aac7a89605b/response completed in 0 ms"",""target"":""aws_lambda_runtime_api_proxy_rs::extension::runtime_proxy""}
-"
-1769004170022,"{""timestamp"":""2026-01-21T14:02:50.022206Z"",""level"":""INFO"",""message"":""[DASH0] invocation_response_proxy - no lambda server span found for return value 745b6ed7-4541-48ff-86a3-0aac7a89605b"",""target"":""aws_lambda_runtime_api_proxy_rs::extension::runtime_proxy""}
-"
-1769004170022,"{""timestamp"":""2026-01-21T14:02:50.022213Z"",""level"":""INFO"",""message"":""[DASH0] Total handle time for invocation response: 0 ms"",""target"":""aws_lambda_runtime_api_proxy_rs::extension::runtime_proxy""}
-"
-1769004170022,"{""timestamp"":""2026-01-21T14:02:50.022811Z"",""level"":""INFO"",""message"":""[DASH0] App run time  : 6607 us"",""target"":""aws_lambda_runtime_api_proxy_rs::stats""}
-"
-1769004170243,"{""timestamp"":""2026-01-21T14:02:50.243521Z"",""level"":""INFO"",""message"":""[DASH0] telemetry event path=/v1/telemetry len=18018 body=[{\""time\"":\""2026-01-21T14:02:49.232Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 14.8ms [new]\\t../platform\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.232Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 15.3ms [new]\\t./common/time\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.244Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 34.2ms [CACHED!]\\t@opentelemetry/core@1.17.1\\tnode_modules/@opentelemetry/core/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.244Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 35.1ms [new]\\t./JaegerPropagator\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.244Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 35.7ms [new]\\t@opentelemetry/propagator-jaeger@1.9.1\\tnode_modules/@opentelemetry/propagator-jaeger/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.244Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 84.0ms [new]\\t./NodeTracerProvider\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.245Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 84.8ms [new]\\t@opentelemetry/sdk-trace-node@1.9.1\\tnode_modules/@opentelemetry/sdk-trace-node/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.281Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 10.8ms [new]\\t./platform/index\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.283Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 14.7ms [CACHED!]\\t@opentelemetry/instrumentation@0.51.0\\tnode_modules/@opentelemetry/instrumentation/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.302Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 29.8ms [new]\\t./grpc-js\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.302Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 31.3ms [new]\\t./instrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.302Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 32.5ms [new]\\t@opentelemetry/instrumentation-grpc@0.41.2\\tnode_modules/@opentelemetry/instrumentation-grpc/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.324Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 25.9ms [new]\\t../../instrumentor\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.333Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 69.3ms [new]\\t./instrumentations/@grpc/grpc-js/GrpcInstrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.355Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 18.3ms [CACHED!]\\t@opentelemetry/instrumentation@0.51.0\\tnode_modules/@opentelemetry/instrumentation/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.357Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 21.8ms [new]\\t./instrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.358Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 22.8ms [new]\\t@opentelemetry/instrumentation-nestjs-core@0.34.0\\tnode_modules/@opentelemetry/instrumentation-nestjs-core/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.358Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 25.3ms [new]\\t./instrumentations/@nestjs/core/NestInstrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.377Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 17.1ms [new]\\t@lumigo/node-core@1.14.0\\tnode_modules/@lumigo/node-core/lib/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.395Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 13.3ms [CACHED!]\\t@opentelemetry/instrumentation@0.51.0\\tnode_modules/@opentelemetry/instrumentation/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.397Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 17.3ms [new]\\t./amqplib\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.397Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 18.7ms [new]\\t@opentelemetry/instrumentation-amqplib@0.33.2\\tnode_modules/@opentelemetry/instrumentation-amqplib/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.398Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 39.7ms [new]\\t./instrumentations/amqplib/AmqplibInstrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.419Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 14.1ms [CACHED!]\\t@opentelemetry/instrumentation@0.51.0\\tnode_modules/@opentelemetry/instrumentation/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.424Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 20.5ms [new]\\t./express\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.425Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 21.7ms [new]\\topentelemetry-instrumentation-express@0.39.1\\tnode_modules/opentelemetry-instrumentation-express/dist/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.425Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 26.9ms [new]\\t./instrumentations/express/ExpressInstrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.443Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 12.7ms [CACHED!]\\t@opentelemetry/instrumentation@0.51.0\\tnode_modules/@opentelemetry/instrumentation/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.445Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 15.4ms [new]\\t./instrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.445Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 17.2ms [new]\\t@opentelemetry/instrumentation-fastify@0.32.6\\tnode_modules/@opentelemetry/instrumentation-fastify/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.446Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 20.7ms [new]\\t./instrumentations/fastify/FastifyInstrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.470Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 12.5ms [new]\\t./node\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.470Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 13.0ms [new]\\t../platform\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.470Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 13.5ms [new]\\t./common/time\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.481Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 30.6ms [CACHED!]\\t@opentelemetry/core@1.17.1\\tnode_modules/@opentelemetry/core/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.503Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 12.4ms [new]\\trequire-in-the-middle@8.0.1\\tnode_modules/require-in-the-middle/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.504Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 14.1ms [new]\\t./RequireInTheMiddleSingleton\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.504Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 15.4ms [new]\\t./instrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.507Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 18.2ms [new]\\t./node\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.507Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 19.2ms [new]\\t./platform/index\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.509Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 23.2ms [CACHED!]\\t@opentelemetry/instrumentation@0.51.0\\tnode_modules/@opentelemetry/instrumentation/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.509Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 59.3ms [new]\\t./http\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.510Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 62.0ms [new]\\t@opentelemetry/instrumentation-http@0.38.0\\tnode_modules/@opentelemetry/instrumentation-http/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.518Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 72.2ms [new]\\t./instrumentations/https/HttpInstrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.543Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 11.0ms [new]\\t./types_internal\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.545Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 23.6ms [CACHED!]\\t@opentelemetry/instrumentation@0.51.0\\tnode_modules/@opentelemetry/instrumentation/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.549Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 28.8ms [new]\\t./instrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.550Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 30.2ms [new]\\t@opentelemetry/instrumentation-ioredis@0.35.3\\tnode_modules/@opentelemetry/instrumentation-ioredis/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.550Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 32.5ms [new]\\t./instrumentations/ioredis/IORedisInstrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.569Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 13.2ms [CACHED!]\\t@opentelemetry/instrumentation@0.51.0\\tnode_modules/@opentelemetry/instrumentation/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.569Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 14.7ms [new]\\t./kafkajs\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.570Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 16.0ms [new]\\topentelemetry-instrumentation-kafkajs@0.39.1\\tnode_modules/opentelemetry-instrumentation-kafkajs/dist/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.570Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 19.5ms [new]\\t./instrumentations/kafkajs/KafkaJsInstrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.601Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 13.8ms [new]\\t./instrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.605Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 15.9ms [new]\\t./node\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.605Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 17.0ms [new]\\t./platform/index\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.606Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 30.7ms [CACHED!]\\t@opentelemetry/instrumentation@0.51.0\\tnode_modules/@opentelemetry/instrumentation/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.620Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 13.8ms [CACHED!]\\t@opentelemetry/semantic-conventions@1.17.1\\tnode_modules/@opentelemetry/semantic-conventions/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.622Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 47.7ms [new]\\t./instrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.623Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 49.2ms [new]\\t@opentelemetry/instrumentation-mongodb@0.51.0\\tnode_modules/@opentelemetry/instrumentation-mongodb/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.623Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 52.6ms [new]\\t./instrumentations/mongodb/MongoDBInstrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.641Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 13.7ms [CACHED!]\\t@opentelemetry/instrumentation@0.51.0\\tnode_modules/@opentelemetry/instrumentation/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.647Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 20.5ms [new]\\t./instrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.649Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 23.1ms [new]\\t@opentelemetry/instrumentation-pg@0.38.0\\tnode_modules/@opentelemetry/instrumentation-pg/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.649Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 26.4ms [new]\\t./instrumentations/pg/PgInstrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.668Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 13.9ms [CACHED!]\\t@opentelemetry/instrumentation@0.51.0\\tnode_modules/@opentelemetry/instrumentation/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.694Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 13.0ms [new]\\t./node\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.694Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 13.5ms [new]\\t../platform\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.694Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 14.0ms [new]\\t./common/time\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.707Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 34.9ms [CACHED!]\\t@opentelemetry/core@1.17.1\\tnode_modules/@opentelemetry/core/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.719Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 47.7ms [new]\\t./Tracer\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.741Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 19.7ms [CACHED!]\\t@opentelemetry/resources@1.17.1\\tnode_modules/@opentelemetry/resources/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.747Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 27.2ms [new]\\t./BasicTracerProvider\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.753Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 82.8ms [CACHED!]\\t@opentelemetry/sdk-trace-base@1.9.1\\tnode_modules/@opentelemetry/sdk-trace-base/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.753Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 84.6ms [new]\\t./ActiveTracingHelper\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.754Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 100.9ms [new]\\t./PrismaInstrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.755Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 102.2ms [new]\\t@prisma/instrumentation@4.16.2\\tnode_modules/@prisma/instrumentation/dist/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.755Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 105.4ms [new]\\t./instrumentations/prisma/PrismaInstrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.775Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 14.2ms [CACHED!]\\t@opentelemetry/instrumentation@0.51.0\\tnode_modules/@opentelemetry/instrumentation/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.776Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 17.3ms [new]\\t./instrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.777Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 19.2ms [new]\\t@opentelemetry/instrumentation-redis-4@0.35.6\\tnode_modules/@opentelemetry/instrumentation-redis-4/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.778Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 22.8ms [new]\\t./instrumentations/redis/RedisInstrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.804Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 14.0ms [CACHED!]\\t@opentelemetry/instrumentation@0.51.0\\tnode_modules/@opentelemetry/instrumentation/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.807Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 24.8ms [new]\\t./aws-sdk\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.808Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 26.3ms [new]\\t@opentelemetry/instrumentation-aws-sdk@0.38.1\\tnode_modules/@opentelemetry/instrumentation-aws-sdk/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.810Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 30.8ms [new]\\t./LumigoAwsSdkLibInstrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.810Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 31.3ms [new]\\t./LumigoAwsSdkV2LibInstrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.811Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 33.0ms [new]\\t./instrumentations/aws-sdk\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.837Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 20.7ms [CACHED!]\\t@opentelemetry/instrumentation@0.51.0\\tnode_modules/@opentelemetry/instrumentation/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.838Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 23.0ms [new]\\t./instrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.839Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 25.4ms [new]\\t@opentelemetry/instrumentation-winston@0.36.0\\tnode_modules/@opentelemetry/instrumentation-winston/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.839Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 28.7ms [new]\\t./instrumentations/winston/WinstonInstrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.866Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 20.3ms [CACHED!]\\t@opentelemetry/instrumentation@0.51.0\\tnode_modules/@opentelemetry/instrumentation/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.869Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 23.9ms [new]\\t./instrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.870Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 26.4ms [new]\\t@opentelemetry/instrumentation-bunyan@0.37.0\\tnode_modules/@opentelemetry/instrumentation-bunyan/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.870Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 30.6ms [new]\\t./instrumentations/bunyan/BunyanInstrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.896Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 10.4ms [new]\\t./platform/index\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.897Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 21.2ms [CACHED!]\\t@opentelemetry/instrumentation@0.51.0\\tnode_modules/@opentelemetry/instrumentation/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.936Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 11.7ms [CACHED!]\\t@opentelemetry/semantic-conventions@1.17.1\\tnode_modules/@opentelemetry/semantic-conventions/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.936Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 21.3ms [new]\\t./sdk-info\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.943Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 33.8ms [new]\\t./node\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.943Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 34.3ms [new]\\t../platform\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.943Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 34.8ms [new]\\t./common/time\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.957Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 57.2ms [CACHED!]\\t@opentelemetry/core@1.17.1\\tnode_modules/@opentelemetry/core/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.957Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 58.8ms [new]\\t./log-sending-utils\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.957Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 83.3ms [new]\\t./instrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.959Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 85.7ms [new]\\t@opentelemetry/instrumentation-pino@0.42.0\\tnode_modules/@opentelemetry/instrumentation-pino/build/src/index.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.959Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 88.8ms [new]\\t./instrumentations/pino/PinoInstrumentation\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.968Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 1519.9ms [new]\\t./bootstrap\\t\
-\""},{\""time\"":\""2026-01-21T14:02:49.988Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 1542.5ms [CACHED!]\\t/opt/node_modules/@lumigo/opentelemetry/dist/src/distro.js@1.53.0\\tnode_modules/@lumigo/opentelemetry/dist/src/distro.js\
-\""},{\""time\"":\""2026-01-21T14:02:49.988Z\"",\""type\"":\""function\"",\""record\"":\""init.mjs line 1\
-\""},{\""time\"":\""2026-01-21T14:02:49.988Z\"",\""type\"":\""function\"",\""record\"":\""init.mjs line 4\
-\""},{\""time\"":\""2026-01-21T14:02:49.999Z\"",\""type\"":\""function\"",\""record\"":\""@lumigo/opentelemetry Logging is disabled (the \\\""LUMIGO_ENABLE_LOGS\\\"" environment variable is not set to \\\""true\\\""): no logs will be sent to Lumigo.\
-\""},{\""time\"":\""2026-01-21T14:02:50.000Z\"",\""type\"":\""function\"",\""record\"":\""@lumigo/opentelemetry Lumigo OpenTelemetry Distro v1.53.0 started.\
-\""},{\""time\"":\""2026-01-21T14:02:50.012Z\"",\""type\"":\""platform.initRuntimeDone\"",\""record\"":{\""initializationType\"":\""on-demand\"",\""phase\"":\""init\"",\""status\"":\""success\""}},{\""time\"":\""2026-01-21T14:02:50.012Z\"",\""type\"":\""platform.extension\"",\""record\"":{\""name\"":\""lrap\"",\""state\"":\""Ready\"",\""events\"":[\""INVOKE\"",\""SHUTDOWN\""]}},{\""time\"":\""2026-01-21T14:02:50.012Z\"",\""type\"":\""platform.initReport\"",\""record\"":{\""initializationType\"":\""on-demand\"",\""metrics\"":{\""durationMs\"":1803.54},\""phase\"":\""init\""}},{\""time\"":\""2026-01-21T14:02:50.015Z\"",\""type\"":\""platform.start\"",\""record\"":{\""requestId\"":\""745b6ed7-4541-48ff-86a3-0aac7a89605b\"",\""version\"":\""$LATEST\""}},{\""time\"":\""2026-01-21T14:02:50.017Z\"",\""type\"":\""function\"",\""record\"":\""2026-01-21T14:02:50.017Z\\t745b6ed7-4541-48ff-86a3-0aac7a89605b\\tINFO\\tchecking\
-\""},{\""time\"":\""2026-01-21T14:02:50.023Z\"",\""type\"":\""platform.runtimeDone\"",\""record\"":{\""requestId\"":\""745b6ed7-4541-48ff-86a3-0aac7a89605b\"",\""status\"":\""success\"",\""spans\"":[{\""name\"":\""responseLatency\"",\""start\"":\""2026-01-21T14:02:50.015Z\"",\""durationMs\"":5.986},{\""name\"":\""responseDuration\"",\""start\"":\""2026-01-21T14:02:50.021Z\"",\""durationMs\"":0.088},{\""name\"":\""runtimeOverhead\"",\""start\"":\""2026-01-21T14:02:50.022Z\"",\""durationMs\"":0.817}],\""metrics\"":{\""durationMs\"":7.046,\""producedBytes\"":50}}}]"",""target"":""aws_lambda_runtime_api_proxy_rs::extension::telemetry_receiver""}
-"
-1769004170244,"{""timestamp"":""2026-01-21T14:02:50.244097Z"",""level"":""INFO"",""message"":""[DASH0] Signaled platform.runtimeDone"",""target"":""aws_lambda_runtime_api_proxy_rs::util::log_processing""}
-"
-1769004170244,"{""timestamp"":""2026-01-21T14:02:50.244308Z"",""level"":""INFO"",""message"":""[DASH0:Extension] Received platform.runtimeDone signal"",""target"":""aws_lambda_runtime_api_proxy_rs::extension::events""}
-"
-1769004170738,"{""timestamp"":""2026-01-21T14:02:50.738551Z"",""level"":""INFO"",""message"":""[DASH0] Sent logs (count=216) in 493 ms, status=200 OK"",""count"":216,""duration"":""493"",""target"":""aws_lambda_runtime_api_proxy_rs::otlp::exporter""}
-"
-1769004170740,"END RequestId: 745b6ed7-4541-48ff-86a3-0aac7a89605b
-"
-1769004170740,"REPORT RequestId: 745b6ed7-4541-48ff-86a3-0aac7a89605b	Duration: 723.59 ms	Billed Duration: 2528 ms	Memory Size: 512 MB	Max Memory Used: 158 MB	Init Duration: 1803.54 ms	
+1769073489807,"{""timestamp"":""2026-01-22T09:18:09.806814Z"",""level"":""INFO"",""message"":""[DASH0] telemetry event path=/v1/telemetry len=5971 body=[{\""time\"":\""2026-01-22T09:18:08.805Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 37.0ms [new]\\t./JaegerPropagator\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.806Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 37.8ms [new]\\t@opentelemetry/propagator-jaeger@1.9.1\\tnode_modules/@opentelemetry/propagator-jaeger/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.806Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 89.4ms [new]\\t./NodeTracerProvider\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.806Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 90.1ms [new]\\t@opentelemetry/sdk-trace-node@1.9.1\\tnode_modules/@opentelemetry/sdk-trace-node/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.836Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 17.8ms [new]\\t../utils\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.846Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 28.8ms [new]\\t./report\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.846Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 31.0ms [new]\\t./dependencies\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.887Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 19.5ms [new]\\t@lumigo/node-core@1.14.0\\tnode_modules/@lumigo/node-core/lib/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.887Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 26.7ms [new]\\t./resources/detectors/ProcessEnvironmentDetector\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.892Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 859.6ms [new]\\t./bootstrap\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.894Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 863.5ms [CACHED!]\\t/opt/node_modules/@lumigo/opentelemetry/dist/src/distro.js@1.53.0\\tnode_modules/@lumigo/opentelemetry/dist/src/distro.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.894Z\"",\""type\"":\""function\"",\""record\"":\""init.mjs line 1\
+\""},{\""time\"":\""2026-01-22T09:18:08.894Z\"",\""type\"":\""function\"",\""record\"":\""init.mjs line 4\
+\""},{\""time\"":\""2026-01-22T09:18:08.930Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 21.3ms [new]\\t./node\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.930Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 21.8ms [new]\\t../platform\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.930Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 22.4ms [new]\\t./common/time\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.948Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 47.7ms [CACHED!]\\t@opentelemetry/core@1.17.1\\tnode_modules/@opentelemetry/core/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.983Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 11.6ms [new]\\tresolve@1.22.11\\tnode_modules/resolve/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.983Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 16.1ms [new]\\trequire-in-the-middle@8.0.1\\tnode_modules/require-in-the-middle/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.985Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 18.0ms [new]\\t./RequireInTheMiddleSingleton\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.985Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 19.7ms [new]\\t./instrumentation\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.988Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 22.8ms [new]\\t./node\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.988Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 23.8ms [new]\\t./platform/index\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.990Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 28.4ms [CACHED!]\\t@opentelemetry/instrumentation@0.51.0\\tnode_modules/@opentelemetry/instrumentation/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:08.990Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 91.4ms [new]\\t./http\\t\
+\""},{\""time\"":\""2026-01-22T09:18:08.992Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 94.4ms [new]\\t@opentelemetry/instrumentation-http@0.38.0\\tnode_modules/@opentelemetry/instrumentation-http/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:09.001Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 106.8ms [new]\\t./instrumentations/https/HttpInstrumentation\\t\
+\""},{\""time\"":\""2026-01-22T09:18:09.076Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 27.6ms [CACHED!]\\t@opentelemetry/instrumentation@0.51.0\\tnode_modules/@opentelemetry/instrumentation/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:09.076Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 40.9ms [new]\\t./aws-sdk\\t\
+\""},{\""time\"":\""2026-01-22T09:18:09.077Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 43.2ms [new]\\t@opentelemetry/instrumentation-aws-sdk@0.38.1\\tnode_modules/@opentelemetry/instrumentation-aws-sdk/build/src/index.js\
+\""},{\""time\"":\""2026-01-22T09:18:09.079Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 48.0ms [new]\\t./LumigoAwsSdkLibInstrumentation\\t\
+\""},{\""time\"":\""2026-01-22T09:18:09.079Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 48.4ms [new]\\t./LumigoAwsSdkV2LibInstrumentation\\t\
+\""},{\""time\"":\""2026-01-22T09:18:09.080Z\"",\""type\"":\""function\"",\""record\"":\""[timing] 49.7ms [new]\\t./instrumentations/aws-sdk\\t\
+\""},{\""time\"":\""2026-01-22T09:18:09.098Z\"",\""type\"":\""function\"",\""record\"":\""@lumigo/opentelemetry Logging is disabled (the \\\""LUMIGO_ENABLE_LOGS\\\"" environment variable is not set to \\\""true\\\""): no logs will be sent to Lumigo.\
+\""},{\""time\"":\""2026-01-22T09:18:09.100Z\"",\""type\"":\""function\"",\""record\"":\""@lumigo/opentelemetry Lumigo OpenTelemetry Distro v1.53.0 started.\
+\""},{\""time\"":\""2026-01-22T09:18:09.124Z\"",\""type\"":\""platform.initRuntimeDone\"",\""record\"":{\""initializationType\"":\""on-demand\"",\""phase\"":\""init\"",\""status\"":\""success\""}},{\""time\"":\""2026-01-22T09:18:09.124Z\"",\""type\"":\""platform.extension\"",\""record\"":{\""name\"":\""lrap\"",\""state\"":\""Ready\"",\""events\"":[\""INVOKE\"",\""SHUTDOWN\""]}},{\""time\"":\""2026-01-22T09:18:09.124Z\"",\""type\"":\""platform.initReport\"",\""record\"":{\""initializationType\"":\""on-demand\"",\""metrics\"":{\""durationMs\"":1326.85},\""phase\"":\""init\""}},{\""time\"":\""2026-01-22T09:18:09.127Z\"",\""type\"":\""platform.start\"",\""record\"":{\""requestId\"":\""e30078db-ea80-4e83-858c-5e66b9023dea\"",\""version\"":\""$LATEST\""}},{\""time\"":\""2026-01-22T09:18:09.130Z\"",\""type\"":\""function\"",\""record\"":\""2026-01-22T09:18:09.130Z\\te30078db-ea80-4e83-858c-5e66b9023dea\\tINFO\\tchecking\
+\""},{\""time\"":\""2026-01-22T09:18:09.146Z\"",\""type\"":\""platform.runtimeDone\"",\""record\"":{\""requestId\"":\""e30078db-ea80-4e83-858c-5e66b9023dea\"",\""status\"":\""success\"",\""spans\"":[{\""name\"":\""responseLatency\"",\""start\"":\""2026-01-22T09:18:09.127Z\"",\""durationMs\"":8.646},{\""name\"":\""responseDuration\"",\""start\"":\""2026-01-22T09:18:09.136Z\"",\""durationMs\"":0.09},{\""name\"":\""runtimeOverhead\"",\""start\"":\""2026-01-22T09:18:09.136Z\"",\""durationMs\"":10.006}],\""metrics\"":{\""durationMs\"":18.904,\""producedBytes\"":50}}}]"",""target"":""aws_lambda_runtime_api_proxy_rs::extension::telemetry_receiver""}
+"
+1769073489807,"{""timestamp"":""2026-01-22T09:18:09.807034Z"",""level"":""INFO"",""message"":""[DASH0] Signaled platform.runtimeDone"",""target"":""aws_lambda_runtime_api_proxy_rs::util::log_processing""}
+"
+1769073489807,"{""timestamp"":""2026-01-22T09:18:09.807198Z"",""level"":""INFO"",""message"":""[DASH0:Extension] Received platform.runtimeDone signal"",""target"":""aws_lambda_runtime_api_proxy_rs::extension::events""}
+"
+1769073490288,"{""timestamp"":""2026-01-22T09:18:10.288396Z"",""level"":""INFO"",""message"":""[DASH0] Sent logs (count=138) in 480 ms, status=200 OK"",""count"":138,""duration"":""480"",""target"":""aws_lambda_runtime_api_proxy_rs::otlp::exporter""}
+"
+1769073490290,"END RequestId: e30078db-ea80-4e83-858c-5e66b9023dea
+"
+1769073490290,"REPORT RequestId: e30078db-ea80-4e83-858c-5e66b9023dea	Duration: 1161.35 ms	Billed Duration: 2489 ms	Memory Size: 512 MB	Max Memory Used: 143 MB	Init Duration: 1326.85 ms	
 "

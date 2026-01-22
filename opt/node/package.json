@@ -5,6 +5,7 @@
   "description": "Layer including OpenTelemetry SDK for use with AWS Lambda.",
   "repository": "open-telemetry/opentelemetry-lambda",
   "scripts": {
+    "build": "node build.mjs"
   },
   "keywords": [
     "opentelemetry",
@@ -25,5 +26,8 @@
     "import-in-the-middle": "2.0.0",
     "require-in-the-middle": "^8.0.1"
   },
-  "sideEffects": false
+  "sideEffects": false,
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  }
 }

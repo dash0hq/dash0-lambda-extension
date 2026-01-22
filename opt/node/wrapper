@@ -41,7 +41,7 @@ if [ -z "$DISABLE_AUTO_INSTRUMENTATION" ] || [ "${DISABLE_AUTO_INSTRUMENTATION,,
 
   TIMING_LOADER="/opt/timing-loader.mjs"
   PACKAGE_PATH="/opt/init.mjs"
-  export NODE_OPTIONS="${NODE_OPTIONS} --import \"${TIMING_LOADER}\" --import \"${PACKAGE_PATH}\""
+  export NODE_OPTIONS="${NODE_OPTIONS} --import \"${PACKAGE_PATH}\""
 fi
 
 echo "starting execution of user handler"
