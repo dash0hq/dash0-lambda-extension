@@ -2,8 +2,9 @@ FROM public.ecr.aws/lambda/python:3.12 AS build
 
 WORKDIR /var/task
 
-COPY opt/python/opentelemetry_exporter_otlp_proto_http-1.39.1-py3-none-any.whl /Users/mosheshaham/workspace/opentelemetry-python/exporter/opentelemetry-exporter-otlp-proto-http/dist/opentelemetry_exporter_otlp_proto_http-1.39.1-py3-none-any.whl
-COPY opt/python/lumigo_opentelemetry-1.0.199.tar.gz .
+# Install git (required by setuptools_scm during package installation)
+RUN dnf install -y git && dnf clean all
+
 COPY opt/python/requirements.txt .
 
 # Install dependencies into a directory Lambda will recognize when added to a layer.

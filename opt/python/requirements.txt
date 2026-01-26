@@ -1,1 +1,1 @@
-lumigo_opentelemetry-1.0.199.tar.gz
+git+https://github.com/lumigo-io/opentelemetry-python-distro.git@rd-9999-improve-init-duration
