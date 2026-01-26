@@ -35,6 +35,18 @@ interface SubStackProps extends cdk.NestedStackProps {
   logGroup: logs.ILogGroup;
 }
 
+function createPythonCode(): lambda.Code {
+  return lambda.Code.fromAsset(path.join(__dirname, '../lambdas'), {
+    bundling: {
+      image: lambda.Runtime.PYTHON_3_12.bundlingImage,
+      command: [
+        'bash', '-c',
+        'pip install -r requirements.txt -t /asset-output && cp -au . /asset-output'
+      ],
+    },
+  });
+}
+
 function createLambdas(
     scope: Construct,
     runtimes: lambda.Runtime[],
@@ -111,7 +123,9 @@ class PythonStack extends cdk.NestedStack {
       lambda.Runtime.PYTHON_3_14,
     ];
 
-    createLambdas(this, runtimes, props.layer, props.role, props.logGroup);
+    createLambdas(this, runtimes, props.layer, props.role, props.logGroup, {
+      code: createPythonCode(),
+    });
   }
 }
 
