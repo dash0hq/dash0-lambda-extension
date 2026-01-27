@@ -185,7 +185,7 @@ class ManualStack extends cdk.NestedStack {
         functionName: `manual-instrumentation-${runtimeName}`,
         runtime,
         memorySize: 512,
-        handler: 'handler.hello',
+        handler: 'index.hello',
         architecture: lambda.Architecture.X86_64,
         timeout: cdk.Duration.seconds(10),
         code,
@@ -193,7 +193,6 @@ class ManualStack extends cdk.NestedStack {
         role: props.role,
         environment: {
           AWS_LAMBDA_EXEC_WRAPPER: "/opt/wrapper",
-          NODE_OPTIONS: '--require ./tracing.js',
           DASH0_TOKEN: "auth_oEiAAAy5hZvVsEAADPm4uDyV7OcBmU4B",
           DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
           DASH0_EXTENSION_LOG_LEVEL: "info",
