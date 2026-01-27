@@ -2,13 +2,15 @@ import fetch from 'node-fetch';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
 import { DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS } from "./config";
-import {compareJsonStrings, getAttributesMap, getRequestPayload, invokeFunction} from "./utils";
+import {checkLogs, compareJsonStrings, getAttributesMap, getRequestPayload, invokeFunction} from "./utils";
 
 const FUNCTION_NAME = 'manual-instrumentation-node';
 
 const verifyManualInstrumentation = async () => {
     const invocationId = await invokeFunction(FUNCTION_NAME, true, false);
 
+    let traceId: string | undefined = undefined;
+    let parentSpanId: string | undefined = undefined;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         await delay(RETRY_DELAY_MS);
         console.log(`Attempt ${attempt} to fetch spans for function ${FUNCTION_NAME}`);
@@ -38,6 +40,8 @@ const verifyManualInstrumentation = async () => {
             compareJsonStrings(spanAttributes['faas.event'].stringValue, '{"parameter1":"right"}');
             compareJsonStrings(spanAttributes['faas.return_value'].stringValue, '{"statusCode":200,"body":"{\\"message\\":\\"Success\\"}"}');
 
+            traceId = span.traceId;
+            parentSpanId = span.spanId;
             return;
         } catch (error) {
             console.error(`Error fetching spans on attempt ${attempt}:`, error);
@@ -46,6 +50,19 @@ const verifyManualInstrumentation = async () => {
             }
         }
     }
+    const logsToBeChecked = [
+        'START RequestId: ',
+        '[tracing] forceFlush complete',
+        'END RequestId: ',
+    ]
+    await checkLogs({
+        invocationId: invocationId!,
+        functionName: FUNCTION_NAME,
+        traceId: traceId!,
+        parentSpanId: parentSpanId!,
+        success: true,
+        logsToBeChecked
+    });
 }
 
 describe('Manual instrumentation Lambda', () => {
