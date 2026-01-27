@@ -13,13 +13,8 @@ module.exports.hello = async (event, context) => {
     'function.name': context?.functionName || 'unknown',
   });
 
-  const response = {
+  return {
     statusCode: 200,
-    body: JSON.stringify({
-      message: 'Hello from Lambda!',
-      input: event,
-    }),
+    body: JSON.stringify({ message: "Success" }),
   };
-
-  return response;
 };
