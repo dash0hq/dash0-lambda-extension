@@ -4,16 +4,14 @@ import { describe, expect, it } from 'vitest';
 import { DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS } from "./config";
 import {checkLogs, compareJsonStrings, getAttributesMap, getRequestPayload, invokeFunction} from "./utils";
 
-const FUNCTION_NAME = 'manual-instrumentation-node';
-
-const verifyManualInstrumentation = async () => {
-    const invocationId = await invokeFunction(FUNCTION_NAME, true, false);
+const verifyManualInstrumentation = async (functionName: string) => {
+    const invocationId = await invokeFunction(functionName, true, false);
 
     let traceId: string | undefined = undefined;
     let parentSpanId: string | undefined = undefined;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         await delay(RETRY_DELAY_MS);
-        console.log(`Attempt ${attempt} to fetch spans for function ${FUNCTION_NAME}`);
+        console.log(`Attempt ${attempt} to fetch spans for function ${functionName}`);
         try {
             const spanResponse = await fetch(DASH0_ENDPOINT + 'spans', {
                 method: 'POST',
@@ -32,7 +30,7 @@ const verifyManualInstrumentation = async () => {
             expect(spanPayload?.resourceSpans[0].scopeSpans[0].scope.name).toEqual(expectedScopeName);
             expect(spanPayload?.resourceSpans[0].scopeSpans[0].spans.length).toEqual(1);
             const resourceAttributes = getAttributesMap(spanPayload?.resourceSpans[0].resource.attributes);
-            expect(resourceAttributes['service.name'].stringValue).toEqual(FUNCTION_NAME);
+            expect(resourceAttributes['service.name'].stringValue).toEqual(functionName);
             // check span attributes
             const span = spanPayload.resourceSpans[0].scopeSpans[0].spans[0];
             const spanAttributes = getAttributesMap(span.attributes);
@@ -57,7 +55,7 @@ const verifyManualInstrumentation = async () => {
     ]
     await checkLogs({
         invocationId: invocationId!,
-        functionName: FUNCTION_NAME,
+        functionName,
         traceId: traceId!,
         parentSpanId: parentSpanId!,
         success: true,
@@ -66,12 +64,16 @@ const verifyManualInstrumentation = async () => {
 }
 
 describe('Manual instrumentation Lambda', () => {
-    it(
-        `invokes ${FUNCTION_NAME} and receives trace`,
-        async () => {
-            console.log(`Starting test for ${FUNCTION_NAME}`, new Date().toISOString());
-            await verifyManualInstrumentation();
-        },
-        120_000
-    );
+    const runtimes = ['nodejs20-x', 'nodejs22-x', 'nodejs24-x'];
+    for (const runtime of runtimes) {
+        const functionName = `manual-instrumentation-${runtime}`
+        it(
+            `invokes ${functionName} and receives trace`,
+            async () => {
+                console.log(`Starting test for ${functionName}`, new Date().toISOString());
+                await verifyManualInstrumentation(functionName);
+            },
+            120_000
+        );
+    }
 });

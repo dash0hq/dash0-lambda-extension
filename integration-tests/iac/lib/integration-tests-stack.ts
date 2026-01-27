@@ -165,6 +165,11 @@ class ManualStack extends cdk.NestedStack {
   constructor(scope: Construct, id: string, props: SubStackProps) {
     super(scope, id, props);
 
+    const runtimes = [
+      lambda.Runtime.NODEJS_20_X,
+      lambda.Runtime.NODEJS_22_X,
+      lambda.Runtime.NODEJS_24_X,
+    ];
     const code = lambda.Code.fromAsset(path.join(__dirname, '../lambdas/manual'), {
       bundling: {
         image: lambda.Runtime.NODEJS_20_X.bundlingImage,
@@ -174,27 +179,29 @@ class ManualStack extends cdk.NestedStack {
         ],
       },
     });
-
-    new lambda.Function(this, 'manual-instrumentation-node', {
-      functionName: 'manual-instrumentation-node',
-      runtime: lambda.Runtime.NODEJS_20_X,
-      memorySize: 512,
-      handler: 'handler.hello',
-      architecture: lambda.Architecture.X86_64,
-      timeout: cdk.Duration.seconds(10),
-      code,
-      layers: [props.layer],
-      role: props.role,
-      environment: {
-        AWS_LAMBDA_EXEC_WRAPPER: "/opt/wrapper",
-        NODE_OPTIONS: '--require ./tracing.js',
-        DASH0_TOKEN: "auth_oEiAAAy5hZvVsEAADPm4uDyV7OcBmU4B",
-        DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
-        DASH0_EXTENSION_LOG_LEVEL: "info",
-      },
-      logGroup: props.logGroup,
-      loggingFormat: lambda.LoggingFormat.TEXT,
-    });
+    for (const runtime of runtimes) {
+      const runtimeName = runtime.name.replace(/\./g, '-');
+      new lambda.Function(this, `manual-instrumentation-${runtimeName}`, {
+        functionName: `manual-instrumentation-${runtimeName}`,
+        runtime,
+        memorySize: 512,
+        handler: 'handler.hello',
+        architecture: lambda.Architecture.X86_64,
+        timeout: cdk.Duration.seconds(10),
+        code,
+        layers: [props.layer],
+        role: props.role,
+        environment: {
+          AWS_LAMBDA_EXEC_WRAPPER: "/opt/wrapper",
+          NODE_OPTIONS: '--require ./tracing.js',
+          DASH0_TOKEN: "auth_oEiAAAy5hZvVsEAADPm4uDyV7OcBmU4B",
+          DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
+          DASH0_EXTENSION_LOG_LEVEL: "info",
+        },
+        logGroup: props.logGroup,
+        loggingFormat: lambda.LoggingFormat.TEXT,
+      });
+    }
   }
 }
 
