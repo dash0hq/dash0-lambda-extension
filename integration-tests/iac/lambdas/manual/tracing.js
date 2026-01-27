@@ -17,7 +17,6 @@ const resource = resourceFromAttributes({
 });
 
 const exporter = new OTLPTraceExporter({
-  // url: `${process.env.DASH0_ENDPOINT}/v1/traces`,
   url: `http://127.0.0.1:9009/v1/traces`,
   headers: {
     Authorization: `Bearer ${process.env.DASH0_TOKEN}`,
@@ -33,7 +32,6 @@ provider.register();
 
 // Metrics setup
 const metricExporter = new OTLPMetricExporter({
-  // url: `${process.env.DASH0_ENDPOINT}/v1/metrics`,
   url: `http://127.0.0.1:9009/v1/metrics`,
   headers: {
     Authorization: `Bearer ${process.env.DASH0_TOKEN}`,
@@ -55,6 +53,7 @@ const meter = meterProvider.getMeter('lambda-metrics');
 registerInstrumentations({
   instrumentations: [
     new AwsLambdaInstrumentation({
+      disableAwsContextPropagation: true,
       responseHook: async (span) => {
         console.log('[tracing] responseHook called, flushing spans and metrics');
         await Promise.all([

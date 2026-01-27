@@ -172,7 +172,7 @@ class ManualStack extends cdk.NestedStack {
     ];
     const code = lambda.Code.fromAsset(path.join(__dirname, '../lambdas/manual'), {
       bundling: {
-        image: lambda.Runtime.NODEJS_20_X.bundlingImage,
+        image: lambda.Runtime.NODEJS_24_X.bundlingImage,
         command: [
           'bash', '-c',
           'npm ci --cache /tmp/.npm && cp -au . /asset-output'
