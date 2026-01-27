@@ -77,6 +77,29 @@ pub fn snapshot_logs() -> Vec<StoredLog> {
 
 static LOG_STORE: Lazy<Mutex<Vec<StoredLog>>> = Lazy::new(|| Mutex::new(Vec::new()));
 
+#[derive(Clone)]
+pub struct StoredMetric {
+    pub method: hyper::Method,
+    pub path_and_query: String,
+    pub headers: hyper::HeaderMap,
+    pub body: Vec<u8>,
+}
+
+pub fn store_metric(metric: StoredMetric) {
+    METRIC_STORE.lock().push(metric);
+}
+
+pub fn take_metrics() -> Vec<StoredMetric> {
+    std::mem::take(&mut *METRIC_STORE.lock())
+}
+
+#[allow(dead_code)]
+pub fn snapshot_metrics() -> Vec<StoredMetric> {
+    METRIC_STORE.lock().clone()
+}
+
+static METRIC_STORE: Lazy<Mutex<Vec<StoredMetric>>> = Lazy::new(|| Mutex::new(Vec::new()));
+
 pub fn store_return_payload(invocation_id: &str, payload: &str) {
     RETURN_PAYLOADS
         .lock()
