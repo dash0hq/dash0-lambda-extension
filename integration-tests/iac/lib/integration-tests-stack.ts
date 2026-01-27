@@ -186,6 +186,8 @@ class ManualStack extends cdk.NestedStack {
       layers: [props.layer],
       role: props.role,
       environment: {
+        AWS_LAMBDA_EXEC_WRAPPER: "/opt/wrapper",
+        NODE_OPTIONS: '--require ./tracing.js',
         DASH0_TOKEN: "auth_oEiAAAy5hZvVsEAADPm4uDyV7OcBmU4B",
         DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
         DASH0_EXTENSION_LOG_LEVEL: "info",
