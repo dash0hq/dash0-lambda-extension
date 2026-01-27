@@ -161,6 +161,41 @@ class JavaStack extends cdk.NestedStack {
   }
 }
 
+class ManualStack extends cdk.NestedStack {
+  constructor(scope: Construct, id: string, props: SubStackProps) {
+    super(scope, id, props);
+
+    const code = lambda.Code.fromAsset(path.join(__dirname, '../lambdas/manual'), {
+      bundling: {
+        image: lambda.Runtime.NODEJS_20_X.bundlingImage,
+        command: [
+          'bash', '-c',
+          'npm ci --cache /tmp/.npm && cp -au . /asset-output'
+        ],
+      },
+    });
+
+    new lambda.Function(this, 'manual-instrumentation-node', {
+      functionName: 'manual-instrumentation-node',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      memorySize: 512,
+      handler: 'handler.hello',
+      architecture: lambda.Architecture.X86_64,
+      timeout: cdk.Duration.seconds(10),
+      code,
+      layers: [props.layer],
+      role: props.role,
+      environment: {
+        DASH0_TOKEN: "auth_oEiAAAy5hZvVsEAADPm4uDyV7OcBmU4B",
+        DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
+        DASH0_EXTENSION_LOG_LEVEL: "info",
+      },
+      logGroup: props.logGroup,
+      loggingFormat: lambda.LoggingFormat.TEXT,
+    });
+  }
+}
+
 export class IntegrationTestsStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -196,6 +231,12 @@ export class IntegrationTestsStack extends cdk.Stack {
     new JavaStack(this, 'JavaStack', {
       role,
       layer: javaLayer,
+      logGroup: sharedLogGroup,
+    });
+
+    new ManualStack(this, 'ManualStack', {
+      role,
+      layer: manualLayer,
       logGroup: sharedLogGroup,
     });
   }

@@ -1,0 +1,27 @@
+{
+  "name": "lambda-metrics",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "deploy": "serverless deploy",
+    "invoke": "serverless invoke local -f hello",
+    "local": "DASH0_TOKEN=auth_oEiAAAy5hZvVsEAADPm4uDyV7OcBmU4B DASH0_ENDPOINT=https://ingress.eu-west-1.aws.dash0-dev.com:4318 node invoke-local.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.211.0",
+    "@opentelemetry/instrumentation": "^0.211.0",
+    "@opentelemetry/instrumentation-aws-lambda": "^0.63.0",
+    "@opentelemetry/resources": "^2.5.0",
+    "@opentelemetry/sdk-trace-base": "^2.5.0",
+    "@opentelemetry/sdk-trace-node": "^2.5.0",
+    "@opentelemetry/semantic-conventions": "^1.39.0",
+    "@opentelemetry/sdk-metrics": "^2.5.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.211.0"
+  }
+}
