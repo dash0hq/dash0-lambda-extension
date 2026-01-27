@@ -36,7 +36,7 @@ interface SubStackProps extends cdk.NestedStackProps {
 }
 
 function createPythonCode(): lambda.Code {
-  return lambda.Code.fromAsset(path.join(__dirname, '../lambdas'), {
+  return lambda.Code.fromAsset(path.join(__dirname, '../lambdas/python'), {
     bundling: {
       image: lambda.Runtime.PYTHON_3_12.bundlingImage,
       command: [
@@ -87,7 +87,7 @@ function createLambdas(
 
             const functionName = `${runtimeName}-${scenario}-${traced}-invocation-end-${invocationEnd}-${architecture.name}`;
             const handler = overrides?.handler ?? `${scenario}.handler`;
-            const code = overrides?.code ?? lambda.Code.fromAsset(path.join(__dirname, '../lambdas'));
+            const code = overrides?.code ?? lambda.Code.fromAsset(path.join(__dirname, '../lambdas/node'));
             const memorySize = overrides?.memorySize ?? 128;
 
             new lambda.Function(scope, functionName, {
@@ -149,13 +149,13 @@ class JavaStack extends cdk.NestedStack {
 
     createLambdas(this, [lambda.Runtime.JAVA_21], props.layer, props.role, props.logGroup, {
       handler: 'com.example.App::handleRequest',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../lambdas/java21-success.jar')),
+      code: lambda.Code.fromAsset(path.join(__dirname, '../lambdas/java/java21-success.jar')),
       memorySize: 512,
     });
 
     createLambdas(this, [lambda.Runtime.JAVA_17], props.layer, props.role, props.logGroup, {
       handler: 'com.example.App::handleRequest',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../lambdas/java17-success.jar')),
+      code: lambda.Code.fromAsset(path.join(__dirname, '../lambdas/java/java17-success.jar')),
       memorySize: 512,
     });
   }
@@ -168,6 +168,7 @@ export class IntegrationTestsStack extends cdk.Stack {
     const pythonLayer = getLatestLayerVersion(this, 'pythonLrapLayer', 'dash0-extension-python');
     const nodeLayer = getLatestLayerVersion(this, 'nodeLrapLayer', 'dash0-extension-node');
     const javaLayer = getLatestLayerVersion(this, 'javaLrapLayer', 'dash0-extension-java');
+    const manualLayer = getLatestLayerVersion(this, 'manualLrapLayer', 'dash0-extension-manual');
     const role = new iam.Role(this, 'IntegrationTestsLambdaRole', {
       assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
       managedPolicies: [

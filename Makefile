@@ -26,7 +26,7 @@ RS_FILES := $(shell find src -name "*.rs")
 # * create a Layer '.zip'
 # * use AWS CLI to publish Lambda layer
 #
-default: python node java
+default: python node java manual
 
 clean: clean-build clean-cargo
 
