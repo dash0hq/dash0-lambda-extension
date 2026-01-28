@@ -35,7 +35,10 @@ const verifyDockerizedInvocation = async (functionName: string, invocationEnd: b
             const spanPayload = await spanResponse.json() as any;
             expect(spanPayload?.resourceSpans.length).toEqual(1);
             expect(spanPayload?.resourceSpans[0].scopeSpans.length).toEqual(1);
-            expect(spanPayload?.resourceSpans[0].scopeSpans[0].scope.name).toEqual("opentelemetry.instrumentation.aws_lambda");
+            const scopeName = functionName.includes("python") ?
+                "opentelemetry.instrumentation.aws_lambda" :
+                "@opentelemetry/instrumentation-aws-lambda";
+            expect(spanPayload?.resourceSpans[0].scopeSpans[0].scope.name).toEqual(scopeName);
             expect(spanPayload?.resourceSpans[0].scopeSpans[0].spans.length).toEqual(1);
             // check span attributes
             span = spanPayload.resourceSpans[0].scopeSpans[0].spans[0];
@@ -81,7 +84,15 @@ const verifyDockerizedInvocation = async (functionName: string, invocationEnd: b
 }
 
 describe.concurrent('Dockerized Lambda invocation', () => {
-    it('dockerized-python', async () => {
-        await verifyDockerizedInvocation('dockerized-python', true);
-    }, 120_000);
+    const runtimes = ['python', 'node'];
+    const architectures = ['x86_64', 'arm64'];
+
+    for (const runtime of runtimes) {
+        for (const architecture of architectures) {
+            const functionName = `dockerized-${runtime}-${architecture}`;
+            it(functionName, async () => {
+                await verifyDockerizedInvocation(functionName, true);
+            }, 120_000);
+        }
+    }
 });
