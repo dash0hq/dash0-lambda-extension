@@ -204,6 +204,28 @@ class ManualStack extends cdk.NestedStack {
   }
 }
 
+interface DockerizedStackProps extends cdk.NestedStackProps {
+  role: iam.Role;
+  logGroup: logs.ILogGroup;
+}
+
+class DockerizedStack extends cdk.NestedStack {
+  constructor(scope: Construct, id: string, props: DockerizedStackProps) {
+    super(scope, id, props);
+
+    new lambda.DockerImageFunction(this, 'dockerized-python', {
+      functionName: 'dockerized-python',
+      code: lambda.DockerImageCode.fromImageAsset(path.join(__dirname, '../lambdas/dockerized')),
+      memorySize: 512,
+      architecture: lambda.Architecture.X86_64,
+      timeout: cdk.Duration.seconds(10),
+      role: props.role,
+      logGroup: props.logGroup,
+      loggingFormat: lambda.LoggingFormat.TEXT,
+    });
+  }
+}
+
 export class IntegrationTestsStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -245,6 +267,11 @@ export class IntegrationTestsStack extends cdk.Stack {
     new ManualStack(this, 'ManualStack', {
       role,
       layer: manualLayer,
+      logGroup: sharedLogGroup,
+    });
+
+    new DockerizedStack(this, 'DockerizedStack', {
+      role,
       logGroup: sharedLogGroup,
     });
   }
