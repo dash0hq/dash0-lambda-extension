@@ -29,5 +29,15 @@ COPY opt/entrypoint /opt/extensions/lrap
 # Copy wrapper script
 COPY opt/node/wrapper /opt/wrapper
 
-# Copy bundled Node.js SDK (webpack output includes all dependencies)
+# Copy bundled Node.js SDK (webpack output)
 COPY opt/node/dist/init.mjs /opt/init.mjs
+
+# Copy external dependencies that are not bundled by webpack
+COPY opt/node/node_modules/require-in-the-middle /opt/node_modules/require-in-the-middle
+COPY opt/node/node_modules/import-in-the-middle /opt/node_modules/import-in-the-middle
+COPY opt/node/node_modules/module-details-from-path /opt/node_modules/module-details-from-path
+COPY opt/node/node_modules/debug /opt/node_modules/debug
+COPY opt/node/node_modules/ms /opt/node_modules/ms
+COPY opt/node/node_modules/acorn /opt/node_modules/acorn
+COPY opt/node/node_modules/acorn-import-attributes /opt/node_modules/acorn-import-attributes
+COPY opt/node/node_modules/cjs-module-lexer /opt/node_modules/cjs-module-lexer
