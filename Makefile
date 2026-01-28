@@ -13,9 +13,12 @@ LAMBDA_LAYER_MARKER_MANUAL := .lambda-layer-manual
 CARGO_FEATURES :=
 PYTHON_DEPS_IMAGE := lrap-python-deps
 
-# Docker image settings
-# Use local image name by default (no registry prefix) to avoid pull attempts
-DOCKER_IMAGE_PYTHON ?= extension-python
+# Docker/ECR image settings
+AWS_ACCOUNT_ID := $(shell aws sts get-caller-identity --query Account --output text)
+AWS_REGION := $(shell aws configure get region)
+ECR_REGISTRY := $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+ECR_REPO_PYTHON ?= dash0-extension-python
+DOCKER_IMAGE_PYTHON := $(ECR_REGISTRY)/$(ECR_REPO_PYTHON)
 VERSION ?= latest
 
 #-- current-condition vars
@@ -176,18 +179,19 @@ doc:
 # Docker targets for containerized Lambda deployments
 # =============================================================================
 
-# Build Docker image for Python extension
+# Build and push Docker image for Python extension to ECR
 # Usage: make docker-python VERSION=1.0.0
 docker-python: build/lrap_x86_64 build/lrap_aarch64 build/python
+	@echo "Creating ECR repository $(ECR_REPO_PYTHON) if it doesn't exist..."
+	@aws ecr describe-repositories --repository-names $(ECR_REPO_PYTHON) 2>/dev/null || \
+		aws ecr create-repository --repository-name $(ECR_REPO_PYTHON) --no-cli-pager
+	@echo "Logging in to ECR..."
+	@aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(ECR_REGISTRY)
 	@echo "Building Docker image $(DOCKER_IMAGE_PYTHON):$(VERSION)"
 	@docker build -f docker/Dockerfile.python -t $(DOCKER_IMAGE_PYTHON):$(VERSION) .
-	@echo "Docker image built: $(DOCKER_IMAGE_PYTHON):$(VERSION)"
+	@echo "Pushing Docker image $(DOCKER_IMAGE_PYTHON):$(VERSION)"
+	@docker push $(DOCKER_IMAGE_PYTHON):$(VERSION)
 	@echo ""
 	@echo "Usage in your Dockerfile:"
 	@echo "  COPY --from=$(DOCKER_IMAGE_PYTHON):$(VERSION) /opt /opt"
 	@echo "  ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper"
-
-# Push Docker image for Python extension
-docker-push-python: docker-python
-	@echo "Pushing Docker image $(DOCKER_IMAGE_PYTHON):$(VERSION)"
-	@docker push $(DOCKER_IMAGE_PYTHON):$(VERSION)
