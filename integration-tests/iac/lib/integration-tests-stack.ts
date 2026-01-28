@@ -216,47 +216,30 @@ class DockerizedStack extends cdk.NestedStack {
     const account = process.env.CDK_DEFAULT_ACCOUNT;
     const region = process.env.CDK_DEFAULT_REGION;
 
-    const pythonExtensionImage = `${account}.dkr.ecr.${region}.amazonaws.com/dash0-extension-python:latest`;
-    new lambda.DockerImageFunction(this, 'dockerized-python', {
-      functionName: 'dockerized-python',
-      code: lambda.DockerImageCode.fromImageAsset(path.join(__dirname, '../lambdas/dockerized-python'), {
-        buildArgs: {
-          EXTENSION_IMAGE: pythonExtensionImage,
-        },
-      }),
-      memorySize: 512,
-      architecture: lambda.Architecture.X86_64,
-      timeout: cdk.Duration.seconds(10),
-      role: props.role,
-      environment: {
-        DASH0_TOKEN: "auth_oEiAAAy5hZvVsEAADPm4uDyV7OcBmU4B",
-        DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
-        DASH0_EXTENSION_LOG_LEVEL: "info",
-      },
-      logGroup: props.logGroup,
-      loggingFormat: lambda.LoggingFormat.TEXT,
-    });
-
-    const nodeExtensionImage = `${account}.dkr.ecr.${region}.amazonaws.com/dash0-extension-node:latest`;
-    new lambda.DockerImageFunction(this, 'dockerized-node', {
-      functionName: 'dockerized-node',
-      code: lambda.DockerImageCode.fromImageAsset(path.join(__dirname, '../lambdas/dockerized-node'), {
-        buildArgs: {
-          EXTENSION_IMAGE: nodeExtensionImage,
-        },
-      }),
-      memorySize: 512,
-      architecture: lambda.Architecture.X86_64,
-      timeout: cdk.Duration.seconds(10),
-      role: props.role,
-      environment: {
-        DASH0_TOKEN: "auth_oEiAAAy5hZvVsEAADPm4uDyV7OcBmU4B",
-        DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
-        DASH0_EXTENSION_LOG_LEVEL: "info",
-      },
-      logGroup: props.logGroup,
-      loggingFormat: lambda.LoggingFormat.TEXT,
-    });
+    for (const runtime of ["python", "node"]) {
+      for (const architecture of [lambda.Architecture.X86_64, lambda.Architecture.ARM_64]) {
+        const extensionImage = `${account}.dkr.ecr.${region}.amazonaws.com/dash0-extension-${runtime}:latest`;
+        new lambda.DockerImageFunction(this, `dockerized-${runtime}-${architecture.name}`, {
+          functionName: `dockerized-${runtime}-${architecture.name}`,
+          code: lambda.DockerImageCode.fromImageAsset(path.join(__dirname, `../lambdas/dockerized-${runtime}`), {
+            buildArgs: {
+              EXTENSION_IMAGE: extensionImage,
+            },
+          }),
+          memorySize: 512,
+          architecture,
+          timeout: cdk.Duration.seconds(10),
+          role: props.role,
+          environment: {
+            DASH0_TOKEN: "auth_oEiAAAy5hZvVsEAADPm4uDyV7OcBmU4B",
+            DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
+            DASH0_EXTENSION_LOG_LEVEL: "info",
+          },
+          logGroup: props.logGroup,
+          loggingFormat: lambda.LoggingFormat.TEXT,
+        });
+      }
+    }
   }
 }
 
