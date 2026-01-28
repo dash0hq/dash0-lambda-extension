@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as ecr_assets from 'aws-cdk-lib/aws-ecr-assets';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as cr from 'aws-cdk-lib/custom-resources';
@@ -219,6 +220,9 @@ class DockerizedStack extends cdk.NestedStack {
     for (const runtime of ["python", "node", "java"]) {
       for (const architecture of [lambda.Architecture.X86_64, lambda.Architecture.ARM_64]) {
         const extensionImage = `${account}.dkr.ecr.${region}.amazonaws.com/dash0-extension-${runtime}:latest`;
+        const platform = architecture === lambda.Architecture.ARM_64
+          ? ecr_assets.Platform.LINUX_ARM64
+          : ecr_assets.Platform.LINUX_AMD64;
         new lambda.DockerImageFunction(this, `dockerized-${runtime}-${architecture.name}`, {
           functionName: `dockerized-${runtime}-${architecture.name}`,
           code: lambda.DockerImageCode.fromImageAsset(path.join(__dirname, `../lambdas/dockerized-${runtime}`), {
@@ -226,6 +230,7 @@ class DockerizedStack extends cdk.NestedStack {
               EXTENSION_IMAGE: extensionImage,
             },
             extraHash: Date.now().toString(),
+            platform,
           }),
           memorySize: 512,
           architecture,

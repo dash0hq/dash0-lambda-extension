@@ -181,20 +181,28 @@ doc:
 
 # =============================================================================
 # Docker targets for containerized Lambda deployments
+# Multi-platform builds (linux/amd64 + linux/arm64) using docker buildx
 # =============================================================================
+
+BUILDX_BUILDER := multiplatform-builder
+
+# Ensure buildx builder exists for multi-platform builds
+.PHONY: ensure-buildx
+ensure-buildx:
+	@docker buildx inspect $(BUILDX_BUILDER) >/dev/null 2>&1 || \
+		docker buildx create --name $(BUILDX_BUILDER) --use --bootstrap
 
 # Build and push Docker image for Python extension to ECR
 # Usage: make docker-python VERSION=1.0.0
-docker-python: build/lrap_x86_64 build/lrap_aarch64 build/python
+docker-python: build/lrap_x86_64 build/lrap_aarch64 build/python ensure-buildx
 	@echo "Creating ECR repository $(ECR_REPO_PYTHON) if it doesn't exist..."
 	@aws ecr describe-repositories --repository-names $(ECR_REPO_PYTHON) 2>/dev/null || \
 		aws ecr create-repository --repository-name $(ECR_REPO_PYTHON) --no-cli-pager
 	@echo "Logging in to ECR..."
 	@aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(ECR_REGISTRY)
-	@echo "Building Docker image $(DOCKER_IMAGE_PYTHON):$(VERSION)"
-	@docker build -f opt/docker/Dockerfile.python -t $(DOCKER_IMAGE_PYTHON):$(VERSION) .
-	@echo "Pushing Docker image $(DOCKER_IMAGE_PYTHON):$(VERSION)"
-	@docker push $(DOCKER_IMAGE_PYTHON):$(VERSION)
+	@echo "Building and pushing multi-platform Docker image $(DOCKER_IMAGE_PYTHON):$(VERSION)"
+	@docker buildx build --builder $(BUILDX_BUILDER) --platform linux/amd64,linux/arm64 \
+		-f opt/docker/Dockerfile.python -t $(DOCKER_IMAGE_PYTHON):$(VERSION) --push .
 	@echo ""
 	@echo "Usage in your Dockerfile:"
 	@echo "  COPY --from=$(DOCKER_IMAGE_PYTHON):$(VERSION) /opt /opt"
@@ -202,7 +210,7 @@ docker-python: build/lrap_x86_64 build/lrap_aarch64 build/python
 
 # Build and push Docker image for Node.js extension to ECR
 # Usage: make docker-node VERSION=1.0.0
-docker-node: build/lrap_x86_64 build/lrap_aarch64
+docker-node: build/lrap_x86_64 build/lrap_aarch64 ensure-buildx
 	@echo "Building Node.js SDK..."
 	@cd opt/node && npm install && npm run build
 	@echo "Creating ECR repository $(ECR_REPO_NODE) if it doesn't exist..."
@@ -210,10 +218,9 @@ docker-node: build/lrap_x86_64 build/lrap_aarch64
 		aws ecr create-repository --repository-name $(ECR_REPO_NODE) --no-cli-pager
 	@echo "Logging in to ECR..."
 	@aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(ECR_REGISTRY)
-	@echo "Building Docker image $(DOCKER_IMAGE_NODE):$(VERSION)"
-	@docker build -f opt/docker/Dockerfile.node -t $(DOCKER_IMAGE_NODE):$(VERSION) .
-	@echo "Pushing Docker image $(DOCKER_IMAGE_NODE):$(VERSION)"
-	@docker push $(DOCKER_IMAGE_NODE):$(VERSION)
+	@echo "Building and pushing multi-platform Docker image $(DOCKER_IMAGE_NODE):$(VERSION)"
+	@docker buildx build --builder $(BUILDX_BUILDER) --platform linux/amd64,linux/arm64 \
+		-f opt/docker/Dockerfile.node -t $(DOCKER_IMAGE_NODE):$(VERSION) --push .
 	@echo ""
 	@echo "Usage in your Dockerfile:"
 	@echo "  COPY --from=$(DOCKER_IMAGE_NODE):$(VERSION) /opt /opt"
@@ -221,16 +228,15 @@ docker-node: build/lrap_x86_64 build/lrap_aarch64
 
 # Build and push Docker image for Java extension to ECR
 # Usage: make docker-java VERSION=1.0.0
-docker-java: build/lrap_x86_64 build/lrap_aarch64
+docker-java: build/lrap_x86_64 build/lrap_aarch64 ensure-buildx
 	@echo "Creating ECR repository $(ECR_REPO_JAVA) if it doesn't exist..."
 	@aws ecr describe-repositories --repository-names $(ECR_REPO_JAVA) 2>/dev/null || \
 		aws ecr create-repository --repository-name $(ECR_REPO_JAVA) --no-cli-pager
 	@echo "Logging in to ECR..."
 	@aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(ECR_REGISTRY)
-	@echo "Building Docker image $(DOCKER_IMAGE_JAVA):$(VERSION)"
-	@docker build -f opt/docker/Dockerfile.java -t $(DOCKER_IMAGE_JAVA):$(VERSION) .
-	@echo "Pushing Docker image $(DOCKER_IMAGE_JAVA):$(VERSION)"
-	@docker push $(DOCKER_IMAGE_JAVA):$(VERSION)
+	@echo "Building and pushing multi-platform Docker image $(DOCKER_IMAGE_JAVA):$(VERSION)"
+	@docker buildx build --builder $(BUILDX_BUILDER) --platform linux/amd64,linux/arm64 \
+		-f opt/docker/Dockerfile.java -t $(DOCKER_IMAGE_JAVA):$(VERSION) --push .
 	@echo ""
 	@echo "Usage in your Dockerfile:"
 	@echo "  COPY --from=$(DOCKER_IMAGE_JAVA):$(VERSION) /opt /opt"
