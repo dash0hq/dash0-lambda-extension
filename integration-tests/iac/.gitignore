@@ -1,6 +1,7 @@
 *.js
 !jest.config.js
 !lambdas/manual/*.js
+!lambdas/dockerized-node/*.js
 *.d.ts
 node_modules
 
