@@ -15,7 +15,7 @@
 #   # First build the binaries and stage the layer
 #   make build/$(ZIP_NAME_PYTHON)
 #   # Then build the Docker image
-#   docker build -f docker/Dockerfile.python -t dash0/extension-python:latest .
+#   docker build -f opt/docker/Dockerfile.python -t dash0/extension-python:latest .
 
 # Stage 1: Build Python dependencies
 FROM public.ecr.aws/lambda/python:3.12 AS python-deps

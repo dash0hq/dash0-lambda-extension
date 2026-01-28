@@ -187,7 +187,7 @@ docker-python: build/lrap_x86_64 build/lrap_aarch64 build/python
 	@echo "Logging in to ECR..."
 	@aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(ECR_REGISTRY)
 	@echo "Building Docker image $(DOCKER_IMAGE_PYTHON):$(VERSION)"
-	@docker build -f docker/Dockerfile.python -t $(DOCKER_IMAGE_PYTHON):$(VERSION) .
+	@docker build -f opt/docker/Dockerfile.python -t $(DOCKER_IMAGE_PYTHON):$(VERSION) .
 	@echo "Pushing Docker image $(DOCKER_IMAGE_PYTHON):$(VERSION)"
 	@docker push $(DOCKER_IMAGE_PYTHON):$(VERSION)
 	@echo ""
