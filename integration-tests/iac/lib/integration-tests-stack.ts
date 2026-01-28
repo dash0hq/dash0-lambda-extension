@@ -72,7 +72,7 @@ function createLambdas(
             const runtimeName = runtime.name.replace(/\./g, '-');
             const environment: any = {
               AWS_LAMBDA_EXEC_WRAPPER: "/opt/wrapper",
-              DASH0_TOKEN: "process.env.DASH0_DEV_API_TOKEN!",
+              DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
               DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
               DASH0_EXTENSION_LOG_LEVEL: "info",
               SEND_ON_INVOCATION_END: invocationEnd,
@@ -194,7 +194,7 @@ class ManualStack extends cdk.NestedStack {
         role: props.role,
         environment: {
           AWS_LAMBDA_EXEC_WRAPPER: "/opt/wrapper",
-          DASH0_TOKEN: "process.env.DASH0_DEV_API_TOKEN!",
+          DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
           DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
           DASH0_EXTENSION_LOG_LEVEL: "info",
         },
@@ -237,7 +237,7 @@ class DockerizedStack extends cdk.NestedStack {
           timeout: cdk.Duration.seconds(10),
           role: props.role,
           environment: {
-            DASH0_TOKEN: "process.env.DASH0_DEV_API_TOKEN!",
+            DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
             DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
             DASH0_EXTENSION_LOG_LEVEL: "info",
           },
