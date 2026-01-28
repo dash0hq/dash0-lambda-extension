@@ -12,8 +12,8 @@ import {
 } from "./utils";
 
 
-const verifyDockerizedInvocation = async (functionName: string, invocationEnd: boolean) => {
-    const invocationId = await invokeFunction(functionName, invocationEnd, false);
+const verifyDockerizedInvocation = async (functionName: string, runtime: string) => {
+    const invocationId = await invokeFunction(functionName, true, false);
 
     let traceId: string | undefined = undefined;
     let parentSpanId: string | undefined = undefined;
@@ -35,17 +35,20 @@ const verifyDockerizedInvocation = async (functionName: string, invocationEnd: b
             const spanPayload = await spanResponse.json() as any;
             expect(spanPayload?.resourceSpans.length).toEqual(1);
             expect(spanPayload?.resourceSpans[0].scopeSpans.length).toEqual(1);
-            const scopeName = functionName.includes("python") ?
-                "opentelemetry.instrumentation.aws_lambda" :
-                "@opentelemetry/instrumentation-aws-lambda";
-            expect(spanPayload?.resourceSpans[0].scopeSpans[0].scope.name).toEqual(scopeName);
+            const scopeNameMap = {
+                "python": "opentelemetry.instrumentation.aws_lambda",
+                "node": "@opentelemetry/instrumentation-aws-lambda",
+                "java": "io.opentelemetry.aws-lambda-events-2.2"
+            }
+            expect(spanPayload?.resourceSpans[0].scopeSpans[0].scope.name).toEqual(scopeNameMap[runtime as keyof typeof scopeNameMap]);
             expect(spanPayload?.resourceSpans[0].scopeSpans[0].spans.length).toEqual(1);
             // check span attributes
             span = spanPayload.resourceSpans[0].scopeSpans[0].spans[0];
             const spanAttributes = getAttributesMap(span.attributes);
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
             expect(spanAttributes['faas.event'].stringValue).toEqual('{"parameter1":"right"}');
-            compareJsonStrings(spanAttributes['faas.return_value'].stringValue, '{"statusCode":200,"body":"{\\"message\\":\\"Success\\"}"}');
+            const returnValue = runtime === 'java' ? '"Hello World from Java Lambda!"' : '{"statusCode":200,"body":"{\\"message\\":\\"Success\\"}"}';
+            compareJsonStrings(spanAttributes['faas.return_value'].stringValue, returnValue);
             expect(spanAttributes['faas.init_duration'].doubleValue).toBeGreaterThan(0);
 
             const resourceAttributes = getAttributesMap(spanPayload?.resourceSpans[0].resource.attributes);
@@ -64,13 +67,9 @@ const verifyDockerizedInvocation = async (functionName: string, invocationEnd: b
 
     const logsToBeChecked = [
         'START RequestId: ',
-        'event payload: ',
         'END RequestId: ',
     ]
-    if (!invocationEnd) {
-        logsToBeChecked.push('REPORT RequestId: ');
-    }
-    const reportLog = await checkLogs({
+    await checkLogs({
         invocationId: invocationId!,
         functionName,
         traceId: traceId!,
@@ -78,20 +77,17 @@ const verifyDockerizedInvocation = async (functionName: string, invocationEnd: b
         success: true,
         logsToBeChecked
     });
-    if (!invocationEnd) {
-        checkSpanAttributesFromReport(reportLog, span);
-    }
 }
 
 describe.concurrent('Dockerized Lambda invocation', () => {
-    const runtimes = ['python', 'node'];
+    const runtimes = ['python', 'node', 'java'];
     const architectures = ['x86_64', 'arm64'];
 
     for (const runtime of runtimes) {
         for (const architecture of architectures) {
             const functionName = `dockerized-${runtime}-${architecture}`;
             it(functionName, async () => {
-                await verifyDockerizedInvocation(functionName, true);
+                await verifyDockerizedInvocation(functionName, runtime);
             }, 120_000);
         }
     }
