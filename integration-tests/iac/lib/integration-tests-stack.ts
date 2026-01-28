@@ -218,7 +218,7 @@ class DockerizedStack extends cdk.NestedStack {
     const extensionImage = `${account}.dkr.ecr.${region}.amazonaws.com/dash0-extension-python:latest`;
     new lambda.DockerImageFunction(this, 'dockerized-python', {
       functionName: 'dockerized-python',
-      code: lambda.DockerImageCode.fromImageAsset(path.join(__dirname, '../lambdas/dockerized'), {
+      code: lambda.DockerImageCode.fromImageAsset(path.join(__dirname, '../lambdas/dockerized-python'), {
         buildArgs: {
           EXTENSION_IMAGE: extensionImage,
         },
