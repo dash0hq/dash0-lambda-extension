@@ -36,7 +36,7 @@ interface SubStackProps extends cdk.NestedStackProps {
 }
 
 function createPythonCode(): lambda.Code {
-  return lambda.Code.fromAsset(path.join(__dirname, '../lambdas'), {
+  return lambda.Code.fromAsset(path.join(__dirname, '../lambdas/python'), {
     bundling: {
       image: lambda.Runtime.PYTHON_3_12.bundlingImage,
       command: [
@@ -87,7 +87,7 @@ function createLambdas(
 
             const functionName = `${runtimeName}-${scenario}-${traced}-invocation-end-${invocationEnd}-${architecture.name}`;
             const handler = overrides?.handler ?? `${scenario}.handler`;
-            const code = overrides?.code ?? lambda.Code.fromAsset(path.join(__dirname, '../lambdas'));
+            const code = overrides?.code ?? lambda.Code.fromAsset(path.join(__dirname, '../lambdas/node'));
             const memorySize = overrides?.memorySize ?? 128;
 
             new lambda.Function(scope, functionName, {
@@ -149,15 +149,58 @@ class JavaStack extends cdk.NestedStack {
 
     createLambdas(this, [lambda.Runtime.JAVA_21], props.layer, props.role, props.logGroup, {
       handler: 'com.example.App::handleRequest',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../lambdas/java21-success.jar')),
+      code: lambda.Code.fromAsset(path.join(__dirname, '../lambdas/java/java21-success.jar')),
       memorySize: 512,
     });
 
     createLambdas(this, [lambda.Runtime.JAVA_17], props.layer, props.role, props.logGroup, {
       handler: 'com.example.App::handleRequest',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../lambdas/java17-success.jar')),
+      code: lambda.Code.fromAsset(path.join(__dirname, '../lambdas/java/java17-success.jar')),
       memorySize: 512,
     });
+  }
+}
+
+class ManualStack extends cdk.NestedStack {
+  constructor(scope: Construct, id: string, props: SubStackProps) {
+    super(scope, id, props);
+
+    const runtimes = [
+      lambda.Runtime.NODEJS_20_X,
+      lambda.Runtime.NODEJS_22_X,
+      lambda.Runtime.NODEJS_24_X,
+    ];
+    const code = lambda.Code.fromAsset(path.join(__dirname, '../lambdas/manual'), {
+      bundling: {
+        image: lambda.Runtime.NODEJS_24_X.bundlingImage,
+        command: [
+          'bash', '-c',
+          'npm ci --cache /tmp/.npm && cp -au . /asset-output'
+        ],
+      },
+    });
+    for (const runtime of runtimes) {
+      const runtimeName = runtime.name.replace(/\./g, '-');
+      new lambda.Function(this, `manual-instrumentation-${runtimeName}`, {
+        functionName: `manual-instrumentation-${runtimeName}`,
+        runtime,
+        memorySize: 512,
+        handler: 'index.hello',
+        architecture: lambda.Architecture.X86_64,
+        timeout: cdk.Duration.seconds(10),
+        code,
+        layers: [props.layer],
+        role: props.role,
+        environment: {
+          AWS_LAMBDA_EXEC_WRAPPER: "/opt/wrapper",
+          DASH0_TOKEN: "auth_oEiAAAy5hZvVsEAADPm4uDyV7OcBmU4B",
+          DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
+          DASH0_EXTENSION_LOG_LEVEL: "info",
+        },
+        logGroup: props.logGroup,
+        loggingFormat: lambda.LoggingFormat.TEXT,
+      });
+    }
   }
 }
 
@@ -168,6 +211,7 @@ export class IntegrationTestsStack extends cdk.Stack {
     const pythonLayer = getLatestLayerVersion(this, 'pythonLrapLayer', 'dash0-extension-python');
     const nodeLayer = getLatestLayerVersion(this, 'nodeLrapLayer', 'dash0-extension-node');
     const javaLayer = getLatestLayerVersion(this, 'javaLrapLayer', 'dash0-extension-java');
+    const manualLayer = getLatestLayerVersion(this, 'manualLrapLayer', 'dash0-extension-manual');
     const role = new iam.Role(this, 'IntegrationTestsLambdaRole', {
       assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
       managedPolicies: [
@@ -195,6 +239,12 @@ export class IntegrationTestsStack extends cdk.Stack {
     new JavaStack(this, 'JavaStack', {
       role,
       layer: javaLayer,
+      logGroup: sharedLogGroup,
+    });
+
+    new ManualStack(this, 'ManualStack', {
+      role,
+      layer: manualLayer,
       logGroup: sharedLogGroup,
     });
   }

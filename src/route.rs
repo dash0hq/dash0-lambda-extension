@@ -5,6 +5,7 @@ use once_cell::sync::Lazy;
 
 use crate::extension::telemetry_receiver::telemetry;
 use crate::otlp::logs_receiver::logs;
+use crate::otlp::metrics_receiver::metrics;
 use crate::otlp::receiver::traces;
 use crate::state::invocation_data::force_init_trace_store;
 
@@ -25,6 +26,7 @@ pub fn make_route<'a>() -> Router<'a> {
         )
         .post("/:apiver/traces", traces)
         .post("/:apiver/logs", logs)
+        .post("/:apiver/metrics", metrics)
         .post("/:apiver/telemetry", telemetry)
         .not_found(crate::extension::runtime_proxy::notfound_passthru_proxy);
     Lazy::force(&HTTPS_CLIENT);

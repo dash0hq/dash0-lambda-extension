@@ -12,7 +12,7 @@ tokio = { version = "1.29.1", features = ["full"] }
 hyper = { version = "0.14.27", features = ["client", "server", "runtime", "tcp", "stream", "http1"] }
 hyper-rustls = { version = "0.24", features = ["http1", "native-tokio", "tls12"] }
 httprouter = "0.5.0"
-opentelemetry-proto = { version = "0.31", features = ["trace", "logs", "with-serde"] }
+opentelemetry-proto = { version = "0.31", features = ["trace", "logs", "metrics", "with-serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 prost = "0.14.1"
 serde = { version = "1", features = ["derive"] }
