@@ -8,7 +8,7 @@ ECR_REPO_NAME="dash0-extension-python"
 CDK_QUALIFIER="hnb659fds"
 
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-REGION=$(aws configure get region)
+REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-$(aws configure get region)}}"
 
 echo "Setting up ECR policy for account $ACCOUNT_ID in region $REGION"
 
