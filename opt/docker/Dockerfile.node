@@ -1,0 +1,33 @@
+# Dockerfile for building the Node.js Lambda extension image
+#
+# This image contains the extension files at /opt and can be used in
+# multi-stage builds for containerized Lambda functions:
+#
+#   FROM public.ecr.aws/lambda/nodejs:20
+#   COPY --from=dash0/extension-node:latest /opt /opt
+#   ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper
+#   ...
+#
+# Build with:
+#   make docker-node
+#
+# Or manually:
+#   # First build the binaries and bundle the Node.js SDK
+#   make build/$(ZIP_NAME_NODE)
+#   # Then build the Docker image
+#   docker build -f opt/docker/Dockerfile.node -t dash0/extension-node:latest .
+
+FROM scratch
+
+# Copy extension binaries (both architectures - entrypoint selects at runtime)
+COPY build/lrap_x86_64 /opt/lrap_x86_64
+COPY build/lrap_aarch64 /opt/lrap_aarch64
+
+# Copy entrypoint script (Lambda extension entry point)
+COPY opt/entrypoint /opt/extensions/lrap
+
+# Copy wrapper script
+COPY opt/node/wrapper /opt/wrapper
+
+# Copy bundled Node.js SDK (webpack output includes all dependencies)
+COPY opt/node/dist/init.mjs /opt/init.mjs
