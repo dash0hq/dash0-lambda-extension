@@ -14,8 +14,8 @@ CARGO_FEATURES :=
 PYTHON_DEPS_IMAGE := lrap-python-deps
 
 # Docker image settings
-DOCKER_REGISTRY ?= dash0
-DOCKER_IMAGE_PYTHON = $(DOCKER_REGISTRY)/extension-python
+# Use local image name by default (no registry prefix) to avoid pull attempts
+DOCKER_IMAGE_PYTHON ?= extension-python
 VERSION ?= latest
 
 #-- current-condition vars

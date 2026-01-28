@@ -215,11 +215,20 @@ class DockerizedStack extends cdk.NestedStack {
 
     new lambda.DockerImageFunction(this, 'dockerized-python', {
       functionName: 'dockerized-python',
-      code: lambda.DockerImageCode.fromImageAsset(path.join(__dirname, '../lambdas/dockerized')),
+      code: lambda.DockerImageCode.fromImageAsset(path.join(__dirname, '../lambdas/dockerized'), {
+        buildArgs: {
+          EXTENSION_IMAGE: 'extension-python:latest',
+        },
+      }),
       memorySize: 512,
       architecture: lambda.Architecture.X86_64,
       timeout: cdk.Duration.seconds(10),
       role: props.role,
+      environment: {
+        DASH0_TOKEN: "auth_oEiAAAy5hZvVsEAADPm4uDyV7OcBmU4B",
+        DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
+        DASH0_EXTENSION_LOG_LEVEL: "info",
+      },
       logGroup: props.logGroup,
       loggingFormat: lambda.LoggingFormat.TEXT,
     });
