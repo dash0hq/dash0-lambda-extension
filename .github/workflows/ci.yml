@@ -65,6 +65,8 @@ jobs:
       - name: Deploy CDK stack
         working-directory: integration-tests/iac
         run: npm run deploy
+        env:
+          DASH0_DEV_API_TOKEN: ${{ secrets.DASH0_DEV_API_TOKEN }}
       - name: Install test dependencies
         working-directory: integration-tests/tests
         run: npm ci
