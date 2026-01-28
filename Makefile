@@ -10,8 +10,13 @@ LAMBDA_LAYER_MARKER_PYTHON := .lambda-layer-python
 LAMBDA_LAYER_MARKER_NODE := .lambda-layer-node
 LAMBDA_LAYER_MARKER_JAVA := .lambda-layer-java
 LAMBDA_LAYER_MARKER_MANUAL := .lambda-layer-manual
-CARGO_FEATURES := 
+CARGO_FEATURES :=
 PYTHON_DEPS_IMAGE := lrap-python-deps
+
+# Docker image settings
+DOCKER_REGISTRY ?= dash0
+DOCKER_IMAGE_PYTHON = $(DOCKER_REGISTRY)/extension-python
+VERSION ?= latest
 
 #-- current-condition vars
 # Check if Docker is available or running-- needed by `cargo cross`.
@@ -20,7 +25,7 @@ DOCKER_RUNNING := $(shell docker ps > /dev/null 2>&1 && echo -n yes)
 RS_FILES := $(shell find src -name "*.rs")
 
 
-.phony: build clean cargo zip clean-build clean-cargo deploy-layer doc python node java manual
+.phony: build clean cargo zip clean-build clean-cargo deploy-layer doc python node java manual docker-python docker-push-python
 
 # * Build both x86_64 and aarch64 binaries
 # * create a Layer '.zip'
@@ -161,7 +166,28 @@ $(LAMBDA_LAYER_MARKER_MANUAL): build/$(ZIP_NAME_MANUAL)
 
 
 
-doc: 
+doc:
 	@cargo doc
 	@echo
 	@echo "Docs are located in target/doc/aws_lambda_runtime_api_proxy_rs/index.html"
+
+
+# =============================================================================
+# Docker targets for containerized Lambda deployments
+# =============================================================================
+
+# Build Docker image for Python extension
+# Usage: make docker-python VERSION=1.0.0
+docker-python: build/lrap_x86_64 build/lrap_aarch64 build/python
+	@echo "Building Docker image $(DOCKER_IMAGE_PYTHON):$(VERSION)"
+	@docker build -f docker/Dockerfile.python -t $(DOCKER_IMAGE_PYTHON):$(VERSION) .
+	@echo "Docker image built: $(DOCKER_IMAGE_PYTHON):$(VERSION)"
+	@echo ""
+	@echo "Usage in your Dockerfile:"
+	@echo "  COPY --from=$(DOCKER_IMAGE_PYTHON):$(VERSION) /opt /opt"
+	@echo "  ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper"
+
+# Push Docker image for Python extension
+docker-push-python: docker-python
+	@echo "Pushing Docker image $(DOCKER_IMAGE_PYTHON):$(VERSION)"
+	@docker push $(DOCKER_IMAGE_PYTHON):$(VERSION)
