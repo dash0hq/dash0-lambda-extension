@@ -4,7 +4,7 @@
 
 set -e
 
-ECR_REPOS=("dash0-extension-python" "dash0-extension-node")
+ECR_REPOS=("dash0-extension-python" "dash0-extension-node" "dash0-extension-java")
 CDK_QUALIFIER="hnb659fds"
 
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)

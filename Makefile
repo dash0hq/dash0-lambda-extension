@@ -19,8 +19,10 @@ AWS_REGION ?= $(shell aws configure get region)
 ECR_REGISTRY := $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 ECR_REPO_PYTHON ?= dash0-extension-python
 ECR_REPO_NODE ?= dash0-extension-node
+ECR_REPO_JAVA ?= dash0-extension-java
 DOCKER_IMAGE_PYTHON := $(ECR_REGISTRY)/$(ECR_REPO_PYTHON)
 DOCKER_IMAGE_NODE := $(ECR_REGISTRY)/$(ECR_REPO_NODE)
+DOCKER_IMAGE_JAVA := $(ECR_REGISTRY)/$(ECR_REPO_JAVA)
 VERSION ?= latest
 
 #-- current-condition vars
@@ -30,13 +32,13 @@ DOCKER_RUNNING := $(shell docker ps > /dev/null 2>&1 && echo -n yes)
 RS_FILES := $(shell find src -name "*.rs")
 
 
-.phony: build clean cargo zip clean-build clean-cargo deploy-layer doc python node java manual docker-python docker-node
+.phony: build clean cargo zip clean-build clean-cargo deploy-layer doc python node java manual docker-python docker-node docker-java
 
 # * Build both x86_64 and aarch64 binaries
 # * create a Layer '.zip'
 # * use AWS CLI to publish Lambda layer
 #
-default: python node java manual docker-python docker-node
+default: python node java manual docker-python docker-node docker-java
 
 clean: clean-build clean-cargo
 
@@ -215,4 +217,21 @@ docker-node: build/lrap_x86_64 build/lrap_aarch64
 	@echo ""
 	@echo "Usage in your Dockerfile:"
 	@echo "  COPY --from=$(DOCKER_IMAGE_NODE):$(VERSION) /opt /opt"
+	@echo "  ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper"
+
+# Build and push Docker image for Java extension to ECR
+# Usage: make docker-java VERSION=1.0.0
+docker-java: build/lrap_x86_64 build/lrap_aarch64
+	@echo "Creating ECR repository $(ECR_REPO_JAVA) if it doesn't exist..."
+	@aws ecr describe-repositories --repository-names $(ECR_REPO_JAVA) 2>/dev/null || \
+		aws ecr create-repository --repository-name $(ECR_REPO_JAVA) --no-cli-pager
+	@echo "Logging in to ECR..."
+	@aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(ECR_REGISTRY)
+	@echo "Building Docker image $(DOCKER_IMAGE_JAVA):$(VERSION)"
+	@docker build -f opt/docker/Dockerfile.java -t $(DOCKER_IMAGE_JAVA):$(VERSION) .
+	@echo "Pushing Docker image $(DOCKER_IMAGE_JAVA):$(VERSION)"
+	@docker push $(DOCKER_IMAGE_JAVA):$(VERSION)
+	@echo ""
+	@echo "Usage in your Dockerfile:"
+	@echo "  COPY --from=$(DOCKER_IMAGE_JAVA):$(VERSION) /opt /opt"
 	@echo "  ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper"

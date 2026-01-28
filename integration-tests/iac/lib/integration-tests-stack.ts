@@ -216,7 +216,7 @@ class DockerizedStack extends cdk.NestedStack {
     const account = process.env.CDK_DEFAULT_ACCOUNT;
     const region = process.env.CDK_DEFAULT_REGION;
 
-    for (const runtime of ["python", "node"]) {
+    for (const runtime of ["python", "node", "java"]) {
       for (const architecture of [lambda.Architecture.X86_64, lambda.Architecture.ARM_64]) {
         const extensionImage = `${account}.dkr.ecr.${region}.amazonaws.com/dash0-extension-${runtime}:latest`;
         new lambda.DockerImageFunction(this, `dockerized-${runtime}-${architecture.name}`, {
