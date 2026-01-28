@@ -15,7 +15,6 @@ PYTHON_DEPS_IMAGE := lrap-python-deps
 
 # Docker/ECR image settings
 AWS_ACCOUNT_ID := $(shell aws sts get-caller-identity --query Account --output text)
-AWS_REGION := $(shell aws configure get region)
 ECR_REGISTRY := $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 ECR_REPO_PYTHON ?= dash0-extension-python
 DOCKER_IMAGE_PYTHON := $(ECR_REGISTRY)/$(ECR_REPO_PYTHON)
