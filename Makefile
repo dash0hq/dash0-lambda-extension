@@ -34,7 +34,7 @@ RS_FILES := $(shell find src -name "*.rs")
 # * create a Layer '.zip'
 # * use AWS CLI to publish Lambda layer
 #
-default: python node java manual
+default: python node java manual docker-python
 
 clean: clean-build clean-cargo
 

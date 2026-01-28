@@ -60,7 +60,7 @@ jobs:
         run: npm ci
       - name: Deploy CDK stack
         working-directory: integration-tests/iac
-        run: npx cdk deploy --require-approval never
+        run: npm run deploy
       - name: Install test dependencies
         working-directory: integration-tests/tests
         run: npm ci
