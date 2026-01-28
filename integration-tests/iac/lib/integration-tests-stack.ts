@@ -225,6 +225,7 @@ class DockerizedStack extends cdk.NestedStack {
             buildArgs: {
               EXTENSION_IMAGE: extensionImage,
             },
+            extraHash: Date.now().toString(),
           }),
           memorySize: 512,
           architecture,
