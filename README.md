@@ -9,6 +9,11 @@ This extension has four main functionalities:
 4. Collect all logs and send to Dash0, correlated with the trace id of the invocation.
 
 
+## Layer ARNs
+
+TBD
+
+
 ## Configuration
 
 ### Required
@@ -26,6 +31,10 @@ This extension has four main functionalities:
 * `DASH0_ENDPOINT` - Custom endpoint URL for sending telemetry data. Default: Dash0 ingestion endpoint.
 
 * `DASH0_EXTENSION_LOG_LEVEL` - Log level for the extension itself. Valid values: `trace`, `debug`, `info`, `warn`, `error`. Default: `warn`.
+
+* `DASH0_REQUEST_TIMEOUT` - Timeout in milliseconds for HTTP requests to the backend. Default: `2000`.
+
+* `DASH0_MAX_EVENT_PAYLOAD` - Maximum size in KB for event payloads (request/response bodies) captured in traces. Payloads exceeding this limit are truncated. Default: `20`.
 
 ### Secret Masking
 
