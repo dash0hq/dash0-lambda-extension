@@ -10,8 +10,20 @@ LAMBDA_LAYER_MARKER_PYTHON := .lambda-layer-python
 LAMBDA_LAYER_MARKER_NODE := .lambda-layer-node
 LAMBDA_LAYER_MARKER_JAVA := .lambda-layer-java
 LAMBDA_LAYER_MARKER_MANUAL := .lambda-layer-manual
-CARGO_FEATURES := 
+CARGO_FEATURES :=
 PYTHON_DEPS_IMAGE := lrap-python-deps
+
+# Docker/ECR image settings
+AWS_ACCOUNT_ID := $(shell aws sts get-caller-identity --query Account --output text)
+AWS_REGION ?= $(shell aws configure get region)
+ECR_REGISTRY := $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+ECR_REPO_PYTHON ?= dash0-extension-python
+ECR_REPO_NODE ?= dash0-extension-node
+ECR_REPO_JAVA ?= dash0-extension-java
+DOCKER_IMAGE_PYTHON := $(ECR_REGISTRY)/$(ECR_REPO_PYTHON)
+DOCKER_IMAGE_NODE := $(ECR_REGISTRY)/$(ECR_REPO_NODE)
+DOCKER_IMAGE_JAVA := $(ECR_REGISTRY)/$(ECR_REPO_JAVA)
+VERSION ?= latest
 
 #-- current-condition vars
 # Check if Docker is available or running-- needed by `cargo cross`.
@@ -20,13 +32,13 @@ DOCKER_RUNNING := $(shell docker ps > /dev/null 2>&1 && echo -n yes)
 RS_FILES := $(shell find src -name "*.rs")
 
 
-.phony: build clean cargo zip clean-build clean-cargo deploy-layer doc python node java manual
+.phony: build clean cargo zip clean-build clean-cargo deploy-layer doc python node java manual docker-python docker-node docker-java
 
 # * Build both x86_64 and aarch64 binaries
 # * create a Layer '.zip'
 # * use AWS CLI to publish Lambda layer
 #
-default: python node java manual
+default: python node java manual docker-python docker-node docker-java
 
 clean: clean-build clean-cargo
 
@@ -161,7 +173,71 @@ $(LAMBDA_LAYER_MARKER_MANUAL): build/$(ZIP_NAME_MANUAL)
 
 
 
-doc: 
+doc:
 	@cargo doc
 	@echo
 	@echo "Docs are located in target/doc/aws_lambda_runtime_api_proxy_rs/index.html"
+
+
+# =============================================================================
+# Docker targets for containerized Lambda deployments
+# Multi-platform builds (linux/amd64 + linux/arm64) using docker buildx
+# =============================================================================
+
+BUILDX_BUILDER := multiplatform-builder
+
+# Ensure buildx builder exists for multi-platform builds
+.PHONY: ensure-buildx
+ensure-buildx:
+	@docker buildx inspect $(BUILDX_BUILDER) >/dev/null 2>&1 || \
+		docker buildx create --name $(BUILDX_BUILDER) --use --bootstrap
+
+# Build and push Docker image for Python extension to ECR
+# Usage: make docker-python VERSION=1.0.0
+docker-python: build/lrap_x86_64 build/lrap_aarch64 build/python ensure-buildx
+	@echo "Creating ECR repository $(ECR_REPO_PYTHON) if it doesn't exist..."
+	@aws ecr describe-repositories --repository-names $(ECR_REPO_PYTHON) 2>/dev/null || \
+		aws ecr create-repository --repository-name $(ECR_REPO_PYTHON) --no-cli-pager
+	@echo "Logging in to ECR..."
+	@aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(ECR_REGISTRY)
+	@echo "Building and pushing multi-platform Docker image $(DOCKER_IMAGE_PYTHON):$(VERSION)"
+	@docker buildx build --builder $(BUILDX_BUILDER) --platform linux/amd64,linux/arm64 \
+		-f opt/docker/Dockerfile.python -t $(DOCKER_IMAGE_PYTHON):$(VERSION) --push .
+	@echo ""
+	@echo "Usage in your Dockerfile:"
+	@echo "  COPY --from=$(DOCKER_IMAGE_PYTHON):$(VERSION) /opt /opt"
+	@echo "  ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper"
+
+# Build and push Docker image for Node.js extension to ECR
+# Usage: make docker-node VERSION=1.0.0
+docker-node: build/lrap_x86_64 build/lrap_aarch64 ensure-buildx
+	@echo "Building Node.js SDK..."
+	@cd opt/node && npm install && npm run build
+	@echo "Creating ECR repository $(ECR_REPO_NODE) if it doesn't exist..."
+	@aws ecr describe-repositories --repository-names $(ECR_REPO_NODE) 2>/dev/null || \
+		aws ecr create-repository --repository-name $(ECR_REPO_NODE) --no-cli-pager
+	@echo "Logging in to ECR..."
+	@aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(ECR_REGISTRY)
+	@echo "Building and pushing multi-platform Docker image $(DOCKER_IMAGE_NODE):$(VERSION)"
+	@docker buildx build --builder $(BUILDX_BUILDER) --platform linux/amd64,linux/arm64 \
+		-f opt/docker/Dockerfile.node -t $(DOCKER_IMAGE_NODE):$(VERSION) --push .
+	@echo ""
+	@echo "Usage in your Dockerfile:"
+	@echo "  COPY --from=$(DOCKER_IMAGE_NODE):$(VERSION) /opt /opt"
+	@echo "  ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper"
+
+# Build and push Docker image for Java extension to ECR
+# Usage: make docker-java VERSION=1.0.0
+docker-java: build/lrap_x86_64 build/lrap_aarch64 ensure-buildx
+	@echo "Creating ECR repository $(ECR_REPO_JAVA) if it doesn't exist..."
+	@aws ecr describe-repositories --repository-names $(ECR_REPO_JAVA) 2>/dev/null || \
+		aws ecr create-repository --repository-name $(ECR_REPO_JAVA) --no-cli-pager
+	@echo "Logging in to ECR..."
+	@aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(ECR_REGISTRY)
+	@echo "Building and pushing multi-platform Docker image $(DOCKER_IMAGE_JAVA):$(VERSION)"
+	@docker buildx build --builder $(BUILDX_BUILDER) --platform linux/amd64,linux/arm64 \
+		-f opt/docker/Dockerfile.java -t $(DOCKER_IMAGE_JAVA):$(VERSION) --push .
+	@echo ""
+	@echo "Usage in your Dockerfile:"
+	@echo "  COPY --from=$(DOCKER_IMAGE_JAVA):$(VERSION) /opt /opt"
+	@echo "  ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper"

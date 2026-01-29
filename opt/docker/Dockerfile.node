@@ -1,0 +1,43 @@
+# Dockerfile for building the Node.js Lambda extension image
+#
+# This image contains the extension files at /opt and can be used in
+# multi-stage builds for containerized Lambda functions:
+#
+#   FROM public.ecr.aws/lambda/nodejs:20
+#   COPY --from=dash0/extension-node:latest /opt /opt
+#   ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper
+#   ...
+#
+# Build with:
+#   make docker-node
+#
+# Or manually:
+#   # First build the binaries and bundle the Node.js SDK
+#   make build/$(ZIP_NAME_NODE)
+#   # Then build the Docker image
+#   docker build -f opt/docker/Dockerfile.node -t dash0/extension-node:latest .
+
+FROM scratch
+
+# Copy extension binaries (both architectures - entrypoint selects at runtime)
+COPY build/lrap_x86_64 /opt/lrap_x86_64
+COPY build/lrap_aarch64 /opt/lrap_aarch64
+
+# Copy entrypoint script (Lambda extension entry point)
+COPY opt/entrypoint /opt/extensions/lrap
+
+# Copy wrapper script
+COPY opt/node/wrapper /opt/wrapper
+
+# Copy bundled Node.js SDK (webpack output)
+COPY opt/node/dist/init.mjs /opt/init.mjs
+
+# Copy external dependencies that are not bundled by webpack
+COPY opt/node/node_modules/require-in-the-middle /opt/node_modules/require-in-the-middle
+COPY opt/node/node_modules/import-in-the-middle /opt/node_modules/import-in-the-middle
+COPY opt/node/node_modules/module-details-from-path /opt/node_modules/module-details-from-path
+COPY opt/node/node_modules/debug /opt/node_modules/debug
+COPY opt/node/node_modules/ms /opt/node_modules/ms
+COPY opt/node/node_modules/acorn /opt/node_modules/acorn
+COPY opt/node/node_modules/acorn-import-attributes /opt/node_modules/acorn-import-attributes
+COPY opt/node/node_modules/cjs-module-lexer /opt/node_modules/cjs-module-lexer

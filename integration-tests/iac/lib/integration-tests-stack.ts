@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as ecr_assets from 'aws-cdk-lib/aws-ecr-assets';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as cr from 'aws-cdk-lib/custom-resources';
@@ -71,7 +72,7 @@ function createLambdas(
             const runtimeName = runtime.name.replace(/\./g, '-');
             const environment: any = {
               AWS_LAMBDA_EXEC_WRAPPER: "/opt/wrapper",
-              DASH0_TOKEN: "auth_oEiAAAy5hZvVsEAADPm4uDyV7OcBmU4B",
+              DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
               DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
               DASH0_EXTENSION_LOG_LEVEL: "info",
               SEND_ON_INVOCATION_END: invocationEnd,
@@ -193,13 +194,57 @@ class ManualStack extends cdk.NestedStack {
         role: props.role,
         environment: {
           AWS_LAMBDA_EXEC_WRAPPER: "/opt/wrapper",
-          DASH0_TOKEN: "auth_oEiAAAy5hZvVsEAADPm4uDyV7OcBmU4B",
+          DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
           DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
           DASH0_EXTENSION_LOG_LEVEL: "info",
         },
         logGroup: props.logGroup,
         loggingFormat: lambda.LoggingFormat.TEXT,
       });
+    }
+  }
+}
+
+interface DockerizedStackProps extends cdk.NestedStackProps {
+  role: iam.Role;
+  logGroup: logs.ILogGroup;
+}
+
+class DockerizedStack extends cdk.NestedStack {
+  constructor(scope: Construct, id: string, props: DockerizedStackProps) {
+    super(scope, id, props);
+
+    const account = process.env.CDK_DEFAULT_ACCOUNT;
+    const region = process.env.CDK_DEFAULT_REGION;
+
+    for (const runtime of ["python", "node", "java"]) {
+      for (const architecture of [lambda.Architecture.X86_64, lambda.Architecture.ARM_64]) {
+        const extensionImage = `${account}.dkr.ecr.${region}.amazonaws.com/dash0-extension-${runtime}:latest`;
+        const platform = architecture === lambda.Architecture.ARM_64
+          ? ecr_assets.Platform.LINUX_ARM64
+          : ecr_assets.Platform.LINUX_AMD64;
+        new lambda.DockerImageFunction(this, `dockerized-${runtime}-${architecture.name}`, {
+          functionName: `dockerized-${runtime}-${architecture.name}`,
+          code: lambda.DockerImageCode.fromImageAsset(path.join(__dirname, `../lambdas/dockerized-${runtime}`), {
+            buildArgs: {
+              EXTENSION_IMAGE: extensionImage,
+            },
+            extraHash: Date.now().toString(),
+            platform,
+          }),
+          memorySize: 512,
+          architecture,
+          timeout: cdk.Duration.seconds(10),
+          role: props.role,
+          environment: {
+            DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
+            DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
+            DASH0_EXTENSION_LOG_LEVEL: "info",
+          },
+          logGroup: props.logGroup,
+          loggingFormat: lambda.LoggingFormat.TEXT,
+        });
+      }
     }
   }
 }
@@ -245,6 +290,11 @@ export class IntegrationTestsStack extends cdk.Stack {
     new ManualStack(this, 'ManualStack', {
       role,
       layer: manualLayer,
+      logGroup: sharedLogGroup,
+    });
+
+    new DockerizedStack(this, 'DockerizedStack', {
+      role,
       logGroup: sharedLogGroup,
     });
   }
