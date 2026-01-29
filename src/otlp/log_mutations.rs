@@ -967,7 +967,7 @@ mod tests {
         // Set AWS_LAMBDA_EXEC_WRAPPER so is_auto_instrumented_disabled() returns false
         // This is required for the "put back to store" branch to be taken
         std::env::set_var("AWS_LAMBDA_EXEC_WRAPPER", "/opt/wrapper");
-        std::env::remove_var("DISABLE_AUTO_INSTRUMENTATION");
+        std::env::remove_var("DASH0_DISABLE_AUTO_INSTRUMENTATION");
 
         let logs = vec![TelemetryLog {
             time: "2023-10-26T12:00:00.000Z".to_string(),

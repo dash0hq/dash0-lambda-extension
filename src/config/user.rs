@@ -1,7 +1,7 @@
-/// Return true if SEND_ON_INVOCATION_END is set to a truthy value.
+/// Return true if DASH0_SEND_ON_INVOCATION_END is set to a truthy value.
 /// Defaults to true when unset or unrecognized.
 pub fn is_send_on_invocation_end() -> bool {
-    match std::env::var("SEND_ON_INVOCATION_END") {
+    match std::env::var("DASH0_SEND_ON_INVOCATION_END") {
         Ok(val) => matches!(
             val.as_str(),
             "1" | "true" | "TRUE" | "True" | "yes" | "YES" | "Yes" | "y" | "Y"
@@ -15,7 +15,7 @@ pub fn is_auto_instrumented_disabled() -> bool {
         return true;
     }
 
-    match std::env::var("DISABLE_AUTO_INSTRUMENTATION") {
+    match std::env::var("DASH0_DISABLE_AUTO_INSTRUMENTATION") {
         Ok(val) => matches!(
             val.as_str(),
             "1" | "true" | "TRUE" | "True" | "yes" | "YES" | "Yes" | "y" | "Y"
@@ -25,7 +25,7 @@ pub fn is_auto_instrumented_disabled() -> bool {
 }
 
 pub fn max_event_payload_size() -> usize {
-    match std::env::var("MAX_EVENT_PAYLOAD") {
+    match std::env::var("DASH0_MAX_EVENT_PAYLOAD") {
         Ok(val) => val.parse::<usize>().unwrap_or(20) * 1024,
         Err(_) => 20 * 1024,
     }
@@ -66,7 +66,7 @@ mod tests {
     #[test]
     #[serial]
     fn defaults_to_true_when_missing() {
-        std::env::remove_var("SEND_ON_INVOCATION_END");
+        std::env::remove_var("DASH0_SEND_ON_INVOCATION_END");
         assert!(is_send_on_invocation_end());
     }
 
@@ -74,20 +74,20 @@ mod tests {
     #[serial]
     fn recognizes_truthy_values() {
         for val in ["1", "true", "TRUE", "True", "yes", "YES", "Yes", "y", "Y"] {
-            std::env::set_var("SEND_ON_INVOCATION_END", val);
+            std::env::set_var("DASH0_SEND_ON_INVOCATION_END", val);
             assert!(is_send_on_invocation_end(), "value {}", val);
         }
-        std::env::remove_var("SEND_ON_INVOCATION_END");
+        std::env::remove_var("DASH0_SEND_ON_INVOCATION_END");
     }
 
     #[test]
     #[serial]
     fn false_for_other_values() {
         for val in ["0", "false", "no", "maybe", ""] {
-            std::env::set_var("SEND_ON_INVOCATION_END", val);
+            std::env::set_var("DASH0_SEND_ON_INVOCATION_END", val);
             assert!(!is_send_on_invocation_end(), "value {}", val);
         }
-        std::env::remove_var("SEND_ON_INVOCATION_END");
+        std::env::remove_var("DASH0_SEND_ON_INVOCATION_END");
     }
 
     #[test]
@@ -101,7 +101,7 @@ mod tests {
     #[serial]
     fn auto_instrumentation_enabled_when_wrapper_present() {
         std::env::set_var("AWS_LAMBDA_EXEC_WRAPPER", "/opt/lumigo_wrapper");
-        std::env::remove_var("DISABLE_AUTO_INSTRUMENTATION");
+        std::env::remove_var("DASH0_DISABLE_AUTO_INSTRUMENTATION");
         assert!(!is_auto_instrumented_disabled());
         std::env::remove_var("AWS_LAMBDA_EXEC_WRAPPER");
     }
@@ -110,33 +110,33 @@ mod tests {
     #[serial]
     fn auto_instrumentation_disabled_explicitly() {
         std::env::set_var("AWS_LAMBDA_EXEC_WRAPPER", "/opt/lumigo_wrapper");
-        std::env::set_var("DISABLE_AUTO_INSTRUMENTATION", "true");
+        std::env::set_var("DASH0_DISABLE_AUTO_INSTRUMENTATION", "true");
         assert!(is_auto_instrumented_disabled());
         std::env::remove_var("AWS_LAMBDA_EXEC_WRAPPER");
-        std::env::remove_var("DISABLE_AUTO_INSTRUMENTATION");
+        std::env::remove_var("DASH0_DISABLE_AUTO_INSTRUMENTATION");
     }
 
     #[test]
     #[serial]
     fn max_event_payload_size_defaults_to_20kb() {
-        std::env::remove_var("MAX_EVENT_PAYLOAD");
+        std::env::remove_var("DASH0_MAX_EVENT_PAYLOAD");
         assert_eq!(max_event_payload_size(), 20 * 1024);
     }
 
     #[test]
     #[serial]
     fn max_event_payload_size_parses_value() {
-        std::env::set_var("MAX_EVENT_PAYLOAD", "100");
+        std::env::set_var("DASH0_MAX_EVENT_PAYLOAD", "100");
         assert_eq!(max_event_payload_size(), 100 * 1024);
-        std::env::remove_var("MAX_EVENT_PAYLOAD");
+        std::env::remove_var("DASH0_MAX_EVENT_PAYLOAD");
     }
 
     #[test]
     #[serial]
     fn max_event_payload_size_handles_invalid_value() {
-        std::env::set_var("MAX_EVENT_PAYLOAD", "not_a_number");
+        std::env::set_var("DASH0_MAX_EVENT_PAYLOAD", "not_a_number");
         assert_eq!(max_event_payload_size(), 20 * 1024);
-        std::env::remove_var("MAX_EVENT_PAYLOAD");
+        std::env::remove_var("DASH0_MAX_EVENT_PAYLOAD");
     }
 
     #[test]
