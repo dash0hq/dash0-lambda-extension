@@ -312,7 +312,7 @@ mod tests {
     #[serial]
     fn process_payload_truncates_at_char_boundary_for_multibyte_utf8() {
         // Set a small max payload size (1KB)
-        std::env::set_var("MAX_EVENT_PAYLOAD", "1");
+        std::env::set_var("DASH0_MAX_EVENT_PAYLOAD", "1");
 
         // Create a payload with multi-byte UTF-8 characters (Korean '생' is 3 bytes)
         // The payload is designed so truncation at exactly 1024 bytes would fall mid-character
@@ -328,14 +328,14 @@ mod tests {
         // The result should end at a character boundary (not mid-character)
         assert!(result.is_char_boundary(result.len()));
 
-        std::env::remove_var("MAX_EVENT_PAYLOAD");
+        std::env::remove_var("DASH0_MAX_EVENT_PAYLOAD");
     }
 
     #[test]
     #[serial]
     fn process_payload_handles_truncation_mid_emoji() {
         // Set a small max payload size (1KB)
-        std::env::set_var("MAX_EVENT_PAYLOAD", "1");
+        std::env::set_var("DASH0_MAX_EVENT_PAYLOAD", "1");
 
         // Emoji '😀' is 4 bytes (F0 9F 98 80)
         let base = "x".repeat(1022);
@@ -347,19 +347,19 @@ mod tests {
         assert!(result.len() <= 1024);
         assert!(result.chars().count() > 0);
 
-        std::env::remove_var("MAX_EVENT_PAYLOAD");
+        std::env::remove_var("DASH0_MAX_EVENT_PAYLOAD");
     }
 
     #[test]
     #[serial]
     fn process_payload_no_truncation_when_under_limit() {
-        std::env::set_var("MAX_EVENT_PAYLOAD", "1");
+        std::env::set_var("DASH0_MAX_EVENT_PAYLOAD", "1");
 
         let payload = "short payload";
         let result = process_payload(payload.as_bytes());
 
         assert_eq!(result, payload);
 
-        std::env::remove_var("MAX_EVENT_PAYLOAD");
+        std::env::remove_var("DASH0_MAX_EVENT_PAYLOAD");
     }
 }

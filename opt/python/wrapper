@@ -35,8 +35,8 @@ fi
 echo "{\"OTEL_SERVICE_NAME\": \"$OTEL_SERVICE_NAME\", \"OTEL_RESOURCE_ATTRIBUTES\": \"$OTEL_RESOURCE_ATTRIBUTES\"}" > /tmp/lumigo_env_vars || true
 
 
-# enable auto instrumentation unless DISABLE_AUTO_INSTRUMENTATION is set
-if [ -z "$DISABLE_AUTO_INSTRUMENTATION" ] || [ "${DISABLE_AUTO_INSTRUMENTATION,,}" = "false" ]; then
+# enable auto instrumentation unless DASH0_DISABLE_AUTO_INSTRUMENTATION is set
+if [ -z "$DASH0_DISABLE_AUTO_INSTRUMENTATION" ] || [ "${DASH0_DISABLE_AUTO_INSTRUMENTATION,,}" = "false" ]; then
   export LAMBDA_LAYER_PKGS_DIR="/opt/python";
   export PYTHONPATH="$LAMBDA_LAYER_PKGS_DIR:$PYTHONPATH";
   export PYTHONPATH="$LAMBDA_RUNTIME_DIR:$PYTHONPATH";
