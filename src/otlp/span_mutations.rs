@@ -12,7 +12,7 @@ use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use opentelemetry_proto::tonic::common::v1::any_value::Value;
 use opentelemetry_proto::tonic::common::v1::{AnyValue, InstrumentationScope, KeyValue};
 use opentelemetry_proto::tonic::resource::v1::Resource;
-use opentelemetry_proto::tonic::trace::v1::span::{Event, SpanKind};
+use opentelemetry_proto::tonic::trace::v1::span::{Event, Link, SpanKind};
 use opentelemetry_proto::tonic::trace::v1::status::StatusCode;
 use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span, Status};
 use prost::Message;
@@ -314,6 +314,71 @@ fn is_lambda_instrumentation_scope(scope_name: &str) -> bool {
         || scope_name == "OpenTelemetry.Instrumentation.AWSLambda"
 }
 
+/// Parses a W3C traceparent header and returns (trace_id, span_id) as byte vectors.
+/// Format: {version}-{trace_id}-{span_id}-{flags}
+/// Example: 00-026d2b5d090c15f6423df90800000000-157c058e59db86fb-01
+fn parse_traceparent(traceparent: &str) -> Option<(Vec<u8>, Vec<u8>)> {
+    let parts: Vec<&str> = traceparent.split('-').collect();
+    if parts.len() != 4 {
+        return None;
+    }
+    // parts[0] = version (00)
+    // parts[1] = trace_id (32 hex chars = 16 bytes)
+    // parts[2] = span_id (16 hex chars = 8 bytes)
+    // parts[3] = flags
+
+    let trace_id = hex::decode(parts[1]).ok()?;
+    let span_id = hex::decode(parts[2]).ok()?;
+
+    if trace_id.len() != 16 || span_id.len() != 8 {
+        return None;
+    }
+
+    Some((trace_id, span_id))
+}
+
+/// Extracts span links from SQS event payload.
+/// Looks for Records[].messageAttributes.traceparent.stringValue
+fn extract_sqs_span_links(event_payload: &str) -> Vec<Link> {
+    let mut links = Vec::new();
+
+    let json_val: serde_json::Value = match serde_json::from_str(event_payload) {
+        Ok(v) => v,
+        Err(_) => return links,
+    };
+
+    let records = match json_val.get("Records").and_then(|v| v.as_array()) {
+        Some(r) => r,
+        None => return links,
+    };
+
+    for record in records {
+        // Check if this is an SQS event
+        if record.get("eventSource").and_then(|v| v.as_str()) != Some("aws:sqs") {
+            continue;
+        }
+
+        // Try to get traceparent from messageAttributes
+        let traceparent = record
+            .get("messageAttributes")
+            .and_then(|ma| ma.get("traceparent"))
+            .and_then(|tp| tp.get("stringValue"))
+            .and_then(|sv| sv.as_str());
+
+        if let Some(tp) = traceparent {
+            if let Some((trace_id, span_id)) = parse_traceparent(tp) {
+                links.push(Link {
+                    trace_id,
+                    span_id,
+                    ..Default::default()
+                });
+            }
+        }
+    }
+
+    links
+}
+
 pub fn add_event_payload_to_lambda_server_spans(
     request: &mut ExportTraceServiceRequest,
     invocation_ids: &mut Vec<String>,
@@ -338,6 +403,18 @@ fn annotate_server_spans(spans: &mut Vec<Span>, invocation_ids: &mut Vec<String>
             invocation_ids.push(invocation_id.clone());
 
             if let Some(event_payload) = get_event_payload(&invocation_id) {
+                // Extract SQS span links before consuming event_payload
+                let sqs_links = extract_sqs_span_links(&event_payload);
+                if !sqs_links.is_empty() {
+                    tracing::trace!(
+                        "[{}] Adding {} SQS span links to lambda span for invocation_id={}",
+                        crate::log_prefix(),
+                        sqs_links.len(),
+                        invocation_id
+                    );
+                    span.links.extend(sqs_links);
+                }
+
                 span.attributes.push(KeyValue {
                     key: "faas.event".to_string(),
                     value: Some(AnyValue {
@@ -1421,6 +1498,168 @@ mod tests {
         // timestamps (ms -> ns)
         assert_eq!(span.start_time_unix_nano, 1_000_000_000);
         assert_eq!(span.end_time_unix_nano, 2_000_000_000);
+    }
+
+    #[test]
+    fn parse_traceparent_valid() {
+        let traceparent = "00-026d2b5d090c15f6423df90800000000-157c058e59db86fb-01";
+        let (trace_id, span_id) =
+            super::parse_traceparent(traceparent).expect("should parse valid traceparent");
+
+        assert_eq!(trace_id.len(), 16);
+        assert_eq!(span_id.len(), 8);
+        assert_eq!(hex::encode(&trace_id), "026d2b5d090c15f6423df90800000000");
+        assert_eq!(hex::encode(&span_id), "157c058e59db86fb");
+    }
+
+    #[test]
+    fn parse_traceparent_invalid_format() {
+        assert!(super::parse_traceparent("invalid").is_none());
+        assert!(super::parse_traceparent("00-abc-def-01").is_none());
+        assert!(super::parse_traceparent("").is_none());
+    }
+
+    #[test]
+    fn extract_sqs_span_links_with_valid_sqs_event() {
+        let event_payload = r#"{
+            "Records": [
+                {
+                    "eventSource": "aws:sqs",
+                    "messageAttributes": {
+                        "traceparent": {
+                            "stringValue": "00-026d2b5d090c15f6423df90800000000-157c058e59db86fb-01"
+                        }
+                    }
+                }
+            ]
+        }"#;
+
+        let links = super::extract_sqs_span_links(event_payload);
+
+        assert_eq!(links.len(), 1);
+        assert_eq!(
+            hex::encode(&links[0].trace_id),
+            "026d2b5d090c15f6423df90800000000"
+        );
+        assert_eq!(hex::encode(&links[0].span_id), "157c058e59db86fb");
+    }
+
+    #[test]
+    fn extract_sqs_span_links_with_multiple_records() {
+        let event_payload = r#"{
+            "Records": [
+                {
+                    "eventSource": "aws:sqs",
+                    "messageAttributes": {
+                        "traceparent": {
+                            "stringValue": "00-aaaabbbbccccddddeeeeffffaaaabbbb-1111222233334444-01"
+                        }
+                    }
+                },
+                {
+                    "eventSource": "aws:sqs",
+                    "messageAttributes": {
+                        "traceparent": {
+                            "stringValue": "00-11112222333344445555666677778888-5555666677778888-01"
+                        }
+                    }
+                }
+            ]
+        }"#;
+
+        let links = super::extract_sqs_span_links(event_payload);
+
+        assert_eq!(links.len(), 2);
+        assert_eq!(
+            hex::encode(&links[0].trace_id),
+            "aaaabbbbccccddddeeeeffffaaaabbbb"
+        );
+        assert_eq!(
+            hex::encode(&links[1].trace_id),
+            "11112222333344445555666677778888"
+        );
+    }
+
+    #[test]
+    fn extract_sqs_span_links_ignores_non_sqs_events() {
+        let event_payload = r#"{
+            "Records": [
+                {
+                    "eventSource": "aws:sns",
+                    "messageAttributes": {
+                        "traceparent": {
+                            "stringValue": "00-026d2b5d090c15f6423df90800000000-157c058e59db86fb-01"
+                        }
+                    }
+                }
+            ]
+        }"#;
+
+        let links = super::extract_sqs_span_links(event_payload);
+        assert!(links.is_empty());
+    }
+
+    #[test]
+    fn extract_sqs_span_links_handles_missing_traceparent() {
+        let event_payload = r#"{
+            "Records": [
+                {
+                    "eventSource": "aws:sqs",
+                    "messageAttributes": {}
+                }
+            ]
+        }"#;
+
+        let links = super::extract_sqs_span_links(event_payload);
+        assert!(links.is_empty());
+    }
+
+    #[test]
+    fn extract_sqs_span_links_handles_non_json() {
+        let links = super::extract_sqs_span_links("not json");
+        assert!(links.is_empty());
+    }
+
+    #[test]
+    fn extract_sqs_span_links_handles_no_records() {
+        let event_payload = r#"{"foo": "bar"}"#;
+        let links = super::extract_sqs_span_links(event_payload);
+        assert!(links.is_empty());
+    }
+
+    #[test]
+    #[serial]
+    fn add_event_payload_adds_sqs_span_links() {
+        let invocation_id = "inv-sqs-links";
+        let sqs_event = r#"{
+            "Records": [
+                {
+                    "eventSource": "aws:sqs",
+                    "messageAttributes": {
+                        "traceparent": {
+                            "stringValue": "00-abcdef01234567890123456789abcdef-fedcba9876543210-01"
+                        }
+                    }
+                }
+            ]
+        }"#;
+        store_event_payload(invocation_id, sqs_event);
+        let span = make_span_with_invocation(invocation_id);
+        let mut request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
+        let mut invocation_ids = Vec::new();
+
+        let added = add_event_payload_to_lambda_server_spans(&mut request, &mut invocation_ids);
+
+        assert!(added, "expected faas.event to be added");
+        let span = &request.resource_spans[0].scope_spans[0].spans[0];
+
+        // Verify span links were added
+        assert_eq!(span.links.len(), 1, "expected 1 span link from SQS message");
+        assert_eq!(
+            hex::encode(&span.links[0].trace_id),
+            "abcdef01234567890123456789abcdef"
+        );
+        assert_eq!(hex::encode(&span.links[0].span_id), "fedcba9876543210");
     }
 }
 

@@ -1,1 +1,1 @@
-git+https://github.com/lumigo-io/opentelemetry-python-distro.git@rd-9999-improve-init-duration
+git+https://github.com/lumigo-io/opentelemetry-python-distro.git@dbdc6a3e8a6ed1cb7932e30d01a01c096dc01196
