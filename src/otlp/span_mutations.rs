@@ -71,14 +71,6 @@ pub fn build_synthetic_trace(
     if let Some(event_payload) = get_event_payload(invocation_id) {
         // Extract SQS span links before consuming event_payload
         sqs_links = extract_sqs_span_links(&event_payload);
-        if !sqs_links.is_empty() {
-            tracing::trace!(
-                "[{}] Adding {} SQS span links to synthetic span for invocation_id={}",
-                crate::log_prefix(),
-                sqs_links.len(),
-                invocation_id
-            );
-        }
 
         attributes.push(KeyValue {
             key: "faas.event".to_string(),
