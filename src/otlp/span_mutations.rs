@@ -361,6 +361,7 @@ fn extract_span_links(event_payload: &str) -> Vec<Link> {
     for record in records {
         // Check for SQS event (lowercase eventSource)
         if record.get("eventSource").and_then(|v| v.as_str()) == Some("aws:sqs") {
+            // First try: direct SQS messageAttributes
             let traceparent = record
                 .get("messageAttributes")
                 .and_then(|ma| ma.get("traceparent"))
@@ -369,6 +370,31 @@ fn extract_span_links(event_payload: &str) -> Vec<Link> {
 
             if let Some(tp) = traceparent {
                 if let Some((trace_id, span_id)) = parse_traceparent(tp) {
+                    links.push(Link {
+                        trace_id,
+                        span_id,
+                        ..Default::default()
+                    });
+                }
+                continue;
+            }
+
+            // Second try: SNS message embedded in SQS body (SNS → SQS → Lambda pattern)
+            let traceparent_from_body = record
+                .get("body")
+                .and_then(|b| b.as_str())
+                .and_then(|body_str| serde_json::from_str::<serde_json::Value>(body_str).ok())
+                .and_then(|body_json| {
+                    body_json
+                        .get("MessageAttributes")
+                        .and_then(|ma| ma.get("traceparent"))
+                        .and_then(|tp| tp.get("Value"))
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string())
+                });
+
+            if let Some(tp) = traceparent_from_body {
+                if let Some((trace_id, span_id)) = parse_traceparent(&tp) {
                     links.push(Link {
                         trace_id,
                         span_id,
@@ -1789,6 +1815,88 @@ mod tests {
             hex::encode(&links[1].trace_id),
             "11112222333344445555666677778888"
         );
+    }
+
+    #[test]
+    fn extract_span_links_from_sns_via_sqs() {
+        // SNS → SQS → Lambda pattern: traceparent is in the SNS message embedded in SQS body
+        let event_payload = r#"{
+            "Records": [
+                {
+                    "eventSource": "aws:sqs",
+                    "messageAttributes": {},
+                    "body": "{\"Type\":\"Notification\",\"MessageId\":\"a5bc81a6-95e1-5509-b973-e05a6e57f3e6\",\"TopicArn\":\"arn:aws:sns:us-west-2:123456789:topic\",\"Message\":\"test\",\"MessageAttributes\":{\"traceparent\":{\"Type\":\"String\",\"Value\":\"00-547e30d6367841ef2fb1000600000000-d24fe80e627d602e-01\"}}}"
+                }
+            ]
+        }"#;
+
+        let links = super::extract_span_links(event_payload);
+
+        assert_eq!(links.len(), 1);
+        assert_eq!(
+            hex::encode(&links[0].trace_id),
+            "547e30d6367841ef2fb1000600000000"
+        );
+        assert_eq!(hex::encode(&links[0].span_id), "d24fe80e627d602e");
+    }
+
+    #[test]
+    fn extract_span_links_from_sns_via_sqs_prefers_direct_message_attributes() {
+        // When both messageAttributes and body have traceparent, prefer messageAttributes
+        let event_payload = r#"{
+            "Records": [
+                {
+                    "eventSource": "aws:sqs",
+                    "messageAttributes": {
+                        "traceparent": {
+                            "stringValue": "00-aaaabbbbccccddddeeeeffffaaaabbbb-1111222233334444-01"
+                        }
+                    },
+                    "body": "{\"MessageAttributes\":{\"traceparent\":{\"Type\":\"String\",\"Value\":\"00-11112222333344445555666677778888-5555666677778888-01\"}}}"
+                }
+            ]
+        }"#;
+
+        let links = super::extract_span_links(event_payload);
+
+        assert_eq!(links.len(), 1);
+        // Should use the direct messageAttributes traceparent, not the one from body
+        assert_eq!(
+            hex::encode(&links[0].trace_id),
+            "aaaabbbbccccddddeeeeffffaaaabbbb"
+        );
+    }
+
+    #[test]
+    fn extract_span_links_from_sns_via_sqs_handles_invalid_body_json() {
+        let event_payload = r#"{
+            "Records": [
+                {
+                    "eventSource": "aws:sqs",
+                    "messageAttributes": {},
+                    "body": "not valid json"
+                }
+            ]
+        }"#;
+
+        let links = super::extract_span_links(event_payload);
+        assert!(links.is_empty());
+    }
+
+    #[test]
+    fn extract_span_links_from_sns_via_sqs_handles_body_without_traceparent() {
+        let event_payload = r#"{
+            "Records": [
+                {
+                    "eventSource": "aws:sqs",
+                    "messageAttributes": {},
+                    "body": "{\"Type\":\"Notification\",\"Message\":\"test\",\"MessageAttributes\":{}}"
+                }
+            ]
+        }"#;
+
+        let links = super::extract_span_links(event_payload);
+        assert!(links.is_empty());
     }
 
     #[test]
