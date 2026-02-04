@@ -342,9 +342,10 @@ fn parse_traceparent(traceparent: &str) -> Option<(Vec<u8>, Vec<u8>)> {
     Some((trace_id, span_id))
 }
 
-/// Extracts span links from SQS and SNS event payloads.
+/// Extracts span links from SQS, SNS, and EventBridge event payloads.
 /// For SQS: looks for Records[].messageAttributes.traceparent.stringValue (eventSource: "aws:sqs")
 /// For SNS: looks for Records[].Sns.MessageAttributes.traceparent.Value (EventSource: "aws:sns")
+/// For EventBridge: looks for detail.traceparent
 fn extract_span_links(event_payload: &str) -> Vec<Link> {
     let mut links = Vec::new();
 
@@ -352,6 +353,24 @@ fn extract_span_links(event_payload: &str) -> Vec<Link> {
         Ok(v) => v,
         Err(_) => return links,
     };
+
+    // Check for EventBridge event (has "detail" and "detail-type" fields, no "Records")
+    if json_val.get("detail-type").is_some() {
+        if let Some(traceparent) = json_val
+            .get("detail")
+            .and_then(|d| d.get("traceparent"))
+            .and_then(|tp| tp.as_str())
+        {
+            if let Some((trace_id, span_id)) = parse_traceparent(traceparent) {
+                links.push(Link {
+                    trace_id,
+                    span_id,
+                    ..Default::default()
+                });
+            }
+        }
+        return links;
+    }
 
     let records = match json_val.get("Records").and_then(|v| v.as_array()) {
         Some(r) => r,
@@ -1893,6 +1912,69 @@ mod tests {
                     "body": "{\"Type\":\"Notification\",\"Message\":\"test\",\"MessageAttributes\":{}}"
                 }
             ]
+        }"#;
+
+        let links = super::extract_span_links(event_payload);
+        assert!(links.is_empty());
+    }
+
+    #[test]
+    fn extract_span_links_from_eventbridge() {
+        let event_payload = r#"{
+            "version": "0",
+            "id": "d83d3d45-e768-015d-a133-80d073f5697e",
+            "detail-type": "TestMessage",
+            "source": "tracing-tests.producer",
+            "account": "285732642181",
+            "time": "2026-02-04T13:57:53Z",
+            "region": "us-west-2",
+            "resources": [],
+            "detail": {
+                "message": "Hello from EventBridge producer!",
+                "requestId": "2a45cb5d-0ca6-4a67-aabf-3ff31180a6b2",
+                "traceparent": "00-462b7e674cf81fa63fdd74b200000000-cf2870befd9580d7-01"
+            }
+        }"#;
+
+        let links = super::extract_span_links(event_payload);
+
+        assert_eq!(links.len(), 1);
+        assert_eq!(
+            hex::encode(&links[0].trace_id),
+            "462b7e674cf81fa63fdd74b200000000"
+        );
+        assert_eq!(hex::encode(&links[0].span_id), "cf2870befd9580d7");
+    }
+
+    #[test]
+    fn extract_span_links_from_eventbridge_without_traceparent() {
+        let event_payload = r#"{
+            "version": "0",
+            "id": "d83d3d45-e768-015d-a133-80d073f5697e",
+            "detail-type": "TestMessage",
+            "source": "tracing-tests.producer",
+            "account": "285732642181",
+            "time": "2026-02-04T13:57:53Z",
+            "region": "us-west-2",
+            "resources": [],
+            "detail": {
+                "message": "Hello from EventBridge producer!",
+                "requestId": "2a45cb5d-0ca6-4a67-aabf-3ff31180a6b2"
+            }
+        }"#;
+
+        let links = super::extract_span_links(event_payload);
+        assert!(links.is_empty());
+    }
+
+    #[test]
+    fn extract_span_links_from_eventbridge_with_empty_detail() {
+        let event_payload = r#"{
+            "version": "0",
+            "id": "d83d3d45-e768-015d-a133-80d073f5697e",
+            "detail-type": "TestMessage",
+            "source": "tracing-tests.producer",
+            "detail": {}
         }"#;
 
         let links = super::extract_span_links(event_payload);
