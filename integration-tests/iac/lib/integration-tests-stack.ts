@@ -253,9 +253,23 @@ class DockerizedStack extends cdk.NestedStack {
   }
 }
 
+interface TracingScenariosStackProps extends cdk.NestedStackProps {
+  layer: lambda.ILayerVersion;
+  logGroup: logs.ILogGroup;
+}
+
 class TracingScenariosStack extends cdk.NestedStack {
-  constructor(scope: Construct, id: string, props: SubStackProps) {
+  constructor(scope: Construct, id: string, props: TracingScenariosStackProps) {
     super(scope, id, props);
+
+    const role = new iam.Role(this, 'TracingScenariosLambdaRole', {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
+        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSQSFullAccess'),
+        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSNSFullAccess'),
+      ],
+    });
 
     const pythonCode = createPythonCode();
     const baseEnvironment = {
@@ -285,7 +299,7 @@ class TracingScenariosStack extends cdk.NestedStack {
         handler: 'sqs_producer.handler',
         code: pythonCode,
         layers: [props.layer],
-        role: props.role,
+        role,
         timeout: cdk.Duration.seconds(10),
         logGroup: props.logGroup,
         environment: {
@@ -293,7 +307,6 @@ class TracingScenariosStack extends cdk.NestedStack {
           QUEUE_URL: sqsQueue.queueUrl,
         },
       });
-      sqsQueue.grantSendMessages(sqsProducer);
 
       const sqsConsumer = new lambda.Function(this, `SqsConsumerLambda-${runtimeName}`, {
         functionName: `tracing-sqs-consumer-${runtimeName}`,
@@ -301,7 +314,7 @@ class TracingScenariosStack extends cdk.NestedStack {
         handler: 'consumer.handler',
         code: pythonCode,
         layers: [props.layer],
-        role: props.role,
+        role,
         timeout: cdk.Duration.seconds(10),
         logGroup: props.logGroup,
         environment: baseEnvironment,
@@ -321,7 +334,7 @@ class TracingScenariosStack extends cdk.NestedStack {
         handler: 'sns_producer.handler',
         code: pythonCode,
         layers: [props.layer],
-        role: props.role,
+        role,
         timeout: cdk.Duration.seconds(10),
         logGroup: props.logGroup,
         environment: {
@@ -329,7 +342,6 @@ class TracingScenariosStack extends cdk.NestedStack {
           TOPIC_ARN: snsTopic.topicArn,
         },
       });
-      snsTopic.grantPublish(snsProducer);
 
       const snsConsumer = new lambda.Function(this, `SnsConsumerLambda-${runtimeName}`, {
         functionName: `tracing-sns-consumer-${runtimeName}`,
@@ -337,7 +349,7 @@ class TracingScenariosStack extends cdk.NestedStack {
         handler: 'consumer.handler',
         code: pythonCode,
         layers: [props.layer],
-        role: props.role,
+        role,
         timeout: cdk.Duration.seconds(10),
         logGroup: props.logGroup,
         environment: baseEnvironment,
@@ -363,7 +375,7 @@ class TracingScenariosStack extends cdk.NestedStack {
         handler: 'sns_producer.handler',
         code: pythonCode,
         layers: [props.layer],
-        role: props.role,
+        role,
         timeout: cdk.Duration.seconds(10),
         logGroup: props.logGroup,
         environment: {
@@ -371,7 +383,6 @@ class TracingScenariosStack extends cdk.NestedStack {
           TOPIC_ARN: snsSqsTopic.topicArn,
         },
       });
-      snsSqsTopic.grantPublish(snsSqsProducer);
 
       const snsSqsConsumer = new lambda.Function(this, `SnsSqsConsumerLambda-${runtimeName}`, {
         functionName: `tracing-sns-sqs-consumer-${runtimeName}`,
@@ -379,7 +390,7 @@ class TracingScenariosStack extends cdk.NestedStack {
         handler: 'consumer.handler',
         code: pythonCode,
         layers: [props.layer],
-        role: props.role,
+        role,
         timeout: cdk.Duration.seconds(10),
         logGroup: props.logGroup,
         environment: baseEnvironment,
@@ -441,7 +452,6 @@ export class IntegrationTestsStack extends cdk.Stack {
     });
 
     new TracingScenariosStack(this, 'TracingScenariosStack', {
-      role,
       layer: pythonLayer,
       logGroup: sharedLogGroup,
     });
