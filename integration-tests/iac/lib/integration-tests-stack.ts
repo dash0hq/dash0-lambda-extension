@@ -265,22 +265,23 @@ class TracingScenariosStack extends cdk.NestedStack {
       DASH0_EXTENSION_LOG_LEVEL: "info",
     };
     const runtimes = [
-      lambda.Runtime.PYTHON_3_10,
       lambda.Runtime.PYTHON_3_11,
       lambda.Runtime.PYTHON_3_12,
       lambda.Runtime.PYTHON_3_13,
       lambda.Runtime.PYTHON_3_14,
     ];
     for (const runtime of runtimes) {
+      const runtimeName = runtime.name.replace(/\./g, '-');
+
       // Scenario 1: Lambda > SQS > Lambda
-      const sqsQueue = new sqs.Queue(this, 'TracingTestSqsQueue', {
-        queueName: 'tracing-test-sqs-queue',
+      const sqsQueue = new sqs.Queue(this, `TracingTestSqsQueue-${runtimeName}`, {
+        queueName: `tracing-test-sqs-queue-${runtimeName}`,
         visibilityTimeout: cdk.Duration.seconds(30),
       });
 
-      const sqsProducer = new lambda.Function(this, 'SqsProducerLambda', {
-        functionName: 'tracing-sqs-producer',
-        runtime: lambda.Runtime.PYTHON_3_12,
+      const sqsProducer = new lambda.Function(this, `SqsProducerLambda-${runtimeName}`, {
+        functionName: `tracing-sqs-producer-${runtimeName}`,
+        runtime,
         handler: 'sqs_producer.handler',
         code: pythonCode,
         layers: [props.layer],
@@ -294,9 +295,9 @@ class TracingScenariosStack extends cdk.NestedStack {
       });
       sqsQueue.grantSendMessages(sqsProducer);
 
-      const sqsConsumer = new lambda.Function(this, 'SqsConsumerLambda', {
-        functionName: 'tracing-sqs-consumer',
-        runtime: lambda.Runtime.PYTHON_3_12,
+      const sqsConsumer = new lambda.Function(this, `SqsConsumerLambda-${runtimeName}`, {
+        functionName: `tracing-sqs-consumer-${runtimeName}`,
+        runtime,
         handler: 'consumer.handler',
         code: pythonCode,
         layers: [props.layer],
@@ -310,13 +311,13 @@ class TracingScenariosStack extends cdk.NestedStack {
       }));
 
       // Scenario 2: Lambda > SNS > Lambda
-      const snsTopic = new sns.Topic(this, 'TracingTestSnsTopic', {
-        topicName: 'tracing-test-sns-topic',
+      const snsTopic = new sns.Topic(this, `TracingTestSnsTopic-${runtimeName}`, {
+        topicName: `tracing-test-sns-topic-${runtimeName}`,
       });
 
-      const snsProducer = new lambda.Function(this, 'SnsProducerLambda', {
-        functionName: 'tracing-sns-producer',
-        runtime: lambda.Runtime.PYTHON_3_12,
+      const snsProducer = new lambda.Function(this, `SnsProducerLambda-${runtimeName}`, {
+        functionName: `tracing-sns-producer-${runtimeName}`,
+        runtime,
         handler: 'sns_producer.handler',
         code: pythonCode,
         layers: [props.layer],
@@ -330,9 +331,9 @@ class TracingScenariosStack extends cdk.NestedStack {
       });
       snsTopic.grantPublish(snsProducer);
 
-      const snsConsumer = new lambda.Function(this, 'SnsConsumerLambda', {
-        functionName: 'tracing-sns-consumer',
-        runtime: lambda.Runtime.PYTHON_3_12,
+      const snsConsumer = new lambda.Function(this, `SnsConsumerLambda-${runtimeName}`, {
+        functionName: `tracing-sns-consumer-${runtimeName}`,
+        runtime,
         handler: 'consumer.handler',
         code: pythonCode,
         layers: [props.layer],
@@ -344,21 +345,21 @@ class TracingScenariosStack extends cdk.NestedStack {
       snsTopic.addSubscription(new sns_subscriptions.LambdaSubscription(snsConsumer));
 
       // Scenario 3: Lambda > SNS > SQS > Lambda
-      const snsSqsTopic = new sns.Topic(this, 'TracingTestSnsSqsTopic', {
-        topicName: 'tracing-test-sns-sqs-topic',
+      const snsSqsTopic = new sns.Topic(this, `TracingTestSnsSqsTopic-${runtimeName}`, {
+        topicName: `tracing-test-sns-sqs-topic-${runtimeName}`,
       });
 
-      const snsSqsQueue = new sqs.Queue(this, 'TracingTestSnsSqsQueue', {
-        queueName: 'tracing-test-sns-sqs-queue',
+      const snsSqsQueue = new sqs.Queue(this, `TracingTestSnsSqsQueue-${runtimeName}`, {
+        queueName: `tracing-test-sns-sqs-queue-${runtimeName}`,
         visibilityTimeout: cdk.Duration.seconds(30),
       });
       snsSqsTopic.addSubscription(new sns_subscriptions.SqsSubscription(snsSqsQueue, {
         rawMessageDelivery: false, // Keep SNS envelope to preserve MessageAttributes
       }));
 
-      const snsSqsProducer = new lambda.Function(this, 'SnsSqsProducerLambda', {
-        functionName: 'tracing-sns-sqs-producer',
-        runtime: lambda.Runtime.PYTHON_3_12,
+      const snsSqsProducer = new lambda.Function(this, `SnsSqsProducerLambda-${runtimeName}`, {
+        functionName: `tracing-sns-sqs-producer-${runtimeName}`,
+        runtime,
         handler: 'sns_producer.handler',
         code: pythonCode,
         layers: [props.layer],
@@ -372,9 +373,9 @@ class TracingScenariosStack extends cdk.NestedStack {
       });
       snsSqsTopic.grantPublish(snsSqsProducer);
 
-      const snsSqsConsumer = new lambda.Function(this, 'SnsSqsConsumerLambda', {
-        functionName: 'tracing-sns-sqs-consumer',
-        runtime: lambda.Runtime.PYTHON_3_12,
+      const snsSqsConsumer = new lambda.Function(this, `SnsSqsConsumerLambda-${runtimeName}`, {
+        functionName: `tracing-sns-sqs-consumer-${runtimeName}`,
+        runtime,
         handler: 'consumer.handler',
         code: pythonCode,
         layers: [props.layer],
