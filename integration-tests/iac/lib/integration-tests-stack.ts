@@ -5,6 +5,10 @@ import * as ecr_assets from 'aws-cdk-lib/aws-ecr-assets';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as cr from 'aws-cdk-lib/custom-resources';
+import * as sqs from 'aws-cdk-lib/aws-sqs';
+import * as sns from 'aws-cdk-lib/aws-sns';
+import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
+import * as lambda_event_sources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as path from 'path';
 
 function getLatestLayerVersion(scope: Construct, id: string, layerName: string): lambda.ILayerVersion {
@@ -249,6 +253,143 @@ class DockerizedStack extends cdk.NestedStack {
   }
 }
 
+class TracingScenariosStack extends cdk.NestedStack {
+  constructor(scope: Construct, id: string, props: SubStackProps) {
+    super(scope, id, props);
+
+    const pythonCode = createPythonCode();
+    const baseEnvironment = {
+      AWS_LAMBDA_EXEC_WRAPPER: "/opt/wrapper",
+      DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
+      DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
+      DASH0_EXTENSION_LOG_LEVEL: "info",
+    };
+    const runtimes = [
+      lambda.Runtime.PYTHON_3_10,
+      lambda.Runtime.PYTHON_3_11,
+      lambda.Runtime.PYTHON_3_12,
+      lambda.Runtime.PYTHON_3_13,
+      lambda.Runtime.PYTHON_3_14,
+    ];
+    for (const runtime of runtimes) {
+      // Scenario 1: Lambda > SQS > Lambda
+      const sqsQueue = new sqs.Queue(this, 'TracingTestSqsQueue', {
+        queueName: 'tracing-test-sqs-queue',
+        visibilityTimeout: cdk.Duration.seconds(30),
+      });
+
+      const sqsProducer = new lambda.Function(this, 'SqsProducerLambda', {
+        functionName: 'tracing-sqs-producer',
+        runtime: lambda.Runtime.PYTHON_3_12,
+        handler: 'sqs_producer.handler',
+        code: pythonCode,
+        layers: [props.layer],
+        role: props.role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: {
+          ...baseEnvironment,
+          QUEUE_URL: sqsQueue.queueUrl,
+        },
+      });
+      sqsQueue.grantSendMessages(sqsProducer);
+
+      const sqsConsumer = new lambda.Function(this, 'SqsConsumerLambda', {
+        functionName: 'tracing-sqs-consumer',
+        runtime: lambda.Runtime.PYTHON_3_12,
+        handler: 'consumer.handler',
+        code: pythonCode,
+        layers: [props.layer],
+        role: props.role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: baseEnvironment,
+      });
+      sqsConsumer.addEventSource(new lambda_event_sources.SqsEventSource(sqsQueue, {
+        batchSize: 1,
+      }));
+
+      // Scenario 2: Lambda > SNS > Lambda
+      const snsTopic = new sns.Topic(this, 'TracingTestSnsTopic', {
+        topicName: 'tracing-test-sns-topic',
+      });
+
+      const snsProducer = new lambda.Function(this, 'SnsProducerLambda', {
+        functionName: 'tracing-sns-producer',
+        runtime: lambda.Runtime.PYTHON_3_12,
+        handler: 'sns_producer.handler',
+        code: pythonCode,
+        layers: [props.layer],
+        role: props.role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: {
+          ...baseEnvironment,
+          TOPIC_ARN: snsTopic.topicArn,
+        },
+      });
+      snsTopic.grantPublish(snsProducer);
+
+      const snsConsumer = new lambda.Function(this, 'SnsConsumerLambda', {
+        functionName: 'tracing-sns-consumer',
+        runtime: lambda.Runtime.PYTHON_3_12,
+        handler: 'consumer.handler',
+        code: pythonCode,
+        layers: [props.layer],
+        role: props.role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: baseEnvironment,
+      });
+      snsTopic.addSubscription(new sns_subscriptions.LambdaSubscription(snsConsumer));
+
+      // Scenario 3: Lambda > SNS > SQS > Lambda
+      const snsSqsTopic = new sns.Topic(this, 'TracingTestSnsSqsTopic', {
+        topicName: 'tracing-test-sns-sqs-topic',
+      });
+
+      const snsSqsQueue = new sqs.Queue(this, 'TracingTestSnsSqsQueue', {
+        queueName: 'tracing-test-sns-sqs-queue',
+        visibilityTimeout: cdk.Duration.seconds(30),
+      });
+      snsSqsTopic.addSubscription(new sns_subscriptions.SqsSubscription(snsSqsQueue, {
+        rawMessageDelivery: false, // Keep SNS envelope to preserve MessageAttributes
+      }));
+
+      const snsSqsProducer = new lambda.Function(this, 'SnsSqsProducerLambda', {
+        functionName: 'tracing-sns-sqs-producer',
+        runtime: lambda.Runtime.PYTHON_3_12,
+        handler: 'sns_producer.handler',
+        code: pythonCode,
+        layers: [props.layer],
+        role: props.role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: {
+          ...baseEnvironment,
+          TOPIC_ARN: snsSqsTopic.topicArn,
+        },
+      });
+      snsSqsTopic.grantPublish(snsSqsProducer);
+
+      const snsSqsConsumer = new lambda.Function(this, 'SnsSqsConsumerLambda', {
+        functionName: 'tracing-sns-sqs-consumer',
+        runtime: lambda.Runtime.PYTHON_3_12,
+        handler: 'consumer.handler',
+        code: pythonCode,
+        layers: [props.layer],
+        role: props.role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: baseEnvironment,
+      });
+      snsSqsConsumer.addEventSource(new lambda_event_sources.SqsEventSource(snsSqsQueue, {
+        batchSize: 1,
+      }));
+    }
+  }
+}
+
 export class IntegrationTestsStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -295,6 +436,12 @@ export class IntegrationTestsStack extends cdk.Stack {
 
     new DockerizedStack(this, 'DockerizedStack', {
       role,
+      logGroup: sharedLogGroup,
+    });
+
+    new TracingScenariosStack(this, 'TracingScenariosStack', {
+      role,
+      layer: pythonLayer,
       logGroup: sharedLogGroup,
     });
   }
