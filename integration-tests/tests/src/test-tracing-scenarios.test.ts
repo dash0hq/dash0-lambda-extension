@@ -4,19 +4,17 @@ import { describe, expect, it } from 'vitest';
 import { DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS } from './config';
 import { getAttributesMap, getRequestPayload, invokeFunction } from './utils';
 
-// const runtimes = ['python3-11', 'python3-12', 'python3-13', 'python3-14'];
-const runtimes = ['python3-12'];
+const runtimes = ['python3-11', 'python3-12', 'python3-13', 'python3-14'];
 
 const scenarios = [
     { name: 'sqs', producerPrefix: 'tracing-sqs-producer', consumerPrefix: 'tracing-sqs-consumer' },
-    // { name: 'sns', producerPrefix: 'tracing-sns-producer', consumerPrefix: 'tracing-sns-consumer' },
-    // { name: 'sns-sqs', producerPrefix: 'tracing-sns-sqs-producer', consumerPrefix: 'tracing-sns-sqs-consumer' },
+    { name: 'sns', producerPrefix: 'tracing-sns-producer', consumerPrefix: 'tracing-sns-consumer' },
+    { name: 'sns-sqs', producerPrefix: 'tracing-sns-sqs-producer', consumerPrefix: 'tracing-sns-sqs-consumer' },
 ] as const;
 
 const verifyTracingScenario = async (
     producerFunctionName: string,
     consumerFunctionName: string,
-    scenarioName: string,
 ) => {
     // Step 1: Invoke the producer lambda
     const producerInvocationId = await invokeFunction(producerFunctionName, true, false);
@@ -142,7 +140,7 @@ describe.concurrent('Tracing Scenarios', () => {
                 `verifies ${scenario.name} trace linking for ${runtime}`,
                 async () => {
                     console.log(`Starting test for ${scenario.name} scenario with ${runtime}`, new Date().toISOString());
-                    await verifyTracingScenario(producerFunctionName, consumerFunctionName, scenario.name);
+                    await verifyTracingScenario(producerFunctionName, consumerFunctionName);
                 },
                 180_000
             );
