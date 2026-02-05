@@ -12,7 +12,7 @@ def check_dependency_conflicts(package_name):
     """Check for dependency conflicts between a package (and its sub-dependencies) and the current environment."""
     # Build a map of installed packages and their versions once
     installed = {dist.metadata["Name"].lower(): dist.metadata["Version"] for dist in distributions()}
-    logger.warning(installed)
+#     logger.warning(installed)
 
     visited = set()
 
@@ -27,7 +27,7 @@ def check_dependency_conflicts(package_name):
             if not package_requirements:
                 return
 
-            logger.warning(f"Package '{pkg_name}' requirements: {package_requirements}")
+#             logger.warning(f"Package '{pkg_name}' requirements: {package_requirements}")
 
             for req_str in package_requirements:
                 # Skip extras (e.g., "package[extra]" or markers like "; extra == 'dev'")
@@ -36,6 +36,11 @@ def check_dependency_conflicts(package_name):
 
                 try:
                     req = Requirement(req_str)
+
+                    # Skip if the requirement has a marker that doesn't apply to current environment
+                    if req.marker and not req.marker.evaluate():
+                        continue
+
                     req_name = req.name.lower()
 
                     if req_name in installed:
