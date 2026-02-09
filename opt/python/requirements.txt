@@ -1,1 +1,0 @@
-git+https://github.com/lumigo-io/opentelemetry-python-distro.git@0997183c2682d544b0d4c05520023d8e7fc4d833
