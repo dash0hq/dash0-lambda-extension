@@ -64,7 +64,7 @@ def check_dependency_conflicts(package_name):
                         installed_version = installed[req_name]
                         if not req.specifier.contains(installed_version):
                             logger.warning(
-                                f"Dependency conflict: {pkg_name} requires {req_str}, "
+                                f"Skipping instrumentation due to dependency conflict: {pkg_name} requires {req_str}, "
                                 f"but {req_name}=={installed_version} is installed"
                             )
                             return True
