@@ -115,16 +115,14 @@ def init() -> Dict[str, Any]:
     from lumigo_opentelemetry.instrumentations.instrumentations import framework
     from lumigo_opentelemetry.libs.general_utils import get_max_size
     from lumigo_opentelemetry.resources.detectors import (
-        get_infrastructure_resource,
         get_process_resource,
         get_resource,
     )
 
-    infrastructure_resource = get_infrastructure_resource()
     process_resource = get_process_resource()
 
     resource = get_resource(
-        infrastructure_resource, process_resource, {"framework": framework}
+        process_resource, {"framework": framework}
     )
 
     tracer_provider = TracerProvider(

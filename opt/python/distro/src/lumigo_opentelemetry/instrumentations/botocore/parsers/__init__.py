@@ -15,7 +15,6 @@ from lumigo_opentelemetry.libs.general_utils import (
     lumigo_safe_wrapper,
 )
 from lumigo_opentelemetry.libs.json_utils import dump_with_context
-from lumigo_opentelemetry.resources.span_processor import set_span_skip_export
 from lumigo_opentelemetry.utils.aws_utils import (
     extract_region_from_arn,
     get_resource_fullname,
@@ -356,14 +355,6 @@ class SqsParser(AwsParser):
             span.set_attributes(
                 {"lumigoData": json.dumps({"trigger": trigger_details})}
             )
-
-        # Filter out sqs polls with empty response
-        if cls._should_skip_empty_sqs_polling_response(operation_name, result):
-            logger.debug(
-                "Not tracing empty SQS polling requests "
-                f"(override by setting the {AUTO_FILTER_EMPTY_SQS} env var to false)"
-            )
-            set_span_skip_export(span)
 
 
 class LambdaParser(AwsParser):
