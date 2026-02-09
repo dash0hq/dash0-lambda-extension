@@ -72,10 +72,12 @@ def check_dependency_conflicts(package_name):
                         if check_package(req_name):
                             return True
                 except Exception as e:
-                    logger.info(f"Could not parse requirement '{req_str}': {e}")
+                    logger.warning(f"Could not parse requirement '{req_str}': {e}")
+                    return True
 
         except Exception as e:
-            logger.info(f"Could not check dependencies for {pkg_name}: {e}")
+            logger.warning(f"Could not check dependencies for {pkg_name}: {e}")
+            return True
 
         return False
 
@@ -85,9 +87,12 @@ def check_dependency_conflicts(package_name):
 conflict_found = check_dependency_conflicts("lumigo_opentelemetry")
 
 if not conflict_found:
-    import lumigo_opentelemetry
-    from opentelemetry.instrumentation.aws_lambda import AwsLambdaInstrumentor
-    AwsLambdaInstrumentor().instrument()
+    try:
+        import lumigo_opentelemetry
+        from opentelemetry.instrumentation.aws_lambda import AwsLambdaInstrumentor
+        AwsLambdaInstrumentor().instrument()
+    except Exception as e:
+        logger.warning(f"Failed to instrument with opentelemetry: {e}")
 
 try:
     (mod_name, handler_name) = path.rsplit(".", 1)
