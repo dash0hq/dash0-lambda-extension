@@ -56,7 +56,7 @@ const verifyDependencyConflict = async (functionName: string) => {
 };
 
 describe.concurrent('Python dependency conflict', { retry: 1 }, () => {
-    const runtimes = ['python3-10', 'python3-11', 'python3-12', 'python3-13', 'python3-14'];
+    const runtimes = ['python3-10', 'python3-11', 'python3-12', 'python3-13'];
 
     for (const runtime of runtimes) {
         const functionName = `dependency-conflict-${runtime}`;

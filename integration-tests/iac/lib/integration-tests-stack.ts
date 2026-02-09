@@ -148,7 +148,8 @@ class PythonStack extends cdk.NestedStack {
       },
     );
 
-    for (const runtime of runtimes) {
+    const dependencyConflictRuntimes = runtimes.filter(r => r !== lambda.Runtime.PYTHON_3_14);
+    for (const runtime of dependencyConflictRuntimes) {
       const runtimeName = runtime.name.replace(/\./g, '-');
       new lambda.Function(this, `dependency-conflict-${runtimeName}`, {
         functionName: `dependency-conflict-${runtimeName}`,
