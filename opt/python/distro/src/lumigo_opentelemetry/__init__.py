@@ -46,25 +46,6 @@ def _setup_logger(logger_name: str = "lumigo-opentelemetry") -> logging.Logger:
 logger = _setup_logger()
 
 
-def _get_lumigo_opentelemetry_version() -> str:
-    try:
-        with open(os.path.join(os.path.dirname(__file__), "VERSION")) as version_file:
-            return version_file.read().strip()
-    except Exception as err:
-        logger.exception("failed getting lumigo_opentelemetry version", exc_info=err)
-        return "unknown"
-
-
-def _get_lumigo_sampler() -> Any:
-    # import here to avoid circular imports
-    from lumigo_opentelemetry.libs.sampling import LUMIGO_SAMPLER
-
-    return LUMIGO_SAMPLER
-
-
-__version__ = _get_lumigo_opentelemetry_version()
-
-
 def auto_load(_: Any) -> None:
     """
     Called when injection performed over `AUTOWRAPT_BOOTSTRAP`.
@@ -111,17 +92,15 @@ def init() -> Dict[str, Any]:
         activation_mode = "import"
 
     logger.info(
-        f"Loading the Dash0 OpenTelemetry distribution v{__version__} (injection mode: %s)",
+        f"Loading the Dash0 OpenTelemetry distribution (injection mode: %s)",
         activation_mode,
     )
 
     from opentelemetry import trace
     from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
     from opentelemetry.sdk.trace import SpanLimits, TracerProvider
-    from opentelemetry.instrumentation.logging import LoggingInstrumentor
     from lumigo_opentelemetry.resources.span_processor import (
         LumigoSpanProcessor,
-        LumigoExecutionTagProcessor,
     )
 
     LUMIGO_ENDPOINT_BASE_URL = "https://ga-otlp.lumigo-tracer-edge.golumigo.com/v1"
@@ -137,7 +116,6 @@ def init() -> Dict[str, Any]:
     from lumigo_opentelemetry.instrumentations import instrumentations  # noqa
     from lumigo_opentelemetry.instrumentations.instrumentations import framework
     from lumigo_opentelemetry.libs.general_utils import get_max_size
-    from lumigo_opentelemetry.processors.logs_processor import LumigoLogRecordProcessor
     from lumigo_opentelemetry.resources.detectors import (
         get_infrastructure_resource,
         get_process_resource,
@@ -153,11 +131,8 @@ def init() -> Dict[str, Any]:
 
     tracer_provider = TracerProvider(
         resource=resource,
-        sampler=_get_lumigo_sampler(),
         span_limits=(SpanLimits(max_span_attribute_length=(get_max_size()))),
     )
-
-    tracer_provider.add_span_processor(LumigoExecutionTagProcessor())
 
     if lumigo_token:
         if tracing_enabled:
