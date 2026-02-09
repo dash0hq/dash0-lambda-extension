@@ -61,7 +61,9 @@ build/lrap_aarch64: $(RS_FILES) Cargo.toml
 	@cross build --release --target aarch64-unknown-linux-musl ${CARGO_FEATURES}
 	@cp target/aarch64-unknown-linux-musl/release/aws-lambda-runtime-api-proxy-rs build/lrap_aarch64
 
-build/python: opt/python/distro/requirements.txt opt/python/Dockerfile
+PYTHON_DISTRO_SRC := $(shell find opt/python/distro/src -type f)
+
+build/python: opt/python/distro/requirements.txt opt/python/Dockerfile $(PYTHON_DISTRO_SRC)
 	@mkdir -p build
 	@rm -rf build/python
 	@docker build -t $(PYTHON_DEPS_IMAGE) -f opt/python/Dockerfile .
