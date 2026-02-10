@@ -87,7 +87,7 @@ pub fn extract_error_invocation_ids(body_bytes: &[u8], body_text: &str) -> Vec<(
 }
 
 pub fn parse_otlp_endpoint() -> Option<(String, String)> {
-    let lumigo_endpoint = match std::env::var("DASH0_ENDPOINT") {
+    let dash0_endpoint = match std::env::var("DASH0_ENDPOINT") {
         Ok(val) => val,
         Err(err) => {
             tracing::warn!(
@@ -99,7 +99,7 @@ pub fn parse_otlp_endpoint() -> Option<(String, String)> {
         }
     };
 
-    let base_uri: hyper::Uri = match lumigo_endpoint.parse() {
+    let base_uri: hyper::Uri = match dash0_endpoint.parse() {
         Ok(uri) => uri,
         Err(err) => {
             tracing::error!(

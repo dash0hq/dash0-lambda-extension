@@ -15,7 +15,6 @@ fi
 
 export AWS_LAMBDA_RUNTIME_API="127.0.0.1:9009"
 export LUMIGO_ENDPOINT="http://127.0.0.1:9009/v1/traces"
-export LUMIGO_LOGS_ENDPOINT="http://127.0.0.1:9009/v1/logs"
 export LUMIGO_TRACER_TOKEN="t_xxxx"
 export LUMIGO_REPORT_DEPENDENCIES="false"
 

@@ -6,7 +6,7 @@ import sys
 from typing import Any, Dict, TypeVar
 
 
-LOG_FORMAT = "#LUMIGO# - %(asctime)s - %(levelname)s - %(message)s"
+LOG_FORMAT = "#DASH0# - %(asctime)s - %(levelname)s - %(message)s"
 DEFAULT_TIMEOUT_MS = 1000
 MAX_FLUSH_TIMEOUT_MS = 10000  # 10 seconds
 USING_DEFAULT_TIMEOUT_MESSAGE = f"Using default {DEFAULT_TIMEOUT_MS}ms timeout."
@@ -14,17 +14,17 @@ USING_DEFAULT_TIMEOUT_MESSAGE = f"Using default {DEFAULT_TIMEOUT_MS}ms timeout."
 T = TypeVar("T")
 
 
-def _setup_logger(logger_name: str = "lumigo-opentelemetry") -> logging.Logger:
+def _setup_logger(logger_name: str = "dash0-opentelemetry") -> logging.Logger:
     """
-    This function returns Lumigo's logger. The Lumigo logger prints to stderr.
-    The Lumigo logger is set to INFO by default. If the environment variable
-    `LUMIGO_DEBUG=true` is set, the severity is set to DEBUG.
+    This function returns Dash0's logger. The Dash0 logger prints to stderr.
+    The Dash0 logger is set to INFO by default. If the environment variable
+    `DASH0_DISTRO_DEBUG=true` is set, the severity is set to DEBUG.
     """
     _logger = logging.getLogger(logger_name)
     _logger.propagate = False
     handler = logging.StreamHandler()
     handler.setFormatter(logging.Formatter(LOG_FORMAT))
-    if os.environ.get("LUMIGO_DEBUG", "").lower() == "true":
+    if os.environ.get("DASH0_DISTRO_DEBUG", "").lower() == "true":
         _logger.setLevel(logging.DEBUG)
     else:
         _logger.setLevel(logging.INFO)
@@ -62,7 +62,7 @@ def auto_load(_: Any) -> None:
 
 
 def init() -> Dict[str, Any]:
-    """Initialize the Lumigo OpenTelemetry distribution."""
+    """Initialize the Dash0 OpenTelemetry distribution."""
 
     try:
         python_version = sys.version_info
@@ -79,9 +79,9 @@ def init() -> Dict[str, Any]:
         logger.warning("Failed to verify the Python version due to: %s", str(e))
         return {}
 
-    if str(os.environ.get("LUMIGO_SWITCH_OFF", False)).lower() == "true":
+    if str(os.environ.get("DASH0_SWITCH_OFF", False)).lower() == "true":
         logger.info(
-            "Lumigo OpenTelemetry distribution disabled via the 'LUMIGO_SWITCH_OFF' environment variable"
+            "Dash0 OpenTelemetry distribution disabled via the 'DASH0_SWITCH_OFF' environment variable"
         )
         return {}
 
@@ -101,13 +101,11 @@ def init() -> Dict[str, Any]:
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
     from opentelemetry.sdk.trace import SpanLimits, TracerProvider
 
-    LUMIGO_ENDPOINT_BASE_URL = "https://ga-otlp.lumigo-tracer-edge.golumigo.com/v1"
+    DASH0_EXTENSION_ENDPOINT = "http://127.0.0.1:9009/v1/traces"
 
-    DEFAULT_LUMIGO_ENDPOINT = f"{LUMIGO_ENDPOINT_BASE_URL}/traces"
-
-    lumigo_traces_endpoint = os.getenv("LUMIGO_ENDPOINT", DEFAULT_LUMIGO_ENDPOINT)
-    lumigo_token = os.getenv("LUMIGO_TRACER_TOKEN")
-    spandump_file = os.getenv("LUMIGO_DEBUG_SPANDUMP")
+    traces_endpoint = os.getenv("DASH0_EXTENSION_ENDPOINT", DASH0_EXTENSION_ENDPOINT)
+    dash0_token = os.getenv("DASH0_TOKEN")
+    spandump_file = os.getenv("DASH0_DEBUG_SPANDUMP")
 
     # Activate instrumentations
     from lumigo_opentelemetry.instrumentations import instrumentations  # noqa
@@ -129,19 +127,19 @@ def init() -> Dict[str, Any]:
         span_limits=(SpanLimits(max_span_attribute_length=(get_max_size()))),
     )
 
-    if lumigo_token:
+    if dash0_token:
         tracer_provider.add_span_processor(
             BatchSpanProcessor(
                 OTLPSpanExporter(
-                    endpoint=lumigo_traces_endpoint,
-                    headers={"Authorization": f"LumigoToken {lumigo_token}"},
+                    endpoint=traces_endpoint,
+                    headers={"Authorization": f"Bearer {dash0_token}"},
                 ),
             )
         )
     else:
         logger.warning(
-            "Lumigo token not provided (env var 'LUMIGO_TRACER_TOKEN' not set); "
-            "no data will be sent to Lumigo"
+            "Dash0 token not provided (env var 'DASH0_TOKEN' not set); "
+            "no data will be sent to Dash0"
         )
 
     if spandump_file:
