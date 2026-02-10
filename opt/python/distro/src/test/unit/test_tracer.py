@@ -1,5 +1,6 @@
 import sys
 import unittest
+from collections import namedtuple
 
 from unittest import TestCase
 from unittest.mock import patch, Mock
@@ -7,6 +8,8 @@ from unittest.mock import patch, Mock
 from opentelemetry.sdk.trace import SpanProcessor
 
 from dash0_opentelemetry import init
+
+VersionInfo = namedtuple("version_info", ["major", "minor", "micro", "releaselevel", "serial"])
 
 
 class TestDistroInit(unittest.TestCase):
@@ -19,12 +22,8 @@ class TestDistroInit(unittest.TestCase):
 
 
 class TestPythonVersionCheck(TestCase):
-    @patch("sys.version_info", Mock())
+    @patch("sys.version_info", VersionInfo(3, 8, 0, "final", 0))
     def test_python_version_too_old(self):
-        # Mock version_info for Python 3.8
-        sys.version_info.major = 3
-        sys.version_info.minor = 8
-
         with self.assertLogs("dash0-opentelemetry", level="WARNING") as cm:
             result = init()
 
@@ -34,34 +33,22 @@ class TestPythonVersionCheck(TestCase):
             cm.output[0],
         )
 
-    @patch("sys.version_info", Mock())
+    @patch("sys.version_info", VersionInfo(3, 9, 0, "final", 0))
     def test_python_version_supported(self):
-        # Mock version_info for Python 3.9
-        sys.version_info.major = 3
-        sys.version_info.minor = 9
-
-        with self.assertLogs("dash0-opentelemetry", level="WARNING"):
+        with self.assertLogs("dash0-opentelemetry", level="INFO"):
             result = init()
 
         self.assertIsInstance(result, dict)
 
-    @patch("sys.version_info", Mock())
+    @patch("sys.version_info", VersionInfo(3, 14, 0, "final", 0))
     def test_python_version_314_supported(self):
-        # Mock version_info for Python 3.14
-        sys.version_info.major = 3
-        sys.version_info.minor = 14
-
-        with self.assertLogs("dash0-opentelemetry", level="WARNING"):
+        with self.assertLogs("dash0-opentelemetry", level="INFO"):
             result = init()
 
         self.assertIsInstance(result, dict)
 
-    @patch("sys.version_info", Mock())
+    @patch("sys.version_info", VersionInfo(3, 15, 0, "final", 0))
     def test_python_version_too_new(self):
-        # Mock version_info for Python 3.15
-        sys.version_info.major = 3
-        sys.version_info.minor = 15
-
         with self.assertLogs("dash0-opentelemetry", level="WARNING") as cm:
             result = init()
 
