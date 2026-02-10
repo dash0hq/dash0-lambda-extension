@@ -14,7 +14,8 @@ VersionInfo = namedtuple("version_info", ["major", "minor", "micro", "releaselev
 
 class TestDistroInit(unittest.TestCase):
     def test_access_trace_providers(self):
-        from dash0_opentelemetry import tracer_provider
+        result = init()
+        tracer_provider = result.get("tracer_provider")
 
         self.assertIsNotNone(tracer_provider)
         self.assertTrue(hasattr(tracer_provider, "force_flush"))

@@ -171,6 +171,8 @@ def init() -> Dict[str, Any]:
     return {"tracer_provider": tracer_provider}
 
 
+tracer_provider = None
+
 DISTRO_REQUIREMENTS = os.path.join(os.path.dirname(__file__), "requirements.txt")
 conflict_found = check_dependency_conflicts(DISTRO_REQUIREMENTS)
 
