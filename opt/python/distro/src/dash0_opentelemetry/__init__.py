@@ -5,6 +5,7 @@ import os
 import sys
 from typing import Any, Dict, TypeVar
 
+from dash0_opentelemetry.utils.check_dependencies import check_dependency_conflicts
 
 LOG_FORMAT = "#DASH0# - %(asctime)s - %(levelname)s - %(message)s"
 DEFAULT_TIMEOUT_MS = 1000
@@ -170,10 +171,12 @@ def init() -> Dict[str, Any]:
     return {"tracer_provider": tracer_provider}
 
 
-# Load the package on import
-init_data = init()
+DISTRO_REQUIREMENTS = os.path.join(os.path.dirname(__file__), "requirements.txt")
+conflict_found = check_dependency_conflicts(DISTRO_REQUIREMENTS)
 
-tracer_provider = init_data.get("tracer_provider")
+if not conflict_found:
+    init_data = init()
+    tracer_provider = init_data.get("tracer_provider")
 
 __all__ = [
     "auto_load",
