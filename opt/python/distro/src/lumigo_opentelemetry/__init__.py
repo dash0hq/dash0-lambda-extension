@@ -107,7 +107,6 @@ def init() -> Dict[str, Any]:
 
     lumigo_traces_endpoint = os.getenv("LUMIGO_ENDPOINT", DEFAULT_LUMIGO_ENDPOINT)
     lumigo_token = os.getenv("LUMIGO_TRACER_TOKEN")
-    tracing_enabled = os.getenv("LUMIGO_ENABLE_TRACES", "true").lower() == "true"
     spandump_file = os.getenv("LUMIGO_DEBUG_SPANDUMP")
 
     # Activate instrumentations
@@ -131,19 +130,14 @@ def init() -> Dict[str, Any]:
     )
 
     if lumigo_token:
-        if tracing_enabled:
-            tracer_provider.add_span_processor(
-                BatchSpanProcessor(
-                    OTLPSpanExporter(
-                        endpoint=lumigo_traces_endpoint,
-                        headers={"Authorization": f"LumigoToken {lumigo_token}"},
-                    ),
-                )
+        tracer_provider.add_span_processor(
+            BatchSpanProcessor(
+                OTLPSpanExporter(
+                    endpoint=lumigo_traces_endpoint,
+                    headers={"Authorization": f"LumigoToken {lumigo_token}"},
+                ),
             )
-        else:
-            logger.info(
-                'Tracing is disabled (the "LUMIGO_ENABLE_TRACES" environment variable is not set to "true"): no traces will be sent to Lumigo.'
-            )
+        )
     else:
         logger.warning(
             "Lumigo token not provided (env var 'LUMIGO_TRACER_TOKEN' not set); "

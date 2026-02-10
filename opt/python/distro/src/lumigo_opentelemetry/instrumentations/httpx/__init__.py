@@ -12,9 +12,6 @@ class HttpxInstrumentorWrapper(AbstractInstrumentor):
     def __init__(self) -> None:
         super().__init__("httpx")
 
-    def is_disabled_on_lambda(self) -> bool:
-        return False
-
     def assert_instrumented_package_importable(self) -> None:
         import httpx  # noqa
 

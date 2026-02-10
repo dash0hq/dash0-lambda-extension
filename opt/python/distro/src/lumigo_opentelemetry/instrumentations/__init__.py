@@ -9,24 +9,16 @@ class AbstractInstrumentor(ABC):
     to provide a safer baseline in terms of dependency checks than what is available upstream.
     """
 
-    # TODO Implement lookup of package versions based on the file-based version ranges we validate
-
     @abstractmethod
     def __init__(self, instrumentation_id: str):
         self._instrumentation_id = instrumentation_id
 
     def is_applicable(self) -> bool:
-        tracing_enabled = (
-            os.environ.get("LUMIGO_ENABLE_TRACES", "true").lower() == "true"
-        )
-        if not tracing_enabled:
-            return False
-
         # Check if this instrumentation is explicitly disabled
         disabled_instrumentations = get_disabled_instrumentations()
         if self.instrumentation_id in disabled_instrumentations:
             logger.info(
-                "Instrumentation '%s' is disabled via LUMIGO_DISABLE_INSTRUMENTATION",
+                "Instrumentation '%s' is disabled via DASH0_DISABLE_INSTRUMENTATION",
                 self.instrumentation_id,
             )
             return False
@@ -36,9 +28,6 @@ class AbstractInstrumentor(ABC):
             return True
         except ImportError:
             return False
-
-    def is_disabled_on_lambda(self) -> bool:
-        return True
 
     @abstractmethod
     def assert_instrumented_package_importable(self) -> None:
