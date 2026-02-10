@@ -25,8 +25,11 @@ path = modify_module_name(path)
 os.environ["ORIG_HANDLER"] = path
 
 
-def check_dependency_conflicts(package_name):
-    """Check for dependency conflicts between a package (and its sub-dependencies) and the current environment.
+def check_dependency_conflicts(requirements_file):
+    """Check for dependency conflicts between requirements and the current environment.
+
+    Reads the top-level requirements from a file, then recursively checks
+    sub-dependencies using importlib.metadata.
 
     Returns True if conflicts were found, False otherwise.
     """
@@ -35,17 +38,35 @@ def check_dependency_conflicts(package_name):
 
     visited = set()
 
-    def _read_requirements_file(pkg_name):
-        """Fall back to reading a bundled requirements.txt for packages without metadata."""
-        try:
-            pkg = import_module(pkg_name)
-            req_path = os.path.join(os.path.dirname(pkg.__file__), "requirements.txt")
-            if os.path.isfile(req_path):
-                with open(req_path) as f:
-                    return [line.strip() for line in f if line.strip() and not line.startswith(("#", "-"))]
-        except Exception:
-            pass
-        return None
+    def check_requirements(pkg_name, package_requirements):
+        for req_str in package_requirements:
+            if "extra" in req_str:
+                continue
+
+            try:
+                req = Requirement(req_str)
+
+                if req.marker and not req.marker.evaluate():
+                    continue
+
+                req_name = req.name.lower()
+
+                if req_name in installed:
+                    installed_version = installed[req_name]
+                    if not req.specifier.contains(installed_version):
+                        logger.warning(
+                            f"Skipping instrumentation due to dependency conflict: {pkg_name} requires {req_str}, "
+                            f"but {req_name}=={installed_version} is installed"
+                        )
+                        return True
+                    # Recursively check sub-dependencies
+                    if check_package(req_name):
+                        return True
+            except Exception as e:
+                logger.warning(f"Could not parse requirement '{req_str}': {e}")
+                return True
+
+        return False
 
     def check_package(pkg_name):
         pkg_name_lower = pkg_name.lower()
@@ -56,49 +77,25 @@ def check_dependency_conflicts(package_name):
         try:
             package_requirements = requires(pkg_name)
             if not package_requirements:
-                package_requirements = _read_requirements_file(pkg_name)
-            if not package_requirements:
                 return False
-
-            for req_str in package_requirements:
-                # Skip extras (e.g., "package[extra]" or markers like "; extra == 'dev'")
-                if "extra" in req_str:
-                    continue
-
-                try:
-                    req = Requirement(req_str)
-
-                    # Skip if the requirement has a marker that doesn't apply to current environment
-                    if req.marker and not req.marker.evaluate():
-                        continue
-
-                    req_name = req.name.lower()
-
-                    if req_name in installed:
-                        installed_version = installed[req_name]
-                        if not req.specifier.contains(installed_version):
-                            logger.warning(
-                                f"Skipping instrumentation due to dependency conflict: {pkg_name} requires {req_str}, "
-                                f"but {req_name}=={installed_version} is installed"
-                            )
-                            return True
-                        # Recursively check sub-dependencies
-                        if check_package(req_name):
-                            return True
-                except Exception as e:
-                    logger.warning(f"Could not parse requirement '{req_str}': {e}")
-                    return True
-
+            return check_requirements(pkg_name, package_requirements)
         except Exception as e:
             logger.warning(f"Could not check dependencies for {pkg_name}: {e}")
             return True
 
-        return False
+    # Read top-level requirements from file
+    try:
+        with open(requirements_file) as f:
+            top_level_requirements = [line.strip() for line in f if line.strip() and not line.startswith(("#", "-"))]
+    except Exception as e:
+        logger.warning(f"Could not read requirements file {requirements_file}: {e}")
+        return True
 
-    return check_package(package_name)
+    return check_requirements("dash0_opentelemetry", top_level_requirements)
 
 
-conflict_found = check_dependency_conflicts("dash0_opentelemetry")
+DISTRO_REQUIREMENTS = os.path.join(os.path.dirname(__file__), "dash0_opentelemetry", "requirements.txt")
+conflict_found = check_dependency_conflicts(DISTRO_REQUIREMENTS)
 
 if not conflict_found:
     try:
