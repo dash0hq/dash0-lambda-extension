@@ -4,7 +4,7 @@ from grpc._utilities import RpcMethodHandler
 from grpc._server import _RequestIterator
 from opentelemetry.instrumentation.grpc._server import OpenTelemetryServerInterceptor
 
-from dash0_opentelemetry.libs.general_utils import lumigo_safe_execute
+from dash0_opentelemetry.libs.general_utils import dash0_safe_execute
 from dash0_opentelemetry.instrumentations.instrumentation_utils import PAYLOAD_MAX_SIZE
 
 from .common import add_payload_in_bulks
@@ -29,7 +29,7 @@ class LumigoServerInterceptor(OpenTelemetryServerInterceptor):
             context,
             set_status_on_exception=set_status_on_exception,
         )
-        with lumigo_safe_execute("LumigoServerInterceptor._start_span"):
+        with dash0_safe_execute("LumigoServerInterceptor._start_span"):
             if getattr(self, "latest_request", None) is not None:
                 if isinstance(self.latest_request, _RequestIterator):
                     request_wrapper(self.latest_request)
@@ -42,7 +42,7 @@ class LumigoServerInterceptor(OpenTelemetryServerInterceptor):
     def intercept_service(self, continuation, handler_call_details):  # type: ignore
         original = super().intercept_service(continuation, handler_call_details)
 
-        with lumigo_safe_execute("LumigoServerInterceptor.intercept_service"):
+        with dash0_safe_execute("LumigoServerInterceptor.intercept_service"):
 
             def wrapper(func):  # type: ignore
                 def wrapped(request_or_iterator, context):  # type: ignore

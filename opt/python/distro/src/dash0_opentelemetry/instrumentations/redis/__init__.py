@@ -6,7 +6,7 @@ from dash0_opentelemetry.instrumentations import AbstractInstrumentor
 from dash0_opentelemetry.instrumentations.instrumentation_utils import (
     add_body_attribute,
 )
-from dash0_opentelemetry.libs.general_utils import lumigo_safe_execute
+from dash0_opentelemetry.libs.general_utils import dash0_safe_execute
 
 
 class RedisInstrumentor(AbstractInstrumentor):
@@ -23,7 +23,7 @@ class RedisInstrumentor(AbstractInstrumentor):
         def request_hook(
             span: Span, instance: Connection, args: List[Any], kwargs: Dict[Any, Any]
         ) -> None:
-            with lumigo_safe_execute("redis_request_hook"):
+            with dash0_safe_execute("redis_request_hook"):
                 # a db.statement attribute is automatically added by the RedisInstrumentor
                 # when this hook is called, but only includes the command name for some
                 # versions so we need to set it ourselves.
@@ -32,7 +32,7 @@ class RedisInstrumentor(AbstractInstrumentor):
                 )
 
         def response_hook(span: Span, instance: Connection, response: Any) -> None:
-            with lumigo_safe_execute("redis_response_hook"):
+            with dash0_safe_execute("redis_response_hook"):
                 add_body_attribute(span, response, "db.response.body")
 
         RedisInstrumentor().instrument(

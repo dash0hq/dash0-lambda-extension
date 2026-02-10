@@ -3,7 +3,7 @@ from typing import Any, Iterator as IteratorType
 
 from opentelemetry.instrumentation.grpc._client import OpenTelemetryClientInterceptor
 
-from dash0_opentelemetry.libs.general_utils import lumigo_safe_execute
+from dash0_opentelemetry.libs.general_utils import dash0_safe_execute
 from dash0_opentelemetry.instrumentations.instrumentation_utils import PAYLOAD_MAX_SIZE
 
 from .common import add_payload_in_bulks
@@ -22,7 +22,7 @@ def iterator_wrapper(
 class LumigoClientInterceptor(OpenTelemetryClientInterceptor):
     def _start_span(self, method, **kwargs):  # type: ignore
         ctx = super()._start_span(method, **kwargs)
-        with lumigo_safe_execute("LumigoClientInterceptor._start_span"):
+        with dash0_safe_execute("LumigoClientInterceptor._start_span"):
             if getattr(self, "latest_request", None) is not None:
                 # if it's an iterator, we already set the attribute in the iterator wrapper
                 if not isinstance(self.latest_request, Iterator):

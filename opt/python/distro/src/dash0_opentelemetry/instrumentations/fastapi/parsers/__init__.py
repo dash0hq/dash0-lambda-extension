@@ -2,7 +2,7 @@ from typing import Any, Dict
 
 from opentelemetry.trace import Span
 
-from dash0_opentelemetry.libs.general_utils import lumigo_safe_execute
+from dash0_opentelemetry.libs.general_utils import dash0_safe_execute
 from dash0_opentelemetry.libs.json_utils import (
     dump,
     dump_with_context,
@@ -13,7 +13,7 @@ from dash0_opentelemetry.libs.json_utils import (
 class FastAPIParser:
     @staticmethod
     def safe_extract_headers_bytes(headers: Any) -> Dict[str, str]:
-        with lumigo_safe_execute("safe_extract_headers_bytes"):
+        with dash0_safe_execute("safe_extract_headers_bytes"):
             return {
                 key.decode("utf-8"): value.decode("utf-8") for key, value in headers
             }
@@ -21,7 +21,7 @@ class FastAPIParser:
 
     @staticmethod
     def server_request_hook(span: Span, scope: Dict[str, Any]) -> None:
-        with lumigo_safe_execute("FastAPIParser: server_request_hook"):
+        with dash0_safe_execute("FastAPIParser: server_request_hook"):
             headers = FastAPIParser.safe_extract_headers_bytes(
                 headers=scope.get("headers", [])
             )
@@ -40,7 +40,7 @@ class FastAPIParser:
 
         async def new_otel_receive():  # type: ignore
             return_value = await original_otel_receive()
-            with lumigo_safe_execute("FastAPIParser: new_otel_receive"):
+            with dash0_safe_execute("FastAPIParser: new_otel_receive"):
                 with instance.tracer.start_as_current_span("receive_body") as send_span:
                     if isinstance(return_value, dict) and "body" in return_value:
                         send_span.set_attribute(
@@ -60,7 +60,7 @@ class FastAPIParser:
     def client_response_hook(
         span: Span, scope: Dict[str, Any], message: Dict[str, Any]
     ) -> None:
-        with lumigo_safe_execute("FastAPIParser: client_response_hook"):
+        with dash0_safe_execute("FastAPIParser: client_response_hook"):
             body = safe_convert_bytes_to_string(message.get("body"))
             if body:
                 span.set_attribute(

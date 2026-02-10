@@ -3,7 +3,7 @@ from typing import Any, Dict
 from opentelemetry.trace.span import Span
 
 from dash0_opentelemetry.instrumentations import AbstractInstrumentor
-from dash0_opentelemetry.libs.general_utils import lumigo_safe_execute
+from dash0_opentelemetry.libs.general_utils import dash0_safe_execute
 from dash0_opentelemetry.libs.json_utils import dump_with_context
 
 
@@ -18,7 +18,7 @@ class FlaskInstrumentorWrapper(AbstractInstrumentor):
         from opentelemetry.instrumentation.flask import FlaskInstrumentor
 
         def request_hook(span: Span, flask_request_environ: Dict[str, Any]) -> None:
-            with lumigo_safe_execute("flask_request_hook"):
+            with dash0_safe_execute("flask_request_hook"):
                 span.set_attribute(
                     "http.request.headers",
                     dump_with_context("requestHeaders", flask_request_environ),
@@ -27,7 +27,7 @@ class FlaskInstrumentorWrapper(AbstractInstrumentor):
         def response_hook(
             span: Span, status: int, response_headers: Dict[str, Any]
         ) -> None:
-            with lumigo_safe_execute("flask_response_hook"):
+            with dash0_safe_execute("flask_response_hook"):
                 span.set_attribute(
                     "http.response.headers",
                     dump_with_context("responseHeaders", response_headers),

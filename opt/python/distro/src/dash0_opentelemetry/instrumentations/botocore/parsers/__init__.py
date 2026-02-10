@@ -11,7 +11,7 @@ from dash0_opentelemetry import logger
 from dash0_opentelemetry.libs.environment_variables import AUTO_FILTER_EMPTY_SQS
 from dash0_opentelemetry.libs.general_utils import (
     get_boolean_env_var,
-    lumigo_safe_execute,
+    dash0_safe_execute,
     lumigo_safe_wrapper,
 )
 from dash0_opentelemetry.libs.json_utils import dump_with_context
@@ -200,7 +200,7 @@ class AwsParser:
         operation_name: str,
         api_params: Dict[str, Any],
     ) -> None:
-        with lumigo_safe_execute("aws: request_hook"):
+        with dash0_safe_execute("aws: request_hook"):
             parser = AwsParser.get_parser(service_name=service_name)
             parser.parse_request(
                 span=span,
@@ -242,7 +242,7 @@ class AwsParser:
     def response_hook(
         cls, span: Span, service_name: str, operation_name: str, result: Dict[Any, Any]
     ) -> None:
-        with lumigo_safe_execute("aws: response_hook"):
+        with dash0_safe_execute("aws: response_hook"):
             parser = AwsParser.get_parser(service_name=service_name)
             parser.parse_response(
                 span=span,

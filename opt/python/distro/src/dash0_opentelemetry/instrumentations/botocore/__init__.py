@@ -1,6 +1,6 @@
 from typing import Dict, Any
 
-from dash0_opentelemetry.libs.general_utils import lumigo_safe_execute
+from dash0_opentelemetry.libs.general_utils import dash0_safe_execute
 from opentelemetry.trace import Span, SpanKind
 
 from dash0_opentelemetry.instrumentations import AbstractInstrumentor

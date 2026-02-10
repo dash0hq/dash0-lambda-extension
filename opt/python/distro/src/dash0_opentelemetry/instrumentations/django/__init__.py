@@ -4,7 +4,7 @@ from dash0_opentelemetry.instrumentations import AbstractInstrumentor
 from dash0_opentelemetry.instrumentations.instrumentation_utils import (
     add_body_attribute,
 )
-from dash0_opentelemetry.libs.general_utils import lumigo_safe_execute
+from dash0_opentelemetry.libs.general_utils import dash0_safe_execute
 from dash0_opentelemetry.libs.json_utils import dump_with_context
 
 
@@ -20,7 +20,7 @@ class DjangoInstrumentorWrapper(AbstractInstrumentor):
         from opentelemetry.instrumentation.django import DjangoInstrumentor
 
         def request_hook(span: Span, request: HttpRequest) -> None:
-            with lumigo_safe_execute("django request_hook"):
+            with dash0_safe_execute("django request_hook"):
                 span.set_attribute(
                     "http.request.headers",
                     dump_with_context("requestHeaders", request.headers),
@@ -30,7 +30,7 @@ class DjangoInstrumentorWrapper(AbstractInstrumentor):
         def response_hook(
             span: Span, request: HttpRequest, response: HttpResponse
         ) -> None:
-            with lumigo_safe_execute("django response_hook"):
+            with dash0_safe_execute("django response_hook"):
                 span.set_attribute(
                     "http.response.headers",
                     dump_with_context("responseHeaders", response.headers),

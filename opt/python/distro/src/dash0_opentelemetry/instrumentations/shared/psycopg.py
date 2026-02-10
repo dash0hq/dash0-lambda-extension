@@ -4,7 +4,7 @@ import wrapt
 from opentelemetry.instrumentation.dbapi import DatabaseApiIntegration
 from opentelemetry.trace import SpanKind
 
-from dash0_opentelemetry.libs.general_utils import lumigo_safe_execute
+from dash0_opentelemetry.libs.general_utils import dash0_safe_execute
 from dash0_opentelemetry.libs.json_utils import dump_with_context
 
 
@@ -37,7 +37,7 @@ def patch_psycopg_for_payload_capture(package: Any) -> None:
                         fetch_function_name, kind=SpanKind.CLIENT
                     ) as span:
                         result = original_fetch_function(self, *args, **kwargs)
-                        with lumigo_safe_execute(
+                        with dash0_safe_execute(
                             f"set response body ({fetch_function_name})"
                         ):
                             _cursor_tracer._populate_span(span, None, *args)

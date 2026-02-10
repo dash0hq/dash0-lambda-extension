@@ -2,7 +2,7 @@ import os
 from typing import Callable, Any
 
 from opentelemetry.trace import get_current_span
-from dash0_opentelemetry.libs.general_utils import lumigo_safe_execute
+from dash0_opentelemetry.libs.general_utils import dash0_safe_execute
 from dash0_opentelemetry import logger
 from dash0_opentelemetry.instrumentations.instrumentation_utils import PAYLOAD_MAX_SIZE
 
@@ -20,7 +20,7 @@ def add_payload_in_bulks(attribute_name: str) -> Callable[[str], None]:
 
         :param payload: The payload to add.
         """
-        with lumigo_safe_execute("add_payload_in_bulks"):
+        with dash0_safe_execute("add_payload_in_bulks"):
             nonlocal remaining_size
             if remaining_size > 0:
                 history.append(str(payload))

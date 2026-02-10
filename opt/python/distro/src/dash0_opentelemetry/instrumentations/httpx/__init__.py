@@ -1,6 +1,6 @@
 from dash0_opentelemetry.instrumentations import AbstractInstrumentor
 from opentelemetry.trace import Span
-from dash0_opentelemetry.libs.general_utils import lumigo_safe_execute
+from dash0_opentelemetry.libs.general_utils import dash0_safe_execute
 from dash0_opentelemetry.libs.json_utils import dump_with_context
 from dash0_opentelemetry.instrumentations.instrumentation_utils import (
     add_body_attribute,
@@ -20,7 +20,7 @@ class HttpxInstrumentorWrapper(AbstractInstrumentor):
         import httpx
 
         def request_hook(span: Span, request: Tuple[Any, ...]) -> Tuple[Any, ...]:
-            with lumigo_safe_execute("requests request_hook"):
+            with dash0_safe_execute("requests request_hook"):
                 method, url, headers, stream, extensions = request
                 body = b"".join([chunk for chunk in stream])
                 span.set_attribute(
@@ -39,7 +39,7 @@ class HttpxInstrumentorWrapper(AbstractInstrumentor):
         def response_hook(
             span: Span, request: Tuple[Any, ...], response: Tuple[Any, ...]
         ) -> None:
-            with lumigo_safe_execute("requests response_hook"):
+            with dash0_safe_execute("requests response_hook"):
                 status_code, headers, stream, extensions = response
                 span.set_attribute(
                     "http.response.headers",

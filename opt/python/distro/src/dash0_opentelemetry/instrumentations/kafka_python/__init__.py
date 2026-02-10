@@ -6,7 +6,7 @@ from dash0_opentelemetry.instrumentations import AbstractInstrumentor
 from dash0_opentelemetry.instrumentations.instrumentation_utils import (
     add_body_attribute,
 )
-from dash0_opentelemetry.libs.general_utils import lumigo_safe_execute
+from dash0_opentelemetry.libs.general_utils import dash0_safe_execute
 
 
 class KafkaPythonInstrumentor(AbstractInstrumentor):
@@ -21,7 +21,7 @@ class KafkaPythonInstrumentor(AbstractInstrumentor):
         from kafka.record.abc import ABCRecord
 
         def _produce_hook(span: Span, args: List[Any], kwargs: Dict[Any, Any]) -> None:
-            with lumigo_safe_execute("kafka _produce_hook"):
+            with dash0_safe_execute("kafka _produce_hook"):
                 value = kwargs.get("value")
                 if value is None and len(args) > 1:
                     value = args[1]
@@ -30,7 +30,7 @@ class KafkaPythonInstrumentor(AbstractInstrumentor):
         def _consume_hook(
             span: Span, record: ABCRecord, args: List[Any], kwargs: Dict[Any, Any]
         ) -> None:
-            with lumigo_safe_execute("kafka _consume_hook"):
+            with dash0_safe_execute("kafka _consume_hook"):
                 add_body_attribute(span, record.value, "messaging.consume.body")
 
         KafkaInstrumentor().instrument(

@@ -22,7 +22,7 @@ T = TypeVar("T")
 
 
 @contextmanager
-def lumigo_safe_execute(part_name: str = "") -> Generator[None, None, None]:
+def dash0_safe_execute(part_name: str = "") -> Generator[None, None, None]:
     try:
         yield
     except Exception as e:

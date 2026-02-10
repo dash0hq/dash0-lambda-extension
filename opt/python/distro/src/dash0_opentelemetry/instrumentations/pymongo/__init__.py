@@ -4,7 +4,7 @@ from opentelemetry.trace.span import Span
 
 from dash0_opentelemetry.instrumentations import AbstractInstrumentor
 from dash0_opentelemetry import logger
-from dash0_opentelemetry.libs.general_utils import lumigo_safe_execute
+from dash0_opentelemetry.libs.general_utils import dash0_safe_execute
 from dash0_opentelemetry.libs.json_utils import dump_with_context
 
 
@@ -24,7 +24,7 @@ class PymongoInstrumentor(AbstractInstrumentor):
         )
 
         def request_hook(span: Span, event: CommandStartedEvent) -> None:
-            with lumigo_safe_execute("pymongo_request_hook"):
+            with dash0_safe_execute("pymongo_request_hook"):
                 span.set_attribute("db.statement", event.command_name)
                 if isinstance(event, CommandStartedEvent):
                     span.set_attribute(
@@ -37,7 +37,7 @@ class PymongoInstrumentor(AbstractInstrumentor):
         def response_hook(
             span: Span, event: Union[CommandSucceededEvent, CommandFailedEvent]
         ) -> None:
-            with lumigo_safe_execute("pymongo_response_hook"):
+            with dash0_safe_execute("pymongo_response_hook"):
                 if isinstance(event, CommandSucceededEvent):
                     span.set_attribute(
                         "db.response.body",

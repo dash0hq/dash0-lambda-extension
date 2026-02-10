@@ -1,10 +1,6 @@
 #!/bin/bash
 args=("$@")
 
-if [ "$X_LUMIGO_KILLSWITCH" = "true" ]; then
-    exec "${args[@]}"
-fi
-
 # Copy DASH0_* masking env vars to LUMIGO_* equivalents
 [ -n "$DASH0_MASK_RULES" ] && export LUMIGO_SECRET_MASKING_REGEX="$DASH0_MASK_RULES"
 [ -n "$DASH0_MASK_REQUEST_BODY" ] && export LUMIGO_SECRET_MASKING_REGEX_HTTP_REQUEST_BODIES="$DASH0_MASK_REQUEST_BODY"
