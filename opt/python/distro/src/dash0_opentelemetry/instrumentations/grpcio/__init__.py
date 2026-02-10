@@ -10,13 +10,13 @@ class GRPCInstrumentor(AbstractInstrumentor):
         import grpc  # noqa
 
     @staticmethod
-    def inject_lumigo_interceptors() -> None:
-        from .grpc_instrument_client import LumigoClientInterceptor
-        from .grpc_instrument_server import LumigoServerInterceptor
+    def inject_interceptors() -> None:
+        from .grpc_instrument_client import Dash0ClientInterceptor
+        from .grpc_instrument_server import Dash0ServerInterceptor
         from opentelemetry.instrumentation.grpc import _client, _server
 
-        _client.OpenTelemetryClientInterceptor = LumigoClientInterceptor
-        _server.OpenTelemetryServerInterceptor = LumigoServerInterceptor
+        _client.OpenTelemetryClientInterceptor = Dash0ClientInterceptor
+        _server.OpenTelemetryServerInterceptor = Dash0ServerInterceptor
 
     def install_instrumentation(self) -> None:
         from opentelemetry.instrumentation.grpc import (
@@ -25,7 +25,7 @@ class GRPCInstrumentor(AbstractInstrumentor):
         )
 
         if SHOULD_INSTRUMENT_PAYLOADS:
-            self.inject_lumigo_interceptors()
+            self.inject_interceptors()
         GrpcInstrumentorServer().instrument()
         GrpcInstrumentorClient().instrument()
 

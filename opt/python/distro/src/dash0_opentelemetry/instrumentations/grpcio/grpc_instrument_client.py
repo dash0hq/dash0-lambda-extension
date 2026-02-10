@@ -19,10 +19,10 @@ def iterator_wrapper(
         yield data_chunk
 
 
-class LumigoClientInterceptor(OpenTelemetryClientInterceptor):
+class Dash0ClientInterceptor(OpenTelemetryClientInterceptor):
     def _start_span(self, method, **kwargs):  # type: ignore
         ctx = super()._start_span(method, **kwargs)
-        with dash0_safe_execute("LumigoClientInterceptor._start_span"):
+        with dash0_safe_execute("Dash0ClientInterceptor._start_span"):
             if getattr(self, "latest_request", None) is not None:
                 # if it's an iterator, we already set the attribute in the iterator wrapper
                 if not isinstance(self.latest_request, Iterator):

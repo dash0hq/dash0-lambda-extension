@@ -7,7 +7,7 @@ from dash0_opentelemetry import logger
 from dash0_opentelemetry.instrumentations.instrumentation_utils import PAYLOAD_MAX_SIZE
 
 SHOULD_INSTRUMENT_PAYLOADS = (
-    os.getenv("LUMIGO_INSTRUMENT_GRPC_PAYLOADS", "true").lower() != "false"
+    os.getenv("DASH0_INSTRUMENT_GRPC_PAYLOADS", "true").lower() != "false"
 )
 
 

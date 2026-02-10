@@ -22,14 +22,14 @@ def request_wrapper(request: _RequestIterator) -> None:
     request._next = wrapped_next
 
 
-class LumigoServerInterceptor(OpenTelemetryServerInterceptor):
+class Dash0ServerInterceptor(OpenTelemetryServerInterceptor):
     def _start_span(self, handler_call_details, context, set_status_on_exception=False):  # type: ignore
         ctx = super()._start_span(
             handler_call_details,
             context,
             set_status_on_exception=set_status_on_exception,
         )
-        with dash0_safe_execute("LumigoServerInterceptor._start_span"):
+        with dash0_safe_execute("Dash0ServerInterceptor._start_span"):
             if getattr(self, "latest_request", None) is not None:
                 if isinstance(self.latest_request, _RequestIterator):
                     request_wrapper(self.latest_request)
@@ -42,7 +42,7 @@ class LumigoServerInterceptor(OpenTelemetryServerInterceptor):
     def intercept_service(self, continuation, handler_call_details):  # type: ignore
         original = super().intercept_service(continuation, handler_call_details)
 
-        with dash0_safe_execute("LumigoServerInterceptor.intercept_service"):
+        with dash0_safe_execute("Dash0ServerInterceptor.intercept_service"):
 
             def wrapper(func):  # type: ignore
                 def wrapped(request_or_iterator, context):  # type: ignore

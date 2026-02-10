@@ -27,14 +27,14 @@ def dash0_safe_execute(part_name: str = "") -> Generator[None, None, None]:
         yield
     except Exception as e:
         logger.exception(
-            f"An exception occurred in lumigo's code {part_name}", exc_info=e
+            f"An exception occurred in dash0's code {part_name}", exc_info=e
         )
 
 
 TCallable = TypeVar("TCallable", bound=Callable)  # type: ignore
 
 
-def lumigo_safe_wrapper(
+def dash0_safe_wrapper(
     default_return_value: Any = None, level: Optional[int] = logging.ERROR
 ) -> Callable:  # type: ignore
     """
@@ -53,7 +53,7 @@ def lumigo_safe_wrapper(
                 if level is not None:
                     logger.log(
                         level=level,
-                        msg=f"An exception occurred in lumigo's code {func.__name__}",
+                        msg=f"An exception occurred in dash0's code {func.__name__}",
                         exc_info=e,
                     )
 

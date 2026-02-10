@@ -12,7 +12,7 @@ from dash0_opentelemetry.libs.environment_variables import AUTO_FILTER_EMPTY_SQS
 from dash0_opentelemetry.libs.general_utils import (
     get_boolean_env_var,
     dash0_safe_execute,
-    lumigo_safe_wrapper,
+    dash0_safe_wrapper,
 )
 from dash0_opentelemetry.libs.json_utils import dump_with_context
 from dash0_opentelemetry.utils.aws_utils import (
@@ -37,7 +37,7 @@ class AwsParser:
         return parsers.get(service_name, AwsParser)
 
     @classmethod
-    @lumigo_safe_wrapper(level=logging.DEBUG)
+    @dash0_safe_wrapper(level=logging.DEBUG)
     def safe_extract_region(
         cls,
         span: Optional[Span] = None,
@@ -68,7 +68,7 @@ class AwsParser:
         return None
 
     @classmethod
-    @lumigo_safe_wrapper(level=logging.DEBUG)
+    @dash0_safe_wrapper(level=logging.DEBUG)
     def safe_extract_url(
         cls,
         span: Optional[Span] = None,
@@ -88,7 +88,7 @@ class AwsParser:
         return None
 
     @classmethod
-    @lumigo_safe_wrapper(level=logging.DEBUG)
+    @dash0_safe_wrapper(level=logging.DEBUG)
     def safe_extract_arn(
         cls,
         span: Optional[Span] = None,
@@ -100,7 +100,7 @@ class AwsParser:
         return None
 
     @classmethod
-    @lumigo_safe_wrapper(level=logging.DEBUG)
+    @dash0_safe_wrapper(level=logging.DEBUG)
     def safe_extract_resource_name(
         cls,
         span: Optional[Span] = None,
@@ -117,7 +117,7 @@ class AwsParser:
         return get_resource_fullname(arn) if arn else None
 
     @classmethod
-    @lumigo_safe_wrapper(level=logging.DEBUG)
+    @dash0_safe_wrapper(level=logging.DEBUG)
     def safe_extract_http_request_body(
         cls,
         span: Optional[Span] = None,
@@ -254,7 +254,7 @@ class AwsParser:
 
 class SnsParser(AwsParser):
     @classmethod
-    @lumigo_safe_wrapper(level=logging.DEBUG)
+    @dash0_safe_wrapper(level=logging.DEBUG)
     def safe_extract_arn(
         cls,
         span: Optional[Span] = None,
@@ -265,7 +265,7 @@ class SnsParser(AwsParser):
         return api_params.get("TargetArn") if api_params else None
 
     @classmethod
-    @lumigo_safe_wrapper(level=logging.DEBUG)
+    @dash0_safe_wrapper(level=logging.DEBUG)
     def safe_extract_http_request_body(
         cls,
         span: Optional[Span] = None,
@@ -288,7 +288,7 @@ class SqsParser(AwsParser):
         return queue_url.split("/")[-1]
 
     @classmethod
-    @lumigo_safe_wrapper(level=logging.DEBUG)
+    @dash0_safe_wrapper(level=logging.DEBUG)
     def safe_extract_http_request_body(
         cls,
         span: Optional[Span] = None,
@@ -305,7 +305,7 @@ class SqsParser(AwsParser):
         )
 
     @classmethod
-    @lumigo_safe_wrapper(level=logging.DEBUG)
+    @dash0_safe_wrapper(level=logging.DEBUG)
     def safe_extract_resource_name(
         cls,
         span: Optional[Span] = None,
@@ -353,13 +353,13 @@ class SqsParser(AwsParser):
         )
         if trigger_details:
             span.set_attributes(
-                {"lumigoData": json.dumps({"trigger": trigger_details})}
+                {"dash0Data": json.dumps({"trigger": trigger_details})}
             )
 
 
 class LambdaParser(AwsParser):
     @classmethod
-    @lumigo_safe_wrapper(level=logging.DEBUG)
+    @dash0_safe_wrapper(level=logging.DEBUG)
     def safe_extract_http_request_body(
         cls,
         span: Optional[Span] = None,
@@ -376,7 +376,7 @@ class LambdaParser(AwsParser):
         )
 
     @classmethod
-    @lumigo_safe_wrapper(level=logging.DEBUG)
+    @dash0_safe_wrapper(level=logging.DEBUG)
     def safe_extract_resource_name(
         cls,
         span: Optional[Span] = None,
@@ -393,7 +393,7 @@ class LambdaParser(AwsParser):
 
 class DynamoParser(AwsParser):
     @classmethod
-    @lumigo_safe_wrapper(level=logging.DEBUG)
+    @dash0_safe_wrapper(level=logging.DEBUG)
     def safe_extract_resource_name(
         cls,
         span: Optional[Span] = None,
