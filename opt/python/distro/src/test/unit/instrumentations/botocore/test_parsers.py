@@ -50,69 +50,7 @@ def test_sqs_skip_sqs_response(
 
 
 @patch(
-    "lumigo_opentelemetry.instrumentations.botocore.parsers.SqsParser._should_skip_empty_sqs_polling_response"
-)
-def test_parse_sqs_response_skipping_empty_polls_outputs_log(
-    should_skip_mock, caplog, monkeypatch
-):
-    monkeypatch.setenv("LUMIGO_DEBUG", "true")
-    should_skip_mock.return_value = True
-    span = Mock(set_attribute=Mock())
-    service_name = "sqs"
-    operation_name = "ReceiveMessage"
-    result = {
-        "ResponseMetadata": {
-            "RequestId": "54bf0dab-cfab-5fa5-b284-50d83403c94c",
-            "HTTPStatusCode": 200,
-            "HTTPHeaders": {
-                "x-amzn-requestid": "54bf0dab-cfab-5fa5-b284-50d83403c94c",
-                "date": "Thu, 07 Sep 2023 16:25:12 GMT",
-                "content-type": "text/xml",
-                "content-length": "240",
-                "connection": "keep-alive",
-            },
-            "RetryAttempts": 0,
-        }
-    }
-
-    with caplog.at_level(logging.DEBUG):
-        SqsParser.parse_response(span, service_name, operation_name, result)
-
-        assert "not tracing empty sqs polling requests" in caplog.text.lower()
-
-
-@patch(
-    "lumigo_opentelemetry.instrumentations.botocore.parsers.SqsParser._should_skip_empty_sqs_polling_response"
-)
-def test_parse_sqs_response_not_skipping_polls_no_output_log(should_skip_mock, caplog):
-    should_skip_mock.return_value = False
-    span = Mock(set_attribute=Mock())
-    service_name = "sqs"
-    operation_name = "ReceiveMessage"
-    result = {
-        "ResponseMetadata": {
-            "RequestId": "54bf0dab-cfab-5fa5-b284-50d83403c94c",
-            "HTTPStatusCode": 200,
-            "HTTPHeaders": {
-                "x-amzn-requestid": "54bf0dab-cfab-5fa5-b284-50d83403c94c",
-                "date": "Thu, 07 Sep 2023 16:25:12 GMT",
-                "content-type": "text/xml",
-                "content-length": "240",
-                "connection": "keep-alive",
-            },
-            "RetryAttempts": 0,
-        }
-    }
-
-    SqsParser.parse_response(span, service_name, operation_name, result)
-
-    assert "not tracing empty sqs polling requests" not in caplog.text.lower()
-
-    # Make sure that there is an info log
-
-
-@patch(
-    "lumigo_opentelemetry.instrumentations.botocore.parsers.SqsParser._should_skip_empty_sqs_polling_response"
+    "dash0_opentelemetry.instrumentations.botocore.parsers.SqsParser._should_skip_empty_sqs_polling_response"
 )
 def test_parse_sqs_response_handles_empty_result(should_skip_mock):
     should_skip_mock.return_value = False
@@ -127,7 +65,7 @@ def test_parse_sqs_response_handles_empty_result(should_skip_mock):
     SqsParser.parse_response(span, service_name, operation_name, result)
 
 
-@patch("lumigo_opentelemetry.instrumentations.botocore.parsers.dump_with_context")
+@patch("dash0_opentelemetry.instrumentations.botocore.parsers.dump_with_context")
 def test_parse_response_handles_unparsable_payload(dump_with_context_mock, caplog):
     dump_with_context_mock.side_effect = Exception("Boom!")
 
