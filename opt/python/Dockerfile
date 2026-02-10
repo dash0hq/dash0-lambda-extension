@@ -10,5 +10,6 @@ COPY opt/python/distro/requirements.txt .
 RUN python3.12 -m pip install --upgrade --no-cache-dir pip \
     && python3.12 -m pip install --no-cache-dir -r requirements.txt -t /asset-output/python
 
-# Copy the distro package source directly
+# Copy the distro package source and its requirements
 COPY opt/python/distro/src/dash0_opentelemetry /asset-output/python/dash0_opentelemetry
+COPY opt/python/distro/requirements.txt /asset-output/python/dash0_opentelemetry/requirements.txt

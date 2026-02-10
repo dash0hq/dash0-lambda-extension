@@ -35,6 +35,18 @@ def check_dependency_conflicts(package_name):
 
     visited = set()
 
+    def _read_requirements_file(pkg_name):
+        """Fall back to reading a bundled requirements.txt for packages without metadata."""
+        try:
+            pkg = import_module(pkg_name)
+            req_path = os.path.join(os.path.dirname(pkg.__file__), "requirements.txt")
+            if os.path.isfile(req_path):
+                with open(req_path) as f:
+                    return [line.strip() for line in f if line.strip() and not line.startswith(("#", "-"))]
+        except Exception:
+            pass
+        return None
+
     def check_package(pkg_name):
         pkg_name_lower = pkg_name.lower()
         if pkg_name_lower in visited:
@@ -43,6 +55,8 @@ def check_dependency_conflicts(package_name):
 
         try:
             package_requirements = requires(pkg_name)
+            if not package_requirements:
+                package_requirements = _read_requirements_file(pkg_name)
             if not package_requirements:
                 return False
 
