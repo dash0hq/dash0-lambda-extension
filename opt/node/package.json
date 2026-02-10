@@ -21,7 +21,7 @@
     "node": ">=18.19.0"
   },
   "dependencies": {
-    "@lumigo/opentelemetry": "^1.53.0",
+    "@lumigo/opentelemetry": "file:./distro/distro.tgz",
     "@opentelemetry/instrumentation-aws-lambda": "0.61.0",
     "import-in-the-middle": "2.0.0",
     "require-in-the-middle": "^8.0.1"
