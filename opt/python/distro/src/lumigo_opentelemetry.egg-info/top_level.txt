@@ -1,3 +1,0 @@
-ci
-lumigo_opentelemetry
-test

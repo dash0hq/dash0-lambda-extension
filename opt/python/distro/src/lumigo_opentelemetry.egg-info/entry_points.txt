@@ -1,2 +1,0 @@
-[lumigo_opentelemetry]
-string = lumigo_opentelemetry:auto_load
