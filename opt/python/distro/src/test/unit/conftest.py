@@ -3,7 +3,7 @@ import logging
 import pytest
 
 from lumigo_core.scrubbing import get_omitting_regex
-from lumigo_opentelemetry import logger
+from dash0_opentelemetry import logger
 
 
 @pytest.fixture(autouse=True)

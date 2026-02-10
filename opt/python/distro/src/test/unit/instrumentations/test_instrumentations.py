@@ -1,11 +1,11 @@
 from unittest.mock import MagicMock, patch
-from lumigo_opentelemetry.instrumentations.langchain import (
+from dash0_opentelemetry.instrumentations.langchain import (
     instrumentor as langchain_instrumentor,
 )
-from lumigo_opentelemetry.instrumentations.flask import (
+from dash0_opentelemetry.instrumentations.flask import (
     instrumentor as flask_instrumentor,
 )
-from lumigo_opentelemetry.instrumentations.boto import (
+from dash0_opentelemetry.instrumentations.boto import (
     instrumentor as boto_instrumentor,
 )
 

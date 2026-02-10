@@ -1,4 +1,4 @@
-from lumigo_opentelemetry.libs.json_utils import (
+from dash0_opentelemetry.libs.json_utils import (
     dump,
 )
 

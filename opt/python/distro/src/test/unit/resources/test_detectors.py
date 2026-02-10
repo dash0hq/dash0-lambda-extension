@@ -10,7 +10,7 @@ from opentelemetry.sdk import resources
 from opentelemetry.semconv.resource import ResourceAttributes
 from lumigo_core.configuration import CoreConfiguration
 
-from lumigo_opentelemetry.resources.detectors import (
+from dash0_opentelemetry.resources.detectors import (
     ProcessResourceDetector,
     LumigoDistroDetector,
     LumigoKubernetesResourceDetector,
@@ -22,7 +22,7 @@ from lumigo_opentelemetry.resources.detectors import (
     LumigoContainerNameDetector,
 )
 
-from lumigo_opentelemetry import _setup_logger
+from dash0_opentelemetry import _setup_logger
 
 
 def test_process_detector():

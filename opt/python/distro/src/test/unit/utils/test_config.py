@@ -1,6 +1,6 @@
 import pytest
 
-from lumigo_opentelemetry.utils.config import (
+from dash0_opentelemetry.utils.config import (
     get_connection_timeout_seconds,
     get_disabled_instrumentations,
 )

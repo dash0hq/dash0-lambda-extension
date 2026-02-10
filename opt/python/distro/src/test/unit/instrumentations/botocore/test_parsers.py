@@ -3,7 +3,7 @@ import logging
 import pytest
 from unittest.mock import Mock, patch
 
-from lumigo_opentelemetry.instrumentations.botocore.parsers import SqsParser, AwsParser
+from dash0_opentelemetry.instrumentations.botocore.parsers import SqsParser, AwsParser
 
 
 EMPTY_SQS_RESULT_1 = {}

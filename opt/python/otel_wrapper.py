@@ -1,6 +1,6 @@
 import os
 from importlib import import_module
-import lumigo_opentelemetry
+import dash0_opentelemetry
 from opentelemetry.instrumentation.aws_lambda import AwsLambdaInstrumentor
 
 

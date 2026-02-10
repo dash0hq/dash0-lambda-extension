@@ -2,7 +2,7 @@ from unittest.mock import Mock
 
 from opentelemetry.trace import Span
 
-from lumigo_opentelemetry.instrumentations.instrumentation_utils import (
+from dash0_opentelemetry.instrumentations.instrumentation_utils import (
     add_body_attribute,
     PAYLOAD_MAX_SIZE,
 )

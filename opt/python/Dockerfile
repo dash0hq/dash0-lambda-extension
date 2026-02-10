@@ -11,4 +11,4 @@ RUN python3.12 -m pip install --upgrade --no-cache-dir pip \
     && python3.12 -m pip install --no-cache-dir -r requirements.txt -t /asset-output/python
 
 # Copy the distro package source directly
-COPY opt/python/distro/src/lumigo_opentelemetry /asset-output/python/lumigo_opentelemetry
+COPY opt/python/distro/src/dash0_opentelemetry /asset-output/python/dash0_opentelemetry

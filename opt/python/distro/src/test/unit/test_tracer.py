@@ -12,12 +12,12 @@ from os import environ
 
 from opentelemetry.sdk.trace import SpanProcessor
 
-from lumigo_opentelemetry import init
+from dash0_opentelemetry import init
 
 
 class TestDistroInit(unittest.TestCase):
     def test_access_trace_and_logging_providers(self):
-        from lumigo_opentelemetry import tracer_provider, logger_provider
+        from dash0_opentelemetry import tracer_provider, logger_provider
 
         self.assertIsNotNone(tracer_provider)
         self.assertTrue(hasattr(tracer_provider, "force_flush"))
@@ -166,7 +166,7 @@ class TestPythonVersionCheck(TestCase):
 class TestCreateProgrammaticError(unittest.TestCase):
     @httpretty.activate(allow_net_connect=False)
     def test_create_event_with_correct_attributes(self):
-        from lumigo_opentelemetry import create_programmatic_error, tracer_provider
+        from dash0_opentelemetry import create_programmatic_error, tracer_provider
 
         self.assertIsNotNone(create_programmatic_error)
 
@@ -198,7 +198,7 @@ class TestCreateProgrammaticError(unittest.TestCase):
 class TestLumigoWrapped(unittest.TestCase):
     @httpretty.activate(allow_net_connect=False)
     def test_access_lumigo_wrapped(self):
-        from lumigo_opentelemetry import lumigo_wrapped, tracer_provider
+        from dash0_opentelemetry import lumigo_wrapped, tracer_provider
 
         self.assertIsNotNone(lumigo_wrapped)
         self.assertIsNotNone(tracer_provider)
@@ -241,7 +241,7 @@ class TestLumigoWrapped(unittest.TestCase):
 
 
 def test_access_lumigo_id_generator(monkeypatch):
-    from lumigo_opentelemetry import tracer_provider
+    from dash0_opentelemetry import tracer_provider
 
     tracer = tracer_provider.get_tracer("lumigo")
     assert type(tracer.id_generator).__name__ == "LambdaTraceIdGenerator"

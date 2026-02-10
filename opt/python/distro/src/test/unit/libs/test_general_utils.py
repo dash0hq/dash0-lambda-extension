@@ -1,6 +1,6 @@
 import pytest
 
-from lumigo_opentelemetry.libs.general_utils import (
+from dash0_opentelemetry.libs.general_utils import (
     get_max_size,
     get_boolean_env_var,
     lumigo_safe_wrapper,

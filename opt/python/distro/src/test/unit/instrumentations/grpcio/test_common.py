@@ -1,6 +1,6 @@
 from unittest.mock import Mock
 
-from lumigo_opentelemetry.instrumentations.grpcio.common import (
+from dash0_opentelemetry.instrumentations.grpcio.common import (
     add_payload_in_bulks,
     PAYLOAD_MAX_SIZE,
 )
