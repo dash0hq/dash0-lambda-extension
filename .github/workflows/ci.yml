@@ -29,6 +29,22 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --all-features
 
+  python-distro-test:
+    name: Python Distro Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          python -m venv opt/python/distro/.venv
+          opt/python/distro/.venv/bin/pip install -r opt/python/distro/requirements-dev.txt
+      - name: Run tests
+        working-directory: opt/python/distro
+        run: .venv/bin/pytest
+
   integration-test:
     name: Integration Test
     runs-on: ubuntu-latest
