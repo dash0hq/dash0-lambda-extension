@@ -115,6 +115,7 @@ def init() -> Dict[str, Any]:
         get_process_resource,
         get_resource,
     )
+    from opentelemetry.instrumentation.aws_lambda import AwsLambdaInstrumentor
 
     process_resource = get_process_resource()
 
@@ -163,6 +164,8 @@ def init() -> Dict[str, Any]:
         logger.debug("Storing a copy of the trace data under: %s", spandump_file)
 
     trace.set_tracer_provider(tracer_provider)
+
+    AwsLambdaInstrumentor().instrument()
 
     return {"tracer_provider": tracer_provider}
 

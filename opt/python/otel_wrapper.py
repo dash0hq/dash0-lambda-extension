@@ -100,8 +100,6 @@ conflict_found = check_dependency_conflicts(DISTRO_REQUIREMENTS)
 if not conflict_found:
     try:
         import dash0_opentelemetry
-        from opentelemetry.instrumentation.aws_lambda import AwsLambdaInstrumentor
-        AwsLambdaInstrumentor().instrument()
     except Exception as e:
         logger.warning(f"Failed to instrument with opentelemetry: {e}")
 
