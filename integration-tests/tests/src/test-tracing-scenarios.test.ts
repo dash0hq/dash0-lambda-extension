@@ -4,13 +4,14 @@ import { describe, expect, it } from 'vitest';
 import { DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS } from './config';
 import { getAttributesMap, getRequestPayload, invokeFunction } from './utils';
 
-const runtimes = ['python3-11', 'python3-12', 'python3-13', 'python3-14'];
+const pythonRuntimes = ['python3-11', 'python3-12', 'python3-13', 'python3-14'];
+const nodeRuntimes = ['nodejs20-x', 'nodejs22-x', 'nodejs24-x'];
 
 const scenarios = [
-    { name: 'sqs', producerPrefix: 'tracing-sqs-producer', consumerPrefix: 'tracing-sqs-consumer' },
-    { name: 'sns', producerPrefix: 'tracing-sns-producer', consumerPrefix: 'tracing-sns-consumer' },
-    { name: 'sns-sqs', producerPrefix: 'tracing-sns-sqs-producer', consumerPrefix: 'tracing-sns-sqs-consumer' },
-    { name: 'eventbridge', producerPrefix: 'tracing-eventbridge-producer', consumerPrefix: 'tracing-eventbridge-consumer' },
+    { name: 'sqs', producerPrefix: 'tracing-sqs-producer', consumerPrefix: 'tracing-sqs-consumer', runtimes: [...pythonRuntimes, ...nodeRuntimes] },
+    { name: 'sns', producerPrefix: 'tracing-sns-producer', consumerPrefix: 'tracing-sns-consumer', runtimes: [...pythonRuntimes, ...nodeRuntimes] },
+    { name: 'sns-sqs', producerPrefix: 'tracing-sns-sqs-producer', consumerPrefix: 'tracing-sns-sqs-consumer', runtimes: [...pythonRuntimes, ...nodeRuntimes] },
+    { name: 'eventbridge', producerPrefix: 'tracing-eventbridge-producer', consumerPrefix: 'tracing-eventbridge-consumer', runtimes: [...pythonRuntimes] },
 ] as const;
 
 const verifyTracingScenario = async (
@@ -24,6 +25,10 @@ const verifyTracingScenario = async (
     // Step 2: Fetch and verify the producer span
     let producerTraceId: string | undefined;
     let producerSpanId: string | undefined;
+
+    const expectedScopeName = producerFunctionName.includes('python') ?
+        'opentelemetry.instrumentation.aws_lambda' :
+        '@opentelemetry/instrumentation-aws-lambda';
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         await delay(RETRY_DELAY_MS);
@@ -45,7 +50,7 @@ const verifyTracingScenario = async (
 
             // Find the lambda instrumentation scope
             const lambdaScopeSpan = spanPayload.resourceSpans[0].scopeSpans.find(
-                (ss: any) => ss.scope.name === 'opentelemetry.instrumentation.aws_lambda'
+                (ss: any) => ss.scope.name === expectedScopeName
             );
             expect(lambdaScopeSpan).toBeDefined();
             expect(lambdaScopeSpan.spans.length).toEqual(1);
@@ -103,7 +108,7 @@ const verifyTracingScenario = async (
             let consumerSpanWithLinks: any = null;
             for (const resourceSpan of spanPayload.resourceSpans) {
                 for (const scopeSpan of resourceSpan.scopeSpans) {
-                    if (scopeSpan.scope.name === 'opentelemetry.instrumentation.aws_lambda') {
+                    if (scopeSpan.scope.name === expectedScopeName) {
                         for (const span of scopeSpan.spans) {
                             if (span.links && span.links.length > 0) {
                                 consumerSpanWithLinks = span;
@@ -132,8 +137,8 @@ const verifyTracingScenario = async (
 };
 
 describe.concurrent('Tracing Scenarios', () => {
-    for (const runtime of runtimes) {
-        for (const scenario of scenarios) {
+    for (const scenario of scenarios) {
+        for (const runtime of scenario.runtimes) {
             const producerFunctionName = `${scenario.producerPrefix}-${runtime}`;
             const consumerFunctionName = `${scenario.consumerPrefix}-${runtime}`;
 
