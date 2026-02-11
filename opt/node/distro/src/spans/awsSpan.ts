@@ -11,7 +11,6 @@ import {
   snsParser,
   sqsParser,
 } from '../parsers/aws';
-import { setSpanAsNotExportable } from '../resources/spanProcessor';
 import { AwsOtherService, AwsParsedService, SupportedAwsServices } from './types';
 import { isAwsInstrumentationSpanActive } from '../instrumentations/aws-sdk/shared';
 
@@ -71,15 +70,6 @@ export const getAwsServiceData = (requestData, responseData, span: Span): AwsSer
     serviceType = AwsOtherService.ExternalService;
   } else {
     // not an aws service
-    return {};
-  }
-
-  // AWS services supported by the aws-sdk instrumentation already produce spans, so we skip the http-spans for those calls.
-  // We can remove this logic when we move to entirely relying on the aws-sdk instrumentation, and use the suppressInternalInstrumentation
-  // flag. See:
-  // https://github.com/open-telemetry/opentelemetry-js-contrib/tree/main/plugins/node/opentelemetry-instrumentation-aws-sdk#aws-sdk-instrumentation-options
-  if (isAwsInstrumentationSpanActive()) {
-    setSpanAsNotExportable(span);
     return {};
   }
 

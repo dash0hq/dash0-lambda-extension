@@ -4,7 +4,6 @@ import { traverse } from '../tools/xmlToJson';
 import type { HttpRawRequest, HttpRawResponse } from '@lumigo/node-core/lib/types/spans';
 import { CommonUtils, Triggers } from '@lumigo/node-core';
 import type { AwsServiceAttributes } from '../spans/awsSpan';
-import { getSpanSkipExportAttributes } from '../resources/spanProcessor';
 
 const extractDynamodbMessageId = (reqBody, method) => {
   if (method === 'PutItem' && reqBody['Item']) {
@@ -217,13 +216,6 @@ export const sqsParser = (requestData, responseData, jsonResponseBody = undefine
     awsServiceData.lumigoData = JSON.stringify({
       trigger: [mainTrigger, ...Triggers.recursiveParseTriggers(inner, mainTrigger.id)],
     });
-  }
-
-  if (shouldSkipSqsSpan(parsedReqBody, requestHeaders, awsServiceData.messageId)) {
-    logger.debug(
-      `Not tracing empty SQS polling requests (override by setting the env var LUMIGO_AUTO_FILTER_EMPTY_SQS=FALSE)`
-    );
-    Object.assign(awsServiceData, getSpanSkipExportAttributes());
   }
 
   return awsServiceData;

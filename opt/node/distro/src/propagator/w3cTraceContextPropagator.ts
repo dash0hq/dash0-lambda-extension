@@ -11,7 +11,7 @@ const contextKeysSkipInject = [
   'x-amz-content-sha256', // Amazon Sigv4, see https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
 ];
 
-export class LumigoW3CTraceContextPropagator extends W3CTraceContextPropagator {
+export class Dash0W3CTraceContextPropagator extends W3CTraceContextPropagator {
   override inject(context: Context, carrier: unknown, setter: TextMapSetter): void {
     if (typeof carrier === 'object') {
       const carrierKeys = Object.keys(carrier).map((key) => key.toLowerCase());

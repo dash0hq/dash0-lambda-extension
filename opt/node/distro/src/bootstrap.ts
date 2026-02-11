@@ -8,7 +8,7 @@ import {
   resourceFromAttributes,
   defaultResource,
 } from '@opentelemetry/resources';
-import { BasicTracerProvider, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base';
+import {BasicTracerProvider, BatchSpanProcessor, SimpleSpanProcessor} from '@opentelemetry/sdk-trace-base';
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 
 import {
@@ -30,7 +30,7 @@ import Dash0PrismaInstrumentation from './instrumentations/prisma/PrismaInstrume
 import Dash0RedisInstrumentation from './instrumentations/redis/RedisInstrumentation';
 import { Dash0AwsSdkV3LibInstrumentation } from './instrumentations/aws-sdk';
 
-import { LumigoW3CTraceContextPropagator } from './propagator/w3cTraceContextPropagator';
+import { Dash0W3CTraceContextPropagator } from './propagator/w3cTraceContextPropagator';
 import { getSpanAttributeMaxLength } from './utils';
 import { safeRequire } from './requireUtils';
 
@@ -47,7 +47,7 @@ declare global {
   }
 }
 
-export interface LumigoSdkInitialization {
+export interface Dash0SdkInitialization {
   readonly tracerProvider: BasicTracerProvider;
   readonly resource: Resource;
   readonly instrumentedModules: string[];
@@ -56,7 +56,6 @@ export interface LumigoSdkInitialization {
 import { dirname, join } from 'path';
 import { logger } from './logging';
 import { ProcessEnvironmentDetector } from './resources/detectors/ProcessEnvironmentDetector';
-import { LumigoSpanProcessor } from './resources/spanProcessor';
 import { getCombinedSampler } from './samplers/combinedSampler';
 
 const traceEndpoint = process.env.DASH0_EXTENSION_ENDPOINT || DEFAULT_DASH0_EXTENSION_ENDPOINT;
@@ -70,7 +69,7 @@ function reportInitError(err: Error) {
   );
 }
 
-export const init = async (): Promise<LumigoSdkInitialization> => {
+export const init = async (): Promise<Dash0SdkInitialization> => {
   if (isTraceInitialized) {
     const message =
       'The Dash0 OpenTelemetry Distro is already initialized: additional attempt to initialize has been ignored.';
@@ -179,7 +178,7 @@ export const init = async (): Promise<LumigoSdkInitialization> => {
       });
 
       spanProcessors.push(
-        new LumigoSpanProcessor(otlpTraceExporter, {
+        new BatchSpanProcessor(otlpTraceExporter, {
           // The maximum queue size. After the size is reached spans are dropped.
           maxQueueSize: 1000,
           // The maximum batch size of every export. It must be smaller or equal to maxQueueSize.
@@ -199,7 +198,7 @@ export const init = async (): Promise<LumigoSdkInitialization> => {
     });
 
     tracerProvider.register({
-      propagator: new LumigoW3CTraceContextPropagator(),
+      propagator: new Dash0W3CTraceContextPropagator(),
     });
 
     logger.info(

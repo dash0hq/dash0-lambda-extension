@@ -10,12 +10,12 @@
  * with `undefined` as value; the promise is resolved, instead of rejected, to avoid UnhandledPromiseRejectionWarning
  * or errors affecting processes using unsupported Node.js versions.
  */
-import type { LumigoSdkInitialization } from './bootstrap';
+import type { Dash0SdkInitialization } from './bootstrap';
 import { DASH0_LOGGING_NAMESPACE } from './constants';
 import { minMajor, maxMajor } from './supportedVersions.json';
-export type { LumigoSdkInitialization } from './bootstrap';
+export type { Dash0SdkInitialization } from './bootstrap';
 
-export const init: Promise<LumigoSdkInitialization | undefined> = (() => {
+export const init: Promise<Dash0SdkInitialization | undefined> = (() => {
   const version = process.version;
   try {
     const nodeJsMajorVersion = parseInt(version.match(/v(\d+)\..*/)[1]);
