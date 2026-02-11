@@ -1,5 +1,4 @@
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
 import { registerInstrumentations } from '@opentelemetry/instrumentation';
 import type { Resource } from '@opentelemetry/resources';
 import {
@@ -10,23 +9,14 @@ import {
   defaultResource,
 } from '@opentelemetry/resources';
 import { BasicTracerProvider, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base';
-import {
-  BatchLogRecordProcessor,
-  LoggerProvider,
-  SimpleLogRecordProcessor,
-} from '@opentelemetry/sdk-logs';
-import type { LoggerProvider as ApiLoggerProvider } from '@opentelemetry/api-logs';
-import * as logsAPI from '@opentelemetry/api-logs';
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 
 import * as awsResourceDetectors from '@opentelemetry/resource-detector-aws';
 import {
   DEFAULT_LUMIGO_TRACES_ENDPOINT,
-  DEFAULT_LUMIGO_LOGS_ENDPOINT,
   TRACING_ENABLED,
-  LOGGING_ENABLED,
 } from './constants';
-import { FileLogExporter, FileSpanExporter } from './exporters';
+import { FileSpanExporter } from './exporters';
 
 import LumigoGrpcInstrumentation from './instrumentations/@grpc/grpc-js/GrpcInstrumentation';
 import LumigoNestInstrumentation from './instrumentations/@nestjs/core/NestInstrumentation';
@@ -41,9 +31,6 @@ import LumigoPgInstrumentation from './instrumentations/pg/PgInstrumentation';
 import LumigoPrismaInstrumentation from './instrumentations/prisma/PrismaInstrumentation';
 import LumigoRedisInstrumentation from './instrumentations/redis/RedisInstrumentation';
 import { LumigoAwsSdkV3LibInstrumentation } from './instrumentations/aws-sdk';
-import LumigoWinstonInstrumentation from './instrumentations/winston/WinstonInstrumentation';
-import LumigoBunyanInstrumentation from './instrumentations/bunyan/BunyanInstrumentation';
-import LumigoPinoInstrumentation from './instrumentations/pino/PinoInstrumentation';
 
 import { LumigoW3CTraceContextPropagator } from './propagator/w3cTraceContextPropagator';
 import {
@@ -52,7 +39,7 @@ import {
   LumigoKubernetesDetector,
   LumigoTagDetector,
 } from './resources/detectors';
-import { getLogAttributeMaxLength, getSpanAttributeMaxLength } from './utils';
+import { getSpanAttributeMaxLength } from './utils';
 import { safeRequire } from './requireUtils';
 
 declare global {
@@ -61,10 +48,7 @@ declare global {
     interface ProcessEnv {
       LUMIGO_DEBUG?: string;
       LUMIGO_DEBUG_SPANDUMP?: string;
-      LUMIGO_DEBUG_LOGDUMP?: string;
       LUMIGO_ENDPOINT?: string;
-      LUMIGO_ENABLE_LOGS?: string;
-      LUMIGO_LOGS_ENDPOINT?: string;
       LUMIGO_SWITCH_OFF?: string;
       LUMIGO_TRACER_TOKEN?: string;
     }
@@ -73,7 +57,6 @@ declare global {
 
 export interface LumigoSdkInitialization {
   readonly tracerProvider: BasicTracerProvider;
-  readonly loggerProvider: ApiLoggerProvider;
   readonly resource: Resource;
   readonly instrumentedModules: string[];
 }
@@ -83,10 +66,8 @@ import { logger } from './logging';
 import { ProcessEnvironmentDetector } from './resources/detectors/ProcessEnvironmentDetector';
 import { LumigoSpanProcessor } from './resources/spanProcessor';
 import { getCombinedSampler } from './samplers/combinedSampler';
-import { LumigoLogRecordProcessor } from './processors/LumigoLogRecordProcessor';
 
 const lumigoTraceEndpoint = process.env.LUMIGO_ENDPOINT || DEFAULT_LUMIGO_TRACES_ENDPOINT;
-const lumigoLogEndpoint = process.env.LUMIGO_LOGS_ENDPOINT || DEFAULT_LUMIGO_LOGS_ENDPOINT;
 
 let isTraceInitialized = false;
 
@@ -137,11 +118,6 @@ export const init = async (): Promise<LumigoSdkInitialization> => {
       new LumigoPrismaInstrumentation(),
       new LumigoRedisInstrumentation(),
       new LumigoAwsSdkV3LibInstrumentation(),
-
-      // Loggers
-      new LumigoWinstonInstrumentation(),
-      new LumigoBunyanInstrumentation(),
-      new LumigoPinoInstrumentation(),
     ].filter((i) => i.isApplicable());
 
     /*
@@ -214,14 +190,6 @@ export const init = async (): Promise<LumigoSdkInitialization> => {
       );
     }
 
-    // Build log record processors array
-    const logRecordProcessors = [new LumigoLogRecordProcessor()];
-    if (process.env.LUMIGO_DEBUG_LOGDUMP) {
-      logRecordProcessors.push(
-        new SimpleLogRecordProcessor(new FileLogExporter(process.env.LUMIGO_DEBUG_LOGDUMP))
-      );
-    }
-
     if (lumigoToken) {
       const otlpTraceExporter = new OTLPTraceExporter({
         url: lumigoTraceEndpoint,
@@ -244,28 +212,6 @@ export const init = async (): Promise<LumigoSdkInitialization> => {
           'Tracing is disabled (the "LUMIGO_ENABLE_TRACES" environment variable is not set to "true"): no traces will be sent to Lumigo.'
         );
       }
-
-      const otlpLogExporter = new OTLPLogExporter({
-        url: lumigoLogEndpoint,
-        headers: {
-          Authorization: `LumigoToken ${lumigoToken.trim()}`,
-        },
-      });
-
-      if (LOGGING_ENABLED) {
-        logRecordProcessors.push(
-          new BatchLogRecordProcessor(otlpLogExporter, {
-            // The maximum queue size. After the size is reached logs are dropped.
-            maxQueueSize: 1000,
-            // The maximum batch size of every export. It must be smaller or equal to maxQueueSize.
-            maxExportBatchSize: 100,
-          })
-        );
-      } else {
-        logger.info(
-          'Logging is disabled (the "LUMIGO_ENABLE_LOGS" environment variable is not set to "true"): no logs will be sent to Lumigo.'
-        );
-      }
     }
 
     // Create providers with processors
@@ -278,27 +224,16 @@ export const init = async (): Promise<LumigoSdkInitialization> => {
       spanProcessors,
     });
 
-    const loggerProvider = new LoggerProvider({
-      resource,
-      logRecordLimits: {
-        attributeValueLengthLimit: getLogAttributeMaxLength(),
-      },
-      processors: logRecordProcessors,
-    });
-
     tracerProvider.register({
       propagator: new LumigoW3CTraceContextPropagator(),
     });
 
-    logsAPI.logs.setGlobalLoggerProvider(loggerProvider);
-
     logger.info(
-      `Dash0 OpenTelemetry Distro started.`
+      `Dash0 OpenTelemetry Distro started`
     );
 
     return {
       tracerProvider,
-      loggerProvider,
       resource,
       instrumentedModules,
     };
