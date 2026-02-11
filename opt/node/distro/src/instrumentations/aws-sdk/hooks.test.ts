@@ -1,4 +1,4 @@
-import { responseHook, preRequestHook, sqsProcessHook } from './hooks';
+import { responseHook, preRequestHook } from './hooks';
 import type {
   AwsSdkRequestHookInformation,
   AwsSdkResponseHookInformation,
@@ -172,20 +172,4 @@ describe('aws-sdk instrumentation hooks', () => {
     };
   });
 
-  describe('sqsProcessHook', () => {
-    test('sets the span kind and attributes for tracing-ingestion', () => {
-      // aws-sdk instrumentation does not set the span type to internal, but to consumer for some reason
-      const sqsProcessSpan = rootSpanWithAttributes(
-        {
-          'messaging.message_id': 'this will fail tracing-ingestion by causing an infinite loop',
-        },
-        SpanKind.CONSUMER
-      );
-
-      sqsProcessHook(sqsProcessSpan);
-
-      expect(sqsProcessSpan.kind).toBe(SpanKind.INTERNAL);
-      expect(sqsProcessSpan.attributes['messaging.message_id']).toBeUndefined();
-    });
-  });
 });

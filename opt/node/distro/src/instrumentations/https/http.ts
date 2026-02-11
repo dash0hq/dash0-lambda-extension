@@ -12,7 +12,6 @@ import {
 } from '@opentelemetry/semantic-conventions';
 import type { InstrumentationIfc } from '../hooksIfc';
 import { logger } from '../../logging';
-import { getAwsServiceData } from '../../spans/awsSpan';
 import { runOneTimeWrapper, safeExecute, getSpanAttributeMaxLength } from '../../utils';
 import { contentType, scrubHttpPayload } from '../../tools/payloads';
 
