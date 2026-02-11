@@ -21,13 +21,11 @@ import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 
 import * as awsResourceDetectors from '@opentelemetry/resource-detector-aws';
 import {
-  DEFAULT_DEPENDENCIES_ENDPOINT,
   DEFAULT_LUMIGO_TRACES_ENDPOINT,
   DEFAULT_LUMIGO_LOGS_ENDPOINT,
   TRACING_ENABLED,
   LOGGING_ENABLED,
 } from './constants';
-import { report } from './dependencies';
 import { FileLogExporter, FileSpanExporter } from './exporters';
 
 import LumigoGrpcInstrumentation from './instrumentations/@grpc/grpc-js/GrpcInstrumentation';
@@ -67,7 +65,6 @@ declare global {
       LUMIGO_ENDPOINT?: string;
       LUMIGO_ENABLE_LOGS?: string;
       LUMIGO_LOGS_ENDPOINT?: string;
-      LUMIGO_REPORT_DEPENDENCIES?: string;
       LUMIGO_SWITCH_OFF?: string;
       LUMIGO_TRACER_TOKEN?: string;
     }
@@ -79,7 +76,6 @@ export interface LumigoSdkInitialization {
   readonly loggerProvider: ApiLoggerProvider;
   readonly resource: Resource;
   readonly instrumentedModules: string[];
-  readonly reportDependencies: Promise<void | Object>;
 }
 
 import { dirname, join } from 'path';
@@ -126,9 +122,6 @@ export const init = async (): Promise<LumigoSdkInitialization> => {
       {};
 
     const ignoredHostnames = [new URL(lumigoTraceEndpoint).hostname];
-    if (lumigoTraceEndpoint != DEFAULT_LUMIGO_TRACES_ENDPOINT) {
-      ignoredHostnames.push(new URL(DEFAULT_DEPENDENCIES_ENDPOINT).hostname);
-    }
 
     const instrumentationsToInstall = [
       new LumigoAmqplibInstrumentation(),
@@ -173,9 +166,6 @@ export const init = async (): Promise<LumigoSdkInitialization> => {
         'The Lumigo token is not available (the "LUMIGO_TRACER_TOKEN" environment variable is not set): no telemetry will be sent to Lumigo.'
       );
     }
-
-    const lumigoReportDependencies =
-      process.env.LUMIGO_REPORT_DEPENDENCIES?.toLowerCase() !== 'false';
 
     const infrastructureDetectors = [
       envDetector,
@@ -232,8 +222,6 @@ export const init = async (): Promise<LumigoSdkInitialization> => {
       );
     }
 
-    let reportDependencies: Promise<void | Object>;
-
     if (lumigoToken) {
       const otlpTraceExporter = new OTLPTraceExporter({
         url: lumigoTraceEndpoint,
@@ -278,27 +266,6 @@ export const init = async (): Promise<LumigoSdkInitialization> => {
           'Logging is disabled (the "LUMIGO_ENABLE_LOGS" environment variable is not set to "true"): no logs will be sent to Lumigo.'
         );
       }
-
-      /*
-       * We do not wait for this promise, we do not want to delay the application.
-       * Dependency reporting is done "best effort".
-       */
-      if (!lumigoReportDependencies) {
-        reportDependencies = Promise.resolve('Dependency reporting is turned off');
-      } else {
-        /*
-         * We pass `detectedResource` as opposed to `tracerProvider.resource`
-         * because we want only the infrastructure-related resource attributes
-         * like ARNs, and specifically we do not need the process environment.
-         */
-        reportDependencies = report(
-          DEFAULT_DEPENDENCIES_ENDPOINT,
-          lumigoToken,
-          infrastructureResource.attributes
-        );
-      }
-    } else {
-      reportDependencies = Promise.resolve('No Lumigo token available');
     }
 
     // Create providers with processors
@@ -333,7 +300,6 @@ export const init = async (): Promise<LumigoSdkInitialization> => {
       tracerProvider,
       loggerProvider,
       resource,
-      reportDependencies,
       instrumentedModules,
     };
   } catch (err) {

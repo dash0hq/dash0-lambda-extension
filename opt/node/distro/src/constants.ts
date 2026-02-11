@@ -6,9 +6,6 @@ export const DEFAULT_LUMIGO_TRACES_ENDPOINT =
 export const DEFAULT_LUMIGO_LOGS_ENDPOINT =
   'https://ga-otlp.lumigo-tracer-edge.golumigo.com/v1/logs';
 
-export const DEFAULT_DEPENDENCIES_ENDPOINT =
-  'https://ga-otlp.lumigo-tracer-edge.golumigo.com/v1/dependencies';
-
 // Since tracing is on by default, we allow omitting it and consider it enabled
 export const TRACING_ENABLED =
   process.env.LUMIGO_ENABLE_TRACES === undefined ||
