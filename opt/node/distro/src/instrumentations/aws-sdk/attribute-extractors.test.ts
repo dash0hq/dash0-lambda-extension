@@ -1,7 +1,7 @@
 import { extractAttributesFromSqsResponse } from './attribute-extractors';
-import { rootSpanWithAttributes } from '../../../test/utils/spans';
 import { Triggers } from '@lumigo/node-core';
 import 'jest-json';
+import {rootSpanWithAttributes} from "./hooks.test";
 
 describe('extractAttributesFromSqsResponse', () => {
   const queueUrl = 'https://sqs.us-east-1.amazonaws.com/177715257436/MyQueue';

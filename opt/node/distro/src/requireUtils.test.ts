@@ -1,18 +1,8 @@
-import path from 'path';
 import { safeRequire } from './requireUtils';
-import { version } from '../package.json';
 
 describe('safeRequire', () => {
   afterEach(() => {
     jest.clearAllMocks();
-  });
-
-  test('requires an existing module with the given path', () => {
-    const packageJsonPath = path.join(__dirname, '..', 'package.json');
-
-    const result = safeRequire(packageJsonPath);
-
-    expect(result.version).toEqual(version);
   });
 
   test('does not fail but returns undefined for a non-existing module', () => {

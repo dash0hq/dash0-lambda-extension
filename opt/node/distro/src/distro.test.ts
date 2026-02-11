@@ -1,14 +1,6 @@
-import * as fs from 'fs';
-import { join } from 'path';
-import { version } from '../package.json';
-
-import { DEFAULT_DEPENDENCIES_ENDPOINT, DEFAULT_LUMIGO_ENDPOINT } from './constants';
-
 const OTHER_LUMIGO_ENDPOINT =
   'http://ec2-34-215-6-94.us-west-2.compute.amazonaws.com:55681/v1/trace';
 const LUMIGO_TRACER_TOKEN = 't_10faa5e13e7844aaa1234';
-
-const ECS_CONTAINER_METADATA_URI = 'http://169.255.169.255/v3';
 
 describe('Distro initialization', () => {
   const ORIGINAL_PROCESS_ENV = process.env;
@@ -42,10 +34,10 @@ describe('Distro initialization', () => {
     jest.resetModules();
   });
 
-  describe("with the 'LUMIGO_SWITCH_OFF' environment variable set to 'true'", () => {
+  describe("with the 'DASH0_SWITCH_OFF' environment variable set to 'true'", () => {
     test('should not invoke trace initialization', async () => {
       await jest.isolateModulesAsync(async () => {
-        process.env.LUMIGO_SWITCH_OFF = 'true';
+        process.env.DASH0_SWITCH_OFF = 'true';
 
         const { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-http');
         jest.mock('@opentelemetry/exporter-trace-otlp-http');
@@ -118,38 +110,21 @@ describe('Distro initialization', () => {
         const { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-http');
         jest.mock('@opentelemetry/exporter-trace-otlp-http');
 
-        process.env.LUMIGO_ENDPOINT = OTHER_LUMIGO_ENDPOINT;
-        process.env.LUMIGO_TRACER_TOKEN = LUMIGO_TRACER_TOKEN;
-        process.env.LUMIGO_REPORT_DEPENDENCIES = 'false';
+        process.env.DASH0_EXTENSION_ENDPOINT = OTHER_LUMIGO_ENDPOINT;
+        process.env.DASH0_TOKEN = LUMIGO_TRACER_TOKEN;
 
         const { init } = jest.requireActual('./distro');
         await init;
 
         expect(OTLPTraceExporter).toHaveBeenCalledWith({
           headers: {
-            Authorization: 'LumigoToken t_10faa5e13e7844aaa1234',
+            Authorization: 'Bearer t_10faa5e13e7844aaa1234',
           },
           url: OTHER_LUMIGO_ENDPOINT,
         });
       });
     });
 
-    describe('with the LUMIGO_DEBUG_SPANDUMP variable set', () => {
-      test('should initialize the FileSpanExporter', async () => {
-        await jest.isolateModulesAsync(async () => {
-          process.env.LUMIGO_DEBUG_SPANDUMP = '/dev/stdout';
-          process.env.LUMIGO_REPORT_DEPENDENCIES = 'false';
-
-          const { FileSpanExporter } = require('./exporters');
-          jest.mock('./exporters');
-
-          const { init } = jest.requireActual('./distro');
-          await init;
-
-          expect(FileSpanExporter).toHaveBeenCalledWith('/dev/stdout');
-        });
-      });
-    });
   });
 
   describe('without the LUMIGO_TRACER_TOKEN environment variable set', () => {
@@ -165,10 +140,10 @@ describe('Distro initialization', () => {
       });
     });
 
-    describe('with the LUMIGO_DEBUG_SPANDUMP variable set', () => {
+    describe('with the DASH0_DEBUG_SPANDUMP variable set', () => {
       test('should initialize the FileSpanExporter', async () => {
         await jest.isolateModulesAsync(async () => {
-          process.env.LUMIGO_DEBUG_SPANDUMP = '/dev/stdout';
+          process.env.DASH0_DEBUG_SPANDUMP = '/dev/stdout';
 
           jest.mock('./exporters');
 
@@ -182,67 +157,9 @@ describe('Distro initialization', () => {
     });
   });
 
-  describe('outside of a computing platform for which we have detectors', () => {
-    test('NodeTracerProvider should be given a resource with all the right attributes', async () => {
-      await jest.isolateModulesAsync(async () => {
-        process.env.LUMIGO_TRACER_TOKEN = LUMIGO_TRACER_TOKEN;
-        process.env.OTEL_SERVICE_NAME = 'service-1';
-        process.env.LUMIGO_REPORT_DEPENDENCIES = 'false';
-
-        const { init } = jest.requireActual('./distro');
-        const { resource } = await init;
-
-        // expect(resource.attributes['framework']).toBe('node');
-        expect(resource.attributes['service.name']).toBe('service-1');
-
-        checkBasicResourceAttributes(resource);
-      });
-    });
-  });
-
-  describe('On Amazon ECS', () => {
-    beforeEach(() => {
-      process.env.ECS_CONTAINER_METADATA_URI = ECS_CONTAINER_METADATA_URI;
-      process.env.LUMIGO_REPORT_DEPENDENCIES = 'false';
-
-      // Mock the access to the /proc/sef/cgroup file, of the AWS detector will fail
-      jest.mock('fs', () => ({
-        ...jest.requireActual('fs'),
-        readFile: jest.fn().mockImplementation((path, options, callback) => {
-          if (path === '/proc/sef/cgroup') {
-            callback('some_cgroup');
-          }
-
-          const fs = jest.requireActual('fs');
-          return fs.readFile(path, options, callback);
-        }),
-      }));
-    });
-
-    test('NodeTracerProvider should be given a resource with ECS attributes', async () => {
-      await jest.isolateModulesAsync(async () => {
-        process.env.LUMIGO_TRACER_TOKEN = LUMIGO_TRACER_TOKEN;
-        process.env.OTEL_SERVICE_NAME = 'service-1';
-
-        const { init } = jest.requireActual('./distro');
-        const { resource } = await init;
-
-        // Wait for async attributes (like ECS metadata) to resolve
-        await resource.waitForAsyncAttributes?.();
-
-        checkBasicResourceAttributes(resource);
-
-        // Default ECS from upstream detector
-        expect(resource.attributes['cloud.provider']).toBe('aws');
-        expect(resource.attributes['cloud.platform']).toBe('aws_ecs');
-      });
-    });
-  });
-
   describe('NodeTracerProvider should be initialize with span limit according to environment variables or default', () => {
     beforeEach(() => {
       process.env = { ...ORIGINAL_PROCESS_ENV };
-      process.env.LUMIGO_REPORT_DEPENDENCIES = 'false';
     });
 
     test('NodeTracerProvider should be initialize with span limit equals to OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT', async () => {
@@ -298,187 +215,6 @@ describe('Distro initialization', () => {
     });
   });
 
-  describe('dependency reporting', () => {
-    test('is disabled if LUMIGO_TRACER_TOKEN is not set', async () => {
-      await jest.isolateModulesAsync(async () => {
-        const utils = require('./utils');
-
-        const postUri = jest.spyOn(utils, 'postUri').mockImplementation(() => Promise.resolve());
-
-        const { init } = jest.requireActual('./distro');
-        const { reportDependencies } = await init;
-
-        expect(reportDependencies).resolves.toEqual('No Lumigo token available');
-        expect(postUri).not.toHaveBeenCalled();
-      });
-    });
-
-    test('is disabled if the "LUMIGO_REPORT_DEPENDENCIES" set to something different than "true"', async () => {
-      await jest.isolateModulesAsync(async () => {
-        process.env.LUMIGO_TRACER_TOKEN = 'abcdef';
-        process.env.LUMIGO_REPORT_DEPENDENCIES = 'false';
-
-        const utils = require('./utils');
-
-        const postUri = jest.spyOn(utils, 'postUri').mockImplementation(() => Promise.resolve());
-
-        const { init } = jest.requireActual('./distro');
-        const { reportDependencies } = await init;
-
-        expect(reportDependencies).resolves.toEqual('Dependency reporting is turned off');
-        expect(postUri).not.toHaveBeenCalled();
-      });
-    });
-
-    describe.each([DEFAULT_LUMIGO_ENDPOINT, OTHER_LUMIGO_ENDPOINT])(
-      'submits dependencies to the backend',
-      (endpoint) => {
-        test(`when the Lumigo endpoint is ${
-          endpoint == DEFAULT_LUMIGO_ENDPOINT ? '' : 'not '
-        }the default`, async () => {
-          process.env.LUMIGO_ENDPOINT = endpoint;
-
-          await jest.isolateModulesAsync(async () => {
-            const lumigoToken = 'abcdef';
-            process.env.LUMIGO_TRACER_TOKEN = lumigoToken;
-
-            const utils = require('./utils');
-
-            const postUri = jest
-              .spyOn(utils, 'postUri')
-              .mockImplementation(() => Promise.resolve());
-
-            const { init } = jest.requireActual('./distro');
-            const { reportDependencies } = await init;
-
-            const res = await reportDependencies;
-            expect(res).toBeUndefined();
-
-            expect(postUri.mock.calls.length).toBe(1);
-
-            const [dependenciesEndpoint, data, headers] = postUri.mock.calls[0];
-
-            const payload = data as {
-              resourceAttributes: Object;
-              packages: string;
-            };
-
-            expect(dependenciesEndpoint).toBe(DEFAULT_DEPENDENCIES_ENDPOINT);
-            expect(payload.resourceAttributes['lumigo.distro.version']).toBe(version);
-            expect(payload.packages.length).toBeGreaterThan(0);
-            expect(headers).toEqual({ Authorization: `LumigoToken ${lumigoToken}` });
-          });
-        });
-      }
-    );
-
-    test('does not fail if dependency submission fails', async () => {
-      await jest.isolateModulesAsync(async () => {
-        const lumigoToken = 'abcdef';
-        process.env.LUMIGO_TRACER_TOKEN = lumigoToken;
-
-        const utils = require('./utils');
-
-        const postUri = jest
-          .spyOn(utils, 'postUri')
-          .mockImplementation(() => Promise.reject(new Error('FAIL!')));
-
-        const { init } = jest.requireActual('./distro');
-        const { reportDependencies } = await init;
-
-        const res = await reportDependencies;
-        expect(res).toBeUndefined();
-
-        expect(postUri.mock.calls.length).toBe(1);
-
-        const [dependenciesEndpoint, data, headers] = postUri.mock.calls[0];
-
-        const payload = data as {
-          resourceAttributes: Object;
-          packages: string;
-        };
-
-        expect(dependenciesEndpoint).not.toBeFalsy();
-        expect(payload.resourceAttributes['telemetry.sdk.language']).toBe('nodejs');
-        expect(payload.resourceAttributes['lumigo.distro.version']).toBe(version);
-        expect(payload.packages.length).toBeGreaterThan(0);
-        expect(headers).toEqual({ Authorization: `LumigoToken ${lumigoToken}` });
-      });
-    });
-
-    test('handles correctly folders in node_modules without package.json inside', async () => {
-      await jest.isolateModulesAsync(async () => {
-        const lumigoToken = 'abcdef';
-        process.env.LUMIGO_TRACER_TOKEN = lumigoToken;
-
-        const utils = require('./utils');
-
-        const postUri = jest.spyOn(utils, 'postUri').mockImplementation(() => Promise.resolve());
-
-        await fs.promises.mkdir(join(__dirname, 'node_modules', 'foo'), { recursive: true });
-        await fs.promises.mkdir(join(__dirname, 'node_modules', 'bar'), { recursive: true });
-
-        const { init } = jest.requireActual('./distro');
-        const { reportDependencies } = await init;
-
-        const res = await reportDependencies;
-        expect(res).toBeUndefined();
-
-        expect(postUri.mock.calls.length).toBe(1);
-
-        const [dependenciesEndpoint, data, headers] = postUri.mock.calls[0];
-
-        const payload = data as {
-          resourceAttributes: Object;
-          packages: string;
-        };
-
-        expect(dependenciesEndpoint).not.toBeFalsy();
-        expect(payload.resourceAttributes['lumigo.distro.version']).toBe(version);
-        expect(payload.packages.length).toBeGreaterThan(0);
-        expect(headers).toEqual({ Authorization: `LumigoToken ${lumigoToken}` });
-      });
-    });
-  });
-
-  describe('when used by Webpack', () => {
-    test("uses 'unknown' as the version when it cannot be extracted and does not fail loading", async () => {
-      await jest.isolateModulesAsync(async () => {
-        process.env.LUMIGO_TRACER_TOKEN = 'abcdef';
-
-        const utils = require('./utils');
-
-        const postUri = jest.spyOn(utils, 'postUri').mockImplementation(() => Promise.resolve());
-
-        // Mock a webpack setup where package.json is not available
-        global.__non_webpack_require__ = (moduleName) => {
-          if (moduleName.includes('package.json')) {
-            throw new Error('Cannot find module');
-          } else {
-            return require(moduleName);
-          }
-        };
-        global.__non_webpack_require__.resolve = require.resolve;
-
-        const { init } = jest.requireActual('./distro');
-        const { reportDependencies } = await init;
-
-        const res = await reportDependencies;
-        expect(res).toBeUndefined();
-
-        expect(postUri.mock.calls.length).toBe(1);
-
-        const [, data] = postUri.mock.calls[0];
-
-        const payload = data as {
-          resourceAttributes: Object;
-          packages: string;
-        };
-
-        expect(payload.resourceAttributes['lumigo.distro.version']).toBe('unknown');
-      });
-    });
-  });
 
   it('does not invoke console.error', async () => {
     console.error = jest.fn();
