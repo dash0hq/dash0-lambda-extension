@@ -1,7 +1,8 @@
+import logging
 import os
 from importlib import import_module
-import lumigo_opentelemetry
-from opentelemetry.instrumentation.aws_lambda import AwsLambdaInstrumentor
+
+logger = logging.getLogger(__name__)
 
 
 def modify_module_name(module_name):
@@ -20,7 +21,11 @@ if path is None:
 path = modify_module_name(path)
 os.environ["ORIG_HANDLER"] = path
 
-AwsLambdaInstrumentor().instrument()
+
+try:
+    import dash0_opentelemetry
+except Exception as e:
+    logger.warning(f"Failed to instrument with opentelemetry: {e}")
 
 try:
     (mod_name, handler_name) = path.rsplit(".", 1)

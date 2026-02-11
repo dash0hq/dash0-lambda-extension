@@ -133,6 +133,44 @@ class PythonStack extends cdk.NestedStack {
     createLambdas(this, runtimes, props.layer, props.role, props.logGroup, {
       code: createPythonCode(),
     });
+
+    // Dependency conflict test lambdas
+    const dependencyConflictCode = lambda.Code.fromAsset(
+      path.join(__dirname, '../lambdas/python/dependency-conflict'),
+      {
+        bundling: {
+          image: lambda.Runtime.PYTHON_3_12.bundlingImage,
+          command: [
+            'bash', '-c',
+            'pip install -r requirements.txt -t /asset-output && cp -au . /asset-output',
+          ],
+        },
+      },
+    );
+
+    const dependencyConflictRuntimes = runtimes.filter(r => r !== lambda.Runtime.PYTHON_3_14);
+    for (const runtime of dependencyConflictRuntimes) {
+      const runtimeName = runtime.name.replace(/\./g, '-');
+      new lambda.Function(this, `dependency-conflict-${runtimeName}`, {
+        functionName: `dependency-conflict-${runtimeName}`,
+        runtime,
+        memorySize: 128,
+        handler: 'handler.handler',
+        architecture: lambda.Architecture.X86_64,
+        timeout: cdk.Duration.seconds(10),
+        code: dependencyConflictCode,
+        layers: [props.layer],
+        role: props.role,
+        environment: {
+          AWS_LAMBDA_EXEC_WRAPPER: '/opt/wrapper',
+          DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
+          DASH0_ENDPOINT: 'https://ingress.eu-west-1.aws.dash0-dev.com:4318',
+          DASH0_EXTENSION_LOG_LEVEL: 'info',
+        },
+        logGroup: props.logGroup,
+        loggingFormat: lambda.LoggingFormat.TEXT,
+      });
+    }
   }
 }
 

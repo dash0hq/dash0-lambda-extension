@@ -4,3 +4,4 @@ build
 .lambda-layer
 .idea
 opt/node/node_modules
+.venv

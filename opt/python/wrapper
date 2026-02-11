@@ -1,10 +1,6 @@
 #!/bin/bash
 args=("$@")
 
-if [ "$X_LUMIGO_KILLSWITCH" = "true" ]; then
-    exec "${args[@]}"
-fi
-
 # Copy DASH0_* masking env vars to LUMIGO_* equivalents
 [ -n "$DASH0_MASK_RULES" ] && export LUMIGO_SECRET_MASKING_REGEX="$DASH0_MASK_RULES"
 [ -n "$DASH0_MASK_REQUEST_BODY" ] && export LUMIGO_SECRET_MASKING_REGEX_HTTP_REQUEST_BODIES="$DASH0_MASK_REQUEST_BODY"
@@ -14,10 +10,6 @@ fi
 [ -n "$DASH0_MASK_QUERY_PARAMS" ] && export LUMIGO_SECRET_MASKING_REGEX_HTTP_QUERY_PARAMS="$DASH0_MASK_QUERY_PARAMS"
 
 export AWS_LAMBDA_RUNTIME_API="127.0.0.1:9009"
-export LUMIGO_ENDPOINT="http://127.0.0.1:9009/v1/traces"
-export LUMIGO_LOGS_ENDPOINT="http://127.0.0.1:9009/v1/logs"
-export LUMIGO_TRACER_TOKEN="t_xxxx"
-export LUMIGO_REPORT_DEPENDENCIES="false"
 
 export LAMBDA_RESOURCE_ATTRIBUTES="cloud.region=$AWS_REGION,cloud.provider=aws,faas.name=$AWS_LAMBDA_FUNCTION_NAME,faas.version=$AWS_LAMBDA_FUNCTION_VERSION,faas.instance=$AWS_LAMBDA_LOG_STREAM_NAME";
 
@@ -46,4 +38,6 @@ if [ -z "$DASH0_DISABLE_AUTO_INSTRUMENTATION" ] || [ "${DASH0_DISABLE_AUTO_INSTR
 
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 fi
+
+
 exec "${args[@]}"
