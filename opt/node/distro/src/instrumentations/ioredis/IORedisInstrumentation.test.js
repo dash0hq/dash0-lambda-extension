@@ -1,6 +1,6 @@
-import LumigoIORedisInstrumentation from './IORedisInstrumentation';
+import Dash0IORedisInstrumentation from './IORedisInstrumentation';
 
-describe('LumigoIORedisInstrumentation', () => {
+describe('Dash0IORedisInstrumentation', () => {
   const oldEnv = Object.assign({}, process.env);
 
   beforeEach(() => {
@@ -12,15 +12,15 @@ describe('LumigoIORedisInstrumentation', () => {
     process.env = { ...oldEnv };
   });
 
-  let lumigoIORedisInstrumentation = new LumigoIORedisInstrumentation();
+  let dash0IORedisInstrumentation = new Dash0IORedisInstrumentation();
 
   test('getInstrumentedModule should return "ioredis"', () => {
-    expect(lumigoIORedisInstrumentation.getInstrumentedModule()).toEqual('ioredis');
+    expect(dash0IORedisInstrumentation.getInstrumentedModule()).toEqual('ioredis');
   });
 
   test('disable ioredis instrumentation', () => {
     // We've pre-installed ioredis in package.json
     process.env.LUMIGO_DISABLE_IOREDIS_INSTRUMENTATION = 'true';
-    expect(lumigoIORedisInstrumentation.isApplicable()).toEqual(false);
+    expect(dash0IORedisInstrumentation.isApplicable()).toEqual(false);
   });
 });

@@ -1,13 +1,13 @@
-import LumigoPrismaInstrumentation from './PrismaInstrumentation';
+import Dash0PrismaInstrumentation from './PrismaInstrumentation';
 
-describe('LumigoPrismaInstrumentation', () => {
+describe('Dash0PrismaInstrumentation', () => {
   afterEach(() => {
     jest.clearAllMocks();
   });
 
-  let lumigoPrismaInstrumentation = new LumigoPrismaInstrumentation();
+  let dash0PrismaInstrumentation = new Dash0PrismaInstrumentation();
 
   test('getInstrumentedModule should return "@prisma/client"', () => {
-    expect(lumigoPrismaInstrumentation.getInstrumentedModule()).toEqual('@prisma/client');
+    expect(dash0PrismaInstrumentation.getInstrumentedModule()).toEqual('@prisma/client');
   });
 });

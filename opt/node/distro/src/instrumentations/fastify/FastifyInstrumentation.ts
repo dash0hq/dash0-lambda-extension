@@ -5,7 +5,7 @@ import { contentType, scrubHttpPayload } from '../../tools/payloads';
 import { getSpanAttributeMaxLength } from '../../utils';
 import { TracingInstrumentor } from '../instrumentor';
 
-export default class LumigoFastifyInstrumentation extends TracingInstrumentor<FastifyInstrumentation> {
+export default class Dash0FastifyInstrumentation extends TracingInstrumentor<FastifyInstrumentation> {
   getInstrumentedModule(): string {
     return 'fastify';
   }

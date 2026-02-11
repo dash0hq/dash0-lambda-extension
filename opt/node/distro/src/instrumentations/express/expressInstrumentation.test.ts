@@ -1,9 +1,9 @@
-import LumigoExpressInstrumentation from './ExpressInstrumentation';
+import Dash0ExpressInstrumentation from './ExpressInstrumentation';
 
-describe('LumigoExpressInstrumentation', () => {
-  let lumigoExpressInstrumentation = new LumigoExpressInstrumentation();
+describe('Dash0ExpressInstrumentation', () => {
+  let dash0ExpressInstrumentation = new Dash0ExpressInstrumentation();
 
   test('getInstrumentedModule should return "express"', () => {
-    expect(lumigoExpressInstrumentation.getInstrumentedModule()).toEqual('express');
+    expect(dash0ExpressInstrumentation.getInstrumentedModule()).toEqual('express');
   });
 });

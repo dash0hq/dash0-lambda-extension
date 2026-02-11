@@ -16,19 +16,19 @@ import {
 } from './constants';
 import { FileSpanExporter } from './exporters';
 
-import LumigoGrpcInstrumentation from './instrumentations/@grpc/grpc-js/GrpcInstrumentation';
-import LumigoNestInstrumentation from './instrumentations/@nestjs/core/NestInstrumentation';
-import LumigoAmqplibInstrumentation from './instrumentations/amqplib/AmqplibInstrumentation';
-import LumigoExpressInstrumentation from './instrumentations/express/ExpressInstrumentation';
-import LumigoFastifyInstrumentation from './instrumentations/fastify/FastifyInstrumentation';
-import LumigoHttpInstrumentation from './instrumentations/https/HttpInstrumentation';
-import LumigoIORedisInstrumentation from './instrumentations/ioredis/IORedisInstrumentation';
-import LumigoKafkaJsInstrumentation from './instrumentations/kafkajs/KafkaJsInstrumentation';
-import LumigoMongoDBInstrumentation from './instrumentations/mongodb/MongoDBInstrumentation';
-import LumigoPgInstrumentation from './instrumentations/pg/PgInstrumentation';
-import LumigoPrismaInstrumentation from './instrumentations/prisma/PrismaInstrumentation';
-import LumigoRedisInstrumentation from './instrumentations/redis/RedisInstrumentation';
-import { LumigoAwsSdkV3LibInstrumentation } from './instrumentations/aws-sdk';
+import Dash0GrpcInstrumentation from './instrumentations/@grpc/grpc-js/GrpcInstrumentation';
+import Dash0NestInstrumentation from './instrumentations/@nestjs/core/NestInstrumentation';
+import Dash0AmqplibInstrumentation from './instrumentations/amqplib/AmqplibInstrumentation';
+import Dash0ExpressInstrumentation from './instrumentations/express/ExpressInstrumentation';
+import Dash0FastifyInstrumentation from './instrumentations/fastify/FastifyInstrumentation';
+import Dash0HttpInstrumentation from './instrumentations/https/HttpInstrumentation';
+import Dash0IORedisInstrumentation from './instrumentations/ioredis/IORedisInstrumentation';
+import Dash0KafkaJsInstrumentation from './instrumentations/kafkajs/KafkaJsInstrumentation';
+import Dash0MongoDBInstrumentation from './instrumentations/mongodb/MongoDBInstrumentation';
+import Dash0PgInstrumentation from './instrumentations/pg/PgInstrumentation';
+import Dash0PrismaInstrumentation from './instrumentations/prisma/PrismaInstrumentation';
+import Dash0RedisInstrumentation from './instrumentations/redis/RedisInstrumentation';
+import { Dash0AwsSdkV3LibInstrumentation } from './instrumentations/aws-sdk';
 
 import { LumigoW3CTraceContextPropagator } from './propagator/w3cTraceContextPropagator';
 import { getSpanAttributeMaxLength } from './utils';
@@ -97,19 +97,19 @@ export const init = async (): Promise<LumigoSdkInitialization> => {
     const ignoredHostnames = [new URL(traceEndpoint).hostname];
 
     const instrumentationsToInstall = [
-      new LumigoAmqplibInstrumentation(),
-      new LumigoExpressInstrumentation(),
-      new LumigoGrpcInstrumentation(),
-      new LumigoNestInstrumentation(),
-      new LumigoFastifyInstrumentation(),
-      new LumigoHttpInstrumentation(...ignoredHostnames),
-      new LumigoIORedisInstrumentation(),
-      new LumigoKafkaJsInstrumentation(),
-      new LumigoMongoDBInstrumentation(),
-      new LumigoPgInstrumentation(),
-      new LumigoPrismaInstrumentation(),
-      new LumigoRedisInstrumentation(),
-      new LumigoAwsSdkV3LibInstrumentation(),
+      new Dash0AmqplibInstrumentation(),
+      new Dash0ExpressInstrumentation(),
+      new Dash0GrpcInstrumentation(),
+      new Dash0NestInstrumentation(),
+      new Dash0FastifyInstrumentation(),
+      new Dash0HttpInstrumentation(...ignoredHostnames),
+      new Dash0IORedisInstrumentation(),
+      new Dash0KafkaJsInstrumentation(),
+      new Dash0MongoDBInstrumentation(),
+      new Dash0PgInstrumentation(),
+      new Dash0PrismaInstrumentation(),
+      new Dash0RedisInstrumentation(),
+      new Dash0AwsSdkV3LibInstrumentation(),
     ].filter((i) => i.isApplicable());
 
     /*

@@ -4,7 +4,7 @@ import { IORedisInstrumentation } from '@opentelemetry/instrumentation-ioredis';
 import { getSpanAttributeMaxLength } from '../../utils';
 import { TracingInstrumentor } from '../instrumentor';
 
-export default class LumigoIORedisInstrumentation extends TracingInstrumentor<IORedisInstrumentation> {
+export default class Dash0IORedisInstrumentation extends TracingInstrumentor<IORedisInstrumentation> {
   override isApplicable(): boolean {
     return (
       super.isApplicable() &&

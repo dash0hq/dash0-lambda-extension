@@ -1,6 +1,6 @@
 import { shouldAutoFilterEmptySqs } from '../../parsers/aws';
 import {
-  isServiceSupportedByLumigoAwsSdkInstrumentation,
+  isServiceSupportedByDash0AwsSdkInstrumentation,
   setAwsInstrumentationSpanActive,
 } from './shared';
 import type {
@@ -28,7 +28,7 @@ export const preRequestHook = (span: MutableSpan, requestInfo: AwsSdkRequestHook
   const awsServiceIdentifier = (span.attributes?.[SEMATTRS_RPC_SERVICE] as string)?.toLowerCase();
 
   // Skip all spans that are currently covered by the http-instrumentation
-  if (!isServiceSupportedByLumigoAwsSdkInstrumentation(awsServiceIdentifier as AwsParsedService)) {
+  if (!isServiceSupportedByDash0AwsSdkInstrumentation(awsServiceIdentifier as AwsParsedService)) {
     setSpanAsNotExportable(span as MutableSpan);
     return;
   } else {
@@ -57,7 +57,7 @@ export const responseHook = (span: MutableSpan, responseInfo: AwsSdkResponseHook
 
   // Skip all spans that are currently not supported by the aws-sdk instrumentation,
   // assuming those will be covered by the http-instrumentation for the meantime
-  if (!isServiceSupportedByLumigoAwsSdkInstrumentation(awsServiceIdentifier as AwsParsedService)) {
+  if (!isServiceSupportedByDash0AwsSdkInstrumentation(awsServiceIdentifier as AwsParsedService)) {
     setSpanAsNotExportable(span as MutableSpan);
     return;
   }

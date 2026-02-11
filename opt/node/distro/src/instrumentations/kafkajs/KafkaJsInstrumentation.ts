@@ -5,7 +5,7 @@ import { KafkaJsInstrumentation } from 'opentelemetry-instrumentation-kafkajs';
 import { getSpanAttributeMaxLength } from '../../utils';
 import { TracingInstrumentor } from '../instrumentor';
 
-export default class LumigoKafkaJsInstrumentation extends TracingInstrumentor<KafkaJsInstrumentation> {
+export default class Dash0KafkaJsInstrumentation extends TracingInstrumentor<KafkaJsInstrumentation> {
   getInstrumentedModule(): string {
     return 'kafkajs';
   }

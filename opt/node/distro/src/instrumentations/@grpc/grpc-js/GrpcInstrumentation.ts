@@ -3,7 +3,7 @@ import { TracingInstrumentor } from '../../instrumentor';
 import { wrapServer } from './wrapGrpcServer';
 import { wrapClient } from './wrapGrpcClient';
 
-export default class LumigoGrpcInstrumentation extends TracingInstrumentor<GrpcInstrumentation> {
+export default class Dash0GrpcInstrumentation extends TracingInstrumentor<GrpcInstrumentation> {
   getInstrumentedModule(): string {
     return '@grpc/grpc-js';
   }

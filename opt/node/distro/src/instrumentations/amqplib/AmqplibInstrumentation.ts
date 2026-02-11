@@ -8,7 +8,7 @@ import {
 import { getSpanAttributeMaxLength } from '../../utils';
 import { TracingInstrumentor } from '../instrumentor';
 
-export default class LumigoAmqplibInstrumentation extends TracingInstrumentor<AmqplibInstrumentation> {
+export default class Dash0AmqplibInstrumentation extends TracingInstrumentor<AmqplibInstrumentation> {
   getInstrumentedModule(): string {
     return 'amqplib';
   }

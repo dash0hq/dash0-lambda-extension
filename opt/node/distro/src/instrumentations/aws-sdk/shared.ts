@@ -11,6 +11,6 @@ const LUMIGO_AWS_INSTRUMENTATION_SUPPORTED_SERVICE_TYPES: SupportedAwsServices[]
   AwsOtherService.ElasticBeanstalkSqsDaemon,
 ];
 
-export const isServiceSupportedByLumigoAwsSdkInstrumentation = (
+export const isServiceSupportedByDash0AwsSdkInstrumentation = (
   serviceType: SupportedAwsServices
 ): boolean => LUMIGO_AWS_INSTRUMENTATION_SUPPORTED_SERVICE_TYPES.includes(serviceType);

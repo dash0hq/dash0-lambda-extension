@@ -1,13 +1,13 @@
-import LumigoKafkaJsInstrumentation from './KafkaJsInstrumentation';
+import Dash0KafkaJsInstrumentation from './KafkaJsInstrumentation';
 
-describe('LumigoKafkaJsInstrumentation', () => {
+describe('Dash0KafkaJsInstrumentation', () => {
   afterEach(() => {
     jest.clearAllMocks();
   });
 
-  let lumigoKafkaJsInstrumentation = new LumigoKafkaJsInstrumentation();
+  let dash0KafkaJsInstrumentation = new Dash0KafkaJsInstrumentation();
 
   test('getInstrumentedModule should return "kafkajs"', () => {
-    expect(lumigoKafkaJsInstrumentation.getInstrumentedModule()).toEqual('kafkajs');
+    expect(dash0KafkaJsInstrumentation.getInstrumentedModule()).toEqual('kafkajs');
   });
 });

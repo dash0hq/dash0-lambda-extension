@@ -1,6 +1,6 @@
-import LumigoPgInstrumentation from './PgInstrumentation';
+import Dash0PgInstrumentation from './PgInstrumentation';
 
-describe('LumigoPgInstrumentation', () => {
+describe('Dash0PgInstrumentation', () => {
   const oldEnv = Object.assign({}, process.env);
   beforeEach(() => {
     process.env = { ...oldEnv };
@@ -11,16 +11,16 @@ describe('LumigoPgInstrumentation', () => {
     process.env = { ...oldEnv };
   });
 
-  let lumigoPgInstrumentation = new LumigoPgInstrumentation();
+  let dash0PgInstrumentation = new Dash0PgInstrumentation();
 
   test('disable pg instrumentation', () => {
     // We've pre-installed pg in package.json
     process.env.LUMIGO_DISABLE_PG_INSTRUMENTATION = 'true';
-    expect(lumigoPgInstrumentation.isApplicable()).toEqual(false);
+    expect(dash0PgInstrumentation.isApplicable()).toEqual(false);
   });
 
   test('getInstrumentedModule should return "pg"', () => {
-    expect(lumigoPgInstrumentation.getInstrumentedModule()).toEqual('pg');
+    expect(dash0PgInstrumentation.getInstrumentedModule()).toEqual('pg');
   });
 
   // should not be skipped, see https://lumigo.atlassian.net/browse/RD-11195

@@ -4,7 +4,7 @@ import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
 import { HttpHooks } from './http';
 import { TracingInstrumentor } from '../instrumentor';
 
-export default class LumigoHttpInstrumentation extends TracingInstrumentor<HttpInstrumentation> {
+export default class Dash0HttpInstrumentation extends TracingInstrumentor<HttpInstrumentation> {
   private readonly ignoredHostnames: string[];
 
   constructor(...ignoredHostnames: string[]) {

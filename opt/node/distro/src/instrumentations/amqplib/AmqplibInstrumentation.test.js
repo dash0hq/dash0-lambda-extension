@@ -1,13 +1,13 @@
-import LumigoAmqplibInstrumentation from './AmqplibInstrumentation';
+import Dash0AmqplibInstrumentation from './AmqplibInstrumentation';
 
-describe('LumigoAmqplibInstrumentation', () => {
+describe('Dash0AmqplibInstrumentation', () => {
   afterEach(() => {
     jest.clearAllMocks();
   });
 
-  let lumigoAmqplibInstrumentation = new LumigoAmqplibInstrumentation();
+  let dash0AmqplibInstrumentation = new Dash0AmqplibInstrumentation();
 
   test('getInstrumentedModule should return "amqplib"', () => {
-    expect(lumigoAmqplibInstrumentation.getInstrumentedModule()).toEqual('amqplib');
+    expect(dash0AmqplibInstrumentation.getInstrumentedModule()).toEqual('amqplib');
   });
 });

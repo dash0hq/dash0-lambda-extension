@@ -1,7 +1,7 @@
 import { MongoDBInstrumentation } from '@opentelemetry/instrumentation-mongodb';
 import { TracingInstrumentor } from '../instrumentor';
 
-export default class LumigoMongoDBInstrumentation extends TracingInstrumentor<MongoDBInstrumentation> {
+export default class Dash0MongoDBInstrumentation extends TracingInstrumentor<MongoDBInstrumentation> {
   override isApplicable(): boolean {
     return (
       super.isApplicable() &&

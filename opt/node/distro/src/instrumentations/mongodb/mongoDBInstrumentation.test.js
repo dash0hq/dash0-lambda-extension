@@ -1,6 +1,6 @@
-import LumigoMongoDBInstrumentation from './MongoDBInstrumentation';
+import Dash0MongoDBInstrumentation from './MongoDBInstrumentation';
 
-describe('LumigoMongoDBInstrumentation', () => {
+describe('Dash0MongoDBInstrumentation', () => {
   const oldEnv = Object.assign({}, process.env);
   beforeEach(() => {
     process.env = { ...oldEnv };
@@ -11,15 +11,15 @@ describe('LumigoMongoDBInstrumentation', () => {
     process.env = { ...oldEnv };
   });
 
-  let lumigoMongoDBInstrumentation = new LumigoMongoDBInstrumentation();
+  let dash0MongoDBInstrumentation = new Dash0MongoDBInstrumentation();
 
   test('disable mongodb instrumentation', () => {
     // We've pre-installed mongodb in package.json
     process.env.LUMIGO_DISABLE_MONGODB_INSTRUMENTATION = 'true';
-    expect(lumigoMongoDBInstrumentation.isApplicable()).toEqual(false);
+    expect(dash0MongoDBInstrumentation.isApplicable()).toEqual(false);
   });
 
   test('getInstrumentedModule should return "mongodb"', () => {
-    expect(lumigoMongoDBInstrumentation.getInstrumentedModule()).toEqual('mongodb');
+    expect(dash0MongoDBInstrumentation.getInstrumentedModule()).toEqual('mongodb');
   });
 });

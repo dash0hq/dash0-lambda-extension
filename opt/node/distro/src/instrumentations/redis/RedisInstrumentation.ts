@@ -4,7 +4,7 @@ import { RedisInstrumentation } from '@opentelemetry/instrumentation-redis-4';
 import { getSpanAttributeMaxLength } from '../../utils';
 import { TracingInstrumentor } from '../instrumentor';
 
-export default class LumigoRedisInstrumentation extends TracingInstrumentor<RedisInstrumentation> {
+export default class Dash0RedisInstrumentation extends TracingInstrumentor<RedisInstrumentation> {
   override isApplicable(): boolean {
     return (
       super.isApplicable() &&

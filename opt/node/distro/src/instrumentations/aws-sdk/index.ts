@@ -1,3 +1,3 @@
-import { LumigoAwsSdkV3LibInstrumentation } from './LumigoAwsSdkV3LibInstrumentation';
+import { Dash0AwsSdkV3LibInstrumentation } from './Dash0AwsSdkV3LibInstrumentation';
 
-export { LumigoAwsSdkV3LibInstrumentation };
+export { Dash0AwsSdkV3LibInstrumentation };
