@@ -6,11 +6,6 @@ import { logger } from './logging';
 import { sortify } from './tools/jsonSortify';
 
 export const DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT = 2048;
-export const DEFAULT_CONNECTION_TIMEOUT = 5000;
-
-interface HttpHeaders {
-  [key: string]: string;
-}
 
 export function safeExecute<T>(
   callback: Function,
@@ -43,86 +38,6 @@ export const runOneTimeWrapper = (func: Function, context: any = undefined): Fun
       return result;
     }
   };
-};
-
-export const getConnectionTimeout = () => {
-  return parseInt(process.env['LUMIGO_CONNECTION_TIMEOUT']) || DEFAULT_CONNECTION_TIMEOUT;
-};
-
-export const getProtocolModuleForUri = (uri: string) => {
-  return uri.indexOf('https') === 0 ? https : http;
-};
-
-export const postUri = async (
-  url: string,
-  data: Object,
-  headers: HttpHeaders = {}
-): Promise<Object> => {
-  const jsonData = JSON.stringify(data);
-
-  headers['Content-Type'] = 'application/x-www-form-urlencoded';
-  headers['Content-Length'] = String(jsonData.length);
-
-  const parsedUrl = new URL(url);
-
-  const responseBody = await new Promise((resolve, reject) => {
-    const request = getProtocolModuleForUri(url).request(
-      {
-        method: 'POST',
-        protocol: parsedUrl.protocol,
-        hostname: parsedUrl.hostname,
-        port: parsedUrl.port,
-        path: parsedUrl.pathname,
-        headers,
-      },
-      (response) => {
-        if (response.statusCode >= 400) {
-          reject(`Request to '${url}' failed with status ${response.statusCode}`);
-        }
-        let responseBody = '';
-        response.on('data', (chunk) => (responseBody += chunk.toString()));
-        // All the data has been read, resolve the Promise
-        response.on('end', () => resolve(responseBody));
-      }
-    );
-    // Set an aggressive timeout to prevent lock-ups
-    request.setTimeout(getConnectionTimeout(), () => {
-      request.destroy();
-    });
-    // Connection error, disconnection, etc.
-    request.on('error', reject);
-    request.write(jsonData);
-    request.end();
-  });
-
-  return JSON.parse(responseBody.toString());
-};
-
-export const getUri = async (uri: string): Promise<Object> => {
-  const responseBody = await new Promise((resolve, reject) => {
-    const request = getProtocolModuleForUri(uri).get(uri, (response) => {
-      if (response.statusCode >= 400) {
-        reject(`Request to '${uri}' failed with status ${response.statusCode}`);
-      }
-      /*
-       * Concatenate the response out of chunks:
-       * https://nodejs.org/api/stream.html#stream_event_data
-       */
-      let responseBody = '';
-      response.on('data', (chunk) => (responseBody += chunk.toString()));
-      // All the data has been read, resolve the Promise
-      response.on('end', () => resolve(responseBody));
-    });
-    // Set an aggressive timeout to prevent lock-ups
-    request.setTimeout(getConnectionTimeout(), () => {
-      request.destroy();
-    });
-    // Connection error, disconnection, etc.
-    request.on('error', reject);
-    request.end();
-  });
-
-  return JSON.parse(responseBody.toString());
 };
 
 export const safeGet = (obj, arr, dflt = null) => {
