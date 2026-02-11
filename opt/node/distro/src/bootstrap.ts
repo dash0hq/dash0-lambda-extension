@@ -11,7 +11,6 @@ import {
 import { BasicTracerProvider, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 
-import * as awsResourceDetectors from '@opentelemetry/resource-detector-aws';
 import {
   DEFAULT_LUMIGO_TRACES_ENDPOINT,
   TRACING_ENABLED,
@@ -33,12 +32,6 @@ import LumigoRedisInstrumentation from './instrumentations/redis/RedisInstrument
 import { LumigoAwsSdkV3LibInstrumentation } from './instrumentations/aws-sdk';
 
 import { LumigoW3CTraceContextPropagator } from './propagator/w3cTraceContextPropagator';
-import {
-  LumigoContainerNameDetector,
-  LumigoDistroDetector,
-  LumigoKubernetesDetector,
-  LumigoTagDetector,
-} from './resources/detectors';
 import { getSpanAttributeMaxLength } from './utils';
 import { safeRequire } from './requireUtils';
 
@@ -146,19 +139,7 @@ export const init = async (): Promise<LumigoSdkInitialization> => {
     const infrastructureDetectors = [
       envDetector,
       processDetector,
-      new LumigoDistroDetector(distroVersion),
-      new LumigoKubernetesDetector(),
-      new LumigoTagDetector(),
-      new LumigoContainerNameDetector(),
     ];
-
-    if (process.env.ECS_CONTAINER_METADATA_URI || process.env.ECS_CONTAINER_METADATA_URI_V4) {
-      /*
-       * The ECS detector does not have a component logger we can suppress, to we need to
-       * check whether we should try it at all.
-       */
-      infrastructureDetectors.push(awsResourceDetectors.awsEcsDetector);
-    }
 
     /*
      * These are the resources describing the infrastructure and the runtime that will be
