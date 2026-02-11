@@ -149,19 +149,19 @@ export class Http {
       );
       span.setAttribute('http.response.body', scrubbed);
 
-      try {
-        const serviceAttributes = getAwsServiceData(
-          requestRawData.request,
-          requestRawData.response,
-          span
-        );
-        if (serviceAttributes) {
-          span.setAttributes(serviceAttributes);
-        }
-      } catch (e) {
-        logger.debug('Failed to parse aws service data', e);
-        logger.debug('getHttpSpan args', { requestData: requestRawData });
-      }
+      // try {
+      //   const serviceAttributes = getAwsServiceData(
+      //     requestRawData.request,
+      //     requestRawData.response,
+      //     span
+      //   );
+      //   if (serviceAttributes) {
+      //     span.setAttributes(serviceAttributes);
+      //   }
+      // } catch (e) {
+      //   logger.debug('Failed to parse aws service data', e);
+      //   logger.debug('getHttpSpan args', { requestData: requestRawData });
+      // }
     };
   }
 

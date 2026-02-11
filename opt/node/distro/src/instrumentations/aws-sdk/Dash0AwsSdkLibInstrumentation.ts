@@ -5,8 +5,7 @@ import { preRequestHook, responseHook } from './hooks';
 export abstract class Dash0AwsSdkLibInstrumentation extends TracingInstrumentor<AwsInstrumentation> {
   override isApplicable(): boolean {
     return (
-      super.isApplicable() &&
-      process.env.LUMIGO_USE_AWS_SDK_INSTRUMENTATION?.toLocaleLowerCase() === 'true'
+      super.isApplicable()
     );
   }
 
