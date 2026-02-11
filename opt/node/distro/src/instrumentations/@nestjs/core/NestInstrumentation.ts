@@ -4,8 +4,7 @@ import { TracingInstrumentor } from '../../instrumentor';
 export default class Dash0NestInstrumentation extends TracingInstrumentor<NestInstrumentation> {
   override isApplicable(): boolean {
     return (
-      super.isApplicable() &&
-      process.env.LUMIGO_DISABLE_NEST_INSTRUMENTATION?.toLocaleLowerCase() !== 'true'
+      super.isApplicable()
     );
   }
 

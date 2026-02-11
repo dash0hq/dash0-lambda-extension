@@ -7,8 +7,7 @@ import { TracingInstrumentor } from '../instrumentor';
 export default class Dash0IORedisInstrumentation extends TracingInstrumentor<IORedisInstrumentation> {
   override isApplicable(): boolean {
     return (
-      super.isApplicable() &&
-      process.env.LUMIGO_DISABLE_IOREDIS_INSTRUMENTATION?.toLocaleLowerCase() !== 'true'
+      super.isApplicable()
     );
   }
 

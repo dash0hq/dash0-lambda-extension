@@ -50,37 +50,37 @@ describe('aws-sdk instrumentation hooks', () => {
     });
 
 
-    // test('truncates and scrubs the SQS message body for the ReceiveMessage operations', () => {
-    //   const secretKey = 'shush';
-    //   const secretValue = 'this is top secret';
-    //
-    //   // node-core loads the value of LUMIGO_SECRET_MASKING_REGEX_HTTP_RESPONSE_BODIES on require() time,
-    //   // therefore we must use isolateModules and re-set its value so the change will take effect
-    //   jest.isolateModules(() => {
-    //     process.env['LUMIGO_SECRET_MASKING_REGEX_HTTP_RESPONSE_BODIES'] = JSON.stringify([
-    //       `.*${secretKey}.*`,
-    //     ]);
-    //
-    //     const span = rootSpanWithAttributes({
-    //       'rpc.service': 'SQS',
-    //       'rpc.method': 'ReceiveMessage',
-    //     });
-    //     const payload = {
-    //       Messages: [{ Body: 'some message' }],
-    //       [secretKey]: secretValue,
-    //       'non-secret-key': 'a'.repeat(getSpanAttributeMaxLength() * 2),
-    //     };
-    //     const awsSdkResponse: AwsSdkResponseHookInformation = awsResponseWithData(payload);
-    //
-    //     const responseHook = jest.requireActual('./hooks').responseHook;
-    //     responseHook(span, awsSdkResponse);
-    //
-    //     expect(span.attributes['messaging.consume.body']).not.toContain(secretValue);
-    //     expect(span.attributes['messaging.consume.body']!.toString().length).toBeLessThanOrEqual(
-    //       JSON.stringify(payload).length
-    //     );
-    //   });
-    // });
+    test('truncates and scrubs the SQS message body for the ReceiveMessage operations', () => {
+      const secretKey = 'shush';
+      const secretValue = 'this is top secret';
+
+      // node-core loads the value of LUMIGO_SECRET_MASKING_REGEX_HTTP_RESPONSE_BODIES on require() time,
+      // therefore we must use isolateModules and re-set its value so the change will take effect
+      jest.isolateModules(() => {
+        process.env['LUMIGO_SECRET_MASKING_REGEX_HTTP_RESPONSE_BODIES'] = JSON.stringify([
+          `.*${secretKey}.*`,
+        ]);
+
+        const span = rootSpanWithAttributes({
+          'rpc.service': 'SQS',
+          'rpc.method': 'ReceiveMessage',
+        });
+        const payload = {
+          Messages: [{ Body: 'some message' }],
+          [secretKey]: secretValue,
+          'non-secret-key': 'a'.repeat(getSpanAttributeMaxLength() * 2),
+        };
+        const awsSdkResponse: AwsSdkResponseHookInformation = awsResponseWithData(payload);
+
+        const responseHook = jest.requireActual('./hooks').responseHook;
+        responseHook(span, awsSdkResponse);
+
+        expect(span.attributes['messaging.consume.body']).not.toContain(secretValue);
+        expect(span.attributes['messaging.consume.body']!.toString().length).toBeLessThanOrEqual(
+          JSON.stringify(payload).length
+        );
+      });
+    });
 
     const awsResponseWithData = (data: unknown): AwsSdkResponseHookInformation => {
       return {

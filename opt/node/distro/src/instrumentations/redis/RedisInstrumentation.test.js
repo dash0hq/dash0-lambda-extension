@@ -13,12 +13,6 @@ describe('Dash0RedisInstrumentation', () => {
 
   let dash0RedisInstrumentation = new Dash0RedisInstrumentation();
 
-  test('disable redis instrumentation', () => {
-    // We've pre-installed redis in package.json
-    process.env.LUMIGO_DISABLE_REDIS_INSTRUMENTATION = 'true';
-    expect(dash0RedisInstrumentation.isApplicable()).toEqual(false);
-  });
-
   test('getInstrumentedModule should return "redis and be applicable"', () => {
     expect(dash0RedisInstrumentation.getInstrumentedModule()).toEqual('redis');
   });

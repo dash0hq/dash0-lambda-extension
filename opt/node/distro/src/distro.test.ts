@@ -1,6 +1,6 @@
-const OTHER_LUMIGO_ENDPOINT =
+const OTHER_DASH0_ENDPOINT =
   'http://ec2-34-215-6-94.us-west-2.compute.amazonaws.com:55681/v1/trace';
-const LUMIGO_TRACER_TOKEN = 't_10faa5e13e7844aaa1234';
+const DASH0_TOKEN = 't_10faa5e13e7844aaa1234';
 
 describe('Distro initialization', () => {
   const ORIGINAL_PROCESS_ENV = process.env;
@@ -54,8 +54,7 @@ describe('Distro initialization', () => {
   describe('secret keys', () => {
     test('should be redacted by LUMIGO_SECRET_MASKING_REGEX from env vars', async () => {
       await jest.isolateModulesAsync(async () => {
-        process.env.LUMIGO_REPORT_DEPENDENCIES = 'false';
-        process.env.LUMIGO_TRACER_TOKEN = LUMIGO_TRACER_TOKEN;
+        process.env.DASH0_TOKEN = DASH0_TOKEN;
         process.env.OTEL_SERVICE_NAME = 'service-1';
         process.env.LUMIGO_SECRET_MASKING_REGEX = '["VAR_TO_MASK"]';
         process.env.VAR_TO_MASK = 'some value';
@@ -73,8 +72,7 @@ describe('Distro initialization', () => {
       (envVarName) => {
         test(`with the ${envVarName} set to 'all'`, async () => {
           await jest.isolateModulesAsync(async () => {
-            process.env.LUMIGO_REPORT_DEPENDENCIES = 'false';
-            process.env.LUMIGO_TRACER_TOKEN = LUMIGO_TRACER_TOKEN;
+            process.env.DASH0_TOKEN = DASH0_TOKEN;
             process.env.OTEL_SERVICE_NAME = 'service-1';
             process.env[envVarName] = 'all';
             process.env.VAR_TO_MASK = 'some value';
@@ -90,8 +88,7 @@ describe('Distro initialization', () => {
 
     test('should be redacted from env vars', async () => {
       await jest.isolateModulesAsync(async () => {
-        process.env.LUMIGO_REPORT_DEPENDENCIES = 'false';
-        process.env.LUMIGO_TRACER_TOKEN = LUMIGO_TRACER_TOKEN;
+        process.env.DASH0_TOKEN = DASH0_TOKEN;
         process.env.OTEL_SERVICE_NAME = 'service-1';
         process.env.AUTHORIZATION = 'some value';
 
@@ -104,14 +101,14 @@ describe('Distro initialization', () => {
     });
   });
 
-  describe('with the LUMIGO_TRACER_TOKEN environment variable set', () => {
+  describe('with the DASH0_TOKEN environment variable set', () => {
     test('should initialize the OTLPTraceExporter', async () => {
       await jest.isolateModulesAsync(async () => {
         const { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-http');
         jest.mock('@opentelemetry/exporter-trace-otlp-http');
 
-        process.env.DASH0_EXTENSION_ENDPOINT = OTHER_LUMIGO_ENDPOINT;
-        process.env.DASH0_TOKEN = LUMIGO_TRACER_TOKEN;
+        process.env.DASH0_EXTENSION_ENDPOINT = OTHER_DASH0_ENDPOINT;
+        process.env.DASH0_TOKEN = DASH0_TOKEN;
 
         const { init } = jest.requireActual('./distro');
         await init;
@@ -120,14 +117,14 @@ describe('Distro initialization', () => {
           headers: {
             Authorization: 'Bearer t_10faa5e13e7844aaa1234',
           },
-          url: OTHER_LUMIGO_ENDPOINT,
+          url: OTHER_DASH0_ENDPOINT,
         });
       });
     });
 
   });
 
-  describe('without the LUMIGO_TRACER_TOKEN environment variable set', () => {
+  describe('without the DASH0_TOKEN environment variable set', () => {
     test('should not initialize the OTLPTraceExporter', async () => {
       await jest.isolateModulesAsync(async () => {
         const { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-http');
@@ -164,7 +161,7 @@ describe('Distro initialization', () => {
 
     test('NodeTracerProvider should be initialize with span limit equals to OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT', async () => {
       await jest.isolateModulesAsync(async () => {
-        process.env.LUMIGO_TRACER_TOKEN = LUMIGO_TRACER_TOKEN;
+        process.env.DASH0_TOKEN = DASH0_TOKEN;
         process.env.OTEL_SERVICE_NAME = 'service-1';
         process.env.OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT = '1';
 
@@ -177,7 +174,7 @@ describe('Distro initialization', () => {
 
     test('NodeTracerProvider should be initialize with span limit equals to OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT', async () => {
       await jest.isolateModulesAsync(async () => {
-        process.env.LUMIGO_TRACER_TOKEN = LUMIGO_TRACER_TOKEN;
+        process.env.DASH0_TOKEN = DASH0_TOKEN;
         process.env.OTEL_SERVICE_NAME = 'service-1';
         process.env.OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT = '50';
 
@@ -190,7 +187,7 @@ describe('Distro initialization', () => {
 
     test('NodeTracerProvider should be initialize with span limit equals to default value', async () => {
       await jest.isolateModulesAsync(async () => {
-        process.env.LUMIGO_TRACER_TOKEN = LUMIGO_TRACER_TOKEN;
+        process.env.DASH0_TOKEN = DASH0_TOKEN;
         process.env.OTEL_SERVICE_NAME = 'service-1';
 
         const { init } = jest.requireActual('./distro');
@@ -202,7 +199,7 @@ describe('Distro initialization', () => {
 
     test('NodeTracerProvider should be initialize with span limit equals to OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT when both env. vars set', async () => {
       await jest.isolateModulesAsync(async () => {
-        process.env.LUMIGO_TRACER_TOKEN = LUMIGO_TRACER_TOKEN;
+        process.env.DASH0_TOKEN = DASH0_TOKEN;
         process.env.OTEL_SERVICE_NAME = 'service-1';
         process.env.OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT = '50';
         process.env.OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT = '1';
@@ -228,23 +225,3 @@ describe('Distro initialization', () => {
     });
   });
 });
-
-function checkBasicResourceAttributes(resource) {
-  const resourceAttributeKeys = Object.keys(resource.attributes);
-
-  expect(resourceAttributeKeys).toContain('telemetry.sdk.language');
-  expect(resourceAttributeKeys).toContain('telemetry.sdk.name');
-  expect(resourceAttributeKeys).toContain('telemetry.sdk.version');
-
-  // Lumigo Distro Detector
-  expect(resourceAttributeKeys).toContain('lumigo.distro.version');
-
-  // Process detector
-  expect(resourceAttributeKeys).toContain('process.command');
-  expect(resourceAttributeKeys).toContain('process.command_args');
-  expect(resourceAttributeKeys).toContain('process.executable.name');
-  expect(resourceAttributeKeys).toContain('process.pid');
-  expect(resourceAttributeKeys).toContain('process.runtime.name');
-  expect(resourceAttributeKeys).toContain('process.runtime.description');
-  expect(resourceAttributeKeys).toContain('process.runtime.version');
-}

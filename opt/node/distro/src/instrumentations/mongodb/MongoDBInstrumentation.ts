@@ -4,8 +4,7 @@ import { TracingInstrumentor } from '../instrumentor';
 export default class Dash0MongoDBInstrumentation extends TracingInstrumentor<MongoDBInstrumentation> {
   override isApplicable(): boolean {
     return (
-      super.isApplicable() &&
-      process.env.LUMIGO_DISABLE_MONGODB_INSTRUMENTATION?.toLocaleLowerCase() !== 'true'
+      super.isApplicable()
     );
   }
   getInstrumentedModule(): string {

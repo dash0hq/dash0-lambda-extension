@@ -4,8 +4,7 @@ import { TracingInstrumentor } from '../instrumentor';
 export default class Dash0PgInstrumentation extends TracingInstrumentor<PgInstrumentation> {
   override isApplicable(): boolean {
     return (
-      super.isApplicable() &&
-      process.env.LUMIGO_DISABLE_PG_INSTRUMENTATION?.toLocaleLowerCase() !== 'true'
+      super.isApplicable()
     );
   }
 

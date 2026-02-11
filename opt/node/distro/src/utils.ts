@@ -9,7 +9,7 @@ export const DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT = 2048;
 
 export function safeExecute<T>(
   callback: Function,
-  message = 'Error in Lumigo tracer',
+  message = 'Error in Dash0 tracer',
   defaultReturn: T = undefined
 ): Function {
   return function (...args) {

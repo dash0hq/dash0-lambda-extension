@@ -7,8 +7,7 @@ import { TracingInstrumentor } from '../instrumentor';
 export default class Dash0RedisInstrumentation extends TracingInstrumentor<RedisInstrumentation> {
   override isApplicable(): boolean {
     return (
-      super.isApplicable() &&
-      process.env.LUMIGO_DISABLE_REDIS_INSTRUMENTATION?.toLocaleLowerCase() !== 'true'
+      super.isApplicable()
     );
   }
 
