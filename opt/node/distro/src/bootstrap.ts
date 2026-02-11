@@ -12,8 +12,7 @@ import { BasicTracerProvider, SimpleSpanProcessor } from '@opentelemetry/sdk-tra
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 
 import {
-  DEFAULT_LUMIGO_TRACES_ENDPOINT,
-  TRACING_ENABLED,
+  DEFAULT_DASH0_EXTENSION_ENDPOINT,
 } from './constants';
 import { FileSpanExporter } from './exporters';
 
@@ -39,11 +38,11 @@ declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace NodeJS {
     interface ProcessEnv {
-      LUMIGO_DEBUG?: string;
-      LUMIGO_DEBUG_SPANDUMP?: string;
-      LUMIGO_ENDPOINT?: string;
-      LUMIGO_SWITCH_OFF?: string;
-      LUMIGO_TRACER_TOKEN?: string;
+      DASH0_DEBUG?: string;
+      DASH0_DEBUG_SPANDUMP?: string;
+      DASH0_EXTENSION_ENDPOINT?: string;
+      DASH0_SWITCH_OFF?: string;
+      DASH0_TOKEN?: string;
     }
   }
 }
@@ -60,13 +59,13 @@ import { ProcessEnvironmentDetector } from './resources/detectors/ProcessEnviron
 import { LumigoSpanProcessor } from './resources/spanProcessor';
 import { getCombinedSampler } from './samplers/combinedSampler';
 
-const lumigoTraceEndpoint = process.env.LUMIGO_ENDPOINT || DEFAULT_LUMIGO_TRACES_ENDPOINT;
+const traceEndpoint = process.env.DASH0_EXTENSION_ENDPOINT || DEFAULT_DASH0_EXTENSION_ENDPOINT;
 
 let isTraceInitialized = false;
 
 function reportInitError(err: Error) {
   logger.error(
-    'An error occurred while initializing the Lumigo OpenTelemetry Distro: no telemetry will be collected and sent to Lumigo.',
+    'An error occurred while initializing the Dash0 OpenTelemetry Distro: no telemetry will be collected and sent.',
     err
   );
 }
@@ -83,9 +82,9 @@ export const init = async (): Promise<LumigoSdkInitialization> => {
   isTraceInitialized = true;
 
   try {
-    if (process.env.LUMIGO_SWITCH_OFF?.toLowerCase() === 'true') {
+    if (process.env.DASH0_SWITCH_OFF?.toLowerCase() === 'true') {
       logger.info(
-        'The Dash0 OpenTelemetry Distro is switched off (the "LUMIGO_SWITCH_OFF" environment variable is set): no telemetry will be sent to Dash0.'
+        'The Dash0 OpenTelemetry Distro is switched off (the "DASH0_SWITCH_OFF" environment variable is set): no telemetry will be sent to Dash0.'
       );
       return;
     }
@@ -95,7 +94,7 @@ export const init = async (): Promise<LumigoSdkInitialization> => {
       safeRequire(join(__dirname, 'package.json')) ||
       {};
 
-    const ignoredHostnames = [new URL(lumigoTraceEndpoint).hostname];
+    const ignoredHostnames = [new URL(traceEndpoint).hostname];
 
     const instrumentationsToInstall = [
       new LumigoAmqplibInstrumentation(),
@@ -128,11 +127,11 @@ export const init = async (): Promise<LumigoSdkInitialization> => {
 
     logger.debug(`Instrumented modules: ${instrumentedModules.join(', ')}`);
 
-    const lumigoToken = process.env.LUMIGO_TRACER_TOKEN;
+    const dashToken = process.env.DASH0_TOKEN;
 
-    if (!lumigoToken) {
+    if (!dashToken) {
       logger.warn(
-        'The Lumigo token is not available (the "LUMIGO_TRACER_TOKEN" environment variable is not set): no telemetry will be sent to Lumigo.'
+        'The Dash0 token is not available (the "DASH0_TOKEN" environment variable is not set): no telemetry will be sent.'
       );
     }
 
@@ -165,34 +164,28 @@ export const init = async (): Promise<LumigoSdkInitialization> => {
 
     // Build span processors array
     const spanProcessors = [];
-    if (process.env.LUMIGO_DEBUG_SPANDUMP) {
+    if (process.env.DASH0_DEBUG_SPANDUMP) {
       spanProcessors.push(
-        new SimpleSpanProcessor(new FileSpanExporter(process.env.LUMIGO_DEBUG_SPANDUMP))
+        new SimpleSpanProcessor(new FileSpanExporter(process.env.DASH0_DEBUG_SPANDUMP))
       );
     }
 
-    if (lumigoToken) {
+    if (dashToken) {
       const otlpTraceExporter = new OTLPTraceExporter({
-        url: lumigoTraceEndpoint,
+        url: traceEndpoint,
         headers: {
-          Authorization: `LumigoToken ${lumigoToken.trim()}`,
+          Authorization: `Bearer ${dashToken.trim()}`,
         },
       });
 
-      if (TRACING_ENABLED) {
-        spanProcessors.push(
-          new LumigoSpanProcessor(otlpTraceExporter, {
-            // The maximum queue size. After the size is reached spans are dropped.
-            maxQueueSize: 1000,
-            // The maximum batch size of every export. It must be smaller or equal to maxQueueSize.
-            maxExportBatchSize: 100,
-          })
-        );
-      } else {
-        logger.info(
-          'Tracing is disabled (the "LUMIGO_ENABLE_TRACES" environment variable is not set to "true"): no traces will be sent to Lumigo.'
-        );
-      }
+      spanProcessors.push(
+        new LumigoSpanProcessor(otlpTraceExporter, {
+          // The maximum queue size. After the size is reached spans are dropped.
+          maxQueueSize: 1000,
+          // The maximum batch size of every export. It must be smaller or equal to maxQueueSize.
+          maxExportBatchSize: 100,
+        })
+      );
     }
 
     // Create providers with processors

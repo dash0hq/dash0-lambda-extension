@@ -11,7 +11,7 @@
  * or errors affecting processes using unsupported Node.js versions.
  */
 import type { LumigoSdkInitialization } from './bootstrap';
-import { LUMIGO_LOGGING_NAMESPACE } from './constants';
+import { DASH0_LOGGING_NAMESPACE } from './constants';
 import { minMajor, maxMajor } from './supportedVersions.json';
 export type { LumigoSdkInitialization } from './bootstrap';
 
@@ -22,7 +22,7 @@ export const init: Promise<LumigoSdkInitialization | undefined> = (() => {
 
     if (nodeJsMajorVersion < minMajor) {
       console.error(
-        `${LUMIGO_LOGGING_NAMESPACE}: Node.js version '${version}' is not supported (minimum supported version: ${minMajor}.x); skipping initialization of the Dash0 OpenTelemetry Distro`
+        `${DASH0_LOGGING_NAMESPACE}: Node.js version '${version}' is not supported (minimum supported version: ${minMajor}.x); skipping initialization of the Dash0 OpenTelemetry Distro`
       );
       /*
        * Return a resolve promise, as opposed to a rejected one, to avoid UnhandledPromiseRejectionWarning
@@ -32,12 +32,12 @@ export const init: Promise<LumigoSdkInitialization | undefined> = (() => {
     }
     if (nodeJsMajorVersion > maxMajor) {
       console.error(
-        `${LUMIGO_LOGGING_NAMESPACE}: Node.js version '${version}' has not been tested with the Dash0 OpenTelemetry Distro (maximum supported version: ${maxMajor}.x)`
+        `${DASH0_LOGGING_NAMESPACE}: Node.js version '${version}' has not been tested with the Dash0 OpenTelemetry Distro (maximum supported version: ${maxMajor}.x)`
       );
     }
   } catch (err) {
     console.error(
-      `${LUMIGO_LOGGING_NAMESPACE}: Cannot parse the Node.js version '${version}'; skipping initialization of the Dash0 OpenTelemetry Distro`
+      `${DASH0_LOGGING_NAMESPACE}: Cannot parse the Node.js version '${version}'; skipping initialization of the Dash0 OpenTelemetry Distro`
     );
     /*
      * Return a resolve promise, as opposed to a rejected one, to avoid UnhandledPromiseRejectionWarning
@@ -58,6 +58,6 @@ export const init: Promise<LumigoSdkInitialization | undefined> = (() => {
     /* eslint-enable */
     return Promise.resolve(bootstrapInit());
   } catch (err) {
-    console.error(`${LUMIGO_LOGGING_NAMESPACE}: bootstrap failed: ${err}`);
+    console.error(`${DASH0_LOGGING_NAMESPACE}: bootstrap failed: ${err}`);
   }
 })();

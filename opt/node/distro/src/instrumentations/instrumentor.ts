@@ -1,6 +1,5 @@
 import type { Instrumentation } from '@opentelemetry/instrumentation';
 import { canRequireModule } from '../requireUtils';
-import { TRACING_ENABLED } from '../constants';
 
 abstract class Instrumentor<T extends Instrumentation> {
   abstract getInstrumentedModule(): string;
@@ -14,6 +13,6 @@ abstract class Instrumentor<T extends Instrumentation> {
 
 export abstract class TracingInstrumentor<T extends Instrumentation> extends Instrumentor<T> {
   override isApplicable() {
-    return TRACING_ENABLED && super.isApplicable();
+    return super.isApplicable();
   }
 }

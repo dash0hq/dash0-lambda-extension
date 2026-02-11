@@ -1,21 +1,21 @@
 import { diag, DiagLogLevel, DiagConsoleLogger } from '@opentelemetry/api';
-import { LUMIGO_LOGGING_NAMESPACE } from './constants';
+import { DASH0_LOGGING_NAMESPACE } from './constants';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace NodeJS {
     interface ProcessEnv {
-      LUMIGO_DEBUG?: string;
+      DASH0_DEBUG?: string;
     }
   }
 }
 
 export const logger = diag.createComponentLogger({
-  namespace: LUMIGO_LOGGING_NAMESPACE,
+  namespace: DASH0_LOGGING_NAMESPACE,
 });
 
 diag.setLogger(new DiagConsoleLogger(), {
   logLevel:
-    process.env.LUMIGO_DEBUG?.toLowerCase() === 'true' ? DiagLogLevel.DEBUG : DiagLogLevel.INFO,
+    process.env.DASH0_DEBUG?.toLowerCase() === 'true' ? DiagLogLevel.DEBUG : DiagLogLevel.INFO,
   suppressOverrideMessage: true, // Suppress noise in logs
 });

@@ -1,9 +1,4 @@
-export const LUMIGO_LOGGING_NAMESPACE = '@lumigo/opentelemetry';
+export const DASH0_LOGGING_NAMESPACE = '@dash0/opentelemetry';
 
-export const DEFAULT_LUMIGO_TRACES_ENDPOINT =
-  'https://ga-otlp.lumigo-tracer-edge.golumigo.com/v1/traces';
-
-// Since tracing is on by default, we allow omitting it and consider it enabled
-export const TRACING_ENABLED =
-  process.env.LUMIGO_ENABLE_TRACES === undefined ||
-  process.env.LUMIGO_ENABLE_TRACES?.toLowerCase() === 'true';
+export const DEFAULT_DASH0_EXTENSION_ENDPOINT =
+  'http://127.0.0.1:9009/v1/traces';
