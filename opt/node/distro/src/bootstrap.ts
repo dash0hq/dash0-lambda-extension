@@ -104,7 +104,7 @@ function reportInitError(err: Error) {
 export const init = async (): Promise<LumigoSdkInitialization> => {
   if (isTraceInitialized) {
     const message =
-      'The Lumigo OpenTelemetry Distro is already initialized: additional attempt to initialize has been ignored.';
+      'The Dash0 OpenTelemetry Distro is already initialized: additional attempt to initialize has been ignored.';
     logger.debug(message);
 
     throw new Error(message);
@@ -115,7 +115,7 @@ export const init = async (): Promise<LumigoSdkInitialization> => {
   try {
     if (process.env.LUMIGO_SWITCH_OFF?.toLowerCase() === 'true') {
       logger.info(
-        'The Lumigo OpenTelemetry Distro is switched off (the "LUMIGO_SWITCH_OFF" environment variable is set): no telemetry will be sent to Lumigo.'
+        'The Dash0 OpenTelemetry Distro is switched off (the "LUMIGO_SWITCH_OFF" environment variable is set): no telemetry will be sent to Dash0.'
       );
       return;
     }
@@ -326,9 +326,7 @@ export const init = async (): Promise<LumigoSdkInitialization> => {
     logsAPI.logs.setGlobalLoggerProvider(loggerProvider);
 
     logger.info(
-      `Lumigo OpenTelemetry Distro ${
-        distroVersion ? `v${distroVersion}` : 'with an unknown version'
-      } started.`
+      `Dash0 OpenTelemetry Distro started.`
     );
 
     return {
