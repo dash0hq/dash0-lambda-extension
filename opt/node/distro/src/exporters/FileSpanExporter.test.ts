@@ -70,7 +70,7 @@ describe('FileSpanExporter tests', () => {
       await provider.shutdown();
 
       expect(console.log).toHaveBeenCalledTimes(1);
-      const actualSpan = console.log.mock.calls[0][0];
+      const actualSpan = (console.log as jest.Mock).mock.calls[0][0];
 
       expect(JSON.parse(actualSpan)).toEqual(
         expect.objectContaining({
@@ -100,7 +100,7 @@ describe('FileSpanExporter tests', () => {
       await provider.shutdown();
 
       expect(console.error).toHaveBeenCalledTimes(1);
-      const actualSpan = console.error.mock.calls[0][0];
+      const actualSpan = (console.error as jest.Mock).mock.calls[0][0];
 
       expect(JSON.parse(actualSpan)).toEqual(
         expect.objectContaining({
@@ -164,7 +164,7 @@ describe('FileSpanExporter tests', () => {
   test('should log an error when provided an invalid file path', async () => {
     expect(() => {
       new FileSpanExporter('\0');
-    }).toThrowError(
+    }).toThrow(
       "The argument 'path' must be a string, Uint8Array, or URL without null bytes. Received '\\x00'"
     );
   });
