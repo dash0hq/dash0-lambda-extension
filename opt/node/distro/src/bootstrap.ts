@@ -56,7 +56,6 @@ export interface Dash0SdkInitialization {
 import { dirname, join } from 'path';
 import { logger } from './logging';
 import { ProcessEnvironmentDetector } from './resources/detectors/ProcessEnvironmentDetector';
-import { getCombinedSampler } from './samplers/combinedSampler';
 
 const traceEndpoint = process.env.DASH0_EXTENSION_ENDPOINT || DEFAULT_DASH0_EXTENSION_ENDPOINT;
 
@@ -189,7 +188,6 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
 
     // Create providers with processors
     const tracerProvider = new NodeTracerProvider({
-      sampler: getCombinedSampler(),
       resource,
       spanLimits: {
         attributeValueLengthLimit: getSpanAttributeMaxLength(),
