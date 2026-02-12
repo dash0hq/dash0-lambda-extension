@@ -11,7 +11,15 @@ This extension has four main functionalities:
 
 ## Layer ARNs
 
-TBD
+Python:
+```
+arn:aws:lambda:<region>:285732642181:layer:dash0-extension-node:1
+```
+
+Node:
+```
+arn:aws:lambda:<region>:285732642181:layer:dash0-extension-python:1
+```
 
 
 ## Configuration

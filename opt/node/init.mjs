@@ -4,8 +4,6 @@ import { registerInstrumentations } from '@opentelemetry/instrumentation';
 import {register} from "module";
 
 
-console.log("Lumigo OpenTelemetry initialized in Node.js Lambda function.....");
-
 const awsLambdaInstrumentation = new AwsLambdaInstrumentation({});
 const tracerProvider = (await lumigo.init).tracerProvider;
 
