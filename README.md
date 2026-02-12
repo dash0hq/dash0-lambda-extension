@@ -42,13 +42,18 @@ TBD
 
 ### Secret Masking
 
-The extension automatically masks sensitive data in event and return value payloads. By default, any JSON key matching these patterns (case-insensitive) will have its value replaced with `****`:
+The extension automatically masks sensitive data in traces payloads. By default, any JSON key matching these patterns (case-insensitive) will have its value replaced with `****`:
 
 - `.*pass.*`
 - `.*key.*`
 - `.*secret.*`
 - `.*credential.*`
 - `.*passphrase.*`
+
+This is applied to:
+- Lambda event payloads
+- Lambda response payloads
+- Any http request/response payloads captured by the auto-instrumentation
 
 **Custom masking rules:**
 
@@ -60,7 +65,29 @@ The extension automatically masks sensitive data in event and return value paylo
 
   Example: `DASH0_MASK_ENV_VARS='[".*PASSWORD.*", ".*API_KEY.*"]'`
 
-**Secret masking in http request and response payloads:**
+**Secret masking in HTTP request and response payloads:**
+
+The following environment variables allow fine-grained control over secret masking in HTTP payloads captured by the auto-instrumentation. Each accepts a JSON array of regex patterns. When not set, they fall back to `DASH0_MASK_RULES` (or the defaults).
+
+* `DASH0_MASK_REQUEST_BODY` - Regex patterns for masking keys in HTTP request bodies.
+
+  Example: `DASH0_MASK_REQUEST_BODY='[".*credit_card.*", ".*ssn.*"]'`
+
+* `DASH0_MASK_REQUEST_HEADERS` - Regex patterns for masking HTTP request header names.
+
+  Example: `DASH0_MASK_REQUEST_HEADERS='[".*authorization.*", ".*cookie.*"]'`
+
+* `DASH0_MASK_RESPONSE_BODY` - Regex patterns for masking keys in HTTP response bodies.
+
+  Example: `DASH0_MASK_RESPONSE_BODY='[".*token.*", ".*session.*"]'`
+
+* `DASH0_MASK_RESPONSE_HEADERS` - Regex patterns for masking HTTP response header names.
+
+  Example: `DASH0_MASK_RESPONSE_HEADERS='[".*set-cookie.*"]'`
+
+* `DASH0_MASK_QUERY_PARAMS` - Regex patterns for masking HTTP query parameter names.
+
+  Example: `DASH0_MASK_QUERY_PARAMS='[".*api_key.*", ".*token.*"]'`
 
 
 ## Dockerized Lambdas
