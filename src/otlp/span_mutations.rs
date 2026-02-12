@@ -73,7 +73,7 @@ pub fn build_synthetic_trace(
         sqs_links = extract_span_links(&event_payload);
 
         attributes.push(KeyValue {
-            key: "faas.event".to_string(),
+            key: "dash0.faas.event".to_string(),
             value: Some(AnyValue {
                 value: Some(Value::StringValue(event_payload)),
             }),
@@ -88,7 +88,7 @@ pub fn build_synthetic_trace(
 
     if let Some(ret) = return_value {
         attributes.push(KeyValue {
-            key: "faas.return_value".to_string(),
+            key: "dash0.faas.return_value".to_string(),
             value: Some(AnyValue {
                 value: Some(Value::StringValue(ret.to_string())),
             }),
@@ -485,7 +485,7 @@ fn annotate_server_spans(spans: &mut Vec<Span>, invocation_ids: &mut Vec<String>
                 }
 
                 span.attributes.push(KeyValue {
-                    key: "faas.event".to_string(),
+                    key: "dash0.faas.event".to_string(),
                     value: Some(AnyValue {
                         value: Some(Value::StringValue(event_payload)),
                     }),
@@ -560,7 +560,7 @@ pub fn annotate_return_payload(
                         if let Some(id) = extract_invocation_id(span) {
                             if id == invocation_id {
                                 span.attributes.push(KeyValue {
-                                    key: "faas.return_value".to_string(),
+                                    key: "dash0.faas.return_value".to_string(),
                                     value: Some(AnyValue {
                                         value: Some(Value::StringValue(return_payload.to_string())),
                                     }),
@@ -589,7 +589,7 @@ pub fn merge_telemetry_invocation_data(request: &mut ExportTraceServiceRequest) 
                             {
                                 if data.init_duration > 0.0 {
                                     span.attributes.push(KeyValue {
-                                        key: "faas.init_duration".to_string(),
+                                        key: "dash0.faas.init_duration".to_string(),
                                         value: Some(AnyValue {
                                             value: Some(Value::DoubleValue(data.init_duration)),
                                         }),
@@ -598,7 +598,7 @@ pub fn merge_telemetry_invocation_data(request: &mut ExportTraceServiceRequest) 
                                 }
                                 if data.billed_duration > 0.0 {
                                     span.attributes.push(KeyValue {
-                                        key: "faas.billed_duration".to_string(),
+                                        key: "dash0.faas.billed_duration".to_string(),
                                         value: Some(AnyValue {
                                             value: Some(Value::DoubleValue(data.billed_duration)),
                                         }),
@@ -607,7 +607,7 @@ pub fn merge_telemetry_invocation_data(request: &mut ExportTraceServiceRequest) 
                                 }
                                 if data.memory_usage > 0 {
                                     span.attributes.push(KeyValue {
-                                        key: "faas.memory_used".to_string(),
+                                        key: "dash0.faas.memory_used".to_string(),
                                         value: Some(AnyValue {
                                             value: Some(Value::IntValue(data.memory_usage as i64)),
                                         }),
@@ -648,7 +648,7 @@ pub fn process_trace_request(
     if added {
         *encoded_body = decoded.encode_to_vec();
         tracing::info!(
-            "[{}] /v1/traces added faas.event payload to lambda server span. invocation_ids={:?}",
+            "[{}] /v1/traces added dash0.faas.event payload to lambda server span. invocation_ids={:?}",
             crate::log_prefix(),
             invocation_ids
         );
@@ -685,7 +685,7 @@ pub fn process_trace_request(
     if updated_with_return {
         *encoded_body = decoded.encode_to_vec();
         tracing::info!(
-            "[{}] /v1/traces added pending faas.return_value to lambda server span. invocation_ids={:?}", crate::log_prefix(),
+            "[{}] /v1/traces added pending dash0.faas.return_value to lambda server span. invocation_ids={:?}", crate::log_prefix(),
             invocation_ids
         );
         modified = true;
@@ -791,8 +791,8 @@ mod tests {
             Some(&invocation_id.to_string())
         );
 
-        let event_attr = find_attribute(&span, "faas.event");
-        assert!(event_attr.is_some(), "faas.event should be included");
+        let event_attr = find_attribute(&span, "dash0.faas.event");
+        assert!(event_attr.is_some(), "dash0.faas.event should be included");
 
         let exception = span
             .events
@@ -828,10 +828,10 @@ mod tests {
             .expect("should decode otlp payload");
         let span = decoded.resource_spans[0].scope_spans[0].spans[0].clone();
 
-        let event_attr = find_attribute(&span, "faas.event");
+        let event_attr = find_attribute(&span, "dash0.faas.event");
         assert!(
             event_attr.is_none(),
-            "faas.event should be absent when not stored"
+            "dash0.faas.event should be absent when not stored"
         );
 
         let exception = span
@@ -892,11 +892,11 @@ mod tests {
 
         let added = add_event_payload_to_lambda_server_spans(&mut request, &mut invocation_ids);
 
-        assert!(added, "expected faas.event to be added");
+        assert!(added, "expected dash0.faas.event to be added");
         assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
-        let event_attr = find_attribute(span, "faas.event");
-        assert!(event_attr.is_some(), "faas.event attribute should exist");
+        let event_attr = find_attribute(span, "dash0.faas.event");
+        assert!(event_attr.is_some(), "dash0.faas.event attribute should exist");
     }
 
     #[test]
@@ -909,13 +909,13 @@ mod tests {
 
         let added = add_event_payload_to_lambda_server_spans(&mut request, &mut invocation_ids);
 
-        assert!(!added, "no faas.event should be added without payload");
+        assert!(!added, "no dash0.faas.event should be added without payload");
         assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
-        let event_attr = find_attribute(span, "faas.event");
+        let event_attr = find_attribute(span, "dash0.faas.event");
         assert!(
             event_attr.is_none(),
-            "faas.event attribute should be absent"
+            "dash0.faas.event attribute should be absent"
         );
     }
 
@@ -938,10 +938,10 @@ mod tests {
             "invocation_ids should remain empty for non-matching scopes"
         );
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
-        let event_attr = find_attribute(span, "faas.event");
+        let event_attr = find_attribute(span, "dash0.faas.event");
         assert!(
             event_attr.is_none(),
-            "faas.event attribute should be absent"
+            "dash0.faas.event attribute should be absent"
         );
     }
 
@@ -969,8 +969,8 @@ mod tests {
         let decoded = ExportTraceServiceRequest::decode(traces[0].body.as_slice())
             .expect("should decode updated trace");
         let span = &decoded.resource_spans[0].scope_spans[0].spans[0];
-        let attr = find_attribute(span, "faas.return_value");
-        assert!(attr.is_some(), "faas.return_value should be added");
+        let attr = find_attribute(span, "dash0.faas.return_value");
+        assert!(attr.is_some(), "dash0.faas.return_value should be added");
     }
 
     #[test]
@@ -996,10 +996,10 @@ mod tests {
         let decoded = ExportTraceServiceRequest::decode(traces[0].body.as_slice())
             .expect("should decode updated trace");
         let span = &decoded.resource_spans[0].scope_spans[0].spans[0];
-        let attr = find_attribute(span, "faas.return_value");
+        let attr = find_attribute(span, "dash0.faas.return_value");
         assert!(
             attr.is_none(),
-            "faas.return_value should not be added for non-matching invocation"
+            "dash0.faas.return_value should not be added for non-matching invocation"
         );
     }
 
@@ -1033,10 +1033,10 @@ mod tests {
 
         assert!(added, "pending return payload should be applied");
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
-        let attr = find_attribute(span, "faas.return_value");
+        let attr = find_attribute(span, "dash0.faas.return_value");
         assert!(
             attr.is_some(),
-            "faas.return_value attribute should be present after applying pending payload"
+            "dash0.faas.return_value attribute should be present after applying pending payload"
         );
         assert!(
             take_return_payload(invocation_id).is_none(),
@@ -1099,8 +1099,8 @@ mod tests {
         assert!(!encoded_body.is_empty(), "encoded_body should be updated");
 
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
-        let event_attr = find_attribute(span, "faas.event");
-        assert!(event_attr.is_some(), "faas.event should be added");
+        let event_attr = find_attribute(span, "dash0.faas.event");
+        assert!(event_attr.is_some(), "dash0.faas.event should be added");
     }
 
     #[test]
@@ -1125,8 +1125,8 @@ mod tests {
         assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
 
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
-        let return_attr = find_attribute(span, "faas.return_value");
-        assert!(return_attr.is_some(), "faas.return_value should be added");
+        let return_attr = find_attribute(span, "dash0.faas.return_value");
+        assert!(return_attr.is_some(), "dash0.faas.return_value should be added");
 
         // Verify the pending payload was consumed
         assert!(
@@ -1214,15 +1214,15 @@ mod tests {
         assert_eq!(spans.len(), 2);
 
         for span in spans {
-            let event_attr = find_attribute(span, "faas.event");
-            assert!(event_attr.is_some(), "both spans should have faas.event");
+            let event_attr = find_attribute(span, "dash0.faas.event");
+            assert!(event_attr.is_some(), "both spans should have dash0.faas.event");
         }
 
         // Verify only the second span has return value
-        let span2_return = find_attribute(&spans[1], "faas.return_value");
+        let span2_return = find_attribute(&spans[1], "dash0.faas.return_value");
         assert!(
             span2_return.is_some(),
-            "second span should have faas.return_value"
+            "second span should have dash0.faas.return_value"
         );
     }
 
@@ -1291,8 +1291,8 @@ mod tests {
         let request_span = &request.resource_spans[0].scope_spans[0].spans[0];
 
         assert_eq!(decoded_span.attributes.len(), request_span.attributes.len());
-        let event_attr = find_attribute(decoded_span, "faas.event");
-        assert!(event_attr.is_some(), "decoded span should have faas.event");
+        let event_attr = find_attribute(decoded_span, "dash0.faas.event");
+        assert!(event_attr.is_some(), "decoded span should have dash0.faas.event");
     }
 
     #[test]
@@ -1484,11 +1484,11 @@ mod tests {
 
         let added = add_event_payload_to_lambda_server_spans(&mut request, &mut invocation_ids);
 
-        assert!(added, "expected faas.event to be added for nodejs scope");
+        assert!(added, "expected dash0.faas.event to be added for nodejs scope");
         assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
-        let event_attr = find_attribute(span, "faas.event");
-        assert!(event_attr.is_some(), "faas.event attribute should exist");
+        let event_attr = find_attribute(span, "dash0.faas.event");
+        assert!(event_attr.is_some(), "dash0.faas.event attribute should exist");
     }
 
     #[test]
@@ -1515,10 +1515,10 @@ mod tests {
         let decoded = ExportTraceServiceRequest::decode(traces[0].body.as_slice())
             .expect("should decode updated trace");
         let span = &decoded.resource_spans[0].scope_spans[0].spans[0];
-        let attr = find_attribute(span, "faas.return_value");
+        let attr = find_attribute(span, "dash0.faas.return_value");
         assert!(
             attr.is_some(),
-            "faas.return_value should be added for nodejs scope"
+            "dash0.faas.return_value should be added for nodejs scope"
         );
     }
     #[test]
@@ -1545,20 +1545,20 @@ mod tests {
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
 
         // attributes
-        let init_attr = find_attribute(span, "faas.init_duration").and_then(|v| match &v.value {
+        let init_attr = find_attribute(span, "dash0.faas.init_duration").and_then(|v| match &v.value {
             Some(Value::DoubleValue(d)) => Some(*d),
             _ => None,
         });
         assert_eq!(init_attr, Some(100.0));
 
         let billed_attr =
-            find_attribute(span, "faas.billed_duration").and_then(|v| match &v.value {
+            find_attribute(span, "dash0.faas.billed_duration").and_then(|v| match &v.value {
                 Some(Value::DoubleValue(d)) => Some(*d),
                 _ => None,
             });
         assert_eq!(billed_attr, Some(200.0));
 
-        let mem_attr = find_attribute(span, "faas.memory_used").and_then(|v| match &v.value {
+        let mem_attr = find_attribute(span, "dash0.faas.memory_used").and_then(|v| match &v.value {
             Some(Value::IntValue(i)) => Some(*i),
             _ => None,
         });
@@ -2004,7 +2004,7 @@ mod tests {
 
         let added = add_event_payload_to_lambda_server_spans(&mut request, &mut invocation_ids);
 
-        assert!(added, "expected faas.event to be added");
+        assert!(added, "expected dash0.faas.event to be added");
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
 
         // Verify span links were added
