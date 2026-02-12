@@ -8,4 +8,6 @@ on:
 jobs:
   deploy:
     uses: ./.github/workflows/build-and-publish.yml
+    with:
+      environment: prod
     secrets: inherit

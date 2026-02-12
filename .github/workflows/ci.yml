@@ -61,6 +61,8 @@ jobs:
   deploy:
     name: Build and Publish
     uses: ./.github/workflows/build-and-publish.yml
+    with:
+      environment: staging
     secrets: inherit
 
   integration-test:

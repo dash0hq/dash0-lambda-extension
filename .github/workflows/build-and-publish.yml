@@ -2,6 +2,10 @@ name: Build and Publish Layers
 
 on:
   workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
 
 env:
   CARGO_TERM_COLOR: always
@@ -10,7 +14,7 @@ jobs:
   deploy:
     name: Build and Publish
     runs-on: ubuntu-latest
-    environment: staging
+    environment: ${{ inputs.environment }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
