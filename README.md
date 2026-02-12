@@ -1,6 +1,6 @@
 # Dash0 Lambda Extension
 
-An extension for capturing observability data from lambda invocations and shipping to Dash0.
+An extension for capturing observability data from AWS Lambda invocations and shipping to Dash0.
 
 This extension has four main functionalities:
 1. Enable auto-instrumentation for supported runtimes, which currently include Python, Node, Java.
