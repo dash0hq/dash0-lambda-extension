@@ -20,6 +20,8 @@ TBD
 
 * `AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper` - This environment variable must be set in order to enable tracing. If this environment variable will not be set, only logs will be collected.
 
+* `DASH0_ENDPOINT` - The integration endpoint for you organization in Dash0, i.e. `https://ingress.eu-west-1.aws.dash0.com:4318`.
+* 
 * `DASH0_TOKEN` - The API token for your Dash0 project.
 
 ### Optional
@@ -40,7 +42,7 @@ TBD
 
 ### Secret Masking
 
-The extension automatically masks sensitive data in traces. By default, any JSON key matching these patterns (case-insensitive) will have its value replaced with `****`:
+The extension automatically masks sensitive data in event and return value payloads. By default, any JSON key matching these patterns (case-insensitive) will have its value replaced with `****`:
 
 - `.*pass.*`
 - `.*key.*`
@@ -57,6 +59,8 @@ The extension automatically masks sensitive data in traces. By default, any JSON
 * `DASH0_MASK_ENV_VARS` - JSON array of regex patterns specifically for masking environment variables captured in traces. When not set, falls back to using `DASH0_MASK_RULES` (or the defaults).
 
   Example: `DASH0_MASK_ENV_VARS='[".*PASSWORD.*", ".*API_KEY.*"]'`
+
+**Secret masking in http request and response payloads:**
 
 
 ## Dockerized Lambdas
