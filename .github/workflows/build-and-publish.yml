@@ -1,0 +1,35 @@
+name: Build and Publish Layers
+
+on:
+  workflow_call:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  deploy:
+    name: Build and Publish
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl,aarch64-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and publish layers
+        run: make
