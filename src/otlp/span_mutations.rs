@@ -347,6 +347,10 @@ fn parse_traceparent(traceparent: &str) -> Option<(Vec<u8>, Vec<u8>)> {
 /// For SNS: looks for Records[].Sns.MessageAttributes.traceparent.Value (EventSource: "aws:sns")
 /// For EventBridge: looks for detail.traceparent
 fn extract_span_links(event_payload: &str) -> Vec<Link> {
+    if !crate::config::user::is_extract_span_links_in_consumer() {
+        return Vec::new();
+    }
+
     let mut links = Vec::new();
 
     let json_val: serde_json::Value = match serde_json::from_str(event_payload) {
@@ -1612,7 +1616,9 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn extract_span_links_with_valid_sqs_event() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
         let event_payload = r#"{
             "Records": [
                 {
@@ -1634,10 +1640,13 @@ mod tests {
             "026d2b5d090c15f6423df90800000000"
         );
         assert_eq!(hex::encode(&links[0].span_id), "157c058e59db86fb");
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
     }
 
     #[test]
+    #[serial]
     fn extract_span_links_with_multiple_records() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
         let event_payload = r#"{
             "Records": [
                 {
@@ -1670,10 +1679,13 @@ mod tests {
             hex::encode(&links[1].trace_id),
             "11112222333344445555666677778888"
         );
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
     }
 
     #[test]
+    #[serial]
     fn extract_span_links_ignores_non_sqs_events() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
         let event_payload = r#"{
             "Records": [
                 {
@@ -1689,10 +1701,13 @@ mod tests {
 
         let links = super::extract_span_links(event_payload);
         assert!(links.is_empty());
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
     }
 
     #[test]
+    #[serial]
     fn extract_span_links_handles_missing_traceparent() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
         let event_payload = r#"{
             "Records": [
                 {
@@ -1704,23 +1719,32 @@ mod tests {
 
         let links = super::extract_span_links(event_payload);
         assert!(links.is_empty());
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
     }
 
     #[test]
+    #[serial]
     fn extract_span_links_handles_non_json() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
         let links = super::extract_span_links("not json");
         assert!(links.is_empty());
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
     }
 
     #[test]
+    #[serial]
     fn extract_span_links_handles_no_records() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
         let event_payload = r#"{"foo": "bar"}"#;
         let links = super::extract_span_links(event_payload);
         assert!(links.is_empty());
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
     }
 
     #[test]
+    #[serial]
     fn extract_sns_span_links_with_valid_sns_event() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
         let event_payload = r#"{
             "Records": [
                 {
@@ -1745,10 +1769,13 @@ mod tests {
             "0e9448e94692132e3aa97f4300000000"
         );
         assert_eq!(hex::encode(&links[0].span_id), "e17b75c674b168ae");
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
     }
 
     #[test]
+    #[serial]
     fn extract_sns_span_links_with_multiple_records() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
         let event_payload = r#"{
             "Records": [
                 {
@@ -1787,10 +1814,13 @@ mod tests {
             hex::encode(&links[1].trace_id),
             "11112222333344445555666677778888"
         );
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
     }
 
     #[test]
+    #[serial]
     fn extract_sns_span_links_handles_missing_traceparent() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
         let event_payload = r#"{
             "Records": [
                 {
@@ -1804,10 +1834,13 @@ mod tests {
 
         let links = super::extract_span_links(event_payload);
         assert!(links.is_empty());
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
     }
 
     #[test]
+    #[serial]
     fn extract_sns_span_links_handles_missing_sns_object() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
         let event_payload = r#"{
             "Records": [
                 {
@@ -1818,10 +1851,13 @@ mod tests {
 
         let links = super::extract_span_links(event_payload);
         assert!(links.is_empty());
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
     }
 
     #[test]
+    #[serial]
     fn extract_span_links_with_mixed_sqs_and_sns() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
         let event_payload = r#"{
             "Records": [
                 {
@@ -1857,10 +1893,13 @@ mod tests {
             hex::encode(&links[1].trace_id),
             "11112222333344445555666677778888"
         );
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
     }
 
     #[test]
+    #[serial]
     fn extract_span_links_from_sns_via_sqs() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
         // SNS → SQS → Lambda pattern: traceparent is in the SNS message embedded in SQS body
         let event_payload = r#"{
             "Records": [
@@ -1880,10 +1919,13 @@ mod tests {
             "547e30d6367841ef2fb1000600000000"
         );
         assert_eq!(hex::encode(&links[0].span_id), "d24fe80e627d602e");
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
     }
 
     #[test]
+    #[serial]
     fn extract_span_links_from_sns_via_sqs_prefers_direct_message_attributes() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
         // When both messageAttributes and body have traceparent, prefer messageAttributes
         let event_payload = r#"{
             "Records": [
@@ -1907,10 +1949,13 @@ mod tests {
             hex::encode(&links[0].trace_id),
             "aaaabbbbccccddddeeeeffffaaaabbbb"
         );
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
     }
 
     #[test]
+    #[serial]
     fn extract_span_links_from_sns_via_sqs_handles_invalid_body_json() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
         let event_payload = r#"{
             "Records": [
                 {
@@ -1923,10 +1968,13 @@ mod tests {
 
         let links = super::extract_span_links(event_payload);
         assert!(links.is_empty());
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
     }
 
     #[test]
+    #[serial]
     fn extract_span_links_from_sns_via_sqs_handles_body_without_traceparent() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
         let event_payload = r#"{
             "Records": [
                 {
@@ -1939,10 +1987,13 @@ mod tests {
 
         let links = super::extract_span_links(event_payload);
         assert!(links.is_empty());
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
     }
 
     #[test]
+    #[serial]
     fn extract_span_links_from_eventbridge() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
         let event_payload = r#"{
             "version": "0",
             "id": "d83d3d45-e768-015d-a133-80d073f5697e",
@@ -1967,10 +2018,13 @@ mod tests {
             "462b7e674cf81fa63fdd74b200000000"
         );
         assert_eq!(hex::encode(&links[0].span_id), "cf2870befd9580d7");
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
     }
 
     #[test]
+    #[serial]
     fn extract_span_links_from_eventbridge_without_traceparent() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
         let event_payload = r#"{
             "version": "0",
             "id": "d83d3d45-e768-015d-a133-80d073f5697e",
@@ -1988,10 +2042,13 @@ mod tests {
 
         let links = super::extract_span_links(event_payload);
         assert!(links.is_empty());
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
     }
 
     #[test]
+    #[serial]
     fn extract_span_links_from_eventbridge_with_empty_detail() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
         let event_payload = r#"{
             "version": "0",
             "id": "d83d3d45-e768-015d-a133-80d073f5697e",
@@ -2002,11 +2059,13 @@ mod tests {
 
         let links = super::extract_span_links(event_payload);
         assert!(links.is_empty());
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
     }
 
     #[test]
     #[serial]
     fn add_event_payload_adds_sqs_span_links() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
         let invocation_id = "inv-sqs-links";
         let sqs_event = r#"{
             "Records": [
@@ -2037,6 +2096,7 @@ mod tests {
             "abcdef01234567890123456789abcdef"
         );
         assert_eq!(hex::encode(&span.links[0].span_id), "fedcba9876543210");
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
     }
 }
 

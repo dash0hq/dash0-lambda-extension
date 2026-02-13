@@ -45,6 +45,16 @@ pub fn request_retries() -> usize {
     }
 }
 
+pub fn is_extract_span_links_in_consumer() -> bool {
+    match std::env::var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER") {
+        Ok(val) => matches!(
+            val.as_str(),
+            "1" | "true" | "TRUE" | "True" | "yes" | "YES" | "Yes" | "y" | "Y"
+        ),
+        Err(_) => false,
+    }
+}
+
 pub fn is_logs_instrumentation_enabled() -> bool {
     match std::env::var("LUMIGO_ENABLE_LOGS") {
         Ok(val) => matches!(
