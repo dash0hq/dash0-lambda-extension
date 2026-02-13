@@ -896,7 +896,10 @@ mod tests {
         assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
         let event_attr = find_attribute(span, "dash0.faas.event");
-        assert!(event_attr.is_some(), "dash0.faas.event attribute should exist");
+        assert!(
+            event_attr.is_some(),
+            "dash0.faas.event attribute should exist"
+        );
     }
 
     #[test]
@@ -909,7 +912,10 @@ mod tests {
 
         let added = add_event_payload_to_lambda_server_spans(&mut request, &mut invocation_ids);
 
-        assert!(!added, "no dash0.faas.event should be added without payload");
+        assert!(
+            !added,
+            "no dash0.faas.event should be added without payload"
+        );
         assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
         let event_attr = find_attribute(span, "dash0.faas.event");
@@ -1126,7 +1132,10 @@ mod tests {
 
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
         let return_attr = find_attribute(span, "dash0.faas.return_value");
-        assert!(return_attr.is_some(), "dash0.faas.return_value should be added");
+        assert!(
+            return_attr.is_some(),
+            "dash0.faas.return_value should be added"
+        );
 
         // Verify the pending payload was consumed
         assert!(
@@ -1215,7 +1224,10 @@ mod tests {
 
         for span in spans {
             let event_attr = find_attribute(span, "dash0.faas.event");
-            assert!(event_attr.is_some(), "both spans should have dash0.faas.event");
+            assert!(
+                event_attr.is_some(),
+                "both spans should have dash0.faas.event"
+            );
         }
 
         // Verify only the second span has return value
@@ -1292,7 +1304,10 @@ mod tests {
 
         assert_eq!(decoded_span.attributes.len(), request_span.attributes.len());
         let event_attr = find_attribute(decoded_span, "dash0.faas.event");
-        assert!(event_attr.is_some(), "decoded span should have dash0.faas.event");
+        assert!(
+            event_attr.is_some(),
+            "decoded span should have dash0.faas.event"
+        );
     }
 
     #[test]
@@ -1484,11 +1499,17 @@ mod tests {
 
         let added = add_event_payload_to_lambda_server_spans(&mut request, &mut invocation_ids);
 
-        assert!(added, "expected dash0.faas.event to be added for nodejs scope");
+        assert!(
+            added,
+            "expected dash0.faas.event to be added for nodejs scope"
+        );
         assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
         let event_attr = find_attribute(span, "dash0.faas.event");
-        assert!(event_attr.is_some(), "dash0.faas.event attribute should exist");
+        assert!(
+            event_attr.is_some(),
+            "dash0.faas.event attribute should exist"
+        );
     }
 
     #[test]
@@ -1545,10 +1566,11 @@ mod tests {
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
 
         // attributes
-        let init_attr = find_attribute(span, "dash0.faas.init_duration").and_then(|v| match &v.value {
-            Some(Value::DoubleValue(d)) => Some(*d),
-            _ => None,
-        });
+        let init_attr =
+            find_attribute(span, "dash0.faas.init_duration").and_then(|v| match &v.value {
+                Some(Value::DoubleValue(d)) => Some(*d),
+                _ => None,
+            });
         assert_eq!(init_attr, Some(100.0));
 
         let billed_attr =
@@ -1558,10 +1580,11 @@ mod tests {
             });
         assert_eq!(billed_attr, Some(200.0));
 
-        let mem_attr = find_attribute(span, "dash0.faas.memory_used").and_then(|v| match &v.value {
-            Some(Value::IntValue(i)) => Some(*i),
-            _ => None,
-        });
+        let mem_attr =
+            find_attribute(span, "dash0.faas.memory_used").and_then(|v| match &v.value {
+                Some(Value::IntValue(i)) => Some(*i),
+                _ => None,
+            });
         assert_eq!(mem_attr, Some(128));
 
         // timestamps (ms -> ns)
