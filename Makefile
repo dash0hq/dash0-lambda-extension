@@ -62,6 +62,7 @@ build/lrap_aarch64: $(RS_FILES) Cargo.toml
 	@cp target/aarch64-unknown-linux-musl/release/aws-lambda-runtime-api-proxy-rs build/lrap_aarch64
 
 PYTHON_DISTRO_SRC := $(shell find opt/python/distro/src -type f)
+NODE_DISTRO_SRC := $(shell find opt/node/distro/src -type f)
 
 build/python: opt/python/distro/requirements.txt opt/python/Dockerfile $(PYTHON_DISTRO_SRC)
 	@mkdir -p build
@@ -86,7 +87,7 @@ build/$(ZIP_NAME_PYTHON): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint op
 	@cd build/stage-python && zip -r ../$(ZIP_NAME_PYTHON) *
 
 
-build/$(ZIP_NAME_NODE): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/node/package.json opt/node/wrapper opt/node/webpack.config.mjs opt/node/init.mjs
+build/$(ZIP_NAME_NODE): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/node/package.json opt/node/wrapper opt/node/webpack.config.mjs opt/node/init.mjs $(NODE_DISTRO_SRC)
 	@echo Building Node.js layer
 	@rm -f build/$(ZIP_NAME_NODE)
 	@rm -rf build/stage-node

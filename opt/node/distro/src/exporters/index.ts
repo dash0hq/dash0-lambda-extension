@@ -1,0 +1,1 @@
+export { FileSpanExporter } from './FileSpanExporter';

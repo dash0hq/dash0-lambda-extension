@@ -4,4 +4,7 @@ build
 .lambda-layer
 .idea
 opt/node/node_modules
+opt/node/distro/node_modules
+opt/node/distro/dist
+opt/node/dist
 .venv
