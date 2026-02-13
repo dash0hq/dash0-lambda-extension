@@ -79,6 +79,10 @@ jobs:
           cache-dependency-path: |
             integration-tests/iac/package-lock.json
             integration-tests/tests/package-lock.json
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
