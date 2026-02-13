@@ -33,6 +33,7 @@ import { Dash0AwsSdkV3LibInstrumentation } from './instrumentations/aws-sdk';
 import { Dash0W3CTraceContextPropagator } from './propagator/w3cTraceContextPropagator';
 import { getSpanAttributeMaxLength } from './utils';
 import { safeRequire } from './requireUtils';
+import { AWSXRayLambdaPropagator } from '@opentelemetry/propagator-aws-xray-lambda';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -196,7 +197,7 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
     });
 
     tracerProvider.register({
-      propagator: new Dash0W3CTraceContextPropagator(),
+      propagator: new AWSXRayLambdaPropagator(),
     });
 
     logger.info(
