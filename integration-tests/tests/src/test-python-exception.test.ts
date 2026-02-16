@@ -41,8 +41,8 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             span = spanPayload.resourceSpans[0].scopeSpans[0].spans[0];
             const spanAttributes = getAttributesMap(span.attributes);
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
-            expect(spanAttributes['faas.event'].stringValue).toEqual('{"parameter1":"right"}');
-            expect(spanAttributes['faas.return_value'].stringValue).contains('KeyError');
+            expect(spanAttributes['dash0.faas.event'].stringValue).toEqual('{"parameter1":"right"}');
+            expect(spanAttributes['dash0.faas.return_value'].stringValue).contains('KeyError');
 
             // check exception event
             const events = span.events;

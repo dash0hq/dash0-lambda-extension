@@ -73,7 +73,7 @@ pub fn build_synthetic_trace(
         sqs_links = extract_span_links(&event_payload);
 
         attributes.push(KeyValue {
-            key: "faas.event".to_string(),
+            key: "dash0.faas.event".to_string(),
             value: Some(AnyValue {
                 value: Some(Value::StringValue(event_payload)),
             }),
@@ -88,7 +88,7 @@ pub fn build_synthetic_trace(
 
     if let Some(ret) = return_value {
         attributes.push(KeyValue {
-            key: "faas.return_value".to_string(),
+            key: "dash0.faas.return_value".to_string(),
             value: Some(AnyValue {
                 value: Some(Value::StringValue(ret.to_string())),
             }),
@@ -319,133 +319,8 @@ fn is_lambda_instrumentation_scope(scope_name: &str) -> bool {
         || scope_name == "OpenTelemetry.Instrumentation.AWSLambda"
 }
 
-/// Parses a W3C traceparent header and returns (trace_id, span_id) as byte vectors.
-/// Format: {version}-{trace_id}-{span_id}-{flags}
-/// Example: 00-026d2b5d090c15f6423df90800000000-157c058e59db86fb-01
-fn parse_traceparent(traceparent: &str) -> Option<(Vec<u8>, Vec<u8>)> {
-    let parts: Vec<&str> = traceparent.split('-').collect();
-    if parts.len() != 4 {
-        return None;
-    }
-    // parts[0] = version (00)
-    // parts[1] = trace_id (32 hex chars = 16 bytes)
-    // parts[2] = span_id (16 hex chars = 8 bytes)
-    // parts[3] = flags
-
-    let trace_id = hex::decode(parts[1]).ok()?;
-    let span_id = hex::decode(parts[2]).ok()?;
-
-    if trace_id.len() != 16 || span_id.len() != 8 {
-        return None;
-    }
-
-    Some((trace_id, span_id))
-}
-
-/// Extracts span links from SQS, SNS, and EventBridge event payloads.
-/// For SQS: looks for Records[].messageAttributes.traceparent.stringValue (eventSource: "aws:sqs")
-/// For SNS: looks for Records[].Sns.MessageAttributes.traceparent.Value (EventSource: "aws:sns")
-/// For EventBridge: looks for detail.traceparent
 fn extract_span_links(event_payload: &str) -> Vec<Link> {
-    let mut links = Vec::new();
-
-    let json_val: serde_json::Value = match serde_json::from_str(event_payload) {
-        Ok(v) => v,
-        Err(_) => return links,
-    };
-
-    // Check for EventBridge event (has "detail" and "detail-type" fields, no "Records")
-    if json_val.get("detail-type").is_some() {
-        if let Some(traceparent) = json_val
-            .get("detail")
-            .and_then(|d| d.get("traceparent"))
-            .and_then(|tp| tp.as_str())
-        {
-            if let Some((trace_id, span_id)) = parse_traceparent(traceparent) {
-                links.push(Link {
-                    trace_id,
-                    span_id,
-                    ..Default::default()
-                });
-            }
-        }
-        return links;
-    }
-
-    let records = match json_val.get("Records").and_then(|v| v.as_array()) {
-        Some(r) => r,
-        None => return links,
-    };
-
-    for record in records {
-        // Check for SQS event (lowercase eventSource)
-        if record.get("eventSource").and_then(|v| v.as_str()) == Some("aws:sqs") {
-            // First try: direct SQS messageAttributes
-            let traceparent = record
-                .get("messageAttributes")
-                .and_then(|ma| ma.get("traceparent"))
-                .and_then(|tp| tp.get("stringValue"))
-                .and_then(|sv| sv.as_str());
-
-            if let Some(tp) = traceparent {
-                if let Some((trace_id, span_id)) = parse_traceparent(tp) {
-                    links.push(Link {
-                        trace_id,
-                        span_id,
-                        ..Default::default()
-                    });
-                }
-                continue;
-            }
-
-            // Second try: SNS message embedded in SQS body (SNS → SQS → Lambda pattern)
-            let traceparent_from_body = record
-                .get("body")
-                .and_then(|b| b.as_str())
-                .and_then(|body_str| serde_json::from_str::<serde_json::Value>(body_str).ok())
-                .and_then(|body_json| {
-                    body_json
-                        .get("MessageAttributes")
-                        .and_then(|ma| ma.get("traceparent"))
-                        .and_then(|tp| tp.get("Value"))
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string())
-                });
-
-            if let Some(tp) = traceparent_from_body {
-                if let Some((trace_id, span_id)) = parse_traceparent(&tp) {
-                    links.push(Link {
-                        trace_id,
-                        span_id,
-                        ..Default::default()
-                    });
-                }
-            }
-            continue;
-        }
-
-        // Check for SNS event (PascalCase EventSource)
-        if record.get("EventSource").and_then(|v| v.as_str()) == Some("aws:sns") {
-            let traceparent = record
-                .get("Sns")
-                .and_then(|sns| sns.get("MessageAttributes"))
-                .and_then(|ma| ma.get("traceparent"))
-                .and_then(|tp| tp.get("Value"))
-                .and_then(|v| v.as_str());
-
-            if let Some(tp) = traceparent {
-                if let Some((trace_id, span_id)) = parse_traceparent(tp) {
-                    links.push(Link {
-                        trace_id,
-                        span_id,
-                        ..Default::default()
-                    });
-                }
-            }
-        }
-    }
-
-    links
+    crate::otlp::span_link_extractor::extract_span_links(event_payload)
 }
 
 pub fn add_event_payload_to_lambda_server_spans(
@@ -485,7 +360,7 @@ fn annotate_server_spans(spans: &mut Vec<Span>, invocation_ids: &mut Vec<String>
                 }
 
                 span.attributes.push(KeyValue {
-                    key: "faas.event".to_string(),
+                    key: "dash0.faas.event".to_string(),
                     value: Some(AnyValue {
                         value: Some(Value::StringValue(event_payload)),
                     }),
@@ -560,7 +435,7 @@ pub fn annotate_return_payload(
                         if let Some(id) = extract_invocation_id(span) {
                             if id == invocation_id {
                                 span.attributes.push(KeyValue {
-                                    key: "faas.return_value".to_string(),
+                                    key: "dash0.faas.return_value".to_string(),
                                     value: Some(AnyValue {
                                         value: Some(Value::StringValue(return_payload.to_string())),
                                     }),
@@ -589,7 +464,7 @@ pub fn merge_telemetry_invocation_data(request: &mut ExportTraceServiceRequest) 
                             {
                                 if data.init_duration > 0.0 {
                                     span.attributes.push(KeyValue {
-                                        key: "faas.init_duration".to_string(),
+                                        key: "dash0.faas.init_duration".to_string(),
                                         value: Some(AnyValue {
                                             value: Some(Value::DoubleValue(data.init_duration)),
                                         }),
@@ -598,7 +473,7 @@ pub fn merge_telemetry_invocation_data(request: &mut ExportTraceServiceRequest) 
                                 }
                                 if data.billed_duration > 0.0 {
                                     span.attributes.push(KeyValue {
-                                        key: "faas.billed_duration".to_string(),
+                                        key: "dash0.faas.billed_duration".to_string(),
                                         value: Some(AnyValue {
                                             value: Some(Value::DoubleValue(data.billed_duration)),
                                         }),
@@ -607,7 +482,7 @@ pub fn merge_telemetry_invocation_data(request: &mut ExportTraceServiceRequest) 
                                 }
                                 if data.memory_usage > 0 {
                                     span.attributes.push(KeyValue {
-                                        key: "faas.memory_used".to_string(),
+                                        key: "dash0.faas.memory_used".to_string(),
                                         value: Some(AnyValue {
                                             value: Some(Value::IntValue(data.memory_usage as i64)),
                                         }),
@@ -648,7 +523,7 @@ pub fn process_trace_request(
     if added {
         *encoded_body = decoded.encode_to_vec();
         tracing::info!(
-            "[{}] /v1/traces added faas.event payload to lambda server span. invocation_ids={:?}",
+            "[{}] /v1/traces added dash0.faas.event payload to lambda server span. invocation_ids={:?}",
             crate::log_prefix(),
             invocation_ids
         );
@@ -685,7 +560,7 @@ pub fn process_trace_request(
     if updated_with_return {
         *encoded_body = decoded.encode_to_vec();
         tracing::info!(
-            "[{}] /v1/traces added pending faas.return_value to lambda server span. invocation_ids={:?}", crate::log_prefix(),
+            "[{}] /v1/traces added pending dash0.faas.return_value to lambda server span. invocation_ids={:?}", crate::log_prefix(),
             invocation_ids
         );
         modified = true;
@@ -791,8 +666,8 @@ mod tests {
             Some(&invocation_id.to_string())
         );
 
-        let event_attr = find_attribute(&span, "faas.event");
-        assert!(event_attr.is_some(), "faas.event should be included");
+        let event_attr = find_attribute(&span, "dash0.faas.event");
+        assert!(event_attr.is_some(), "dash0.faas.event should be included");
 
         let exception = span
             .events
@@ -828,10 +703,10 @@ mod tests {
             .expect("should decode otlp payload");
         let span = decoded.resource_spans[0].scope_spans[0].spans[0].clone();
 
-        let event_attr = find_attribute(&span, "faas.event");
+        let event_attr = find_attribute(&span, "dash0.faas.event");
         assert!(
             event_attr.is_none(),
-            "faas.event should be absent when not stored"
+            "dash0.faas.event should be absent when not stored"
         );
 
         let exception = span
@@ -892,11 +767,14 @@ mod tests {
 
         let added = add_event_payload_to_lambda_server_spans(&mut request, &mut invocation_ids);
 
-        assert!(added, "expected faas.event to be added");
+        assert!(added, "expected dash0.faas.event to be added");
         assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
-        let event_attr = find_attribute(span, "faas.event");
-        assert!(event_attr.is_some(), "faas.event attribute should exist");
+        let event_attr = find_attribute(span, "dash0.faas.event");
+        assert!(
+            event_attr.is_some(),
+            "dash0.faas.event attribute should exist"
+        );
     }
 
     #[test]
@@ -909,13 +787,16 @@ mod tests {
 
         let added = add_event_payload_to_lambda_server_spans(&mut request, &mut invocation_ids);
 
-        assert!(!added, "no faas.event should be added without payload");
+        assert!(
+            !added,
+            "no dash0.faas.event should be added without payload"
+        );
         assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
-        let event_attr = find_attribute(span, "faas.event");
+        let event_attr = find_attribute(span, "dash0.faas.event");
         assert!(
             event_attr.is_none(),
-            "faas.event attribute should be absent"
+            "dash0.faas.event attribute should be absent"
         );
     }
 
@@ -938,10 +819,10 @@ mod tests {
             "invocation_ids should remain empty for non-matching scopes"
         );
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
-        let event_attr = find_attribute(span, "faas.event");
+        let event_attr = find_attribute(span, "dash0.faas.event");
         assert!(
             event_attr.is_none(),
-            "faas.event attribute should be absent"
+            "dash0.faas.event attribute should be absent"
         );
     }
 
@@ -969,8 +850,8 @@ mod tests {
         let decoded = ExportTraceServiceRequest::decode(traces[0].body.as_slice())
             .expect("should decode updated trace");
         let span = &decoded.resource_spans[0].scope_spans[0].spans[0];
-        let attr = find_attribute(span, "faas.return_value");
-        assert!(attr.is_some(), "faas.return_value should be added");
+        let attr = find_attribute(span, "dash0.faas.return_value");
+        assert!(attr.is_some(), "dash0.faas.return_value should be added");
     }
 
     #[test]
@@ -996,10 +877,10 @@ mod tests {
         let decoded = ExportTraceServiceRequest::decode(traces[0].body.as_slice())
             .expect("should decode updated trace");
         let span = &decoded.resource_spans[0].scope_spans[0].spans[0];
-        let attr = find_attribute(span, "faas.return_value");
+        let attr = find_attribute(span, "dash0.faas.return_value");
         assert!(
             attr.is_none(),
-            "faas.return_value should not be added for non-matching invocation"
+            "dash0.faas.return_value should not be added for non-matching invocation"
         );
     }
 
@@ -1033,10 +914,10 @@ mod tests {
 
         assert!(added, "pending return payload should be applied");
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
-        let attr = find_attribute(span, "faas.return_value");
+        let attr = find_attribute(span, "dash0.faas.return_value");
         assert!(
             attr.is_some(),
-            "faas.return_value attribute should be present after applying pending payload"
+            "dash0.faas.return_value attribute should be present after applying pending payload"
         );
         assert!(
             take_return_payload(invocation_id).is_none(),
@@ -1099,8 +980,8 @@ mod tests {
         assert!(!encoded_body.is_empty(), "encoded_body should be updated");
 
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
-        let event_attr = find_attribute(span, "faas.event");
-        assert!(event_attr.is_some(), "faas.event should be added");
+        let event_attr = find_attribute(span, "dash0.faas.event");
+        assert!(event_attr.is_some(), "dash0.faas.event should be added");
     }
 
     #[test]
@@ -1125,8 +1006,11 @@ mod tests {
         assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
 
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
-        let return_attr = find_attribute(span, "faas.return_value");
-        assert!(return_attr.is_some(), "faas.return_value should be added");
+        let return_attr = find_attribute(span, "dash0.faas.return_value");
+        assert!(
+            return_attr.is_some(),
+            "dash0.faas.return_value should be added"
+        );
 
         // Verify the pending payload was consumed
         assert!(
@@ -1214,15 +1098,18 @@ mod tests {
         assert_eq!(spans.len(), 2);
 
         for span in spans {
-            let event_attr = find_attribute(span, "faas.event");
-            assert!(event_attr.is_some(), "both spans should have faas.event");
+            let event_attr = find_attribute(span, "dash0.faas.event");
+            assert!(
+                event_attr.is_some(),
+                "both spans should have dash0.faas.event"
+            );
         }
 
         // Verify only the second span has return value
-        let span2_return = find_attribute(&spans[1], "faas.return_value");
+        let span2_return = find_attribute(&spans[1], "dash0.faas.return_value");
         assert!(
             span2_return.is_some(),
-            "second span should have faas.return_value"
+            "second span should have dash0.faas.return_value"
         );
     }
 
@@ -1291,8 +1178,11 @@ mod tests {
         let request_span = &request.resource_spans[0].scope_spans[0].spans[0];
 
         assert_eq!(decoded_span.attributes.len(), request_span.attributes.len());
-        let event_attr = find_attribute(decoded_span, "faas.event");
-        assert!(event_attr.is_some(), "decoded span should have faas.event");
+        let event_attr = find_attribute(decoded_span, "dash0.faas.event");
+        assert!(
+            event_attr.is_some(),
+            "decoded span should have dash0.faas.event"
+        );
     }
 
     #[test]
@@ -1484,11 +1374,17 @@ mod tests {
 
         let added = add_event_payload_to_lambda_server_spans(&mut request, &mut invocation_ids);
 
-        assert!(added, "expected faas.event to be added for nodejs scope");
+        assert!(
+            added,
+            "expected dash0.faas.event to be added for nodejs scope"
+        );
         assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
-        let event_attr = find_attribute(span, "faas.event");
-        assert!(event_attr.is_some(), "faas.event attribute should exist");
+        let event_attr = find_attribute(span, "dash0.faas.event");
+        assert!(
+            event_attr.is_some(),
+            "dash0.faas.event attribute should exist"
+        );
     }
 
     #[test]
@@ -1515,10 +1411,10 @@ mod tests {
         let decoded = ExportTraceServiceRequest::decode(traces[0].body.as_slice())
             .expect("should decode updated trace");
         let span = &decoded.resource_spans[0].scope_spans[0].spans[0];
-        let attr = find_attribute(span, "faas.return_value");
+        let attr = find_attribute(span, "dash0.faas.return_value");
         assert!(
             attr.is_some(),
-            "faas.return_value should be added for nodejs scope"
+            "dash0.faas.return_value should be added for nodejs scope"
         );
     }
     #[test]
@@ -1545,23 +1441,25 @@ mod tests {
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
 
         // attributes
-        let init_attr = find_attribute(span, "faas.init_duration").and_then(|v| match &v.value {
-            Some(Value::DoubleValue(d)) => Some(*d),
-            _ => None,
-        });
+        let init_attr =
+            find_attribute(span, "dash0.faas.init_duration").and_then(|v| match &v.value {
+                Some(Value::DoubleValue(d)) => Some(*d),
+                _ => None,
+            });
         assert_eq!(init_attr, Some(100.0));
 
         let billed_attr =
-            find_attribute(span, "faas.billed_duration").and_then(|v| match &v.value {
+            find_attribute(span, "dash0.faas.billed_duration").and_then(|v| match &v.value {
                 Some(Value::DoubleValue(d)) => Some(*d),
                 _ => None,
             });
         assert_eq!(billed_attr, Some(200.0));
 
-        let mem_attr = find_attribute(span, "faas.memory_used").and_then(|v| match &v.value {
-            Some(Value::IntValue(i)) => Some(*i),
-            _ => None,
-        });
+        let mem_attr =
+            find_attribute(span, "dash0.faas.memory_used").and_then(|v| match &v.value {
+                Some(Value::IntValue(i)) => Some(*i),
+                _ => None,
+            });
         assert_eq!(mem_attr, Some(128));
 
         // timestamps (ms -> ns)
@@ -1570,420 +1468,9 @@ mod tests {
     }
 
     #[test]
-    fn parse_traceparent_valid() {
-        let traceparent = "00-026d2b5d090c15f6423df90800000000-157c058e59db86fb-01";
-        let (trace_id, span_id) =
-            super::parse_traceparent(traceparent).expect("should parse valid traceparent");
-
-        assert_eq!(trace_id.len(), 16);
-        assert_eq!(span_id.len(), 8);
-        assert_eq!(hex::encode(&trace_id), "026d2b5d090c15f6423df90800000000");
-        assert_eq!(hex::encode(&span_id), "157c058e59db86fb");
-    }
-
-    #[test]
-    fn parse_traceparent_invalid_format() {
-        assert!(super::parse_traceparent("invalid").is_none());
-        assert!(super::parse_traceparent("00-abc-def-01").is_none());
-        assert!(super::parse_traceparent("").is_none());
-    }
-
-    #[test]
-    fn extract_span_links_with_valid_sqs_event() {
-        let event_payload = r#"{
-            "Records": [
-                {
-                    "eventSource": "aws:sqs",
-                    "messageAttributes": {
-                        "traceparent": {
-                            "stringValue": "00-026d2b5d090c15f6423df90800000000-157c058e59db86fb-01"
-                        }
-                    }
-                }
-            ]
-        }"#;
-
-        let links = super::extract_span_links(event_payload);
-
-        assert_eq!(links.len(), 1);
-        assert_eq!(
-            hex::encode(&links[0].trace_id),
-            "026d2b5d090c15f6423df90800000000"
-        );
-        assert_eq!(hex::encode(&links[0].span_id), "157c058e59db86fb");
-    }
-
-    #[test]
-    fn extract_span_links_with_multiple_records() {
-        let event_payload = r#"{
-            "Records": [
-                {
-                    "eventSource": "aws:sqs",
-                    "messageAttributes": {
-                        "traceparent": {
-                            "stringValue": "00-aaaabbbbccccddddeeeeffffaaaabbbb-1111222233334444-01"
-                        }
-                    }
-                },
-                {
-                    "eventSource": "aws:sqs",
-                    "messageAttributes": {
-                        "traceparent": {
-                            "stringValue": "00-11112222333344445555666677778888-5555666677778888-01"
-                        }
-                    }
-                }
-            ]
-        }"#;
-
-        let links = super::extract_span_links(event_payload);
-
-        assert_eq!(links.len(), 2);
-        assert_eq!(
-            hex::encode(&links[0].trace_id),
-            "aaaabbbbccccddddeeeeffffaaaabbbb"
-        );
-        assert_eq!(
-            hex::encode(&links[1].trace_id),
-            "11112222333344445555666677778888"
-        );
-    }
-
-    #[test]
-    fn extract_span_links_ignores_non_sqs_events() {
-        let event_payload = r#"{
-            "Records": [
-                {
-                    "eventSource": "aws:sns",
-                    "messageAttributes": {
-                        "traceparent": {
-                            "stringValue": "00-026d2b5d090c15f6423df90800000000-157c058e59db86fb-01"
-                        }
-                    }
-                }
-            ]
-        }"#;
-
-        let links = super::extract_span_links(event_payload);
-        assert!(links.is_empty());
-    }
-
-    #[test]
-    fn extract_span_links_handles_missing_traceparent() {
-        let event_payload = r#"{
-            "Records": [
-                {
-                    "eventSource": "aws:sqs",
-                    "messageAttributes": {}
-                }
-            ]
-        }"#;
-
-        let links = super::extract_span_links(event_payload);
-        assert!(links.is_empty());
-    }
-
-    #[test]
-    fn extract_span_links_handles_non_json() {
-        let links = super::extract_span_links("not json");
-        assert!(links.is_empty());
-    }
-
-    #[test]
-    fn extract_span_links_handles_no_records() {
-        let event_payload = r#"{"foo": "bar"}"#;
-        let links = super::extract_span_links(event_payload);
-        assert!(links.is_empty());
-    }
-
-    #[test]
-    fn extract_sns_span_links_with_valid_sns_event() {
-        let event_payload = r#"{
-            "Records": [
-                {
-                    "EventSource": "aws:sns",
-                    "Sns": {
-                        "MessageAttributes": {
-                            "traceparent": {
-                                "Type": "String",
-                                "Value": "00-0e9448e94692132e3aa97f4300000000-e17b75c674b168ae-01"
-                            }
-                        }
-                    }
-                }
-            ]
-        }"#;
-
-        let links = super::extract_span_links(event_payload);
-
-        assert_eq!(links.len(), 1);
-        assert_eq!(
-            hex::encode(&links[0].trace_id),
-            "0e9448e94692132e3aa97f4300000000"
-        );
-        assert_eq!(hex::encode(&links[0].span_id), "e17b75c674b168ae");
-    }
-
-    #[test]
-    fn extract_sns_span_links_with_multiple_records() {
-        let event_payload = r#"{
-            "Records": [
-                {
-                    "EventSource": "aws:sns",
-                    "Sns": {
-                        "MessageAttributes": {
-                            "traceparent": {
-                                "Type": "String",
-                                "Value": "00-aaaabbbbccccddddeeeeffffaaaabbbb-1111222233334444-01"
-                            }
-                        }
-                    }
-                },
-                {
-                    "EventSource": "aws:sns",
-                    "Sns": {
-                        "MessageAttributes": {
-                            "traceparent": {
-                                "Type": "String",
-                                "Value": "00-11112222333344445555666677778888-5555666677778888-01"
-                            }
-                        }
-                    }
-                }
-            ]
-        }"#;
-
-        let links = super::extract_span_links(event_payload);
-
-        assert_eq!(links.len(), 2);
-        assert_eq!(
-            hex::encode(&links[0].trace_id),
-            "aaaabbbbccccddddeeeeffffaaaabbbb"
-        );
-        assert_eq!(
-            hex::encode(&links[1].trace_id),
-            "11112222333344445555666677778888"
-        );
-    }
-
-    #[test]
-    fn extract_sns_span_links_handles_missing_traceparent() {
-        let event_payload = r#"{
-            "Records": [
-                {
-                    "EventSource": "aws:sns",
-                    "Sns": {
-                        "MessageAttributes": {}
-                    }
-                }
-            ]
-        }"#;
-
-        let links = super::extract_span_links(event_payload);
-        assert!(links.is_empty());
-    }
-
-    #[test]
-    fn extract_sns_span_links_handles_missing_sns_object() {
-        let event_payload = r#"{
-            "Records": [
-                {
-                    "EventSource": "aws:sns"
-                }
-            ]
-        }"#;
-
-        let links = super::extract_span_links(event_payload);
-        assert!(links.is_empty());
-    }
-
-    #[test]
-    fn extract_span_links_with_mixed_sqs_and_sns() {
-        let event_payload = r#"{
-            "Records": [
-                {
-                    "eventSource": "aws:sqs",
-                    "messageAttributes": {
-                        "traceparent": {
-                            "stringValue": "00-aaaabbbbccccddddeeeeffffaaaabbbb-1111222233334444-01"
-                        }
-                    }
-                },
-                {
-                    "EventSource": "aws:sns",
-                    "Sns": {
-                        "MessageAttributes": {
-                            "traceparent": {
-                                "Type": "String",
-                                "Value": "00-11112222333344445555666677778888-5555666677778888-01"
-                            }
-                        }
-                    }
-                }
-            ]
-        }"#;
-
-        let links = super::extract_span_links(event_payload);
-
-        assert_eq!(links.len(), 2);
-        assert_eq!(
-            hex::encode(&links[0].trace_id),
-            "aaaabbbbccccddddeeeeffffaaaabbbb"
-        );
-        assert_eq!(
-            hex::encode(&links[1].trace_id),
-            "11112222333344445555666677778888"
-        );
-    }
-
-    #[test]
-    fn extract_span_links_from_sns_via_sqs() {
-        // SNS → SQS → Lambda pattern: traceparent is in the SNS message embedded in SQS body
-        let event_payload = r#"{
-            "Records": [
-                {
-                    "eventSource": "aws:sqs",
-                    "messageAttributes": {},
-                    "body": "{\"Type\":\"Notification\",\"MessageId\":\"a5bc81a6-95e1-5509-b973-e05a6e57f3e6\",\"TopicArn\":\"arn:aws:sns:us-west-2:123456789:topic\",\"Message\":\"test\",\"MessageAttributes\":{\"traceparent\":{\"Type\":\"String\",\"Value\":\"00-547e30d6367841ef2fb1000600000000-d24fe80e627d602e-01\"}}}"
-                }
-            ]
-        }"#;
-
-        let links = super::extract_span_links(event_payload);
-
-        assert_eq!(links.len(), 1);
-        assert_eq!(
-            hex::encode(&links[0].trace_id),
-            "547e30d6367841ef2fb1000600000000"
-        );
-        assert_eq!(hex::encode(&links[0].span_id), "d24fe80e627d602e");
-    }
-
-    #[test]
-    fn extract_span_links_from_sns_via_sqs_prefers_direct_message_attributes() {
-        // When both messageAttributes and body have traceparent, prefer messageAttributes
-        let event_payload = r#"{
-            "Records": [
-                {
-                    "eventSource": "aws:sqs",
-                    "messageAttributes": {
-                        "traceparent": {
-                            "stringValue": "00-aaaabbbbccccddddeeeeffffaaaabbbb-1111222233334444-01"
-                        }
-                    },
-                    "body": "{\"MessageAttributes\":{\"traceparent\":{\"Type\":\"String\",\"Value\":\"00-11112222333344445555666677778888-5555666677778888-01\"}}}"
-                }
-            ]
-        }"#;
-
-        let links = super::extract_span_links(event_payload);
-
-        assert_eq!(links.len(), 1);
-        // Should use the direct messageAttributes traceparent, not the one from body
-        assert_eq!(
-            hex::encode(&links[0].trace_id),
-            "aaaabbbbccccddddeeeeffffaaaabbbb"
-        );
-    }
-
-    #[test]
-    fn extract_span_links_from_sns_via_sqs_handles_invalid_body_json() {
-        let event_payload = r#"{
-            "Records": [
-                {
-                    "eventSource": "aws:sqs",
-                    "messageAttributes": {},
-                    "body": "not valid json"
-                }
-            ]
-        }"#;
-
-        let links = super::extract_span_links(event_payload);
-        assert!(links.is_empty());
-    }
-
-    #[test]
-    fn extract_span_links_from_sns_via_sqs_handles_body_without_traceparent() {
-        let event_payload = r#"{
-            "Records": [
-                {
-                    "eventSource": "aws:sqs",
-                    "messageAttributes": {},
-                    "body": "{\"Type\":\"Notification\",\"Message\":\"test\",\"MessageAttributes\":{}}"
-                }
-            ]
-        }"#;
-
-        let links = super::extract_span_links(event_payload);
-        assert!(links.is_empty());
-    }
-
-    #[test]
-    fn extract_span_links_from_eventbridge() {
-        let event_payload = r#"{
-            "version": "0",
-            "id": "d83d3d45-e768-015d-a133-80d073f5697e",
-            "detail-type": "TestMessage",
-            "source": "tracing-tests.producer",
-            "account": "285732642181",
-            "time": "2026-02-04T13:57:53Z",
-            "region": "us-west-2",
-            "resources": [],
-            "detail": {
-                "message": "Hello from EventBridge producer!",
-                "requestId": "2a45cb5d-0ca6-4a67-aabf-3ff31180a6b2",
-                "traceparent": "00-462b7e674cf81fa63fdd74b200000000-cf2870befd9580d7-01"
-            }
-        }"#;
-
-        let links = super::extract_span_links(event_payload);
-
-        assert_eq!(links.len(), 1);
-        assert_eq!(
-            hex::encode(&links[0].trace_id),
-            "462b7e674cf81fa63fdd74b200000000"
-        );
-        assert_eq!(hex::encode(&links[0].span_id), "cf2870befd9580d7");
-    }
-
-    #[test]
-    fn extract_span_links_from_eventbridge_without_traceparent() {
-        let event_payload = r#"{
-            "version": "0",
-            "id": "d83d3d45-e768-015d-a133-80d073f5697e",
-            "detail-type": "TestMessage",
-            "source": "tracing-tests.producer",
-            "account": "285732642181",
-            "time": "2026-02-04T13:57:53Z",
-            "region": "us-west-2",
-            "resources": [],
-            "detail": {
-                "message": "Hello from EventBridge producer!",
-                "requestId": "2a45cb5d-0ca6-4a67-aabf-3ff31180a6b2"
-            }
-        }"#;
-
-        let links = super::extract_span_links(event_payload);
-        assert!(links.is_empty());
-    }
-
-    #[test]
-    fn extract_span_links_from_eventbridge_with_empty_detail() {
-        let event_payload = r#"{
-            "version": "0",
-            "id": "d83d3d45-e768-015d-a133-80d073f5697e",
-            "detail-type": "TestMessage",
-            "source": "tracing-tests.producer",
-            "detail": {}
-        }"#;
-
-        let links = super::extract_span_links(event_payload);
-        assert!(links.is_empty());
-    }
-
-    #[test]
     #[serial]
     fn add_event_payload_adds_sqs_span_links() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
         let invocation_id = "inv-sqs-links";
         let sqs_event = r#"{
             "Records": [
@@ -2004,7 +1491,7 @@ mod tests {
 
         let added = add_event_payload_to_lambda_server_spans(&mut request, &mut invocation_ids);
 
-        assert!(added, "expected faas.event to be added");
+        assert!(added, "expected dash0.faas.event to be added");
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
 
         // Verify span links were added
@@ -2014,6 +1501,7 @@ mod tests {
             "abcdef01234567890123456789abcdef"
         );
         assert_eq!(hex::encode(&span.links[0].span_id), "fedcba9876543210");
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
     }
 }
 

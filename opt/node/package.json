@@ -50,6 +50,8 @@
     "@opentelemetry/sdk-trace-node": "2.3.0",
     "@opentelemetry/semantic-conventions": "1.38.0",
     "@opentelemetry/winston-transport": "^0.19.0",
+    "@opentelemetry/propagator-aws-xray": "^2.0.0",
+    "@opentelemetry/propagator-aws-xray-lambda": "^0.56.0",
     "@prisma/instrumentation": "^6.0.0",
     "deasync": "^0.1.30",
     "import-in-the-middle": "2.0.0",

@@ -1,0 +1,13 @@
+name: Deploy
+
+on:
+  workflow_dispatch: # TODO: re-enable push trigger once secrets are configured
+  # push:
+  #   branches: [main, master]
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/build-and-publish.yml
+    with:
+      environment: prod
+    secrets: inherit

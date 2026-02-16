@@ -11,7 +11,6 @@ const scenarios = [
     { name: 'sqs', producerPrefix: 'tracing-sqs-producer', consumerPrefix: 'tracing-sqs-consumer', runtimes: [...pythonRuntimes, ...nodeRuntimes] },
     { name: 'sns', producerPrefix: 'tracing-sns-producer', consumerPrefix: 'tracing-sns-consumer', runtimes: [...pythonRuntimes, ...nodeRuntimes] },
     { name: 'sns-sqs', producerPrefix: 'tracing-sns-sqs-producer', consumerPrefix: 'tracing-sns-sqs-consumer', runtimes: [...pythonRuntimes, ...nodeRuntimes] },
-    { name: 'eventbridge', producerPrefix: 'tracing-eventbridge-producer', consumerPrefix: 'tracing-eventbridge-consumer', runtimes: [...pythonRuntimes] },
 ] as const;
 
 const verifyTracingScenario = async (

@@ -1,6 +1,6 @@
 # Dash0 Lambda Extension
 
-An extension for capturing observability data from lambda invocations and shipping to Dash0.
+An extension for capturing observability data from AWS Lambda invocations and shipping to Dash0.
 
 This extension has four main functionalities:
 1. Enable auto-instrumentation for supported runtimes, which currently include Python, Node, Java.
@@ -11,7 +11,15 @@ This extension has four main functionalities:
 
 ## Layer ARNs
 
-TBD
+Python:
+```
+arn:aws:lambda:<region>:285732642181:layer:dash0-extension-node:1
+```
+
+Node:
+```
+arn:aws:lambda:<region>:285732642181:layer:dash0-extension-python:1
+```
 
 
 ## Configuration
@@ -20,6 +28,8 @@ TBD
 
 * `AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper` - This environment variable must be set in order to enable tracing. If this environment variable will not be set, only logs will be collected.
 
+* `DASH0_ENDPOINT` - The integration endpoint for you organization in Dash0, i.e. `https://ingress.eu-west-1.aws.dash0.com:4318`.
+* 
 * `DASH0_TOKEN` - The API token for your Dash0 project.
 
 ### Optional
@@ -40,13 +50,18 @@ TBD
 
 ### Secret Masking
 
-The extension automatically masks sensitive data in traces. By default, any JSON key matching these patterns (case-insensitive) will have its value replaced with `****`:
+The extension automatically masks sensitive data in traces payloads. By default, any JSON key matching these patterns (case-insensitive) will have its value replaced with `****`:
 
 - `.*pass.*`
 - `.*key.*`
 - `.*secret.*`
 - `.*credential.*`
 - `.*passphrase.*`
+
+This is applied to:
+- Lambda event payloads
+- Lambda response payloads
+- Any http request/response payloads captured by the auto-instrumentation
 
 **Custom masking rules:**
 
@@ -57,6 +72,30 @@ The extension automatically masks sensitive data in traces. By default, any JSON
 * `DASH0_MASK_ENV_VARS` - JSON array of regex patterns specifically for masking environment variables captured in traces. When not set, falls back to using `DASH0_MASK_RULES` (or the defaults).
 
   Example: `DASH0_MASK_ENV_VARS='[".*PASSWORD.*", ".*API_KEY.*"]'`
+
+**Secret masking in HTTP request and response payloads:**
+
+The following environment variables allow fine-grained control over secret masking in HTTP payloads captured by the auto-instrumentation. Each accepts a JSON array of regex patterns. When not set, they fall back to `DASH0_MASK_RULES` (or the defaults).
+
+* `DASH0_MASK_REQUEST_BODY` - Regex patterns for masking keys in HTTP request bodies.
+
+  Example: `DASH0_MASK_REQUEST_BODY='[".*credit_card.*", ".*ssn.*"]'`
+
+* `DASH0_MASK_REQUEST_HEADERS` - Regex patterns for masking HTTP request header names.
+
+  Example: `DASH0_MASK_REQUEST_HEADERS='[".*authorization.*", ".*cookie.*"]'`
+
+* `DASH0_MASK_RESPONSE_BODY` - Regex patterns for masking keys in HTTP response bodies.
+
+  Example: `DASH0_MASK_RESPONSE_BODY='[".*token.*", ".*session.*"]'`
+
+* `DASH0_MASK_RESPONSE_HEADERS` - Regex patterns for masking HTTP response header names.
+
+  Example: `DASH0_MASK_RESPONSE_HEADERS='[".*set-cookie.*"]'`
+
+* `DASH0_MASK_QUERY_PARAMS` - Regex patterns for masking HTTP query parameter names.
+
+  Example: `DASH0_MASK_QUERY_PARAMS='[".*api_key.*", ".*token.*"]'`
 
 
 ## Dockerized Lambdas

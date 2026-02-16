@@ -218,9 +218,9 @@ export const checkSpanAttributesFromReport = (reportLog: string, span: any) => {
         const maxMemoryUsed = parseInt(match.groups.maxMemoryUsed);
         const duration = parseFloat(match.groups.duration);
 
-        expect(initDuration).toBeCloseTo(spanAttributes['faas.init_duration'].doubleValue, 0);
-        expect(billedDuration).toEqual(spanAttributes['faas.billed_duration'].doubleValue);
-        expect(maxMemoryUsed).toEqual(Number(spanAttributes['faas.memory_used'].intValue));
+        expect(initDuration).toBeCloseTo(spanAttributes['dash0.faas.init_duration'].doubleValue, 0);
+        expect(billedDuration).toEqual(spanAttributes['dash0.faas.billed_duration'].doubleValue);
+        expect(maxMemoryUsed).toEqual(Number(spanAttributes['dash0.faas.memory_used'].intValue));
 
         const spanDurationNano = Number(BigInt(span.endTimeUnixNano) - BigInt(span.startTimeUnixNano));
         const spanDurationMs = spanDurationNano / 1e6;

@@ -27,6 +27,14 @@ if [ -z "${OTEL_SERVICE_NAME}" ]; then
     export OTEL_SERVICE_NAME=$AWS_LAMBDA_FUNCTION_NAME;
 fi
 
+if [[ -z "$OTEL_PROPAGATORS" ]]; then
+  export OTEL_PROPAGATORS="tracecontext,baggage,xray-lambda"
+fi
+
+if [[ -z "$OTEL_TRACES_SAMPLER" ]]; then
+  export OTEL_TRACES_SAMPLER="always_on"
+fi
+
 # Write env vars to a file for the extension to read
 echo "{\"OTEL_SERVICE_NAME\": \"$OTEL_SERVICE_NAME\", \"OTEL_RESOURCE_ATTRIBUTES\": \"$OTEL_RESOURCE_ATTRIBUTES\"}" > /tmp/lumigo_env_vars || true
 
