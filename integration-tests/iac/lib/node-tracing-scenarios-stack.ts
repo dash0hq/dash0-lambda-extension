@@ -6,6 +6,7 @@ import * as logs from 'aws-cdk-lib/aws-logs';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
+import * as kinesis from 'aws-cdk-lib/aws-kinesis';
 import * as lambda_event_sources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as path from 'path';
 
@@ -24,6 +25,7 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
         iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSQSFullAccess'),
         iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSNSFullAccess'),
+        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonKinesisFullAccess'),
       ],
     });
 
@@ -152,6 +154,43 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         environment: baseEnvironment,
       });
       snsSqsConsumer.addEventSource(new lambda_event_sources.SqsEventSource(snsSqsQueue, {
+        batchSize: 1,
+      }));
+
+      // Scenario 4: Lambda > Kinesis > Lambda
+      const kinesisStream = new kinesis.Stream(this, `TracingTestKinesisStream-${runtimeName}`, {
+        streamName: `tracing-test-kinesis-stream-${runtimeName}`,
+        shardCount: 1,
+      });
+
+      const kinesisProducer = new lambda.Function(this, `KinesisProducerLambda-${runtimeName}`, {
+        functionName: `tracing-kinesis-producer-${runtimeName}`,
+        runtime,
+        handler: 'kinesis_producer.handler',
+        code: nodeCode,
+        layers: [props.layer],
+        role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: {
+          ...baseEnvironment,
+          STREAM_NAME: kinesisStream.streamName,
+        },
+      });
+
+      const kinesisConsumer = new lambda.Function(this, `KinesisConsumerLambda-${runtimeName}`, {
+        functionName: `tracing-kinesis-consumer-${runtimeName}`,
+        runtime,
+        handler: 'consumer.handler',
+        code: nodeCode,
+        layers: [props.layer],
+        role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: baseEnvironment,
+      });
+      kinesisConsumer.addEventSource(new lambda_event_sources.KinesisEventSource(kinesisStream, {
+        startingPosition: lambda.StartingPosition.TRIM_HORIZON,
         batchSize: 1,
       }));
 
