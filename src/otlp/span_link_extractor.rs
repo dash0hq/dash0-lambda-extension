@@ -1,11 +1,14 @@
+use base64::Engine;
 use opentelemetry_proto::tonic::trace::v1::span::Link;
 
-/// Extracts span links from SQS, SNS, and EventBridge event payloads.
+/// Extracts span links from SQS, SNS, EventBridge, and Kinesis event payloads.
 /// For SQS: looks for Records[].messageAttributes["x-amzn-trace-id"].stringValue first,
 ///   then falls back to Records[].messageAttributes.traceparent.stringValue,
 ///   then tries SNS message embedded in SQS body
 /// For SNS: looks for Records[].Sns.MessageAttributes.traceparent.Value
 /// For EventBridge: looks for detail.traceparent
+/// For Kinesis: base64-decodes Records[].kinesis.data, then looks for X-Amzn-Trace-Id first,
+///   then falls back to traceparent
 pub fn extract_span_links(event_payload: &str) -> Vec<Link> {
     if !crate::config::user::is_extract_span_links_in_consumer() {
         return Vec::new();
@@ -44,6 +47,11 @@ fn extract_link_from_record(record: &serde_json::Value) -> Option<Link> {
     // Check for SNS event (PascalCase EventSource)
     if record.get("EventSource").and_then(|v| v.as_str()) == Some("aws:sns") {
         return extract_sns_link(record);
+    }
+
+    // Check for Kinesis event
+    if record.get("eventSource").and_then(|v| v.as_str()) == Some("aws:kinesis") {
+        return extract_kinesis_link(record);
     }
 
     None
@@ -160,6 +168,41 @@ fn extract_sns_link(record: &serde_json::Value) -> Option<Link> {
     })
 }
 
+fn extract_kinesis_link(record: &serde_json::Value) -> Option<Link> {
+    let data_b64 = record
+        .get("kinesis")
+        .and_then(|k| k.get("data"))
+        .and_then(|d| d.as_str())?;
+
+    let decoded_bytes = base64::engine::general_purpose::STANDARD
+        .decode(data_b64)
+        .ok()?;
+    let decoded_str = std::str::from_utf8(&decoded_bytes).ok()?;
+    let data_json: serde_json::Value = serde_json::from_str(decoded_str).ok()?;
+
+    // Try X-Amzn-Trace-Id first, then traceparent
+    if let Some(amzn_val) = data_json
+        .get("X-Amzn-Trace-Id")
+        .and_then(|v| v.as_str())
+    {
+        if let Some((trace_id, span_id)) = parse_amzn_trace_id(amzn_val) {
+            return Some(Link {
+                trace_id,
+                span_id,
+                ..Default::default()
+            });
+        }
+    }
+
+    let traceparent = data_json.get("traceparent").and_then(|v| v.as_str())?;
+    let (trace_id, span_id) = parse_traceparent(traceparent)?;
+    Some(Link {
+        trace_id,
+        span_id,
+        ..Default::default()
+    })
+}
+
 fn extract_eventbridge_link(json_val: &serde_json::Value) -> Option<Link> {
     let traceparent = json_val
         .get("detail")
@@ -229,6 +272,7 @@ fn parse_amzn_trace_id(value: &str) -> Option<(Vec<u8>, Vec<u8>)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use base64::Engine;
     use serial_test::serial;
 
     // ── parse_traceparent ───────────────────────────────────────────
@@ -747,6 +791,161 @@ mod tests {
         }"#;
 
         let links = extract_span_links(payload);
+        assert!(links.is_empty());
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
+    }
+
+    // ── extract_span_links: Kinesis ─────────────────────────────────
+
+    #[test]
+    #[serial]
+    fn extract_kinesis_link_from_amzn_trace_id() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
+        // Decoded data: {"message":"hello","X-Amzn-Trace-Id":"Root=1-69930da5-56f73ce00e736a0e6081eba8;Parent=462fcf08cfbb8353;Sampled=1","traceparent":"00-aaaabbbbccccddddeeeeffffaaaabbbb-1111222233334444-01"}
+        let data_json = serde_json::json!({
+            "message": "hello",
+            "X-Amzn-Trace-Id": "Root=1-69930da5-56f73ce00e736a0e6081eba8;Parent=462fcf08cfbb8353;Sampled=1",
+            "traceparent": "00-aaaabbbbccccddddeeeeffffaaaabbbb-1111222233334444-01"
+        });
+        let data_b64 = base64::engine::general_purpose::STANDARD.encode(data_json.to_string());
+        let payload = serde_json::json!({
+            "Records": [{
+                "eventSource": "aws:kinesis",
+                "kinesis": {
+                    "data": data_b64
+                }
+            }]
+        });
+
+        let links = extract_span_links(&payload.to_string());
+
+        assert_eq!(links.len(), 1);
+        // Should use X-Amzn-Trace-Id, NOT traceparent
+        assert_eq!(
+            hex::encode(&links[0].trace_id),
+            "69930da556f73ce00e736a0e6081eba8"
+        );
+        assert_eq!(hex::encode(&links[0].span_id), "462fcf08cfbb8353");
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
+    }
+
+    #[test]
+    #[serial]
+    fn extract_kinesis_link_falls_back_to_traceparent() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
+        let data_json = serde_json::json!({
+            "message": "hello",
+            "traceparent": "00-026d2b5d090c15f6423df90800000000-157c058e59db86fb-01"
+        });
+        let data_b64 = base64::engine::general_purpose::STANDARD.encode(data_json.to_string());
+        let payload = serde_json::json!({
+            "Records": [{
+                "eventSource": "aws:kinesis",
+                "kinesis": {
+                    "data": data_b64
+                }
+            }]
+        });
+
+        let links = extract_span_links(&payload.to_string());
+
+        assert_eq!(links.len(), 1);
+        assert_eq!(
+            hex::encode(&links[0].trace_id),
+            "026d2b5d090c15f6423df90800000000"
+        );
+        assert_eq!(hex::encode(&links[0].span_id), "157c058e59db86fb");
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
+    }
+
+    #[test]
+    #[serial]
+    fn extract_kinesis_links_with_multiple_records() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
+        let data1 = serde_json::json!({
+            "traceparent": "00-aaaabbbbccccddddeeeeffffaaaabbbb-1111222233334444-01"
+        });
+        let data2 = serde_json::json!({
+            "traceparent": "00-11112222333344445555666677778888-5555666677778888-01"
+        });
+        let b64_1 = base64::engine::general_purpose::STANDARD.encode(data1.to_string());
+        let b64_2 = base64::engine::general_purpose::STANDARD.encode(data2.to_string());
+        let payload = serde_json::json!({
+            "Records": [
+                {
+                    "eventSource": "aws:kinesis",
+                    "kinesis": { "data": b64_1 }
+                },
+                {
+                    "eventSource": "aws:kinesis",
+                    "kinesis": { "data": b64_2 }
+                }
+            ]
+        });
+
+        let links = extract_span_links(&payload.to_string());
+
+        assert_eq!(links.len(), 2);
+        assert_eq!(
+            hex::encode(&links[0].trace_id),
+            "aaaabbbbccccddddeeeeffffaaaabbbb"
+        );
+        assert_eq!(
+            hex::encode(&links[1].trace_id),
+            "11112222333344445555666677778888"
+        );
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
+    }
+
+    #[test]
+    #[serial]
+    fn extract_kinesis_links_handles_invalid_base64() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
+        let payload = r#"{
+            "Records": [{
+                "eventSource": "aws:kinesis",
+                "kinesis": {
+                    "data": "!!!not-valid-base64!!!"
+                }
+            }]
+        }"#;
+
+        let links = extract_span_links(payload);
+        assert!(links.is_empty());
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
+    }
+
+    #[test]
+    #[serial]
+    fn extract_kinesis_links_handles_non_json_data() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
+        let data_b64 = base64::engine::general_purpose::STANDARD.encode("not json");
+        let payload = serde_json::json!({
+            "Records": [{
+                "eventSource": "aws:kinesis",
+                "kinesis": { "data": data_b64 }
+            }]
+        });
+
+        let links = extract_span_links(&payload.to_string());
+        assert!(links.is_empty());
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
+    }
+
+    #[test]
+    #[serial]
+    fn extract_kinesis_links_handles_missing_trace_context() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
+        let data_json = serde_json::json!({"message": "hello"});
+        let data_b64 = base64::engine::general_purpose::STANDARD.encode(data_json.to_string());
+        let payload = serde_json::json!({
+            "Records": [{
+                "eventSource": "aws:kinesis",
+                "kinesis": { "data": data_b64 }
+            }]
+        });
+
+        let links = extract_span_links(&payload.to_string());
         assert!(links.is_empty());
         std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
     }
