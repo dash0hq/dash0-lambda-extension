@@ -174,9 +174,10 @@ fn extract_kinesis_link(record: &serde_json::Value) -> Option<Link> {
     let decoded_str = std::str::from_utf8(&decoded_bytes).ok()?;
     let data_json: serde_json::Value = serde_json::from_str(decoded_str).ok()?;
 
-    // Try X-Amzn-Trace-Id first, then traceparent
+    // Try X-Amzn-Trace-Id (or x-amzn-trace-id) first, then traceparent
     if let Some(amzn_val) = data_json
         .get("X-Amzn-Trace-Id")
+        .or_else(|| data_json.get("x-amzn-trace-id"))
         .and_then(|v| v.as_str())
     {
         if let Some((trace_id, span_id)) = parse_amzn_trace_id(amzn_val) {
@@ -805,6 +806,36 @@ mod tests {
             hex::encode(&links[1].trace_id),
             "11112222333344445555666677778888"
         );
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
+    }
+
+    #[test]
+    #[serial]
+    fn extract_kinesis_link_from_lowercase_amzn_trace_id() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
+        let data_json = serde_json::json!({
+            "message": "hello",
+            "x-amzn-trace-id": "Root=1-69930da5-56f73ce00e736a0e6081eba8;Parent=462fcf08cfbb8353;Sampled=1",
+            "traceparent": "00-aaaabbbbccccddddeeeeffffaaaabbbb-1111222233334444-01"
+        });
+        let data_b64 = base64::engine::general_purpose::STANDARD.encode(data_json.to_string());
+        let payload = serde_json::json!({
+            "Records": [{
+                "eventSource": "aws:kinesis",
+                "kinesis": {
+                    "data": data_b64
+                }
+            }]
+        });
+
+        let links = extract_span_links(&payload.to_string());
+
+        assert_eq!(links.len(), 1);
+        assert_eq!(
+            hex::encode(&links[0].trace_id),
+            "69930da556f73ce00e736a0e6081eba8"
+        );
+        assert_eq!(hex::encode(&links[0].span_id), "462fcf08cfbb8353");
         std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
     }
 
