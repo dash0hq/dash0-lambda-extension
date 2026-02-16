@@ -1,12 +1,11 @@
 use base64::Engine;
 use opentelemetry_proto::tonic::trace::v1::span::Link;
 
-/// Extracts span links from SQS, SNS, EventBridge, and Kinesis event payloads.
+/// Extracts span links from SQS, SNS, and Kinesis event payloads.
 /// For SQS: looks for Records[].messageAttributes["x-amzn-trace-id"].stringValue first,
 ///   then falls back to Records[].messageAttributes.traceparent.stringValue,
 ///   then tries SNS message embedded in SQS body
 /// For SNS: looks for Records[].Sns.MessageAttributes.traceparent.Value
-/// For EventBridge: looks for detail.traceparent
 /// For Kinesis: base64-decodes Records[].kinesis.data, then looks for X-Amzn-Trace-Id first,
 ///   then falls back to traceparent
 pub fn extract_span_links(event_payload: &str) -> Vec<Link> {
@@ -18,11 +17,6 @@ pub fn extract_span_links(event_payload: &str) -> Vec<Link> {
         Ok(v) => v,
         Err(_) => return Vec::new(),
     };
-
-    // Check for EventBridge event (has "detail" and "detail-type" fields, no "Records")
-    if json_val.get("detail-type").is_some() {
-        return extract_eventbridge_link(&json_val).into_iter().collect();
-    }
 
     let records = match json_val.get("Records").and_then(|v| v.as_array()) {
         Some(r) => r,
@@ -195,20 +189,6 @@ fn extract_kinesis_link(record: &serde_json::Value) -> Option<Link> {
     }
 
     let traceparent = data_json.get("traceparent").and_then(|v| v.as_str())?;
-    let (trace_id, span_id) = parse_traceparent(traceparent)?;
-    Some(Link {
-        trace_id,
-        span_id,
-        ..Default::default()
-    })
-}
-
-fn extract_eventbridge_link(json_val: &serde_json::Value) -> Option<Link> {
-    let traceparent = json_val
-        .get("detail")
-        .and_then(|d| d.get("traceparent"))
-        .and_then(|tp| tp.as_str())?;
-
     let (trace_id, span_id) = parse_traceparent(traceparent)?;
     Some(Link {
         trace_id,
@@ -719,75 +699,6 @@ mod tests {
                 "messageAttributes": {},
                 "body": "{\"Type\":\"Notification\",\"Message\":\"test\",\"MessageAttributes\":{}}"
             }]
-        }"#;
-
-        let links = extract_span_links(payload);
-        assert!(links.is_empty());
-        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
-    }
-
-    // ── extract_span_links: EventBridge ─────────────────────────────
-
-    #[test]
-    #[serial]
-    fn extract_links_from_eventbridge() {
-        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
-        let payload = r#"{
-            "version": "0",
-            "id": "d83d3d45-e768-015d-a133-80d073f5697e",
-            "detail-type": "TestMessage",
-            "source": "tracing-tests.producer",
-            "account": "285732642181",
-            "time": "2026-02-04T13:57:53Z",
-            "region": "us-west-2",
-            "resources": [],
-            "detail": {
-                "message": "Hello from EventBridge producer!",
-                "requestId": "2a45cb5d-0ca6-4a67-aabf-3ff31180a6b2",
-                "traceparent": "00-462b7e674cf81fa63fdd74b200000000-cf2870befd9580d7-01"
-            }
-        }"#;
-
-        let links = extract_span_links(payload);
-
-        assert_eq!(links.len(), 1);
-        assert_eq!(
-            hex::encode(&links[0].trace_id),
-            "462b7e674cf81fa63fdd74b200000000"
-        );
-        assert_eq!(hex::encode(&links[0].span_id), "cf2870befd9580d7");
-        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
-    }
-
-    #[test]
-    #[serial]
-    fn extract_links_from_eventbridge_without_traceparent() {
-        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
-        let payload = r#"{
-            "version": "0",
-            "id": "d83d3d45-e768-015d-a133-80d073f5697e",
-            "detail-type": "TestMessage",
-            "source": "tracing-tests.producer",
-            "detail": {
-                "message": "Hello from EventBridge producer!"
-            }
-        }"#;
-
-        let links = extract_span_links(payload);
-        assert!(links.is_empty());
-        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
-    }
-
-    #[test]
-    #[serial]
-    fn extract_links_from_eventbridge_with_empty_detail() {
-        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
-        let payload = r#"{
-            "version": "0",
-            "id": "d83d3d45",
-            "detail-type": "TestMessage",
-            "source": "tracing-tests.producer",
-            "detail": {}
         }"#;
 
         let links = extract_span_links(payload);
