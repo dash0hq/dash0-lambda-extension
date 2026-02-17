@@ -38,7 +38,7 @@ public class LumigoAgent {
       return;
     }
     System.out.println(
-        "Loading the Lumigo OpenTelemetry Java distribution (version "
+        "Loading the Dash0 OpenTelemetry Java distribution (version "
             + LumigoVersion.VERSION
             + ")");
     OpenTelemetryAgent.agentmain(agentArgs, inst);
