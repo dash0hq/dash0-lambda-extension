@@ -51,6 +51,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - name: Build @opentelemetry/instrumentation-aws-sdk from fork
+        run: bash opt/node/scripts/build-aws-sdk-tarball.sh
       - name: Install dependencies
         working-directory: opt/node
         run: npm install
