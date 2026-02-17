@@ -24,6 +24,11 @@ configurations {
     canBeResolved = true
     canBeConsumed = false
   }
+  // libs that must be on the application classpath (e.g. Lambda wrapper classes loaded via Class.forName by the runtime)
+  classpathLibs {
+    canBeResolved = true
+    canBeConsumed = false
+  }
 }
 
 dependencies {
@@ -47,6 +52,19 @@ dependencies {
   javaagentLibs(project(":instrumentation:lettuce:lettuce-5.1:javaagent"))
 
   upstreamAgent("io.opentelemetry.javaagent:opentelemetry-javaagent:${versions.opentelemetryJavaagent}")
+
+  // OTel Lambda wrapper libraries - must be on the application classpath so the Lambda runtime
+  // can load TracingRequestWrapper via Class.forName (set as _HANDLER by the wrapper script)
+  classpathLibs("io.opentelemetry.instrumentation:opentelemetry-aws-lambda-events-2.2:${versions.opentelemetryJavaagentAlpha}") {
+    transitive = false
+  }
+  classpathLibs("io.opentelemetry.instrumentation:opentelemetry-aws-lambda-core-1.0:${versions.opentelemetryJavaagentAlpha}") {
+    transitive = false
+  }
+  classpathLibs("com.amazonaws:aws-lambda-java-core:${versions.awsLambdaJavaCore}")
+  classpathLibs("com.amazonaws:aws-lambda-java-events:${versions.awsLambdaJavaEvents}") {
+    exclude group: "joda-time"
+  }
 }
 
 CopySpec isolateClasses(Iterable<File> jars) {
@@ -146,7 +164,12 @@ tasks {
     }
   }
 
+  task copyClasspathLibs(type: Copy) {
+    from configurations.classpathLibs
+    into "$buildDir/classpath-libs"
+  }
+
   assemble {
-    dependsOn(shadowJar)
+    dependsOn(shadowJar, copyClasspathLibs)
   }
 }

@@ -34,7 +34,7 @@ public class LumigoAgent {
     }
     if (is_switch_off()) {
       System.err.println(
-          "Lumigo OpenTelemetry Java distribution disabled via the 'LUMIGO_SWITCH_OFF' environment variable");
+          "Dash0 OpenTelemetry Java distribution disabled via the 'LUMIGO_SWITCH_OFF' environment variable");
       return;
     }
     System.out.println(

@@ -32,3 +32,6 @@ COPY opt/java/wrapper /opt/wrapper
 
 # Copy Java agent JAR (built locally from opt/java/opentelemetry-java-distro)
 COPY opt/java/opentelemetry-java-distro/agent/build/libs/agent-1.0.0-SNAPSHOT-all.jar /opt/java/lib/lumigo-opentelemetry.jar
+
+# Copy classpath libs (OTel Lambda wrapper classes needed by the Lambda runtime via Class.forName)
+COPY opt/java/opentelemetry-java-distro/agent/build/classpath-libs/*.jar /opt/java/lib/

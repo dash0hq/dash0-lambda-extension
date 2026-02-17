@@ -74,6 +74,8 @@ subprojects {
       storm                      : "2.8.3",
       lettuce51                  : "6.3.2.RELEASE",
       netty41                    : "4.1.0.Final",
+      awsLambdaJavaCore          : "1.2.2",
+      awsLambdaJavaEvents        : "3.11.0",
 
       jackson                    : "2.15.2",
       bytebuddy                  : "1.14.5",

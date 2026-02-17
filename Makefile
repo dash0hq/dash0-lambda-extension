@@ -63,7 +63,7 @@ build/lrap_aarch64: $(RS_FILES) Cargo.toml
 
 PYTHON_DISTRO_SRC := $(shell find opt/python/distro/src -type f)
 NODE_DISTRO_SRC := $(shell find opt/node/distro/src -type f)
-JAVA_DISTRO_SRC := $(shell find opt/java/opentelemetry-java-distro -type f -not -path '*/build/*' -not -path '*/.gradle/*')
+JAVA_DISTRO_SRC := $(shell find opt/java/opentelemetry-java-distro -type f \( -path '*/src/*' -o -name '*.gradle' -o -name 'gradle.properties' \))
 
 build/python: opt/python/distro/requirements.txt opt/python/Dockerfile $(PYTHON_DISTRO_SRC)
 	@mkdir -p build
@@ -114,6 +114,7 @@ build/$(ZIP_NAME_NODE): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/
 
 
 JAVA_DISTRO_JAR := opt/java/opentelemetry-java-distro/agent/build/libs/agent-1.0.0-SNAPSHOT-all.jar
+JAVA_CLASSPATH_LIBS_DIR := opt/java/opentelemetry-java-distro/agent/build/classpath-libs
 
 $(JAVA_DISTRO_JAR): $(JAVA_DISTRO_SRC)
 	@echo Building Java distro
@@ -130,6 +131,7 @@ build/$(ZIP_NAME_JAVA): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/
 	@cp opt/entrypoint build/stage-java/extensions/lrap
 	@cp opt/java/wrapper build/stage-java/wrapper
 	@cp $(JAVA_DISTRO_JAR) build/stage-java/java/lib/lumigo-opentelemetry.jar
+	@cp $(JAVA_CLASSPATH_LIBS_DIR)/*.jar build/stage-java/java/lib/
 	@cd build/stage-java && zip -r ../$(ZIP_NAME_JAVA) *
 
 
