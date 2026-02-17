@@ -87,7 +87,20 @@ build/$(ZIP_NAME_PYTHON): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint op
 	@cd build/stage-python && zip -r ../$(ZIP_NAME_PYTHON) *
 
 
-build/$(ZIP_NAME_NODE): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/node/package.json opt/node/wrapper opt/node/webpack.config.mjs opt/node/init.mjs $(NODE_DISTRO_SRC)
+OTEL_JS_CONTRIB_REPO := https://github.com/mosheshaham-dash0/opentelemetry-js-contrib.git
+OTEL_JS_CONTRIB_BRANCH := instrument-kinesis
+OTEL_AWS_SDK_TGZ := build/opentelemetry-instrumentation-aws-sdk.tgz
+
+$(OTEL_AWS_SDK_TGZ):
+	@echo "Building @opentelemetry/instrumentation-aws-sdk from fork"
+	@mkdir -p build
+	@rm -rf build/opentelemetry-js-contrib
+	@git clone --depth 1 --branch $(OTEL_JS_CONTRIB_BRANCH) $(OTEL_JS_CONTRIB_REPO) build/opentelemetry-js-contrib
+	@cd build/opentelemetry-js-contrib && npm install && npm run compile -w packages/contrib-test-utils && npm run version:update -w packages/instrumentation-aws-sdk && npm run compile -w packages/instrumentation-aws-sdk && npm pack -w packages/instrumentation-aws-sdk
+	@cp build/opentelemetry-js-contrib/opentelemetry-instrumentation-aws-sdk-*.tgz $(OTEL_AWS_SDK_TGZ)
+	@rm -rf build/opentelemetry-js-contrib
+
+build/$(ZIP_NAME_NODE): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/node/package.json opt/node/wrapper opt/node/webpack.config.mjs opt/node/init.mjs $(NODE_DISTRO_SRC) $(OTEL_AWS_SDK_TGZ)
 	@echo Building Node.js layer
 	@rm -f build/$(ZIP_NAME_NODE)
 	@rm -rf build/stage-node
