@@ -63,6 +63,7 @@ build/lrap_aarch64: $(RS_FILES) Cargo.toml
 
 PYTHON_DISTRO_SRC := $(shell find opt/python/distro/src -type f)
 NODE_DISTRO_SRC := $(shell find opt/node/distro/src -type f)
+JAVA_DISTRO_SRC := $(shell find opt/java/opentelemetry-java-distro -type f -not -path '*/build/*' -not -path '*/.gradle/*')
 
 build/python: opt/python/distro/requirements.txt opt/python/Dockerfile $(PYTHON_DISTRO_SRC)
 	@mkdir -p build
@@ -112,7 +113,13 @@ build/$(ZIP_NAME_NODE): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/
 	@cd build/stage-node && zip -r ../$(ZIP_NAME_NODE) *
 
 
-build/$(ZIP_NAME_JAVA): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/java/wrapper
+JAVA_DISTRO_JAR := opt/java/opentelemetry-java-distro/agent/build/libs/agent-1.0.0-SNAPSHOT-all.jar
+
+$(JAVA_DISTRO_JAR): $(JAVA_DISTRO_SRC)
+	@echo Building Java distro
+	@cd opt/java/opentelemetry-java-distro && ./gradlew -Pversion=1.0.0-SNAPSHOT assemble -x javadoc
+
+build/$(ZIP_NAME_JAVA): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/java/wrapper $(JAVA_DISTRO_JAR)
 	@echo Building Java layer
 	@rm -f build/$(ZIP_NAME_JAVA)
 	@rm -rf build/stage-java
@@ -122,7 +129,7 @@ build/$(ZIP_NAME_JAVA): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/
 	@cp build/lrap_aarch64 build/stage-java/
 	@cp opt/entrypoint build/stage-java/extensions/lrap
 	@cp opt/java/wrapper build/stage-java/wrapper
-	@curl -L -o build/stage-java/java/lib/lumigo-opentelemetry.jar https://github.com/lumigo-io/opentelemetry-java-distro/releases/download/v0.20.0/lumigo-opentelemetry-0.20.0.jar
+	@cp $(JAVA_DISTRO_JAR) build/stage-java/java/lib/lumigo-opentelemetry.jar
 	@cd build/stage-java && zip -r ../$(ZIP_NAME_JAVA) *
 
 
@@ -233,7 +240,7 @@ docker-node: build/lrap_x86_64 build/lrap_aarch64 ensure-buildx
 
 # Build and push Docker image for Java extension to ECR
 # Usage: make docker-java VERSION=1.0.0
-docker-java: build/lrap_x86_64 build/lrap_aarch64 ensure-buildx
+docker-java: build/lrap_x86_64 build/lrap_aarch64 $(JAVA_DISTRO_JAR) ensure-buildx
 	@echo "Creating ECR repository $(ECR_REPO_JAVA) if it doesn't exist..."
 	@aws ecr describe-repositories --repository-names $(ECR_REPO_JAVA) 2>/dev/null || \
 		aws ecr create-repository --repository-name $(ECR_REPO_JAVA) --no-cli-pager
