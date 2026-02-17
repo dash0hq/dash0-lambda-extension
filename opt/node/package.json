@@ -5,6 +5,7 @@
   "description": "Layer including OpenTelemetry SDK for use with AWS Lambda.",
   "repository": "open-telemetry/opentelemetry-lambda",
   "scripts": {
+    "preinstall": "bash scripts/build-aws-sdk-tarball.sh",
     "build": "tsc -p distro/tsconfig.json --skipLibCheck && webpack --config webpack.config.mjs",
     "test": "jest --no-cache"
   },
