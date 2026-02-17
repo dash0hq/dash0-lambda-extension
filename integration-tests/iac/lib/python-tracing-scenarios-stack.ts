@@ -6,8 +6,7 @@ import * as logs from 'aws-cdk-lib/aws-logs';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
-import * as events from 'aws-cdk-lib/aws-events';
-import * as events_targets from 'aws-cdk-lib/aws-events-targets';
+import * as kinesis from 'aws-cdk-lib/aws-kinesis';
 import * as lambda_event_sources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as path from 'path';
 
@@ -38,7 +37,7 @@ export class PythonTracingScenariosStack extends cdk.NestedStack {
         iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
         iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSQSFullAccess'),
         iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSNSFullAccess'),
-        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonEventBridgeFullAccess'),
+        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonKinesisFullAccess'),
       ],
     });
 
@@ -171,15 +170,16 @@ export class PythonTracingScenariosStack extends cdk.NestedStack {
         batchSize: 1,
       }));
 
-      // Scenario 4: Lambda > EventBridge > Lambda
-      const eventBus = new events.EventBus(this, `TracingTestEventBus-${runtimeName}`, {
-        eventBusName: `tracing-test-event-bus-${runtimeName}`,
+      // Scenario 4: Lambda > Kinesis > Lambda
+      const kinesisStream = new kinesis.Stream(this, `TracingTestKinesisStream-${runtimeName}`, {
+        streamName: `tracing-test-kinesis-stream-${runtimeName}`,
+        shardCount: 1,
       });
 
-      const eventBridgeProducer = new lambda.Function(this, `EventBridgeProducerLambda-${runtimeName}`, {
-        functionName: `tracing-eventbridge-producer-${runtimeName}`,
+      const kinesisProducer = new lambda.Function(this, `KinesisProducerLambda-${runtimeName}`, {
+        functionName: `tracing-kinesis-producer-${runtimeName}`,
         runtime,
-        handler: 'eventbridge_producer.handler',
+        handler: 'kinesis_producer.handler',
         code: pythonCode,
         layers: [props.layer],
         role,
@@ -187,12 +187,12 @@ export class PythonTracingScenariosStack extends cdk.NestedStack {
         logGroup: props.logGroup,
         environment: {
           ...baseEnvironment,
-          EVENT_BUS_NAME: eventBus.eventBusName,
+          STREAM_NAME: kinesisStream.streamName,
         },
       });
 
-      const eventBridgeConsumer = new lambda.Function(this, `EventBridgeConsumerLambda-${runtimeName}`, {
-        functionName: `tracing-eventbridge-consumer-${runtimeName}`,
+      const kinesisConsumer = new lambda.Function(this, `KinesisConsumerLambda-${runtimeName}`, {
+        functionName: `tracing-kinesis-consumer-${runtimeName}`,
         runtime,
         handler: 'consumer.handler',
         code: pythonCode,
@@ -202,16 +202,11 @@ export class PythonTracingScenariosStack extends cdk.NestedStack {
         logGroup: props.logGroup,
         environment: baseEnvironment,
       });
+      kinesisConsumer.addEventSource(new lambda_event_sources.KinesisEventSource(kinesisStream, {
+        startingPosition: lambda.StartingPosition.TRIM_HORIZON,
+        batchSize: 1,
+      }));
 
-      // Create EventBridge rule to trigger consumer Lambda
-      new events.Rule(this, `TracingTestEventRule-${runtimeName}`, {
-        eventBus,
-        ruleName: `tracing-test-event-rule-${runtimeName}`,
-        eventPattern: {
-          source: ['tracing-tests.producer'],
-        },
-        targets: [new events_targets.LambdaFunction(eventBridgeConsumer)],
-      });
     }
   }
 }

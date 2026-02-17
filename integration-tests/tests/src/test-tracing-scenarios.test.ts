@@ -11,6 +11,7 @@ const scenarios = [
     { name: 'sqs', producerPrefix: 'tracing-sqs-producer', consumerPrefix: 'tracing-sqs-consumer', runtimes: [...pythonRuntimes, ...nodeRuntimes] },
     { name: 'sns', producerPrefix: 'tracing-sns-producer', consumerPrefix: 'tracing-sns-consumer', runtimes: [...pythonRuntimes, ...nodeRuntimes] },
     { name: 'sns-sqs', producerPrefix: 'tracing-sns-sqs-producer', consumerPrefix: 'tracing-sns-sqs-consumer', runtimes: [...pythonRuntimes, ...nodeRuntimes] },
+    { name: 'kinesis', producerPrefix: 'tracing-kinesis-producer', consumerPrefix: 'tracing-kinesis-consumer', runtimes: [...pythonRuntimes, ...nodeRuntimes] },
 ] as const;
 
 const verifyTracingScenario = async (

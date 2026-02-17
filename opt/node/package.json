@@ -5,6 +5,7 @@
   "description": "Layer including OpenTelemetry SDK for use with AWS Lambda.",
   "repository": "open-telemetry/opentelemetry-lambda",
   "scripts": {
+    "preinstall": "bash scripts/build-aws-sdk-tarball.sh",
     "build": "tsc -p distro/tsconfig.json --skipLibCheck && webpack --config webpack.config.mjs",
     "test": "jest --no-cache"
   },
@@ -31,7 +32,7 @@
     "@opentelemetry/instrumentation": "0.209.0",
     "@opentelemetry/instrumentation-amqplib": "^0.56.0",
     "@opentelemetry/instrumentation-aws-lambda": "0.61.0",
-    "@opentelemetry/instrumentation-aws-sdk": "^0.64.1",
+    "@opentelemetry/instrumentation-aws-sdk": "file:../../build/opentelemetry-instrumentation-aws-sdk.tgz",
     "@opentelemetry/instrumentation-bunyan": "0.54.0",
     "@opentelemetry/instrumentation-fastify": "^0.53.1",
     "@opentelemetry/instrumentation-grpc": "^0.209.0",

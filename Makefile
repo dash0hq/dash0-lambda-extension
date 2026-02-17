@@ -96,6 +96,7 @@ build/$(ZIP_NAME_NODE): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/
 	@cp build/lrap_aarch64 build/stage-node/
 	@cp opt/entrypoint build/stage-node/extensions/lrap
 	@cp opt/node/wrapper build/stage-node/wrapper
+	@bash opt/node/scripts/build-aws-sdk-tarball.sh
 	@cd opt/node && npm install && npm run build
 	@cp opt/node/dist/init.mjs build/stage-node/
 	@# Copy only the external dependencies needed at runtime
@@ -215,6 +216,7 @@ docker-python: build/lrap_x86_64 build/lrap_aarch64 build/python ensure-buildx
 # Usage: make docker-node VERSION=1.0.0
 docker-node: build/lrap_x86_64 build/lrap_aarch64 ensure-buildx
 	@echo "Building Node.js SDK..."
+	@bash opt/node/scripts/build-aws-sdk-tarball.sh
 	@cd opt/node && npm install && npm run build
 	@echo "Creating ECR repository $(ECR_REPO_NODE) if it doesn't exist..."
 	@aws ecr describe-repositories --repository-names $(ECR_REPO_NODE) 2>/dev/null || \
