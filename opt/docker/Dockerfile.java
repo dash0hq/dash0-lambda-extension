@@ -21,7 +21,7 @@
 FROM public.ecr.aws/lambda/java:21 AS downloader
 
 RUN curl -L -o /tmp/lumigo-opentelemetry.jar \
-    https://github.com/lumigo-io/opentelemetry-java-distro/releases/download/v0.19.1/lumigo-opentelemetry-0.19.1.jar
+    https://github.com/lumigo-io/opentelemetry-java-distro/releases/download/v0.20.0/lumigo-opentelemetry-0.20.0.jar
 
 # Stage 2: Final image with extension
 FROM scratch

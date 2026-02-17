@@ -122,7 +122,7 @@ build/$(ZIP_NAME_JAVA): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/
 	@cp build/lrap_aarch64 build/stage-java/
 	@cp opt/entrypoint build/stage-java/extensions/lrap
 	@cp opt/java/wrapper build/stage-java/wrapper
-	@curl -L -o build/stage-java/java/lib/lumigo-opentelemetry.jar https://github.com/lumigo-io/opentelemetry-java-distro/releases/download/v0.19.1/lumigo-opentelemetry-0.19.1.jar
+	@curl -L -o build/stage-java/java/lib/lumigo-opentelemetry.jar https://github.com/lumigo-io/opentelemetry-java-distro/releases/download/v0.20.0/lumigo-opentelemetry-0.20.0.jar
 	@cd build/stage-java && zip -r ../$(ZIP_NAME_JAVA) *
 
 
