@@ -73,7 +73,7 @@ public class NettyChannelPipelineInstrumentation implements TypeInstrumentation 
     @Advice.OnMethodEnter
     public static void trackCallDepth(
         @Advice.Argument(2) ChannelHandler handler,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
       // With Java 21 we have error from Muzzle:
       // Missing method io.netty.channel.ChannelHandler#getClass()Ljava/lang/Class;
       // This is probably, because the class is not loaded by the same classloader as the agent.
@@ -91,7 +91,7 @@ public class NettyChannelPipelineInstrumentation implements TypeInstrumentation 
         @Advice.This ChannelPipeline pipeline,
         @Advice.Argument(1) String handlerName,
         @Advice.Argument(2) ChannelHandler handler,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
 
       // Here we have to check if the call depth is greater than 1, because the handler is added
       // together with

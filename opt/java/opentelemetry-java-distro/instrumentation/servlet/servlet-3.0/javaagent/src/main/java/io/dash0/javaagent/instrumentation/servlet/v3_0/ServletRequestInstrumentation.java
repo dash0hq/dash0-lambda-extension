@@ -70,8 +70,8 @@ public class ServletRequestInstrumentation implements TypeInstrumentation {
     @Advice.OnMethodEnter(suppress = Throwable.class)
     public static void methodEnter(
         @Advice.This ServletRequest thiz,
-        @Advice.Local("lumigoSpanHolder") SpanAndRelatedObjectHolder spanHolder,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0SpanHolder") SpanAndRelatedObjectHolder spanHolder,
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth = CallDepth.forClass(ServletRequest.class);
       callDepth.getAndIncrement();
 
@@ -84,8 +84,8 @@ public class ServletRequestInstrumentation implements TypeInstrumentation {
         @Advice.This ServletRequest thiz,
         @Advice.Return ServletInputStream servletInputStream,
         @Advice.Thrown Throwable throwable,
-        @Advice.Local("lumigoSpanHolder") SpanAndRelatedObjectHolder spanHolder,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0SpanHolder") SpanAndRelatedObjectHolder spanHolder,
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
       // Retrieve Jetty check
       VirtualField<ServletRequest, Boolean> jettyCheckVirtual =
           VirtualField.find(ServletRequest.class, Boolean.class);
@@ -124,8 +124,8 @@ public class ServletRequestInstrumentation implements TypeInstrumentation {
     public static void methodEnter(
         @Advice.Origin("#t") Class<?> declaringClass,
         @Advice.This ServletRequest thiz,
-        @Advice.Local("lumigoSpanHolder") SpanAndRelatedObjectHolder spanHolder,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0SpanHolder") SpanAndRelatedObjectHolder spanHolder,
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth = CallDepth.forClass(ServletRequest.class);
       callDepth.getAndIncrement();
 
@@ -146,8 +146,8 @@ public class ServletRequestInstrumentation implements TypeInstrumentation {
         @Advice.This ServletRequest thiz,
         @Advice.Return BufferedReader reader,
         @Advice.Thrown Throwable throwable,
-        @Advice.Local("lumigoSpanHolder") SpanAndRelatedObjectHolder spanHolder,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0SpanHolder") SpanAndRelatedObjectHolder spanHolder,
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth = CallDepth.forClass(ServletRequest.class);
       if (callDepth.decrementAndGet() > 0) {
         return;

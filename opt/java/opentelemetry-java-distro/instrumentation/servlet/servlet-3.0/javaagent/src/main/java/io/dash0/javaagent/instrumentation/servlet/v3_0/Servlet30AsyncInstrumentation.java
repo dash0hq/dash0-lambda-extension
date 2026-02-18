@@ -64,14 +64,14 @@ public class Servlet30AsyncInstrumentation implements TypeInstrumentation {
   }
 
   public static class StartAsyncAdvice {
-    public static final String LUMIGO_SERVLET_3_ASYNC_LISTENER_PRESENCE =
+    public static final String DASH0_SERVLET_3_ASYNC_LISTENER_PRESENCE =
         "io.dash0.Servlet3AsyncListener";
 
     @Advice.OnMethodEnter(suppress = Throwable.class)
     public static void methodEnter(
         @Advice.This ServletRequest servletRequest,
-        @Advice.Local("lumigoSpanHolder") SpanAndRelatedObjectHolder requestSpanHolder,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0SpanHolder") SpanAndRelatedObjectHolder requestSpanHolder,
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth = CallDepth.forClass(AsyncContext.class);
       if (callDepth.getAndIncrement() == 1) {
         // We start at 1 because of the OTeL servlet instrumentation
@@ -87,8 +87,8 @@ public class Servlet30AsyncInstrumentation implements TypeInstrumentation {
     public static void methodExit(
         @Advice.This ServletRequest servletRequest,
         @Advice.Return AsyncContext asyncContext,
-        @Advice.Local("lumigoSpanHolder") SpanAndRelatedObjectHolder requestSpanHolder,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0SpanHolder") SpanAndRelatedObjectHolder requestSpanHolder,
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
       // We never reach zero as the OTeL Servlet instrumentation is also instrumenting this method
       // We want to run on our outermost layer, which is 1
       if (callDepth.decrementAndGet() != 1) {
@@ -103,7 +103,7 @@ public class Servlet30AsyncInstrumentation implements TypeInstrumentation {
         return;
       }
 
-      if (servletRequest.getAttribute(LUMIGO_SERVLET_3_ASYNC_LISTENER_PRESENCE) != null) {
+      if (servletRequest.getAttribute(DASH0_SERVLET_3_ASYNC_LISTENER_PRESENCE) != null) {
         // We've already added our listener
         return;
       }
@@ -151,7 +151,7 @@ public class Servlet30AsyncInstrumentation implements TypeInstrumentation {
           Servlet3Singletons.helper()
               .getAsyncListenerResponse(Java8BytecodeBridge.currentContext()));
       accessor.setRequestAttribute(
-          (HttpServletRequest) servletRequest, LUMIGO_SERVLET_3_ASYNC_LISTENER_PRESENCE, true);
+          (HttpServletRequest) servletRequest, DASH0_SERVLET_3_ASYNC_LISTENER_PRESENCE, true);
     }
   }
 }

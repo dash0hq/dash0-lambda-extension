@@ -71,7 +71,7 @@ public class ServletResponseInstrumentation implements TypeInstrumentation {
     @Advice.OnMethodEnter(suppress = Throwable.class)
     public static void methodEnter(
         @Advice.This ServletResponse servletResponse,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
       if (servletResponse instanceof HttpServletResponseWrapper) {
         return;
       }
@@ -85,7 +85,7 @@ public class ServletResponseInstrumentation implements TypeInstrumentation {
         @Advice.This ServletResponse thiz,
         @Advice.Thrown Throwable throwable,
         @Advice.Return ServletOutputStream servletOutputStream,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
       if (callDepth.decrementAndGet() > 0) {
         return;
       }
@@ -115,7 +115,7 @@ public class ServletResponseInstrumentation implements TypeInstrumentation {
     @Advice.OnMethodEnter(suppress = Throwable.class)
     public static void methodEnter(
         @Advice.This ServletResponse servletResponse,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
       if (servletResponse instanceof HttpServletResponseWrapper) {
         return;
       }
@@ -129,7 +129,7 @@ public class ServletResponseInstrumentation implements TypeInstrumentation {
         @Advice.This ServletResponse thiz,
         @Advice.Thrown Throwable throwable,
         @Advice.Return PrintWriter printWriter,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
       if (callDepth.decrementAndGet() > 0) {
         return;
       }

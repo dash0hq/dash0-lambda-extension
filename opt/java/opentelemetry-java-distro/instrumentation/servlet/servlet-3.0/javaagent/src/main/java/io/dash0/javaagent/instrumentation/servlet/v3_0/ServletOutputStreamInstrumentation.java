@@ -74,7 +74,7 @@ public class ServletOutputStreamInstrumentation implements TypeInstrumentation {
     public static void methodEnter(
         @Advice.This ServletOutputStream thiz,
         @Advice.Argument(0) String str,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth = CallDepth.forClass(ServletOutputStream.class);
       if (callDepth.getAndIncrement() > 0) {
         return;
@@ -90,7 +90,7 @@ public class ServletOutputStreamInstrumentation implements TypeInstrumentation {
     }
 
     @Advice.OnMethodExit(suppress = Throwable.class)
-    public static void methodExit(@Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+    public static void methodExit(@Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth.decrementAndGet();
     }
   }
@@ -100,7 +100,7 @@ public class ServletOutputStreamInstrumentation implements TypeInstrumentation {
     public static void methodEnter(
         @Advice.This ServletOutputStream thiz,
         @Advice.Argument(0) int b,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth = CallDepth.forClass(ServletOutputStream.class);
       if (callDepth.getAndIncrement() > 0) {
         return;
@@ -116,7 +116,7 @@ public class ServletOutputStreamInstrumentation implements TypeInstrumentation {
     }
 
     @Advice.OnMethodExit(suppress = Throwable.class)
-    public static void methodExit(@Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+    public static void methodExit(@Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth.decrementAndGet();
     }
   }
@@ -126,7 +126,7 @@ public class ServletOutputStreamInstrumentation implements TypeInstrumentation {
     public static void methodEnter(
         @Advice.This ServletOutputStream thiz,
         @Advice.Argument(0) byte[] b,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth = CallDepth.forClass(ServletOutputStream.class);
       if (callDepth.getAndIncrement() > 0) {
         return;
@@ -142,7 +142,7 @@ public class ServletOutputStreamInstrumentation implements TypeInstrumentation {
     }
 
     @Advice.OnMethodExit(suppress = Throwable.class)
-    public static void methodExit(@Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+    public static void methodExit(@Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth.decrementAndGet();
     }
   }
@@ -154,7 +154,7 @@ public class ServletOutputStreamInstrumentation implements TypeInstrumentation {
         @Advice.Argument(0) byte[] b,
         @Advice.Argument(1) int off,
         @Advice.Argument(2) int len,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth = CallDepth.forClass(ServletOutputStream.class);
       if (callDepth.getAndIncrement() > 0) {
         return;
@@ -170,7 +170,7 @@ public class ServletOutputStreamInstrumentation implements TypeInstrumentation {
     }
 
     @Advice.OnMethodExit(suppress = Throwable.class)
-    public static void methodExit(@Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+    public static void methodExit(@Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth.decrementAndGet();
     }
   }

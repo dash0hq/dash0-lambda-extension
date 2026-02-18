@@ -96,8 +96,8 @@ public class ServletInputStreamInstrumentation implements TypeInstrumentation {
     @Advice.OnMethodEnter(suppress = Throwable.class)
     public static void methodEnter(
         @Advice.This ServletInputStream thiz,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth,
-        @Advice.Local("lumigoBuffer") ByteBufferHolder bufferHolder) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth,
+        @Advice.Local("dash0Buffer") ByteBufferHolder bufferHolder) {
       callDepth = CallDepth.forClass(ServletInputStream.class);
       if (callDepth.getAndIncrement() > 0) {
         return;
@@ -109,8 +109,8 @@ public class ServletInputStreamInstrumentation implements TypeInstrumentation {
     @Advice.OnMethodExit(suppress = Throwable.class, onThrowable = Throwable.class)
     public static void methodExit(
         @Advice.Return int read,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth,
-        @Advice.Local("lumigoBuffer") ByteBufferHolder bufferHolder) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth,
+        @Advice.Local("dash0Buffer") ByteBufferHolder bufferHolder) {
       if (callDepth.decrementAndGet() > 0) {
         return;
       }
@@ -132,8 +132,8 @@ public class ServletInputStreamInstrumentation implements TypeInstrumentation {
     @Advice.OnMethodEnter(suppress = Throwable.class)
     public static void methodEnter(
         @Advice.This ServletInputStream thiz,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth,
-        @Advice.Local("lumigoBuffer") ByteBufferHolder bufferHolder) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth,
+        @Advice.Local("dash0Buffer") ByteBufferHolder bufferHolder) {
       callDepth = CallDepth.forClass(ServletInputStream.class);
       if (callDepth.getAndIncrement() > 0) {
         return;
@@ -147,8 +147,8 @@ public class ServletInputStreamInstrumentation implements TypeInstrumentation {
         @Advice.This ServletInputStream thiz,
         @Advice.Return int read,
         @Advice.Argument(0) byte[] b,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth,
-        @Advice.Local("lumigoBuffer") ByteBufferHolder bufferHolder) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth,
+        @Advice.Local("dash0Buffer") ByteBufferHolder bufferHolder) {
       if (callDepth.decrementAndGet() > 0) {
         return;
       }
@@ -178,8 +178,8 @@ public class ServletInputStreamInstrumentation implements TypeInstrumentation {
     @Advice.OnMethodEnter(suppress = Throwable.class)
     public static void methodEnter(
         @Advice.This ServletInputStream thiz,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth,
-        @Advice.Local("lumigoBuffer") ByteBufferHolder bufferHolder) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth,
+        @Advice.Local("dash0Buffer") ByteBufferHolder bufferHolder) {
       callDepth = CallDepth.forClass(ServletInputStream.class);
       if (callDepth.getAndIncrement() > 0) {
         return;
@@ -194,8 +194,8 @@ public class ServletInputStreamInstrumentation implements TypeInstrumentation {
         @Advice.Return int read,
         @Advice.Argument(0) byte[] b,
         @Advice.Argument(1) int off,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth,
-        @Advice.Local("lumigoBuffer") ByteBufferHolder bufferHolder) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth,
+        @Advice.Local("dash0Buffer") ByteBufferHolder bufferHolder) {
       if (callDepth.decrementAndGet() > 0) {
         return;
       }
@@ -225,8 +225,8 @@ public class ServletInputStreamInstrumentation implements TypeInstrumentation {
     @Advice.OnMethodEnter(suppress = Throwable.class)
     public static void methodEnter(
         @Advice.This ServletInputStream thiz,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth,
-        @Advice.Local("lumigoBuffer") ByteBufferHolder bufferHolder) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth,
+        @Advice.Local("dash0Buffer") ByteBufferHolder bufferHolder) {
       callDepth = CallDepth.forClass(ServletInputStream.class);
       if (callDepth.getAndIncrement() > 0) {
         return;
@@ -238,8 +238,8 @@ public class ServletInputStreamInstrumentation implements TypeInstrumentation {
     @Advice.OnMethodExit(suppress = Throwable.class, onThrowable = Throwable.class)
     public static void methodExit(
         @Advice.Return byte[] b,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth,
-        @Advice.Local("lumigoBuffer") ByteBufferHolder bufferHolder) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth,
+        @Advice.Local("dash0Buffer") ByteBufferHolder bufferHolder) {
       if (callDepth.decrementAndGet() > 0) {
         return;
       }
@@ -257,8 +257,8 @@ public class ServletInputStreamInstrumentation implements TypeInstrumentation {
     @Advice.OnMethodEnter(suppress = Throwable.class)
     public static void methodEnter(
         @Advice.This ServletInputStream thiz,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth,
-        @Advice.Local("lumigoBuffer") ByteBufferHolder bufferHolder) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth,
+        @Advice.Local("dash0Buffer") ByteBufferHolder bufferHolder) {
       callDepth = CallDepth.forClass(ServletInputStream.class);
       if (callDepth.getAndIncrement() > 0) {
         return;
@@ -271,8 +271,8 @@ public class ServletInputStreamInstrumentation implements TypeInstrumentation {
     public static void methodExit(
         @Advice.This ServletInputStream thiz,
         @Advice.Return byte[] b,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth,
-        @Advice.Local("lumigoBuffer") ByteBufferHolder bufferHolder) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth,
+        @Advice.Local("dash0Buffer") ByteBufferHolder bufferHolder) {
       if (callDepth.decrementAndGet() > 0) {
         return;
       }

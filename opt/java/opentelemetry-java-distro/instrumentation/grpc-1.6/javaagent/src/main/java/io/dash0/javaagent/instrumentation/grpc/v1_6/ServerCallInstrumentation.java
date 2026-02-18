@@ -72,7 +72,7 @@ public class ServerCallInstrumentation implements TypeInstrumentation {
     public static void methodEnter(
         @Advice.This ServerCall<?, ?> serverCall,
         @Advice.Argument(0) Object msg,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth = CallDepth.forClass(ServerCall.class);
       if (callDepth.getAndIncrement() != 0) {
         return;
@@ -106,7 +106,7 @@ public class ServerCallInstrumentation implements TypeInstrumentation {
     }
 
     @Advice.OnMethodExit(onThrowable = Throwable.class, suppress = Throwable.class)
-    public static void methodExit(@Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+    public static void methodExit(@Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth.decrementAndGet();
     }
   }

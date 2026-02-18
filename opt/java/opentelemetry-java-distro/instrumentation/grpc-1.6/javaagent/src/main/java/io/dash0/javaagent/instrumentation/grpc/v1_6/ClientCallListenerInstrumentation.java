@@ -71,7 +71,7 @@ public class ClientCallListenerInstrumentation implements TypeInstrumentation {
   @SuppressWarnings("unused")
   public static class ConstructAdvice {
     @Advice.OnMethodEnter(suppress = Throwable.class)
-    public static void methodEnter(@Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+    public static void methodEnter(@Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth = CallDepth.forClass(ClientCall.Listener.class);
       callDepth.getAndIncrement();
     }
@@ -79,7 +79,7 @@ public class ClientCallListenerInstrumentation implements TypeInstrumentation {
     @Advice.OnMethodExit(suppress = Throwable.class)
     public static void methodExit(
         @Advice.This ClientCall.Listener<?> listener,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
       if (callDepth.decrementAndGet() != 0) {
         return;
       }
@@ -95,7 +95,7 @@ public class ClientCallListenerInstrumentation implements TypeInstrumentation {
     public static void methodEnter(
         @Advice.This ClientCall.Listener<?> listener,
         @Advice.Argument(0) Object msg,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth = CallDepth.forClass(ClientCall.Listener.class);
       if (callDepth.getAndIncrement() != 0) {
         return;
@@ -126,7 +126,7 @@ public class ClientCallListenerInstrumentation implements TypeInstrumentation {
     }
 
     @Advice.OnMethodExit(onThrowable = Throwable.class, suppress = Throwable.class)
-    public static void methodExit(@Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+    public static void methodExit(@Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth.decrementAndGet();
     }
   }

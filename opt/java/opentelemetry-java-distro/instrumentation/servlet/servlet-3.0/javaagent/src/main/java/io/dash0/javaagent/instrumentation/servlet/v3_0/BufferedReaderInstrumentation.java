@@ -68,8 +68,8 @@ public class BufferedReaderInstrumentation implements TypeInstrumentation {
     @Advice.OnMethodEnter(suppress = Throwable.class)
     public static void enter(
         @Advice.This BufferedReader thiz,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth,
-        @Advice.Local("lumigoBuffer") CharBufferHolder bufferHolder) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth,
+        @Advice.Local("dash0Buffer") CharBufferHolder bufferHolder) {
       callDepth = CallDepth.forClass(BufferedReader.class);
       if (callDepth.getAndIncrement() > 0) {
         return;
@@ -82,8 +82,8 @@ public class BufferedReaderInstrumentation implements TypeInstrumentation {
     public static void exit(
         @Advice.This BufferedReader thiz,
         @Advice.Return int read,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth,
-        @Advice.Local("lumigoBuffer") CharBufferHolder bufferHolder) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth,
+        @Advice.Local("dash0Buffer") CharBufferHolder bufferHolder) {
       if (callDepth.decrementAndGet() > 0) {
         return;
       }
@@ -104,8 +104,8 @@ public class BufferedReaderInstrumentation implements TypeInstrumentation {
     @Advice.OnMethodEnter(suppress = Throwable.class)
     public static void enter(
         @Advice.This BufferedReader thiz,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth,
-        @Advice.Local("lumigoBuffer") CharBufferHolder bufferHolder) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth,
+        @Advice.Local("dash0Buffer") CharBufferHolder bufferHolder) {
       callDepth = CallDepth.forClass(BufferedReader.class);
       if (callDepth.getAndIncrement() > 0) {
         return;
@@ -119,8 +119,8 @@ public class BufferedReaderInstrumentation implements TypeInstrumentation {
         @Advice.This BufferedReader thiz,
         @Advice.Return int read,
         @Advice.Argument(0) char[] c,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth,
-        @Advice.Local("lumigoBuffer") CharBufferHolder bufferHolder) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth,
+        @Advice.Local("dash0Buffer") CharBufferHolder bufferHolder) {
       if (callDepth.decrementAndGet() > 0) {
         return;
       }
@@ -141,8 +141,8 @@ public class BufferedReaderInstrumentation implements TypeInstrumentation {
     @Advice.OnMethodEnter(suppress = Throwable.class)
     public static void enter(
         @Advice.This BufferedReader thiz,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth,
-        @Advice.Local("lumigoBuffer") CharBufferHolder bufferHolder) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth,
+        @Advice.Local("dash0Buffer") CharBufferHolder bufferHolder) {
       callDepth = CallDepth.forClass(BufferedReader.class);
       if (callDepth.getAndIncrement() > 0) {
         return;
@@ -158,8 +158,8 @@ public class BufferedReaderInstrumentation implements TypeInstrumentation {
         @Advice.Argument(0) char[] c,
         @Advice.Argument(1) int offset,
         @Advice.Argument(2) int length,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth,
-        @Advice.Local("lumigoBuffer") CharBufferHolder bufferHolder) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth,
+        @Advice.Local("dash0Buffer") CharBufferHolder bufferHolder) {
       if (callDepth.decrementAndGet() > 0) {
         return;
       }
@@ -180,8 +180,8 @@ public class BufferedReaderInstrumentation implements TypeInstrumentation {
     @Advice.OnMethodEnter(suppress = Throwable.class)
     public static void enter(
         @Advice.This BufferedReader thiz,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth,
-        @Advice.Local("lumigoBuffer") CharBufferHolder bufferHolder) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth,
+        @Advice.Local("dash0Buffer") CharBufferHolder bufferHolder) {
       callDepth = CallDepth.forClass(BufferedReader.class);
       if (callDepth.getAndIncrement() > 0) {
         return;
@@ -194,8 +194,8 @@ public class BufferedReaderInstrumentation implements TypeInstrumentation {
     public static void exit(
         @Advice.This BufferedReader thiz,
         @Advice.Return String line,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth,
-        @Advice.Local("lumigoBuffer") CharBufferHolder bufferHolder) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth,
+        @Advice.Local("dash0Buffer") CharBufferHolder bufferHolder) {
 
       if (callDepth.decrementAndGet() > 0) {
         return;

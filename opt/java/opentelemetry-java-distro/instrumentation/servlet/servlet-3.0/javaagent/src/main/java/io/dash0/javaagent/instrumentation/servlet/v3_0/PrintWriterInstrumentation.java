@@ -93,7 +93,7 @@ public class PrintWriterInstrumentation implements TypeInstrumentation {
     public static void methodEnter(
         @Advice.This PrintWriter thiz,
         @Advice.Argument(value = 0) int c,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth = CallDepth.forClass(PrintWriter.class);
       if (callDepth.getAndIncrement() > 0) {
         return;
@@ -109,7 +109,7 @@ public class PrintWriterInstrumentation implements TypeInstrumentation {
     }
 
     @Advice.OnMethodExit(suppress = Throwable.class, onThrowable = Throwable.class)
-    public static void methodExit(@Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+    public static void methodExit(@Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth.decrementAndGet();
     }
   }
@@ -119,7 +119,7 @@ public class PrintWriterInstrumentation implements TypeInstrumentation {
     public static void methodEnter(
         @Advice.This PrintWriter thiz,
         @Advice.Argument(value = 0) char[] chars,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth = CallDepth.forClass(PrintWriter.class);
       if (callDepth.getAndIncrement() > 0) {
         return;
@@ -135,7 +135,7 @@ public class PrintWriterInstrumentation implements TypeInstrumentation {
     }
 
     @Advice.OnMethodExit(suppress = Throwable.class, onThrowable = Throwable.class)
-    public static void methodExit(@Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+    public static void methodExit(@Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth.decrementAndGet();
     }
   }
@@ -147,7 +147,7 @@ public class PrintWriterInstrumentation implements TypeInstrumentation {
         @Advice.Argument(value = 0) char[] chars,
         @Advice.Argument(value = 1) int offset,
         @Advice.Argument(value = 2) int length,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth = CallDepth.forClass(PrintWriter.class);
       if (callDepth.getAndIncrement() > 0) {
         return;
@@ -163,7 +163,7 @@ public class PrintWriterInstrumentation implements TypeInstrumentation {
     }
 
     @Advice.OnMethodExit(suppress = Throwable.class, onThrowable = Throwable.class)
-    public static void methodExit(@Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+    public static void methodExit(@Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth.decrementAndGet();
     }
   }
@@ -173,7 +173,7 @@ public class PrintWriterInstrumentation implements TypeInstrumentation {
     public static void methodEnter(
         @Advice.This PrintWriter thiz,
         @Advice.Argument(value = 0) String str,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth = CallDepth.forClass(PrintWriter.class);
       if (callDepth.getAndIncrement() > 0) {
         return;
@@ -189,7 +189,7 @@ public class PrintWriterInstrumentation implements TypeInstrumentation {
     }
 
     @Advice.OnMethodExit(suppress = Throwable.class, onThrowable = Throwable.class)
-    public static void methodExit(@Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+    public static void methodExit(@Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth.decrementAndGet();
     }
   }
@@ -201,7 +201,7 @@ public class PrintWriterInstrumentation implements TypeInstrumentation {
         @Advice.Argument(value = 0) String str,
         @Advice.Argument(value = 1) int offset,
         @Advice.Argument(value = 2) int length,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth = CallDepth.forClass(PrintWriter.class);
       if (callDepth.getAndIncrement() > 0) {
         return;
@@ -217,7 +217,7 @@ public class PrintWriterInstrumentation implements TypeInstrumentation {
     }
 
     @Advice.OnMethodExit(suppress = Throwable.class, onThrowable = Throwable.class)
-    public static void methodExit(@Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+    public static void methodExit(@Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth.decrementAndGet();
     }
   }
@@ -225,7 +225,7 @@ public class PrintWriterInstrumentation implements TypeInstrumentation {
   public static class PrintLnAdvice {
     @Advice.OnMethodEnter(suppress = Throwable.class)
     public static void methodEnter(
-        @Advice.This PrintWriter thiz, @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.This PrintWriter thiz, @Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth = CallDepth.forClass(PrintWriter.class);
       if (callDepth.getAndIncrement() > 0) {
         return;
@@ -241,7 +241,7 @@ public class PrintWriterInstrumentation implements TypeInstrumentation {
     }
 
     @Advice.OnMethodExit(suppress = Throwable.class, onThrowable = Throwable.class)
-    public static void methodExit(@Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+    public static void methodExit(@Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth.decrementAndGet();
     }
   }
@@ -251,7 +251,7 @@ public class PrintWriterInstrumentation implements TypeInstrumentation {
     public static void methodEnter(
         @Advice.This PrintWriter thiz,
         @Advice.Argument(value = 0) String str,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth = CallDepth.forClass(PrintWriter.class);
       if (callDepth.getAndIncrement() > 0) {
         return;
@@ -268,7 +268,7 @@ public class PrintWriterInstrumentation implements TypeInstrumentation {
     }
 
     @Advice.OnMethodExit(suppress = Throwable.class, onThrowable = Throwable.class)
-    public static void methodExit(@Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+    public static void methodExit(@Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth.decrementAndGet();
     }
   }

@@ -72,7 +72,7 @@ public class Servlet30Instrumentation implements TypeInstrumentation {
         @Advice.Argument(value = 0) ServletRequest request,
         @Advice.Argument(value = 1) ServletResponse response,
         @Advice.Local("currentSpan") Span currentSpan,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
 
       if (!(request instanceof HttpServletRequest) || !(response instanceof HttpServletResponse)) {
         return;
@@ -95,7 +95,7 @@ public class Servlet30Instrumentation implements TypeInstrumentation {
         @Advice.Argument(value = 0) ServletRequest request,
         @Advice.Argument(value = 1) ServletResponse response,
         @Advice.Local("currentSpan") Span currentSpan,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
 
       if (!(request instanceof HttpServletRequest) || !(response instanceof HttpServletResponse)) {
         return;

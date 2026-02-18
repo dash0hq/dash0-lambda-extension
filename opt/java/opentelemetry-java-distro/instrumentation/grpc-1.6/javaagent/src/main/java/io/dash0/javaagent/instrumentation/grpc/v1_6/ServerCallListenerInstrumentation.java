@@ -76,7 +76,7 @@ public class ServerCallListenerInstrumentation implements TypeInstrumentation {
     public static void methodEnter(
         @Advice.This ServerCall.Listener<?> listener,
         @Advice.Argument(0) Object msg,
-        @Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+        @Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth = CallDepth.forClass(ServerCall.Listener.class);
       // Zero level won't have the context attached yet by Contexts.ContextualizedServerCallListener
       // so we need to skip it.
@@ -112,7 +112,7 @@ public class ServerCallListenerInstrumentation implements TypeInstrumentation {
     }
 
     @Advice.OnMethodExit(onThrowable = Throwable.class, suppress = Throwable.class)
-    public static void methodExit(@Advice.Local("lumigoCallDepth") CallDepth callDepth) {
+    public static void methodExit(@Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth.decrementAndGet();
     }
   }
