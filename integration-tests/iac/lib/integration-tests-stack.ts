@@ -192,8 +192,7 @@ class JavaStack extends cdk.NestedStack {
       memorySize: 512,
     };
 
-    createLambdas(this, [lambda.Runtime.JAVA_21], props.layer, props.role, props.logGroup, overrides);
-    createLambdas(this, [lambda.Runtime.JAVA_17], props.layer, props.role, props.logGroup, overrides);
+    createLambdas(this, [lambda.Runtime.JAVA_21, lambda.Runtime.JAVA_17], props.layer, props.role, props.logGroup, overrides);
   }
 }
 
