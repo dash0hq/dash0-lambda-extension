@@ -117,7 +117,7 @@ export class JavaTracingScenariosStack extends cdk.NestedStack {
       const snsConsumer = new lambda.Function(this, `SnsConsumerLambda-${runtimeName}`, {
         functionName: `tracing-sns-consumer-${runtimeName}`,
         runtime,
-        handler: 'org.example.ConsumerHandler::handleRequest',
+        handler: 'org.example.SnsConsumerHandler::handleRequest',
         code: javaCode,
         layers: [props.layer],
         role,
