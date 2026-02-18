@@ -60,7 +60,7 @@ public class TestAppExtension
 
   private static final Network NETWORK = Network.newNetwork();
 
-  private static final String SPANDUMP_FILE = "/opt/lumigo.log";
+  private static final String SPANDUMP_FILE = "/opt/dash0.log";
 
   protected static final String AGENT_PATH =
       System.getProperty("io.opentelemetry.smoketest.agent.shadowJar.path");

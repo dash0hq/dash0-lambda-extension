@@ -23,7 +23,7 @@ import io.opentelemetry.javaagent.extension.ignore.IgnoredTypesConfigurer;
 import io.opentelemetry.sdk.autoconfigure.spi.ConfigProperties;
 
 @AutoService(IgnoredTypesConfigurer.class)
-public class LumigoIgnoredTypesConfigurer implements IgnoredTypesConfigurer {
+public class Dash0IgnoredTypesConfigurer implements IgnoredTypesConfigurer {
   @Override
   public void configure(IgnoredTypesBuilder builder, ConfigProperties config) {
     // TODO Investigate why these classes are being transformed by {@link

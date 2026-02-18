@@ -160,7 +160,7 @@ tasks {
       attributes.put("Can-Redefine-Classes", "true")
       attributes.put("Can-Retransform-Classes", "true")
       attributes.put("Implementation-Vendor", "Dash0")
-      attributes.put("Implementation-Version", "lumigo-${project.version}-otel-${versions.opentelemetryJavaagent}")
+      attributes.put("Implementation-Version", "dash0-${project.version}-otel-${versions.opentelemetryJavaagent}")
     }
   }
 

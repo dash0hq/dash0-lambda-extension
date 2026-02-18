@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
 
 public final class Dash0Version {
   public static final String VERSION = parseVersion();
-  private static final String VERSION_PATTERN = "^lumigo\\-(.*)?\\-otel.*$";
+  private static final String VERSION_PATTERN = "^dash0\\-(.*)?\\-otel.*$";
 
   private static String parseVersion() {
     String version = Dash0Version.class.getPackage().getImplementationVersion();

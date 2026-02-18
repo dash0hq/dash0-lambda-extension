@@ -130,7 +130,7 @@ build/$(ZIP_NAME_JAVA): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/
 	@cp build/lrap_aarch64 build/stage-java/
 	@cp opt/entrypoint build/stage-java/extensions/lrap
 	@cp opt/java/wrapper build/stage-java/wrapper
-	@cp $(JAVA_DISTRO_JAR) build/stage-java/java/lib/lumigo-opentelemetry.jar
+	@cp $(JAVA_DISTRO_JAR) build/stage-java/java/lib/dash0-opentelemetry.jar
 	@cp $(JAVA_CLASSPATH_LIBS_DIR)/*.jar build/stage-java/java/lib/
 	@cd build/stage-java && zip -r ../$(ZIP_NAME_JAVA) *
 
