@@ -11,7 +11,7 @@ public class HelloHandler implements RequestHandler<Object, String> {
 
     @Override
     public String handleRequest(Object input, Context context) {
-        context.getLogger().log("Received: " + String.valueOf(input));
+        context.getLogger().log("Input received: " + String.valueOf(input));
 
         String sleepEnv = System.getenv("SLEEP_DURATION_MS");
         long sleepMs = 1000L;
