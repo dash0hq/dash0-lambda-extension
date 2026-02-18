@@ -176,17 +176,24 @@ class JavaStack extends cdk.NestedStack {
   constructor(scope: Construct, id: string, props: SubStackProps) {
     super(scope, id, props);
 
-    createLambdas(this, [lambda.Runtime.JAVA_21], props.layer, props.role, props.logGroup, {
-      handler: 'com.example.App::handleRequest',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../lambdas/java/java21-success.jar')),
-      memorySize: 512,
+    const javaCode = lambda.Code.fromAsset(path.join(__dirname, '../lambdas/java'), {
+      bundling: {
+        image: lambda.Runtime.JAVA_17.bundlingImage,
+        command: [
+          'bash', '-c',
+          'chmod +x gradlew && ./gradlew buildZip && cd /asset-output && jar xf /asset-input/build/distributions/lambda-java-1.0-SNAPSHOT.zip',
+        ],
+      },
     });
 
-    createLambdas(this, [lambda.Runtime.JAVA_17], props.layer, props.role, props.logGroup, {
-      handler: 'com.example.App::handleRequest',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../lambdas/java/java17-success.jar')),
+    const overrides = {
+      handler: 'org.example.HelloHandler::handleRequest',
+      code: javaCode,
       memorySize: 512,
-    });
+    };
+
+    createLambdas(this, [lambda.Runtime.JAVA_21], props.layer, props.role, props.logGroup, overrides);
+    createLambdas(this, [lambda.Runtime.JAVA_17], props.layer, props.role, props.logGroup, overrides);
   }
 }
 
