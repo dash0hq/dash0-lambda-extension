@@ -22,8 +22,8 @@ import java.util.List;
 
 public abstract class SecretScrubber extends AbstractRegExParser {
   public static final int DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT = 2048;
-  public static final String DASH0_SECRET_MASKING_REGEX = "lumigo.secret.masking.regex";
-  public static final String LUMIGO_SECRET_MASKING_ALL_MAGIC = "all";
+  public static final String DASH0_SECRET_MASKING_REGEX = "dash0.secret.masking.regex";
+  public static final String DASH0_SECRET_MASKING_ALL_MAGIC = "all";
   public static final String SCRUBBED_VALUE = "****";
 
   public static final List<String> DEFAULT_REGEX_KEYS =
@@ -52,6 +52,6 @@ public abstract class SecretScrubber extends AbstractRegExParser {
 
   @Override
   protected String getMagicValue() {
-    return LUMIGO_SECRET_MASKING_ALL_MAGIC;
+    return DASH0_SECRET_MASKING_ALL_MAGIC;
   }
 }

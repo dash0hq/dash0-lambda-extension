@@ -36,7 +36,7 @@ import java.util.regex.Pattern;
 public class RedisSamplingConfigurer implements AutoConfigurationCustomizerProvider {
   private static final Logger LOGGER = Logger.getLogger(RedisSamplingConfigurer.class.getName());
   public static final String DASH0_REDUCED_REDIS_INSTRUMENTATION =
-      "lumigo.reduced.redis.instrumentation";
+      "dash0.reduced.redis.instrumentation";
 
   @Override
   public void customize(AutoConfigurationCustomizer autoConfiguration) {
@@ -65,7 +65,7 @@ public class RedisSamplingConfigurer implements AutoConfigurationCustomizerProvi
 
     if (isReducedRedisInstrumentationEnabled) {
       LOGGER.finest(
-          "Lumigo reduces Redis instrumentation. Redis spans are sampled based on span name using regex. Set `DASH0_REDUCED_REDIS_INSTRUMENTATION=false` to disable this behavior.");
+          "Dash0 reduces Redis instrumentation. Redis spans are sampled based on span name using regex. Set `DASH0_REDUCED_REDIS_INSTRUMENTATION=false` to disable this behavior.");
       return new RedisReduceInfoSpanSampler(defaultSampler);
     }
 

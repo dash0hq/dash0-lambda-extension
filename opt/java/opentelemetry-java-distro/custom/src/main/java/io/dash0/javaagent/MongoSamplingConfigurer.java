@@ -33,7 +33,7 @@ public class MongoSamplingConfigurer implements AutoConfigurationCustomizerProvi
   private static final Logger LOGGER = Logger.getLogger(MongoSamplingConfigurer.class.getName());
 
   public static final String DASH0_REDUCED_MONGO_INSTRUMENTATION =
-      "lumigo.reduced.mongo.instrumentation";
+      "dash0.reduced.mongo.instrumentation";
 
   @Override
   public void customize(AutoConfigurationCustomizer autoConfiguration) {
@@ -66,13 +66,13 @@ public class MongoSamplingConfigurer implements AutoConfigurationCustomizerProvi
 
     if (isReducedMongoInstrumentationEnabled) {
 
-      // Log that Lumigo reduces Mongo instrumentation by omitting certain attributes, like
+      // Log that Dash0 reduces Mongo instrumentation by omitting certain attributes, like
       // `db.operation`
       // For example, the `isMaster` operation is not collected by default to optimize performance.
       // Setting the environment variable `DASH0_REDUCED_MONGO_INSTRUMENTATION=false` will disable
       // this optimization.
       LOGGER.finest(
-          "Lumigo reduces Mongo instrumentation. The `db.operation` attribute (e.g., `isMaster`) is excluded by default. Set `DASH0_REDUCED_MONGO_INSTRUMENTATION=false` to disable this behavior.");
+          "Dash0 reduces Mongo instrumentation. The `db.operation` attribute (e.g., `isMaster`) is excluded by default. Set `DASH0_REDUCED_MONGO_INSTRUMENTATION=false` to disable this behavior.");
 
       samplerBuilder.customize(
           DbIncubatingAttributes.DB_SYSTEM,

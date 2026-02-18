@@ -76,7 +76,7 @@ public final class RabbitSingletons {
     if (CAPTURE_EXPERIMENTAL_SPAN_ATTRIBUTES) {
       extractors.add(new RabbitReceiveExperimentalAttributesExtractor());
     }
-    // Custom Lumigo extractor
+    // Custom Dash0 extractor
     extractors.add(new GetResponseBodyAttributeExtractor());
 
     return Instrumenter.<ReceiveRequest, GetResponse>builder(

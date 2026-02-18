@@ -22,11 +22,11 @@ import java.util.List;
 
 public class HttpEndpointFilter extends AbstractRegExParser {
   public static final String DASH0_FILTER_HTTP_ENDPOINTS_REGEX =
-      "lumigo.filter.http.endpoints.regex";
+      "dash0.filter.http.endpoints.regex";
   public static final String DASH0_FILTER_HTTP_ENDPOINTS_REGEX_CLIENT =
-      "lumigo.filter.http.endpoints.regex.client";
+      "dash0.filter.http.endpoints.regex.client";
   public static final String DASH0_FILTER_HTTP_ENDPOINTS_REGEX_SERVER =
-      "lumigo.filter.http.endpoints.regex.server";
+      "dash0.filter.http.endpoints.regex.server";
 
   public static final List<String> DEFAULT_REGEX_KEYS =
       Arrays.asList(".*/health.*", ".*/actuator.*");

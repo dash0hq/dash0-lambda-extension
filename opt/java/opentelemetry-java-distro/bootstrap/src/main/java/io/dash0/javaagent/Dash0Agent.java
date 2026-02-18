@@ -20,7 +20,7 @@ package io.dash0.javaagent;
 import io.opentelemetry.javaagent.OpenTelemetryAgent;
 import java.lang.instrument.Instrumentation;
 
-public class LumigoAgent {
+public class Dash0Agent {
   public static void premain(final String agentArgs, final Instrumentation inst) {
     agentmain(agentArgs, inst);
   }
@@ -39,7 +39,7 @@ public class LumigoAgent {
     }
     System.out.println(
         "Loading the Dash0 OpenTelemetry Java distribution (version "
-            + LumigoVersion.VERSION
+            + Dash0Version.VERSION
             + ")");
     OpenTelemetryAgent.agentmain(agentArgs, inst);
   }

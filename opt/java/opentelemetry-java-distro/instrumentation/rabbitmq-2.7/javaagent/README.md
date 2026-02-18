@@ -18,7 +18,7 @@ Every update to OpenTelemetry JAVA SDK base version will require:
 Update the `createReceiveInstrumenter()` call to include:
   
 ```java
-// Custom Lumigo extractor
+// Custom Dash0 extractor
 extractors.add(new GetResponseBodyAttributeExtractor());
 ```
 

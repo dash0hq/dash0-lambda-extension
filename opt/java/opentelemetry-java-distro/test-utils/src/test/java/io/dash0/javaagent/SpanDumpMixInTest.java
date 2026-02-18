@@ -122,7 +122,7 @@ public class SpanDumpMixInTest {
     assertThat(serverSpan, hasAttribute("http.status_code", 200L));
     assertThat(serverSpan, hasAttributeOfTypeString("thread.name"));
     assertThat(serverSpan, hasAttributeOfTypeLong("thread.id"));
-    assertThat(serverSpan, hasResourceAttributeOfTypeString("lumigo.distro.version"));
+    assertThat(serverSpan, hasResourceAttributeOfTypeString("dash0.distro.version"));
     assertThat(serverSpan, hasResourceAttributeOfTypeString("container.id"));
 
     SpanDumpEntry internalSpan =
@@ -145,9 +145,9 @@ public class SpanDumpMixInTest {
     assertThat(
         internalSpan,
         hasResourceAttribute(
-            "lumigo.distro.version",
+            "dash0.distro.version",
             serverSpan
                 .getResource()
-                .getAttribute(AttributeKey.stringKey("lumigo.distro.version"))));
+                .getAttribute(AttributeKey.stringKey("dash0.distro.version"))));
   }
 }

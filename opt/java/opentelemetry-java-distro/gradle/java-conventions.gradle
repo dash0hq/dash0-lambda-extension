@@ -45,8 +45,8 @@ tasks {
       attributes(
           "Implementation-Title": project.name,
           "Implementation-Version": project.version,
-          "Implementation-Vendor": "Lumigo",
-          "Implementation-URL": "https://github.com/lumigo-io/opentelemetry-java-distro"
+          "Implementation-Vendor": "Dash0",
+          "Implementation-URL": "https://github.com/dash0hq/dash0-lambda-extension"
       )
     }
   }

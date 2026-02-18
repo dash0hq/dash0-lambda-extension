@@ -20,7 +20,7 @@ package io.dash0.instrumentation.core;
 import io.opentelemetry.api.common.AttributeKey;
 import java.util.List;
 
-/** Semantic Attribute keys specific to Lumigo. */
+/** Semantic Attribute keys specific to Dash0. */
 public final class Dash0SemanticAttributes {
   public static final AttributeKey<String> HTTP_REQUEST_BODY =
       AttributeKey.stringKey("http.request.body");

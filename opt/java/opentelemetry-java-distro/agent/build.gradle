@@ -155,11 +155,11 @@ tasks {
 
     manifest {
       attributes.put("Main-Class", "io.opentelemetry.javaagent.OpenTelemetryAgent")
-      attributes.put("Agent-Class", "io.dash0.javaagent.LumigoAgent")
-      attributes.put("Premain-Class", "io.dash0.javaagent.LumigoAgent")
+      attributes.put("Agent-Class", "io.dash0.javaagent.Dash0Agent")
+      attributes.put("Premain-Class", "io.dash0.javaagent.Dash0Agent")
       attributes.put("Can-Redefine-Classes", "true")
       attributes.put("Can-Retransform-Classes", "true")
-      attributes.put("Implementation-Vendor", "Lumigo")
+      attributes.put("Implementation-Vendor", "Dash0")
       attributes.put("Implementation-Version", "lumigo-${project.version}-otel-${versions.opentelemetryJavaagent}")
     }
   }

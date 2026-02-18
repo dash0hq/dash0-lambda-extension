@@ -20,12 +20,12 @@ package io.dash0.javaagent;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public final class LumigoVersion {
+public final class Dash0Version {
   public static final String VERSION = parseVersion();
   private static final String VERSION_PATTERN = "^lumigo\\-(.*)?\\-otel.*$";
 
   private static String parseVersion() {
-    String version = LumigoVersion.class.getPackage().getImplementationVersion();
+    String version = Dash0Version.class.getPackage().getImplementationVersion();
     final Pattern pattern = Pattern.compile(VERSION_PATTERN);
     try {
       Matcher pt = pattern.matcher(version);
