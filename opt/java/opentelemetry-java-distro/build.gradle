@@ -16,7 +16,7 @@ buildscript {
   }
 }
 
-group = 'io.lumigo.javaagent'
+group = 'io.dash0.javaagent'
 
 subprojects {
   version = rootProject.version

@@ -9,7 +9,7 @@ import static io.opentelemetry.api.trace.SpanKind.CLIENT;
 import static io.opentelemetry.api.trace.SpanKind.PRODUCER;
 
 import com.rabbitmq.client.GetResponse;
-import io.lumigo.javaagent.instrumentation.rabbitmq.GetResponseBodyAttributeExtractor;
+import io.dash0.javaagent.instrumentation.rabbitmq.GetResponseBodyAttributeExtractor;
 import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.context.ContextKey;
 import io.opentelemetry.instrumentation.api.incubator.semconv.messaging.MessageOperation;

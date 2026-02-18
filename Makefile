@@ -118,7 +118,7 @@ JAVA_CLASSPATH_LIBS_DIR := opt/java/opentelemetry-java-distro/agent/build/classp
 
 $(JAVA_DISTRO_JAR): $(JAVA_DISTRO_SRC)
 	@echo Building Java distro
-	@cd opt/java/opentelemetry-java-distro && ./gradlew -Pversion=1.0.0-SNAPSHOT assemble -x javadoc
+	@cd opt/java/opentelemetry-java-distro && ./gradlew clean -Pversion=1.0.0-SNAPSHOT assemble -x javadoc
 
 build/$(ZIP_NAME_JAVA): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/java/wrapper $(JAVA_DISTRO_JAR)
 	@echo Building Java layer

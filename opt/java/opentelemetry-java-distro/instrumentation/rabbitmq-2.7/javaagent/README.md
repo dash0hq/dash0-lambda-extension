@@ -22,7 +22,7 @@ Update the `createReceiveInstrumenter()` call to include:
 extractors.add(new GetResponseBodyAttributeExtractor());
 ```
 
-## `io.lumigo.javaagent.instrumentation.rabbitmq.RabbitMqInstrumentationModule`
+## `io.dash0.javaagent.instrumentation.rabbitmq.RabbitMqInstrumentationModule`
 
 Ensure `typeInstrumentation()` includes all instrumentations from the upstream module.
 
