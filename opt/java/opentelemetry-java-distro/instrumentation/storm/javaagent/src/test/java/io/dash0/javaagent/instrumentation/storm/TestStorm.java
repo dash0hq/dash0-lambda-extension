@@ -17,7 +17,7 @@
  */
 package io.dash0.javaagent.instrumentation.storm;
 
-import io.lumigo.storm.testing.WordCountTopologyLocal;
+import io.dash0.storm.testing.WordCountTopologyLocal;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.instrumentation.testing.junit.AgentInstrumentationExtension;

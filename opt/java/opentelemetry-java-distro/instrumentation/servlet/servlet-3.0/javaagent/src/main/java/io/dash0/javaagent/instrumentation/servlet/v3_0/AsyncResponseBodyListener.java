@@ -19,9 +19,9 @@ package io.dash0.javaagent.instrumentation.servlet.v3_0;
 
 import static io.dash0.javaagent.instrumentation.servlet.v3_0.Servlet3Singletons.asyncResponseInstrumenter;
 
-import io.lumigo.instrumentation.core.ByteBufferHolder;
-import io.lumigo.instrumentation.core.CharBufferHolder;
-import io.lumigo.instrumentation.core.SpanAndRelatedObjectHolder;
+import io.dash0.instrumentation.core.ByteBufferHolder;
+import io.dash0.instrumentation.core.CharBufferHolder;
+import io.dash0.instrumentation.core.SpanAndRelatedObjectHolder;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.instrumentation.api.util.VirtualField;

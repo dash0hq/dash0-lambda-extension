@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.lumigo.instrumentation.core;
+package io.dash0.instrumentation.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 

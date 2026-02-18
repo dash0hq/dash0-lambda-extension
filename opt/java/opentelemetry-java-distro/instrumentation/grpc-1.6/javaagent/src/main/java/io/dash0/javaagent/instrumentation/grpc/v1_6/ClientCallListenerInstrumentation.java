@@ -31,7 +31,7 @@ import com.google.protobuf.GeneratedMessageV3;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import io.grpc.ClientCall;
-import io.lumigo.instrumentation.core.LumigoSemanticAttributes;
+import io.dash0.instrumentation.core.LumigoSemanticAttributes;
 import io.opentelemetry.instrumentation.api.util.VirtualField;
 import io.opentelemetry.javaagent.bootstrap.CallDepth;
 import io.opentelemetry.javaagent.bootstrap.Java8BytecodeBridge;

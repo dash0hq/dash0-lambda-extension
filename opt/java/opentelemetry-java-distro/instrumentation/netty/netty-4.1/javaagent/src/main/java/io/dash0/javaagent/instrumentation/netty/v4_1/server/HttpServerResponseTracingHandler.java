@@ -17,7 +17,7 @@
  */
 package io.dash0.javaagent.instrumentation.netty.v4_1.server;
 
-import io.lumigo.instrumentation.core.ByteBufferHolder;
+import io.dash0.instrumentation.core.ByteBufferHolder;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOutboundHandlerAdapter;

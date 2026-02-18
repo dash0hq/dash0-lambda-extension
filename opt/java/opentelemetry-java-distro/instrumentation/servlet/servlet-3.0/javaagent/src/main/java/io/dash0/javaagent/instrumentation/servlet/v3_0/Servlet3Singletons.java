@@ -24,7 +24,7 @@ import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 
 public final class Servlet3Singletons {
-  private static final String INSTRUMENTATION_NAME = "io.lumigo.servlet";
+  private static final String INSTRUMENTATION_NAME = "io.dash0.servlet";
 
   static final String INTERNAL_SPAN_NAME = "async response payload";
 

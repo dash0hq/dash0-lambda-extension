@@ -23,9 +23,9 @@ import static net.bytebuddy.matcher.ElementMatchers.isPublic;
 import static net.bytebuddy.matcher.ElementMatchers.named;
 import static net.bytebuddy.matcher.ElementMatchers.returns;
 
-import io.lumigo.instrumentation.core.ByteBufferHolder;
-import io.lumigo.instrumentation.core.CharBufferHolder;
-import io.lumigo.instrumentation.core.SpanAndRelatedObjectHolder;
+import io.dash0.instrumentation.core.ByteBufferHolder;
+import io.dash0.instrumentation.core.CharBufferHolder;
+import io.dash0.instrumentation.core.SpanAndRelatedObjectHolder;
 import io.opentelemetry.instrumentation.api.util.VirtualField;
 import io.opentelemetry.javaagent.bootstrap.CallDepth;
 import io.opentelemetry.javaagent.bootstrap.Java8BytecodeBridge;
@@ -65,7 +65,7 @@ public class Servlet30AsyncInstrumentation implements TypeInstrumentation {
 
   public static class StartAsyncAdvice {
     public static final String LUMIGO_SERVLET_3_ASYNC_LISTENER_PRESENCE =
-        "io.lumigo.Servlet3AsyncListener";
+        "io.dash0.Servlet3AsyncListener";
 
     @Advice.OnMethodEnter(suppress = Throwable.class)
     public static void methodEnter(

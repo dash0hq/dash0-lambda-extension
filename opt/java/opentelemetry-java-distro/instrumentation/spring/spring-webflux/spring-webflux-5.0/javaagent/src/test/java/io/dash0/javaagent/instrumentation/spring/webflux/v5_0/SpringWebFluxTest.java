@@ -17,7 +17,7 @@
  */
 package io.dash0.javaagent.instrumentation.spring.webflux.v5_0;
 
-import io.lumigo.spring.webflux.WebfluxApplication;
+import io.dash0.spring.webflux.WebfluxApplication;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.instrumentation.test.utils.PortUtils;

@@ -17,7 +17,7 @@
  */
 package io.dash0.javaagent.instrumentation.awssdk.v1_11;
 
-import io.lumigo.instrumentation.core.ByteBufferHolder;
+import io.dash0.instrumentation.core.ByteBufferHolder;
 import io.opentelemetry.api.trace.Span;
 
 public final class HelperUtil {

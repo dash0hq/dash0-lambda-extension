@@ -17,9 +17,9 @@
  */
 package io.dash0.javaagent.instrumentation.servlet.v3_0;
 
-import io.lumigo.instrumentation.core.ByteBufferHolder;
-import io.lumigo.instrumentation.core.CharBufferHolder;
-import io.lumigo.instrumentation.core.SpanAndRelatedObjectHolder;
+import io.dash0.instrumentation.core.ByteBufferHolder;
+import io.dash0.instrumentation.core.CharBufferHolder;
+import io.dash0.instrumentation.core.SpanAndRelatedObjectHolder;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.instrumentation.api.util.VirtualField;
 import java.io.BufferedReader;

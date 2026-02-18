@@ -18,7 +18,7 @@
 package io.dash0.javaagent.instrumentation.rabbitmq;
 
 import com.rabbitmq.client.GetResponse;
-import io.lumigo.instrumentation.core.LumigoSemanticAttributes;
+import io.dash0.instrumentation.core.LumigoSemanticAttributes;
 import io.opentelemetry.api.common.AttributesBuilder;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.instrumentation.api.instrumenter.AttributesExtractor;

@@ -17,7 +17,7 @@
  */
 package io.dash0.javaagent.instrumentation.awssdk.v2_2;
 
-import static io.lumigo.instrumentation.core.AbstractBufferHolder.MAX_BUFFER_LENGTH;
+import static io.dash0.instrumentation.core.AbstractBufferHolder.MAX_BUFFER_LENGTH;
 import static io.opentelemetry.javaagent.bootstrap.Java8BytecodeBridge.currentContext;
 import static io.opentelemetry.javaagent.extension.matcher.AgentElementMatchers.hasClassesNamed;
 import static net.bytebuddy.matcher.ElementMatchers.*;

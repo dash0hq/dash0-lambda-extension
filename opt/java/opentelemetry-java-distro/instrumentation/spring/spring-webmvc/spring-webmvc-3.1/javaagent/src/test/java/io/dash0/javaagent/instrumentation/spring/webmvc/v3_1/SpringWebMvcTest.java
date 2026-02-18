@@ -17,7 +17,7 @@
  */
 package io.dash0.javaagent.instrumentation.spring.webmvc.v3_1;
 
-import io.lumigo.spring.webmvc.SpringWebApp;
+import io.dash0.spring.webmvc.SpringWebApp;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.instrumentation.test.utils.PortUtils;

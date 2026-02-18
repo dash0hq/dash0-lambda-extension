@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.lumigo.storm.testing;
+package io.dash0.storm.testing;
 
 import static java.util.Arrays.stream;
 

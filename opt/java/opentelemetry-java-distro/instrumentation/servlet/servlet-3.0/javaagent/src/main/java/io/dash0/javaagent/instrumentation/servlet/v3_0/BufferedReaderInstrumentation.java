@@ -20,7 +20,7 @@ package io.dash0.javaagent.instrumentation.servlet.v3_0;
 import static io.opentelemetry.javaagent.extension.matcher.AgentElementMatchers.hasSuperType;
 import static net.bytebuddy.matcher.ElementMatchers.*;
 
-import io.lumigo.instrumentation.core.CharBufferHolder;
+import io.dash0.instrumentation.core.CharBufferHolder;
 import io.opentelemetry.instrumentation.api.util.VirtualField;
 import io.opentelemetry.javaagent.bootstrap.CallDepth;
 import io.opentelemetry.javaagent.extension.instrumentation.TypeInstrumentation;

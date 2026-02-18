@@ -22,7 +22,7 @@ import io.opentelemetry.instrumentation.api.instrumenter.Instrumenter;
 import io.opentelemetry.instrumentation.api.instrumenter.SpanKindExtractor;
 
 public final class JdbcSingletons {
-  private static final String INSTRUMENTATION_NAME = "io.lumigo.jdbc";
+  private static final String INSTRUMENTATION_NAME = "io.dash0.jdbc";
 
   private static final Instrumenter<Void, Void> RESULT_INSTRUMENTER;
 

@@ -24,9 +24,9 @@ import static net.bytebuddy.matcher.ElementMatchers.named;
 import static net.bytebuddy.matcher.ElementMatchers.returns;
 import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 
-import io.lumigo.instrumentation.core.ByteBufferHolder;
-import io.lumigo.instrumentation.core.CharBufferHolder;
-import io.lumigo.instrumentation.core.SpanAndRelatedObjectHolder;
+import io.dash0.instrumentation.core.ByteBufferHolder;
+import io.dash0.instrumentation.core.CharBufferHolder;
+import io.dash0.instrumentation.core.SpanAndRelatedObjectHolder;
 import io.opentelemetry.instrumentation.api.util.VirtualField;
 import io.opentelemetry.javaagent.bootstrap.CallDepth;
 import io.opentelemetry.javaagent.extension.instrumentation.TypeInstrumentation;

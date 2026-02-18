@@ -17,7 +17,7 @@
  */
 package io.dash0.javaagent.instrumentation.kafkaclients.v0_11;
 
-import io.lumigo.instrumentation.core.LumigoSemanticAttributes;
+import io.dash0.instrumentation.core.LumigoSemanticAttributes;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.javaagent.bootstrap.Java8BytecodeBridge;
 import io.opentelemetry.javaagent.bootstrap.kafka.KafkaClientsConsumerProcessTracing;

@@ -15,7 +15,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.lumigo.spring.webmvc;
+package io.dash0.spring.webmvc;
 
 public class Greeting {
   private int count;

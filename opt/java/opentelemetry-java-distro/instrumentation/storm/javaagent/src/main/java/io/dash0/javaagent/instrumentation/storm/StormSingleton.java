@@ -22,7 +22,7 @@ import io.opentelemetry.instrumentation.api.instrumenter.Instrumenter;
 import io.opentelemetry.instrumentation.api.instrumenter.SpanKindExtractor;
 
 public final class StormSingleton {
-  private static final String INSTRUMENTATION_NAME = "io.lumigo.storm";
+  private static final String INSTRUMENTATION_NAME = "io.dash0.storm";
 
   private static final Instrumenter<Object, Object> STORM_INSTRUMENTER;
   private static final Instrumenter<Object, Object> STORM_SPOUT_INSTRUMENTER;
