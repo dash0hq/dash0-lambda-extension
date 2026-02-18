@@ -21,17 +21,17 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 
-public class LumigoConfiguratorTest {
+public class Dash0ConfiguratorTest {
   @Test
   void testStripTraceSuffixWhenNotPresent() {
-    String result = LumigoConfigurator.stripTracesSuffix(LumigoConfigurator.LUMIGO_ENDPOINT_URL);
-    assertEquals(LumigoConfigurator.LUMIGO_ENDPOINT_URL, result);
+    String result = Dash0Configurator.stripTracesSuffix(Dash0Configurator.DASH0_EXTENSION_ENDPOINT_URL);
+    assertEquals(Dash0Configurator.DASH0_EXTENSION_ENDPOINT_URL, result);
   }
 
   @Test
   void testStripTraceSuffixWhenPresent() {
     String result =
-        LumigoConfigurator.stripTracesSuffix(LumigoConfigurator.LUMIGO_ENDPOINT_URL + "/v1/traces");
-    assertEquals(LumigoConfigurator.LUMIGO_ENDPOINT_URL, result);
+        Dash0Configurator.stripTracesSuffix(Dash0Configurator.DASH0_EXTENSION_ENDPOINT_URL + "/v1/traces");
+    assertEquals(Dash0Configurator.DASH0_EXTENSION_ENDPOINT_URL, result);
   }
 }

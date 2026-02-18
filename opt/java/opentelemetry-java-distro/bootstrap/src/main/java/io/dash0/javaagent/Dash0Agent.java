@@ -30,11 +30,11 @@ public class Dash0Agent {
       System.setProperty("otel.javaagent.debug", "true");
       System.setProperty("io.opentelemetry.javaagent.slf4j.simpleLogger.defaultLogLevel", "debug");
       System.setProperty("otel.log.level", "debug");
-      System.setProperty("lumigo.debug", "true");
+      System.setProperty("dash0.debug", "true");
     }
     if (is_switch_off()) {
       System.err.println(
-          "Dash0 OpenTelemetry Java distribution disabled via the 'LUMIGO_SWITCH_OFF' environment variable");
+          "Dash0 OpenTelemetry Java distribution disabled via the 'DASH0_SWITCH_OFF' environment variable");
       return;
     }
     System.out.println(
@@ -50,18 +50,18 @@ public class Dash0Agent {
       value = System.getenv("OTEL_JAVAAGENT_DEBUG");
     }
     if (value == null) {
-      value = System.getProperty("lumigo.debug");
+      value = System.getProperty("dash0.debug");
     }
     if (value == null) {
-      value = System.getenv("LUMIGO_DEBUG");
+      value = System.getenv("DASH0_DISTRO_DEBUG");
     }
     return Boolean.parseBoolean(value);
   }
 
   private static boolean is_switch_off() {
-    String value = System.getProperty("lumigo.switch_off");
+    String value = System.getProperty("dash0.switch_off");
     if (value == null) {
-      value = System.getenv("LUMIGO_SWITCH_OFF");
+      value = System.getenv("DASH0_SWITCH_OFF");
     }
     return Boolean.parseBoolean(value);
   }

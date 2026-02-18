@@ -39,17 +39,15 @@ import java.util.logging.Logger;
  * @see AutoConfigurationCustomizerProvider
  */
 @AutoService(AutoConfigurationCustomizerProvider.class)
-public class LumigoConfigurator implements AutoConfigurationCustomizerProvider {
-  public static final String LUMIGO_TRACER_TOKEN = "lumigo.tracer.token";
-  public static final String LUMIGO_ENDPOINT = "lumigo.endpoint";
-  public static final String LUMIGO_DEBUG_SPANDUMP = "lumigo.debug.spandump";
-  public static final String LUMIGO_ENABLE_LOGS = "lumigo.enable.logs";
-  public static final String LUMIGO_ENABLE_TRACES = "lumigo.enable.traces";
+public class Dash0Configurator implements AutoConfigurationCustomizerProvider {
+  public static final String DASH0_TOKEN = "dash0.token";
+  public static final String DASH0_EXTENSION_ENDPOINT = "dash0.extension.endpoint";
+  public static final String DASH0_DEBUG_SPANDUMP = "dash0.debug.spandump";
 
-  public static final Logger LOGGER = Logger.getLogger(LumigoConfigurator.class.getName());
+  public static final Logger LOGGER = Logger.getLogger(Dash0Configurator.class.getName());
 
-  public static final String LUMIGO_ENDPOINT_URL =
-      "https://ga-otlp.lumigo-tracer-edge.golumigo.com";
+  public static final String DASH0_EXTENSION_ENDPOINT_URL =
+      "http://127.0.0.1:9009";
 
   @Override
   public void customize(AutoConfigurationCustomizer autoConfiguration) {
@@ -61,7 +59,7 @@ public class LumigoConfigurator implements AutoConfigurationCustomizerProvider {
 
   private SdkTracerProviderBuilder tracerProviderCustomizer(
       SdkTracerProviderBuilder tracerProvider, ConfigProperties cfg) {
-    String debugSpanDump = cfg.getString(LUMIGO_DEBUG_SPANDUMP);
+    String debugSpanDump = cfg.getString(DASH0_DEBUG_SPANDUMP);
     if (!Strings.isBlank(debugSpanDump)) {
       if (!(debugSpanDump.split("/").length > 1)) {
         LOGGER.warning("Spandump path '" + debugSpanDump + "' is not valid; spandump is disabled.");
@@ -81,10 +79,10 @@ public class LumigoConfigurator implements AutoConfigurationCustomizerProvider {
   }
 
   private Map<String, String> propertiesCustomizer(ConfigProperties originalCfg) {
-    String accessToken = originalCfg.getString(LUMIGO_TRACER_TOKEN);
+    String accessToken = originalCfg.getString(DASH0_TOKEN);
     if (Strings.isBlank(accessToken)) {
       LOGGER.warning(
-          "Lumigo token not provided (env var 'LUMIGO_TRACER_TOKEN' not set); no data will be sent to Lumigo.");
+          "Dash0 token not provided (env var 'DASH0_TOKEN' not set); no data will be sent.");
       return Collections.emptyMap();
     }
 
@@ -97,42 +95,28 @@ public class LumigoConfigurator implements AutoConfigurationCustomizerProvider {
       headers.addAll(Arrays.asList(rawHeaders.split(",")));
     }
 
-    headers.add("Authorization=LumigoToken " + accessToken);
+    headers.add("Authorization=Bearer " + accessToken);
 
     customizedCfg.put("otel.exporter.otlp.headers", String.join(",", headers));
 
-    String lumigoEndpoint = originalCfg.getString(LUMIGO_ENDPOINT);
-    if (!Strings.isBlank(lumigoEndpoint)) {
-      // This truncation is needed because the Lumigo operator is currently adding the suffix
+    String dash0Endpoint = originalCfg.getString(DASH0_EXTENSION_ENDPOINT);
+    if (!Strings.isBlank(dash0Endpoint)) {
+      // This truncation is needed because the Dash0 operator is currently adding the suffix
       // "/v1/traces" to the endpoint, and we don't want to duplicate it.
-      lumigoEndpoint = stripTracesSuffix(lumigoEndpoint);
-      setIfNotSet(originalCfg, customizedCfg, "otel.exporter.otlp.endpoint", lumigoEndpoint);
+      dash0Endpoint = stripTracesSuffix(dash0Endpoint);
+      setIfNotSet(originalCfg, customizedCfg, "otel.exporter.otlp.endpoint", dash0Endpoint);
     } else {
       /*
        * Upsert only if not set by the user, this allows the user to override the endpoint
        */
-      setIfNotSet(originalCfg, customizedCfg, "otel.exporter.otlp.endpoint", LUMIGO_ENDPOINT_URL);
+      setIfNotSet(originalCfg, customizedCfg, "otel.exporter.otlp.endpoint", DASH0_EXTENSION_ENDPOINT_URL);
     }
     setIfNotSet(originalCfg, customizedCfg, "otel.exporter.otlp.protocol", "http/protobuf");
 
-    String lumigoEnableTraces = originalCfg.getString(LUMIGO_ENABLE_TRACES);
-    if (lumigoEnableTraces != null && lumigoEnableTraces.equalsIgnoreCase("false")) {
-      LOGGER.info("Lumigo - disabling traces exporter");
-      customizedCfg.put("otel.traces.exporter", "none");
-    }
-
     /*
-     * Disable the metrics exporter, as Lumigo does not currently offer a /v1/metrics endpoint
+     * Disable the metrics exporter
      */
     setIfNotSet(originalCfg, customizedCfg, "otel.metrics.exporter", "none");
-
-    String lumigoEnableLogs = originalCfg.getString(LUMIGO_ENABLE_LOGS);
-    if (lumigoEnableLogs == null || !lumigoEnableLogs.equalsIgnoreCase("true")) {
-      setIfNotSet(originalCfg, customizedCfg, "otel.logs.exporter", "none");
-    } else {
-      LOGGER.info("Lumigo - enabling logs exporter");
-      customizedCfg.put("otel.logs.exporter", "otlp");
-    }
 
     /*
      * Set limits in terms of span attribute length to match those that we have
