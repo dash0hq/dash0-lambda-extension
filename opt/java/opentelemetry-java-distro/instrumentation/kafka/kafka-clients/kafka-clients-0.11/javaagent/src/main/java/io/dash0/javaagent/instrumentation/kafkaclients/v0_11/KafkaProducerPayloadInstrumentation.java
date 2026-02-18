@@ -22,7 +22,7 @@ import static net.bytebuddy.matcher.ElementMatchers.isPublic;
 import static net.bytebuddy.matcher.ElementMatchers.named;
 import static net.bytebuddy.matcher.ElementMatchers.takesArgument;
 
-import io.dash0.instrumentation.core.LumigoSemanticAttributes;
+import io.dash0.instrumentation.core.Dash0SemanticAttributes;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.javaagent.bootstrap.Java8BytecodeBridge;
 import io.opentelemetry.javaagent.extension.instrumentation.TypeInstrumentation;
@@ -56,9 +56,9 @@ public class KafkaProducerPayloadInstrumentation implements TypeInstrumentation 
         @Advice.Argument(value = 0, readOnly = false) ProducerRecord<?, ?> record) {
       if (null != record.value()) {
         Span span = Java8BytecodeBridge.currentSpan();
-        span.setAttribute(LumigoSemanticAttributes.MESSAGING_PAYLOAD, record.value().toString());
+        span.setAttribute(Dash0SemanticAttributes.MESSAGING_PAYLOAD, record.value().toString());
         span.setAttribute(
-            LumigoSemanticAttributes.MESSAGING_HEADERS,
+            Dash0SemanticAttributes.MESSAGING_HEADERS,
             KafkaUtils.convertHeadersToString(record.headers()));
       }
     }

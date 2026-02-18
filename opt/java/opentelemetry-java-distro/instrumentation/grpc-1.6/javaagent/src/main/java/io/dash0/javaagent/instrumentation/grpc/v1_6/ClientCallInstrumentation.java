@@ -29,7 +29,7 @@ import com.google.protobuf.GeneratedMessageV3;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import io.grpc.ClientCall;
-import io.dash0.instrumentation.core.LumigoSemanticAttributes;
+import io.dash0.instrumentation.core.Dash0SemanticAttributes;
 import io.opentelemetry.instrumentation.api.util.VirtualField;
 import io.opentelemetry.javaagent.bootstrap.CallDepth;
 import io.opentelemetry.javaagent.bootstrap.Java8BytecodeBridge;
@@ -117,15 +117,15 @@ public class ClientCallInstrumentation implements TypeInstrumentation {
                   .print((GeneratedMessageV3) msg));
           Java8BytecodeBridge.currentSpan()
               .setAttribute(
-                  LumigoSemanticAttributes.GRPC_REQUEST_BODY, JsonUtil.toJson(requestMsgs));
+                  Dash0SemanticAttributes.GRPC_REQUEST_BODY, JsonUtil.toJson(requestMsgs));
         } catch (InvalidProtocolBufferException e) {
           // At this point we know that msg is a GeneratedMessageV3, so this should never happen
           Java8BytecodeBridge.currentSpan()
-              .setAttribute(LumigoSemanticAttributes.GRPC_REQUEST_BODY, msg.toString());
+              .setAttribute(Dash0SemanticAttributes.GRPC_REQUEST_BODY, msg.toString());
         }
       } else {
         Java8BytecodeBridge.currentSpan()
-            .setAttribute(LumigoSemanticAttributes.GRPC_REQUEST_BODY, msg.toString());
+            .setAttribute(Dash0SemanticAttributes.GRPC_REQUEST_BODY, msg.toString());
       }
     }
 

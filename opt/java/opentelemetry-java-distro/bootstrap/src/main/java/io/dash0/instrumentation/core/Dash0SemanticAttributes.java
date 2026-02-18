@@ -21,7 +21,7 @@ import io.opentelemetry.api.common.AttributeKey;
 import java.util.List;
 
 /** Semantic Attribute keys specific to Lumigo. */
-public final class LumigoSemanticAttributes {
+public final class Dash0SemanticAttributes {
   public static final AttributeKey<String> HTTP_REQUEST_BODY =
       AttributeKey.stringKey("http.request.body");
 

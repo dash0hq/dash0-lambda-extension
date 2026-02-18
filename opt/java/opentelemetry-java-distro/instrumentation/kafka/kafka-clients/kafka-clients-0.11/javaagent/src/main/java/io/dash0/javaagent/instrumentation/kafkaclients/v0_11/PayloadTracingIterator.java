@@ -17,7 +17,7 @@
  */
 package io.dash0.javaagent.instrumentation.kafkaclients.v0_11;
 
-import io.dash0.instrumentation.core.LumigoSemanticAttributes;
+import io.dash0.instrumentation.core.Dash0SemanticAttributes;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.javaagent.bootstrap.Java8BytecodeBridge;
 import io.opentelemetry.javaagent.bootstrap.kafka.KafkaClientsConsumerProcessTracing;
@@ -55,9 +55,9 @@ public class PayloadTracingIterator<K, V> implements Iterator<ConsumerRecord<K, 
     ConsumerRecord<K, V> next = delegateIterator.next();
     if (next != null && KafkaClientsConsumerProcessTracing.wrappingEnabled()) {
       Span span = Java8BytecodeBridge.currentSpan();
-      span.setAttribute(LumigoSemanticAttributes.MESSAGING_PAYLOAD, next.value().toString());
+      span.setAttribute(Dash0SemanticAttributes.MESSAGING_PAYLOAD, next.value().toString());
       span.setAttribute(
-          LumigoSemanticAttributes.MESSAGING_HEADERS,
+          Dash0SemanticAttributes.MESSAGING_HEADERS,
           KafkaUtils.convertHeadersToString(next.headers()));
 
       // Support for lumigo lambda tracer kafka instrumentation
