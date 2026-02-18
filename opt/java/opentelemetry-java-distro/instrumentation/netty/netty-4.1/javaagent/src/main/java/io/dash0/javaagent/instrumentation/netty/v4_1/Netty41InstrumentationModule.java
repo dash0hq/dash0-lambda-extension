@@ -26,7 +26,7 @@ import java.util.List;
 @AutoService(InstrumentationModule.class)
 public class Netty41InstrumentationModule extends InstrumentationModule {
   public Netty41InstrumentationModule() {
-    super("lumigo-netty", "lumigo-netty-4.1");
+    super("dash0-netty", "dash0-netty-4.1");
   }
 
   @Override

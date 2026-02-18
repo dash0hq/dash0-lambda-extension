@@ -27,7 +27,7 @@ import java.util.List;
 public class StormInstrumentationModule extends InstrumentationModule {
 
   public StormInstrumentationModule() {
-    super("storm", "lumigo-storm");
+    super("storm", "dash0-storm");
   }
 
   @Override

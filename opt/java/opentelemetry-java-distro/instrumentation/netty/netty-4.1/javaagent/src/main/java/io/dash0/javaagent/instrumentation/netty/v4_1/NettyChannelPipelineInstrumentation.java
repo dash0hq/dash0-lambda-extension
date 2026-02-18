@@ -42,7 +42,7 @@ public class NettyChannelPipelineInstrumentation implements TypeInstrumentation 
 
   public static final String OPENTELEMETRY_RELOCATED_HANDLER_CLASS_NAME =
       "io.opentelemetry.javaagent.shaded.instrumentation.netty.v4_1.internal.server.HttpServerTracingHandler";
-  public static final String LUMIGO_HANDLER_CLASS_NAME =
+  public static final String DASH0_HANDLER_CLASS_NAME =
       "io.dash0.javaagent.instrumentation.netty.v4_1.server.HttpServerTracingHandler";
 
   @Override
@@ -119,7 +119,7 @@ public class NettyChannelPipelineInstrumentation implements TypeInstrumentation 
           // so we can't use getClass() method on it.
           // This is a workaround to avoid the error, until we find a better solution.
           pipeline.addAfter(
-              OPENTELEMETRY_RELOCATED_HANDLER_CLASS_NAME, LUMIGO_HANDLER_CLASS_NAME, ourHandler);
+              OPENTELEMETRY_RELOCATED_HANDLER_CLASS_NAME, DASH0_HANDLER_CLASS_NAME, ourHandler);
 
           // associate our handle with open telemetry handler so they could be removed together
           virtualField.set(handler, ourHandler);

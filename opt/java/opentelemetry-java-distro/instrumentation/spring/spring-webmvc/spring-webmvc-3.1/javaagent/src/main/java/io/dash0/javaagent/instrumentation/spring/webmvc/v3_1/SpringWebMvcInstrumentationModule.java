@@ -32,7 +32,7 @@ import static java.util.Arrays.asList;
 @AutoService(InstrumentationModule.class)
 public class SpringWebMvcInstrumentationModule extends InstrumentationModule {
   public SpringWebMvcInstrumentationModule() {
-    super("lumigo-spring-webmvc", "lumigo-spring-webmvc-3.1");
+    super("dash0-spring-webmvc", "dash0-spring-webmvc-3.1");
   }
 
   @Override

@@ -31,7 +31,7 @@ import static io.opentelemetry.javaagent.extension.matcher.AgentElementMatchers.
 public class LettuceInstrumentationModule extends InstrumentationModule {
 
   public LettuceInstrumentationModule() {
-    super("lumigo-lettuce", "lumigo-lettuce-5.1");
+    super("dash0-lettuce", "dash0-lettuce-5.1");
   }
 
   @Override

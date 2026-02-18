@@ -26,7 +26,7 @@ import java.util.List;
 @AutoService(InstrumentationModule.class)
 public class Servlet30InstrumentationModule extends InstrumentationModule {
   public Servlet30InstrumentationModule() {
-    super("lumigo-servlet", "lumigo-servlet-3.0");
+    super("dash0-servlet", "dash0-servlet-3.0");
   }
 
   @Override

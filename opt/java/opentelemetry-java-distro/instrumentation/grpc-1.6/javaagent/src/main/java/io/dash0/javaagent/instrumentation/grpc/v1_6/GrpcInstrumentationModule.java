@@ -26,7 +26,7 @@ import java.util.List;
 @AutoService(InstrumentationModule.class)
 public class GrpcInstrumentationModule extends InstrumentationModule {
   public GrpcInstrumentationModule() {
-    super("lumigo-grpc", "lumigo-grpc-1.6");
+    super("dash0-grpc", "dash0-grpc-1.6");
   }
 
   @Override

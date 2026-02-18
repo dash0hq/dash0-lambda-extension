@@ -27,7 +27,7 @@ import java.util.List;
 @AutoService(InstrumentationModule.class)
 public class RabbitMqInstrumentationModule extends InstrumentationModule {
   public RabbitMqInstrumentationModule() {
-    super("lumigo-rabbitmq", "lumigo-rabbitmq-2.7");
+    super("dash0-rabbitmq", "dash0-rabbitmq-2.7");
   }
 
   @Override

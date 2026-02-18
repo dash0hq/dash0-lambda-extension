@@ -1,6 +1,6 @@
 # Background on storm instrumentation
 
-This is lumigo instrumentation for the [storm](https://storm.apache.org/) library.
+This is dash0 instrumentation for the [storm](https://storm.apache.org/) library.
 
 ## We provide instrumentation for three key components within the Storm library:
 

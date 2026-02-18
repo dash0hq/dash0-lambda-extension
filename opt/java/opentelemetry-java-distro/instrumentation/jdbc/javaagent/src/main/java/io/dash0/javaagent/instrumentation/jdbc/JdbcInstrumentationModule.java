@@ -26,7 +26,7 @@ import java.util.List;
 @AutoService(InstrumentationModule.class)
 public class JdbcInstrumentationModule extends InstrumentationModule {
   public JdbcInstrumentationModule() {
-    super("lumigo-jdbc");
+    super("dash0-jdbc");
   }
 
   @Override
