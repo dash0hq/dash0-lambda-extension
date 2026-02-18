@@ -8,6 +8,7 @@ import * as cr from 'aws-cdk-lib/custom-resources';
 import * as path from 'path';
 import { PythonTracingScenariosStack, createPythonCode } from './python-tracing-scenarios-stack';
 import { NodeTracingScenariosStack } from './node-tracing-scenarios-stack';
+import { JavaTracingScenariosStack } from './java-tracing-scenarios-stack';
 
 function getLatestLayerVersion(scope: Construct, id: string, layerName: string): lambda.ILayerVersion {
   const stack = cdk.Stack.of(scope);
@@ -340,6 +341,11 @@ export class IntegrationTestsStack extends cdk.Stack {
 
     new NodeTracingScenariosStack(this, 'NodeTracingScenariosStack', {
       layer: nodeLayer,
+      logGroup: sharedLogGroup,
+    });
+
+    new JavaTracingScenariosStack(this, 'JavaTracingScenariosStack', {
+      layer: javaLayer,
       logGroup: sharedLogGroup,
     });
   }
