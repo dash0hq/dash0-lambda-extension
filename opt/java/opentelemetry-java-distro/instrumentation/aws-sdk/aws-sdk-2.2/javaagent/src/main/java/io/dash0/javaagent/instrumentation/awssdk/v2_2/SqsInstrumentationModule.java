@@ -17,7 +17,7 @@ import net.bytebuddy.asm.Advice;
 public class SqsInstrumentationModule extends AbstractAwsSdkInstrumentationModule {
 
   public SqsInstrumentationModule() {
-    super("lumigo-aws-sdk-2.2-sqs");
+    super("dash0-aws-sdk-2.2-sqs");
   }
 
   @Override

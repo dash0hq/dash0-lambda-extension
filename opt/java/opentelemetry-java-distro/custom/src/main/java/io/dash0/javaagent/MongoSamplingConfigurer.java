@@ -32,7 +32,7 @@ import java.util.logging.Logger;
 public class MongoSamplingConfigurer implements AutoConfigurationCustomizerProvider {
   private static final Logger LOGGER = Logger.getLogger(MongoSamplingConfigurer.class.getName());
 
-  public static final String LUMIGO_REDUCED_MONGO_INSTRUMENTATION =
+  public static final String DASH0_REDUCED_MONGO_INSTRUMENTATION =
       "lumigo.reduced.mongo.instrumentation";
 
   @Override
@@ -47,7 +47,7 @@ public class MongoSamplingConfigurer implements AutoConfigurationCustomizerProvi
         RuleBasedRoutingSampler.builder(SpanKind.CLIENT, defaultSampler);
 
     String reduceMongoInstrumentation =
-        configProperties.getString(LUMIGO_REDUCED_MONGO_INSTRUMENTATION);
+        configProperties.getString(DASH0_REDUCED_MONGO_INSTRUMENTATION);
     boolean isReducedMongoInstrumentationEnabled;
 
     if (reduceMongoInstrumentation == null || reduceMongoInstrumentation.isEmpty()) {
@@ -58,7 +58,7 @@ public class MongoSamplingConfigurer implements AutoConfigurationCustomizerProvi
       isReducedMongoInstrumentationEnabled = false;
     } else {
       LOGGER.warning(
-          "Invalid value for LUMIGO_REDUCED_MONGO_INSTRUMENTATION: "
+          "Invalid value for DASH0_REDUCED_MONGO_INSTRUMENTATION: "
               + reduceMongoInstrumentation
               + ". Defaulting to true.");
       isReducedMongoInstrumentationEnabled = true;
@@ -69,10 +69,10 @@ public class MongoSamplingConfigurer implements AutoConfigurationCustomizerProvi
       // Log that Lumigo reduces Mongo instrumentation by omitting certain attributes, like
       // `db.operation`
       // For example, the `isMaster` operation is not collected by default to optimize performance.
-      // Setting the environment variable `LUMIGO_REDUCED_MONGO_INSTRUMENTATION=false` will disable
+      // Setting the environment variable `DASH0_REDUCED_MONGO_INSTRUMENTATION=false` will disable
       // this optimization.
       LOGGER.finest(
-          "Lumigo reduces Mongo instrumentation. The `db.operation` attribute (e.g., `isMaster`) is excluded by default. Set `LUMIGO_REDUCED_MONGO_INSTRUMENTATION=false` to disable this behavior.");
+          "Lumigo reduces Mongo instrumentation. The `db.operation` attribute (e.g., `isMaster`) is excluded by default. Set `DASH0_REDUCED_MONGO_INSTRUMENTATION=false` to disable this behavior.");
 
       samplerBuilder.customize(
           DbIncubatingAttributes.DB_SYSTEM,

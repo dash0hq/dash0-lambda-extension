@@ -84,7 +84,7 @@ public class ProcessEnvironmentScrubberTest {
   @Test
   public void testEmptyEnvironmentMasking() {
     ConfigProperties mockConfig = mock();
-    when(mockConfig.getString(ProcessEnvironmentScrubber.LUMIGO_SECRET_MASKING_REGEX_ENVIRONMENT))
+    when(mockConfig.getString(ProcessEnvironmentScrubber.DASH0_SECRET_MASKING_REGEX_ENVIRONMENT))
         .thenReturn("[]");
 
     ProcessEnvironmentScrubber scrubber = new ProcessEnvironmentScrubber(mockConfig);
@@ -96,7 +96,7 @@ public class ProcessEnvironmentScrubberTest {
   @Test
   public void testInvalidJsonEnvironmentMasking() {
     ConfigProperties mockConfig = mock();
-    when(mockConfig.getString(ProcessEnvironmentScrubber.LUMIGO_SECRET_MASKING_REGEX))
+    when(mockConfig.getString(ProcessEnvironmentScrubber.DASH0_SECRET_MASKING_REGEX))
         .thenReturn("['.*\"my.*']");
 
     ProcessEnvironmentScrubber scrubber = new ProcessEnvironmentScrubber(mockConfig);
@@ -110,7 +110,7 @@ public class ProcessEnvironmentScrubberTest {
   @Test
   public void testInvalidRegExEnvironmentMasking() {
     ConfigProperties mockConfig = mock();
-    when(mockConfig.getString(ProcessEnvironmentScrubber.LUMIGO_SECRET_MASKING_REGEX))
+    when(mockConfig.getString(ProcessEnvironmentScrubber.DASH0_SECRET_MASKING_REGEX))
         .thenReturn("[\"(ad\"]");
 
     ProcessEnvironmentScrubber scrubber = new ProcessEnvironmentScrubber(mockConfig);
@@ -125,7 +125,7 @@ public class ProcessEnvironmentScrubberTest {
   @Test
   public void testInvalidJsonNumberArray() {
     ConfigProperties mockConfig = mock();
-    when(mockConfig.getString(ProcessEnvironmentScrubber.LUMIGO_SECRET_MASKING_REGEX))
+    when(mockConfig.getString(ProcessEnvironmentScrubber.DASH0_SECRET_MASKING_REGEX))
         .thenReturn("[42]");
 
     ProcessEnvironmentScrubber scrubber = new ProcessEnvironmentScrubber(mockConfig);
@@ -140,7 +140,7 @@ public class ProcessEnvironmentScrubberTest {
   @Test
   public void testInvalidJsonBooleanArray() {
     ConfigProperties mockConfig = mock();
-    when(mockConfig.getString(ProcessEnvironmentScrubber.LUMIGO_SECRET_MASKING_REGEX))
+    when(mockConfig.getString(ProcessEnvironmentScrubber.DASH0_SECRET_MASKING_REGEX))
         .thenReturn("[true]");
 
     ProcessEnvironmentScrubber scrubber = new ProcessEnvironmentScrubber(mockConfig);
@@ -155,7 +155,7 @@ public class ProcessEnvironmentScrubberTest {
   @Test
   public void testInvalidJsonPlainString() {
     ConfigProperties mockConfig = mock();
-    when(mockConfig.getString(ProcessEnvironmentScrubber.LUMIGO_SECRET_MASKING_REGEX))
+    when(mockConfig.getString(ProcessEnvironmentScrubber.DASH0_SECRET_MASKING_REGEX))
         .thenReturn("foo");
 
     ProcessEnvironmentScrubber scrubber = new ProcessEnvironmentScrubber(mockConfig);
@@ -170,7 +170,7 @@ public class ProcessEnvironmentScrubberTest {
   @Test
   public void testInvalidJsonObject() {
     ConfigProperties mockConfig = mock();
-    when(mockConfig.getString(ProcessEnvironmentScrubber.LUMIGO_SECRET_MASKING_REGEX))
+    when(mockConfig.getString(ProcessEnvironmentScrubber.DASH0_SECRET_MASKING_REGEX))
         .thenReturn("{\"foo\": \"bar\"}");
 
     ProcessEnvironmentScrubber scrubber = new ProcessEnvironmentScrubber(mockConfig);

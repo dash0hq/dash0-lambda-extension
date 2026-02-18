@@ -17,7 +17,7 @@ and re-application of the following:
 
 ## `ApacheHttpClientSingletons`
 
-Update `INSTRUMENTATION_NAME` to be `io.opentelemetry.lumigo-apache-httpclient-5.0`.
+Update `INSTRUMENTATION_NAME` to be `io.opentelemetry.dash0-apache-httpclient-5.0`.
 
 For the `INSTRUMENTER` field, add the below to the `Instrumenter.builder()` chain:
 
@@ -39,5 +39,5 @@ new SessionInputBufferInstrumentation(), new HttpMessageParserInstrumentation()
 Update the constructor to call:
 
 ```java
-super("lumigo-apache-httpclient", "lumigo-apache-httpclient-5.0");
+super("dash0-apache-httpclient", "dash0-apache-httpclient-5.0");
 ```

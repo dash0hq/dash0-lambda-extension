@@ -21,11 +21,11 @@ import java.util.Arrays;
 import java.util.List;
 
 public class HttpEndpointFilter extends AbstractRegExParser {
-  public static final String LUMIGO_FILTER_HTTP_ENDPOINTS_REGEX =
+  public static final String DASH0_FILTER_HTTP_ENDPOINTS_REGEX =
       "lumigo.filter.http.endpoints.regex";
-  public static final String LUMIGO_FILTER_HTTP_ENDPOINTS_REGEX_CLIENT =
+  public static final String DASH0_FILTER_HTTP_ENDPOINTS_REGEX_CLIENT =
       "lumigo.filter.http.endpoints.regex.client";
-  public static final String LUMIGO_FILTER_HTTP_ENDPOINTS_REGEX_SERVER =
+  public static final String DASH0_FILTER_HTTP_ENDPOINTS_REGEX_SERVER =
       "lumigo.filter.http.endpoints.regex.server";
 
   public static final List<String> DEFAULT_REGEX_KEYS =
@@ -33,7 +33,7 @@ public class HttpEndpointFilter extends AbstractRegExParser {
 
   @Override
   protected String getEnvVarName() {
-    return LUMIGO_FILTER_HTTP_ENDPOINTS_REGEX;
+    return DASH0_FILTER_HTTP_ENDPOINTS_REGEX;
   }
 
   @Override

@@ -35,7 +35,7 @@ import java.util.regex.Pattern;
 @AutoService(AutoConfigurationCustomizerProvider.class)
 public class RedisSamplingConfigurer implements AutoConfigurationCustomizerProvider {
   private static final Logger LOGGER = Logger.getLogger(RedisSamplingConfigurer.class.getName());
-  public static final String LUMIGO_REDUCED_REDIS_INSTRUMENTATION =
+  public static final String DASH0_REDUCED_REDIS_INSTRUMENTATION =
       "lumigo.reduced.redis.instrumentation";
 
   @Override
@@ -46,7 +46,7 @@ public class RedisSamplingConfigurer implements AutoConfigurationCustomizerProvi
   private static Sampler customizeRedisSpans(
       Sampler defaultSampler, ConfigProperties configProperties) {
     String reduceRedisInstrumentation =
-        configProperties.getString(LUMIGO_REDUCED_REDIS_INSTRUMENTATION);
+        configProperties.getString(DASH0_REDUCED_REDIS_INSTRUMENTATION);
     boolean isReducedRedisInstrumentationEnabled;
 
     if (reduceRedisInstrumentation == null || reduceRedisInstrumentation.isEmpty()) {
@@ -57,7 +57,7 @@ public class RedisSamplingConfigurer implements AutoConfigurationCustomizerProvi
       isReducedRedisInstrumentationEnabled = false;
     } else {
       LOGGER.warning(
-          "Invalid value for LUMIGO_REDUCED_REDIS_INSTRUMENTATION: "
+          "Invalid value for DASH0_REDUCED_REDIS_INSTRUMENTATION: "
               + reduceRedisInstrumentation
               + ". Defaulting to true.");
       isReducedRedisInstrumentationEnabled = true;
@@ -65,7 +65,7 @@ public class RedisSamplingConfigurer implements AutoConfigurationCustomizerProvi
 
     if (isReducedRedisInstrumentationEnabled) {
       LOGGER.finest(
-          "Lumigo reduces Redis instrumentation. Redis spans are sampled based on span name using regex. Set `LUMIGO_REDUCED_REDIS_INSTRUMENTATION=false` to disable this behavior.");
+          "Lumigo reduces Redis instrumentation. Redis spans are sampled based on span name using regex. Set `DASH0_REDUCED_REDIS_INSTRUMENTATION=false` to disable this behavior.");
       return new RedisReduceInfoSpanSampler(defaultSampler);
     }
 

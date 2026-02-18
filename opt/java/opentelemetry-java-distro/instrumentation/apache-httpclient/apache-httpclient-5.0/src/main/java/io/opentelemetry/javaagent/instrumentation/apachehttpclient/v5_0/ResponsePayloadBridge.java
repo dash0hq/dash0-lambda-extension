@@ -28,7 +28,7 @@ import java.util.Optional;
 
 public class ResponsePayloadBridge {
   private static final ContextKey<ResponsePayloadBridge> CONTEXT_KEY =
-      ContextKey.named("lumigo-apache-httpclient-response-payload-bridge");
+      ContextKey.named("dash0-apache-httpclient-response-payload-bridge");
 
   private byte[] payloadBuffer = new byte[0];
   private int payloadBufferLength = 0;

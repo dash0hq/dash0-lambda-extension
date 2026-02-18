@@ -20,7 +20,7 @@ import software.amazon.awssdk.core.interceptor.SdkExecutionAttribute;
 import software.amazon.awssdk.http.SdkHttpResponse;
 
 final class AwsSdkInstrumenterFactory {
-  private static final String INSTRUMENTATION_NAME = "io.opentelemetry.lumigo-aws-sdk-2.2";
+  private static final String INSTRUMENTATION_NAME = "io.opentelemetry.dash0-aws-sdk-2.2";
 
   static final AttributesExtractor<ExecutionAttributes, SdkHttpResponse> rpcAttributesExtractor =
       RpcClientAttributesExtractor.create(AwsSdkRpcAttributesGetter.INSTANCE);

@@ -17,7 +17,7 @@ import net.bytebuddy.asm.Advice;
 public class SnsInstrumentationModule extends AbstractAwsSdkInstrumentationModule {
 
   public SnsInstrumentationModule() {
-    super("lumigo-aws-sdk-2.2-sns");
+    super("dash0-aws-sdk-2.2-sns");
   }
 
   @Override

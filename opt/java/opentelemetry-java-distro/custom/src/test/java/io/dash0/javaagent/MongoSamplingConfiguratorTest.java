@@ -35,7 +35,7 @@ import org.junit.jupiter.api.Test;
 public class MongoSamplingConfiguratorTest extends AbstractSamplingConfiguratorTest {
   @AfterEach
   public void tearDown() {
-    System.clearProperty(MongoSamplingConfigurer.LUMIGO_REDUCED_MONGO_INSTRUMENTATION);
+    System.clearProperty(MongoSamplingConfigurer.DASH0_REDUCED_MONGO_INSTRUMENTATION);
   }
 
   @Test
@@ -67,7 +67,7 @@ public class MongoSamplingConfiguratorTest extends AbstractSamplingConfiguratorT
 
   @Test
   public void shouldNotDropIfFalse() {
-    System.setProperty(MongoSamplingConfigurer.LUMIGO_REDUCED_MONGO_INSTRUMENTATION, "false");
+    System.setProperty(MongoSamplingConfigurer.DASH0_REDUCED_MONGO_INSTRUMENTATION, "false");
     AutoConfiguredOpenTelemetrySdkBuilder builder = AutoConfiguredOpenTelemetrySdk.builder();
 
     new MongoSamplingConfigurer().customize(builder);

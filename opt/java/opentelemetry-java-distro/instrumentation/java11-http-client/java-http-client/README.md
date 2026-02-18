@@ -22,7 +22,7 @@ Every update to OpenTelemetry JAVA SDK base version will require:
 Change the `INSTRUMENTATION_NAME` static field to:
 
 ```java
-public static final String INSTRUMENTATION_NAME = "io.opentelemetry.lumigo-java-http-client";
+public static final String INSTRUMENTATION_NAME = "io.opentelemetry.dash0-java-http-client";
 ```
 
 Update the `Instrumenter.builder()` call to include:
@@ -52,7 +52,7 @@ new TrustedSubscriberInstrumentation()
 Update the constructor to call:
 
 ```java
-super("lumigo-java-http-client");
+super("dash0-java-http-client");
 ```
 
 ## `HttpClientInstrumentation`

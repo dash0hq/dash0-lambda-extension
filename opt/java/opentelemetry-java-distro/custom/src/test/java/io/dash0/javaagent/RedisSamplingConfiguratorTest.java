@@ -36,7 +36,7 @@ import org.junit.jupiter.api.Test;
 public class RedisSamplingConfiguratorTest extends AbstractSamplingConfiguratorTest {
   @AfterEach
   public void tearDown() {
-    System.clearProperty(RedisSamplingConfigurer.LUMIGO_REDUCED_REDIS_INSTRUMENTATION);
+    System.clearProperty(RedisSamplingConfigurer.DASH0_REDUCED_REDIS_INSTRUMENTATION);
   }
 
   @Test
@@ -99,7 +99,7 @@ public class RedisSamplingConfiguratorTest extends AbstractSamplingConfiguratorT
 
   @Test
   public void shouldNotDropIfFalse() {
-    System.setProperty(RedisSamplingConfigurer.LUMIGO_REDUCED_REDIS_INSTRUMENTATION, "false");
+    System.setProperty(RedisSamplingConfigurer.DASH0_REDUCED_REDIS_INSTRUMENTATION, "false");
     AutoConfiguredOpenTelemetrySdkBuilder builder = AutoConfiguredOpenTelemetrySdk.builder();
 
     new RedisSamplingConfigurer().customize(builder);

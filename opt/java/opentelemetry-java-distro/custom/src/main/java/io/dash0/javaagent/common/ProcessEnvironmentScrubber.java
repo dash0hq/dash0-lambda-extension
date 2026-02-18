@@ -26,7 +26,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 public class ProcessEnvironmentScrubber extends SecretScrubber {
-  public static final String LUMIGO_SECRET_MASKING_REGEX_ENVIRONMENT =
+  public static final String DASH0_SECRET_MASKING_REGEX_ENVIRONMENT =
       "lumigo.secret.masking.regex.environment";
 
   private final String regExps;
@@ -34,7 +34,7 @@ public class ProcessEnvironmentScrubber extends SecretScrubber {
 
   public ProcessEnvironmentScrubber(ConfigProperties config) {
     ParseExpressionResult result =
-        parseExpressions(config, LUMIGO_SECRET_MASKING_REGEX_ENVIRONMENT);
+        parseExpressions(config, DASH0_SECRET_MASKING_REGEX_ENVIRONMENT);
     this.regExps = result.getRegularExpressions();
     this.expressionPatterns = result.getExpressionPatterns();
   }

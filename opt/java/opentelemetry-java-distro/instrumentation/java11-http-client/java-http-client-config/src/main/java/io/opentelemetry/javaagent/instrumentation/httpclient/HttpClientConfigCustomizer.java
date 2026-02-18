@@ -50,7 +50,7 @@ public class HttpClientConfigCustomizer implements AutoConfigurationCustomizerPr
       autoConfiguration.addPropertiesCustomizer(
           config -> {
             Map<String, String> overrides = new HashMap<>();
-            overrides.put("otel.instrumentation.lumigo-java-http-client.enabled", "false");
+            overrides.put("otel.instrumentation.dash0-java-http-client.enabled", "false");
             return overrides;
           });
 

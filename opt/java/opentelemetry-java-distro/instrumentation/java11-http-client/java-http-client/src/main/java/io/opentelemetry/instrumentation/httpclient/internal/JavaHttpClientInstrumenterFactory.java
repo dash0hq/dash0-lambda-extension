@@ -27,7 +27,7 @@ import java.util.function.Consumer;
  * any time.
  */
 public final class JavaHttpClientInstrumenterFactory {
-  public static final String INSTRUMENTATION_NAME = "io.opentelemetry.lumigo-java-http-client";
+  public static final String INSTRUMENTATION_NAME = "io.opentelemetry.dash0-java-http-client";
 
   public static Instrumenter<HttpRequest, HttpResponse<?>> createInstrumenter(
       OpenTelemetry openTelemetry,

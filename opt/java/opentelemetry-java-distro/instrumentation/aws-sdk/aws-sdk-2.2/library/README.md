@@ -7,7 +7,7 @@ and re-application of the following:
 
 ## `AwsSdkInstrumenterFactory`
 
-Update `INSTRUMENTATION_NAME` to be `io.opentelemetry.lumigo-aws-sdk-2.2`.
+Update `INSTRUMENTATION_NAME` to be `io.opentelemetry.dash0-aws-sdk-2.2`.
 
 Update `createInstrumenter()` with new parameter for `contextCustomizer` and pass to Instrumenter Builder:
 

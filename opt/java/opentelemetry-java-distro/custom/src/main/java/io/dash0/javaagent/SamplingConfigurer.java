@@ -50,7 +50,7 @@ public class SamplingConfigurer implements AutoConfigurationCustomizerProvider {
     HttpEndpointFilter httpEndpointFilter = new HttpEndpointFilter();
     ParseExpressionResult parseResult =
         httpEndpointFilter.parseExpressions(
-            configProperties, HttpEndpointFilter.LUMIGO_FILTER_HTTP_ENDPOINTS_REGEX_SERVER);
+            configProperties, HttpEndpointFilter.DASH0_FILTER_HTTP_ENDPOINTS_REGEX_SERVER);
 
     LOGGER.finest(
         "Filtering HTTP server endpoint spans matching '"
@@ -74,7 +74,7 @@ public class SamplingConfigurer implements AutoConfigurationCustomizerProvider {
     HttpEndpointFilter httpEndpointFilter = new HttpEndpointFilter();
     ParseExpressionResult parseResult =
         httpEndpointFilter.parseExpressions(
-            configProperties, HttpEndpointFilter.LUMIGO_FILTER_HTTP_ENDPOINTS_REGEX_CLIENT);
+            configProperties, HttpEndpointFilter.DASH0_FILTER_HTTP_ENDPOINTS_REGEX_CLIENT);
 
     LOGGER.finest(
         "Filtering HTTP client endpoint spans matching '"

@@ -36,7 +36,7 @@ public class SamplingConfiguratorTest extends AbstractSamplingConfiguratorTest {
   @Test
   public void testCustomize() {
     System.setProperty(
-        HttpEndpointFilter.LUMIGO_FILTER_HTTP_ENDPOINTS_REGEX_SERVER,
+        HttpEndpointFilter.DASH0_FILTER_HTTP_ENDPOINTS_REGEX_SERVER,
         "[\".*/health.*\", \".*/actuator.*\", \".*/version.*\"]");
     AutoConfiguredOpenTelemetrySdkBuilder builder = AutoConfiguredOpenTelemetrySdk.builder();
 

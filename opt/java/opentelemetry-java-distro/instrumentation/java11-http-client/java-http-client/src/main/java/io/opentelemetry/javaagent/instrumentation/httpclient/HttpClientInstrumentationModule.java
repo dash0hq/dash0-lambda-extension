@@ -15,7 +15,7 @@ import java.util.List;
 @AutoService(InstrumentationModule.class)
 public class HttpClientInstrumentationModule extends InstrumentationModule {
   public HttpClientInstrumentationModule() {
-    super("lumigo-java-http-client");
+    super("dash0-java-http-client");
   }
 
   @Override

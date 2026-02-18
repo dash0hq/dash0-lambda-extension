@@ -28,7 +28,7 @@ import java.util.List;
 @AutoService(InstrumentationModule.class)
 public class AwsSdkInstrumentationModule extends AbstractAwsSdkInstrumentationModule {
   public AwsSdkInstrumentationModule() {
-    super("lumigo-aws-sdk-2.2-core");
+    super("dash0-aws-sdk-2.2-core");
   }
 
   @Override

@@ -27,10 +27,10 @@ import java.util.List;
 public class KafkaClientConsumerRecordsInstrumentationModule extends InstrumentationModule {
   public KafkaClientConsumerRecordsInstrumentationModule() {
     super(
-        "lumigo-kafka-clients-consumer-payloads",
-        "lumigo-kafka-clients-0.11",
-        "lumigo-kafka",
-        "lumigo-kafka-consumer-payload");
+        "dash0-kafka-clients-consumer-payloads",
+        "dash0-kafka-clients-0.11",
+        "dash0-kafka",
+        "dash0-kafka-consumer-payload");
   }
 
   @Override

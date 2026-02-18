@@ -26,7 +26,7 @@ import java.util.List;
 @AutoService(InstrumentationModule.class)
 public class AwsSdkInstrumentationModule extends InstrumentationModule {
   public AwsSdkInstrumentationModule() {
-    super("lumigo-aws-sdk", "lumigo-aws-sdk-1.11");
+    super("dash0-aws-sdk", "dash0-aws-sdk-1.11");
   }
 
   @Override

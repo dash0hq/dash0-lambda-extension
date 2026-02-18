@@ -24,7 +24,7 @@ import java.util.Arrays;
 
 public class PayloadBridge {
   private static final ContextKey<PayloadBridge> CONTEXT_KEY =
-      ContextKey.named("lumigo-aws-sdk-payload-bridge");
+      ContextKey.named("dash0-aws-sdk-payload-bridge");
 
   private byte[] responsePayloadBuffer = new byte[0];
   private int responsePayloadBufferLength = 0;

@@ -42,13 +42,13 @@ class HttpEndpointFilterTest {
   @Test
   void testServerOverride() {
     ConfigProperties mockConfig = mock();
-    when(mockConfig.getString(HttpEndpointFilter.LUMIGO_FILTER_HTTP_ENDPOINTS_REGEX_SERVER))
+    when(mockConfig.getString(HttpEndpointFilter.DASH0_FILTER_HTTP_ENDPOINTS_REGEX_SERVER))
         .thenReturn("[\".*/custom.*\"]");
 
     HttpEndpointFilter filter = new HttpEndpointFilter();
     ParseExpressionResult result =
         filter.parseExpressions(
-            mockConfig, HttpEndpointFilter.LUMIGO_FILTER_HTTP_ENDPOINTS_REGEX_SERVER);
+            mockConfig, HttpEndpointFilter.DASH0_FILTER_HTTP_ENDPOINTS_REGEX_SERVER);
 
     assertThat(result.getExpressionPatterns().size(), equalTo(1));
     assertThat(result.getExpressionPatterns().get(0).pattern(), equalTo(".*/custom.*"));
@@ -56,7 +56,7 @@ class HttpEndpointFilterTest {
 
     result =
         filter.parseExpressions(
-            mockConfig, HttpEndpointFilter.LUMIGO_FILTER_HTTP_ENDPOINTS_REGEX_CLIENT);
+            mockConfig, HttpEndpointFilter.DASH0_FILTER_HTTP_ENDPOINTS_REGEX_CLIENT);
 
     assertThat(result.getExpressionPatterns().size(), equalTo(2));
     assertThat(result.getExpressionPatterns().get(0).pattern(), equalTo(".*/health.*"));
@@ -67,13 +67,13 @@ class HttpEndpointFilterTest {
   @Test
   void testServerOverrideWithOriginals() {
     ConfigProperties mockConfig = mock();
-    when(mockConfig.getString(HttpEndpointFilter.LUMIGO_FILTER_HTTP_ENDPOINTS_REGEX_SERVER))
+    when(mockConfig.getString(HttpEndpointFilter.DASH0_FILTER_HTTP_ENDPOINTS_REGEX_SERVER))
         .thenReturn("[\".*/health.*\", \".*/actuator.*\", \".*/custom.*\"]");
 
     HttpEndpointFilter filter = new HttpEndpointFilter();
     ParseExpressionResult result =
         filter.parseExpressions(
-            mockConfig, HttpEndpointFilter.LUMIGO_FILTER_HTTP_ENDPOINTS_REGEX_SERVER);
+            mockConfig, HttpEndpointFilter.DASH0_FILTER_HTTP_ENDPOINTS_REGEX_SERVER);
 
     assertThat(result.getExpressionPatterns().size(), equalTo(3));
     assertThat(result.getExpressionPatterns().get(0).pattern(), equalTo(".*/health.*"));
@@ -85,7 +85,7 @@ class HttpEndpointFilterTest {
 
     result =
         filter.parseExpressions(
-            mockConfig, HttpEndpointFilter.LUMIGO_FILTER_HTTP_ENDPOINTS_REGEX_CLIENT);
+            mockConfig, HttpEndpointFilter.DASH0_FILTER_HTTP_ENDPOINTS_REGEX_CLIENT);
 
     assertThat(result.getExpressionPatterns().size(), equalTo(2));
     assertThat(result.getExpressionPatterns().get(0).pattern(), equalTo(".*/health.*"));
@@ -96,13 +96,13 @@ class HttpEndpointFilterTest {
   @Test
   void testClientOverride() {
     ConfigProperties mockConfig = mock();
-    when(mockConfig.getString(HttpEndpointFilter.LUMIGO_FILTER_HTTP_ENDPOINTS_REGEX_CLIENT))
+    when(mockConfig.getString(HttpEndpointFilter.DASH0_FILTER_HTTP_ENDPOINTS_REGEX_CLIENT))
         .thenReturn("[\".*/custom.*\"]");
 
     HttpEndpointFilter filter = new HttpEndpointFilter();
     ParseExpressionResult result =
         filter.parseExpressions(
-            mockConfig, HttpEndpointFilter.LUMIGO_FILTER_HTTP_ENDPOINTS_REGEX_CLIENT);
+            mockConfig, HttpEndpointFilter.DASH0_FILTER_HTTP_ENDPOINTS_REGEX_CLIENT);
 
     assertThat(result.getExpressionPatterns().size(), equalTo(1));
     assertThat(result.getExpressionPatterns().get(0).pattern(), equalTo(".*/custom.*"));
@@ -110,7 +110,7 @@ class HttpEndpointFilterTest {
 
     result =
         filter.parseExpressions(
-            mockConfig, HttpEndpointFilter.LUMIGO_FILTER_HTTP_ENDPOINTS_REGEX_SERVER);
+            mockConfig, HttpEndpointFilter.DASH0_FILTER_HTTP_ENDPOINTS_REGEX_SERVER);
 
     assertThat(result.getExpressionPatterns().size(), equalTo(2));
     assertThat(result.getExpressionPatterns().get(0).pattern(), equalTo(".*/health.*"));
@@ -121,7 +121,7 @@ class HttpEndpointFilterTest {
   @Test
   void testEmptyHttpFilter() {
     ConfigProperties mockConfig = mock();
-    when(mockConfig.getString(HttpEndpointFilter.LUMIGO_FILTER_HTTP_ENDPOINTS_REGEX))
+    when(mockConfig.getString(HttpEndpointFilter.DASH0_FILTER_HTTP_ENDPOINTS_REGEX))
         .thenReturn("");
 
     HttpEndpointFilter filter = new HttpEndpointFilter();
@@ -136,7 +136,7 @@ class HttpEndpointFilterTest {
   @Test
   void testEmptyArrayHttpFilter() {
     ConfigProperties mockConfig = mock();
-    when(mockConfig.getString(HttpEndpointFilter.LUMIGO_FILTER_HTTP_ENDPOINTS_REGEX))
+    when(mockConfig.getString(HttpEndpointFilter.DASH0_FILTER_HTTP_ENDPOINTS_REGEX))
         .thenReturn("[]");
 
     HttpEndpointFilter filter = new HttpEndpointFilter();
@@ -149,7 +149,7 @@ class HttpEndpointFilterTest {
   @Test
   void testCustomHttpFilter() {
     ConfigProperties mockConfig = mock();
-    when(mockConfig.getString(HttpEndpointFilter.LUMIGO_FILTER_HTTP_ENDPOINTS_REGEX))
+    when(mockConfig.getString(HttpEndpointFilter.DASH0_FILTER_HTTP_ENDPOINTS_REGEX))
         .thenReturn("[\".*/custom.*\"]");
 
     HttpEndpointFilter filter = new HttpEndpointFilter();
@@ -163,7 +163,7 @@ class HttpEndpointFilterTest {
   @Test
   void testInvalidJsonHttpFilter() {
     ConfigProperties mockConfig = mock();
-    when(mockConfig.getString(HttpEndpointFilter.LUMIGO_FILTER_HTTP_ENDPOINTS_REGEX))
+    when(mockConfig.getString(HttpEndpointFilter.DASH0_FILTER_HTTP_ENDPOINTS_REGEX))
         .thenReturn("['.*\"my.*']");
 
     HttpEndpointFilter filter = new HttpEndpointFilter();
@@ -178,7 +178,7 @@ class HttpEndpointFilterTest {
   @Test
   void testInvalidRegExHttpFilter() {
     ConfigProperties mockConfig = mock();
-    when(mockConfig.getString(HttpEndpointFilter.LUMIGO_FILTER_HTTP_ENDPOINTS_REGEX))
+    when(mockConfig.getString(HttpEndpointFilter.DASH0_FILTER_HTTP_ENDPOINTS_REGEX))
         .thenReturn("[\"(ad\"]");
 
     HttpEndpointFilter filter = new HttpEndpointFilter();
@@ -193,7 +193,7 @@ class HttpEndpointFilterTest {
   @Test
   void testInvalidJsonPlainStringFilter() {
     ConfigProperties mockConfig = mock();
-    when(mockConfig.getString(HttpEndpointFilter.LUMIGO_FILTER_HTTP_ENDPOINTS_REGEX))
+    when(mockConfig.getString(HttpEndpointFilter.DASH0_FILTER_HTTP_ENDPOINTS_REGEX))
         .thenReturn("foo");
 
     HttpEndpointFilter filter = new HttpEndpointFilter();
@@ -208,7 +208,7 @@ class HttpEndpointFilterTest {
   @Test
   void testInvalidJsonObjectFilter() {
     ConfigProperties mockConfig = mock();
-    when(mockConfig.getString(HttpEndpointFilter.LUMIGO_FILTER_HTTP_ENDPOINTS_REGEX))
+    when(mockConfig.getString(HttpEndpointFilter.DASH0_FILTER_HTTP_ENDPOINTS_REGEX))
         .thenReturn("{\"foo\": \"bar\"}");
 
     HttpEndpointFilter filter = new HttpEndpointFilter();

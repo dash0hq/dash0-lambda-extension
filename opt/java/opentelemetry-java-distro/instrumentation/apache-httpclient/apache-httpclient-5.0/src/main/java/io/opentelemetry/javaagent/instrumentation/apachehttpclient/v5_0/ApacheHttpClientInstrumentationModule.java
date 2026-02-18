@@ -15,7 +15,7 @@ import java.util.List;
 public class ApacheHttpClientInstrumentationModule extends InstrumentationModule {
 
   public ApacheHttpClientInstrumentationModule() {
-    super("lumigo-apache-httpclient", "lumigo-apache-httpclient-5.0");
+    super("dash0-apache-httpclient", "dash0-apache-httpclient-5.0");
   }
 
   @Override

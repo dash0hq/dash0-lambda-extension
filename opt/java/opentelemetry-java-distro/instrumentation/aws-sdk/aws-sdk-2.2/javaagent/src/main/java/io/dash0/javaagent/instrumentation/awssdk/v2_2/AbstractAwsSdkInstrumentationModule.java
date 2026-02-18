@@ -19,7 +19,7 @@ import net.bytebuddy.matcher.ElementMatcher;
 abstract class AbstractAwsSdkInstrumentationModule extends InstrumentationModule {
 
   protected AbstractAwsSdkInstrumentationModule(String additionalInstrumentationName) {
-    super("lumigo-aws-sdk", "lumigo-aws-sdk-2.2", additionalInstrumentationName);
+    super("dash0-aws-sdk", "dash0-aws-sdk-2.2", additionalInstrumentationName);
   }
 
   @Override
