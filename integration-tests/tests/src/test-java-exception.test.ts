@@ -94,6 +94,6 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
 }
 
 describe.concurrent('Lambda invocation', () => {
-    const runtimes = ['java17', 'java21'];
+    const runtimes = ['java17', 'java21', 'java25'];
     runAllTests('exception', runtimes, verifySuccessInvocation);
 });
