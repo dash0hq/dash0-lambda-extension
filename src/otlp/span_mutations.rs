@@ -1,7 +1,5 @@
 use crate::otlp::log_mutations::try_read_env_from_file;
-use crate::state::invocation_data::{
-    store_return_payload, store_traces, take_return_payload, take_traces, StoredTrace,
-};
+use crate::state::invocation_data::{store_traces, take_traces, StoredTrace};
 use crate::state::invocation_entry;
 use crate::util::parsers::{
     extract_invocation_id, get_span_id_from_invocation_id, get_span_scope_name,
@@ -416,11 +414,11 @@ pub fn add_return_payload_to_lambda_server_spans(
     }
 
     store_traces(updated_traces);
-    if added {
-        // Clean up any pending payload stored earlier for this invocation.
-        let _ = take_return_payload(invocation_id);
-    } else {
-        store_return_payload(invocation_id, return_payload);
+    if !added {
+        let payload = return_payload.to_string();
+        invocation_entry::update(invocation_id, |entry| {
+            entry.return_value = Some(payload);
+        });
     }
     added
 }
@@ -555,7 +553,8 @@ pub fn process_trace_request(
     // If we have pending return payloads for these invocation IDs, apply them now.
     let mut updated_with_return = false;
     for id in invocation_ids.iter() {
-        if let Some(payload) = crate::state::invocation_data::take_return_payload(id) {
+        let payload = invocation_entry::get(id).and_then(|e| e.return_value.clone());
+        if let Some(payload) = payload {
             if annotate_return_payload(decoded, id, &payload) {
                 updated_with_return = true;
             }
@@ -621,10 +620,7 @@ mod tests {
         add_event_payload_to_lambda_server_spans, add_return_payload_to_lambda_server_spans,
         annotate_return_payload, build_synthetic_trace, StatusCode,
     };
-    use crate::state::invocation_data::{
-        snapshot_traces, store_return_payload, store_trace, take_return_payload, take_traces,
-        StoredTrace,
-    };
+    use crate::state::invocation_data::{snapshot_traces, store_trace, take_traces, StoredTrace};
     use crate::state::invocation_entry;
     use hyper::{header, Method};
     use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
@@ -647,6 +643,24 @@ mod tests {
         invocation_entry::update(invocation_id, |entry| {
             entry.event_payload = Some(payload);
         });
+    }
+
+    fn store_return_payload(invocation_id: &str, payload: &str) {
+        let payload = payload.to_string();
+        invocation_entry::update(invocation_id, |entry| {
+            entry.return_value = Some(payload);
+        });
+    }
+
+    fn take_return_payload(invocation_id: &str) -> Option<String> {
+        let entry = invocation_entry::get(invocation_id)?;
+        let value = entry.return_value.clone();
+        if value.is_some() {
+            invocation_entry::update(invocation_id, |entry| {
+                entry.return_value = None;
+            });
+        }
+        value
     }
 
     #[test]
@@ -1028,12 +1042,6 @@ mod tests {
         assert!(
             return_attr.is_some(),
             "dash0.faas.return_value should be added"
-        );
-
-        // Verify the pending payload was consumed
-        assert!(
-            take_return_payload(invocation_id).is_none(),
-            "pending return payload should be consumed"
         );
     }
 

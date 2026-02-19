@@ -83,19 +83,6 @@ pub fn snapshot_metrics() -> Vec<StoredMetric> {
 
 static METRIC_STORE: Lazy<Mutex<Vec<StoredMetric>>> = Lazy::new(|| Mutex::new(Vec::new()));
 
-pub fn store_return_payload(invocation_id: &str, payload: &str) {
-    RETURN_PAYLOADS
-        .lock()
-        .insert(invocation_id.to_string(), payload.to_string());
-}
-
-pub fn take_return_payload(invocation_id: &str) -> Option<String> {
-    RETURN_PAYLOADS.lock().remove(invocation_id)
-}
-
-static RETURN_PAYLOADS: Lazy<Mutex<HashMap<String, String>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
-
 static CURRENT_INVOCATION_ID: Lazy<Mutex<Option<String>>> = Lazy::new(|| Mutex::new(None));
 
 pub fn store_current_invocation_id(invocation_id: &str) {
@@ -239,7 +226,6 @@ pub fn take_invocation_data(invocation_id: &str) -> Option<InvocationData> {
 }
 
 pub(crate) fn cleanup_invocation(invocation_id: &str) {
-    take_return_payload(invocation_id);
     take_invocation_data(invocation_id);
 }
 
