@@ -1,5 +1,6 @@
 use crate::config::is_auto_instrumented_disabled;
-use crate::state::invocation_data::{get_invocation_span_id, store_telemetry_logs, TelemetryLog};
+use crate::state::invocation_data::{store_telemetry_logs, TelemetryLog};
+use crate::state::invocation_entry;
 use crate::util::parsers::{get_span_id_from_invocation_id, get_trace_id_from_invocation_id};
 use chrono::DateTime;
 use opentelemetry_proto::tonic::common::v1::AnyValue;
@@ -161,15 +162,19 @@ pub fn map_logs_to_otlp(logs: &[TelemetryLog], is_invocation_end: bool) -> Vec<L
                 }),
             });
 
-            if let Some(span_ids) = get_invocation_span_id(invocation_id) {
-                if let Ok(tid) = hex::decode(&span_ids.trace_id) {
-                    if tid.len() == 16 {
-                        trace_id = tid;
+            if let Some(entry) = invocation_entry::get(invocation_id) {
+                if let Some(ref tid_hex) = entry.trace_id {
+                    if let Ok(tid) = hex::decode(tid_hex) {
+                        if tid.len() == 16 {
+                            trace_id = tid;
+                        }
                     }
                 }
-                if let Ok(sid) = hex::decode(&span_ids.span_id) {
-                    if sid.len() == 8 {
-                        span_id = sid;
+                if let Some(ref sid_hex) = entry.span_id {
+                    if let Ok(sid) = hex::decode(sid_hex) {
+                        if sid.len() == 8 {
+                            span_id = sid;
+                        }
                     }
                 }
             } else if is_invocation_end || is_auto_instrumented_disabled() {
@@ -494,19 +499,17 @@ mod tests {
 
     #[test]
     fn test_map_logs_with_trace_and_span_id_from_store() {
-        use crate::state::invocation_data::store_invocation_span_id;
+        use crate::state::invocation_entry;
 
         let invocation_id = "inv-with-trace";
         let trace_id_hex = "5b8eff129842a1b9c9283745a23f54b1";
         let span_id_hex = "023f54b19283745a";
 
         // Store the mapping
-        store_invocation_span_id(
-            invocation_id,
-            trace_id_hex.to_string(),
-            span_id_hex.to_string(),
-            String::new(),
-        );
+        invocation_entry::update(invocation_id, |entry| {
+            entry.trace_id = Some(trace_id_hex.to_string());
+            entry.span_id = Some(span_id_hex.to_string());
+        });
 
         let logs = vec![TelemetryLog {
             time: "2023-10-26T12:00:00.000Z".to_string(),

@@ -46,12 +46,12 @@ fn handle_invoke_event(json: &serde_json::Value) {
             {
                 let trace_id = hex::encode(&trace_id_bytes);
                 let parent_span_id = hex::encode(&parent_span_id_bytes);
-                state::invocation_data::store_invocation_span_id(
-                    request_id,
-                    trace_id,
-                    hex::encode(get_span_id_from_invocation_id(request_id)),
-                    parent_span_id,
-                );
+                let span_id = hex::encode(get_span_id_from_invocation_id(request_id));
+                state::invocation_entry::update(request_id, |entry| {
+                    entry.trace_id = Some(trace_id);
+                    entry.span_id = Some(span_id);
+                    entry.parent_span_id = Some(parent_span_id);
+                });
             }
         }
     }

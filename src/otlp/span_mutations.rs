@@ -592,12 +592,11 @@ pub fn process_trace_request(
                                     .iter()
                                     .map(|b| format!("{:02x}", b))
                                     .collect::<String>();
-                                crate::state::invocation_data::store_invocation_span_id(
-                                    invocation_id,
-                                    trace_id_hex,
-                                    span_id_hex,
-                                    parent_span_id_hex,
-                                );
+                                invocation_entry::update(invocation_id, |entry| {
+                                    entry.trace_id = Some(trace_id_hex);
+                                    entry.span_id = Some(span_id_hex);
+                                    entry.parent_span_id = Some(parent_span_id_hex);
+                                });
                                 tracing::debug!(
                                     "[{}] stored trace/span id for invocation_id={}",
                                     crate::log_prefix(),
@@ -1063,7 +1062,7 @@ mod tests {
         super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
 
         // Verify the span IDs were stored
-        let stored = crate::state::invocation_data::get_invocation_span_id(invocation_id);
+        let stored = invocation_entry::get(invocation_id);
         assert!(stored.is_some(), "invocation span IDs should be stored");
 
         let stored = stored.unwrap();
@@ -1076,8 +1075,8 @@ mod tests {
             .map(|b| format!("{:02x}", b))
             .collect::<String>();
 
-        assert_eq!(stored.trace_id, expected_trace_id);
-        assert_eq!(stored.span_id, expected_span_id);
+        assert_eq!(stored.trace_id.unwrap(), expected_trace_id);
+        assert_eq!(stored.span_id.unwrap(), expected_span_id);
     }
 
     #[test]
@@ -1573,13 +1572,14 @@ fn get_trace_span_ids(
         }
     }
 
-    let stored = crate::state::invocation_data::get_invocation_span_id(invocation_id);
+    let stored = invocation_entry::get(invocation_id);
 
     let trace_id = trace_id.unwrap_or_else(|| {
         stored
             .as_ref()
-            .filter(|s| !s.trace_id.is_empty())
-            .and_then(|s| hex::decode(&s.trace_id).ok())
+            .and_then(|s| s.trace_id.as_deref())
+            .filter(|t| !t.is_empty())
+            .and_then(|t| hex::decode(t).ok())
             .filter(|t| t.len() == 16)
             .unwrap_or_else(|| get_trace_id_from_invocation_id(invocation_id))
     });
@@ -1587,8 +1587,9 @@ fn get_trace_span_ids(
     let span_id = span_id.unwrap_or_else(|| {
         stored
             .as_ref()
-            .filter(|s| !s.span_id.is_empty())
-            .and_then(|s| hex::decode(&s.span_id).ok())
+            .and_then(|s| s.span_id.as_deref())
+            .filter(|s| !s.is_empty())
+            .and_then(|s| hex::decode(s).ok())
             .filter(|p| p.len() == 8)
             .unwrap_or_else(|| get_span_id_from_invocation_id(invocation_id))
     });
@@ -1596,18 +1597,18 @@ fn get_trace_span_ids(
     let parent_span_id = parent_span_id.unwrap_or_else(|| {
         stored
             .as_ref()
-            .filter(|s| !s.parent_span_id.is_empty())
-            .and_then(|s| hex::decode(&s.parent_span_id).ok())
+            .and_then(|s| s.parent_span_id.as_deref())
+            .filter(|p| !p.is_empty())
+            .and_then(|p| hex::decode(p).ok())
             .filter(|p| p.len() == 8)
             .unwrap_or_default()
     });
 
-    crate::state::invocation_data::store_invocation_span_id(
-        invocation_id,
-        hex::encode(&trace_id),
-        hex::encode(&span_id),
-        hex::encode(&parent_span_id),
-    );
+    invocation_entry::update(invocation_id, |entry| {
+        entry.trace_id = Some(hex::encode(&trace_id));
+        entry.span_id = Some(hex::encode(&span_id));
+        entry.parent_span_id = Some(hex::encode(&parent_span_id));
+    });
 
     (trace_id, span_id, parent_span_id)
 }
