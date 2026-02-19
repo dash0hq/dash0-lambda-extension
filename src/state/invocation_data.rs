@@ -161,18 +161,26 @@ static TELEMETRY_LOGS: Lazy<Mutex<Vec<TelemetryLog>>> = Lazy::new(|| Mutex::new(
 pub struct SpanId {
     pub trace_id: String,
     pub span_id: String,
+    pub parent_span_id: String,
     pub timestamp: Instant,
 }
 
 impl PartialEq for SpanId {
     fn eq(&self, other: &Self) -> bool {
-        self.trace_id == other.trace_id && self.span_id == other.span_id
+        self.trace_id == other.trace_id
+            && self.span_id == other.span_id
+            && self.parent_span_id == other.parent_span_id
     }
 }
 
 const MAX_INVOCATION_SPAN_IDS: usize = 10;
 
-pub fn store_invocation_span_id(invocation_id: &str, trace_id: String, span_id: String) {
+pub fn store_invocation_span_id(
+    invocation_id: &str,
+    trace_id: String,
+    span_id: String,
+    parent_span_id: String,
+) {
     let mut store = INVOCATION_SPAN_IDS.lock();
 
     // If we're at capacity and this is a new key, remove the oldest entry
@@ -191,6 +199,7 @@ pub fn store_invocation_span_id(invocation_id: &str, trace_id: String, span_id: 
         SpanId {
             trace_id,
             span_id,
+            parent_span_id,
             timestamp: Instant::now(),
         },
     );
@@ -403,6 +412,7 @@ mod tests {
                 &format!("inv-{}", i),
                 format!("trace-{}", i),
                 format!("span-{}", i),
+                String::new(),
             );
             // Small sleep to ensure distinct timestamps
             std::thread::sleep(std::time::Duration::from_millis(5));
@@ -419,7 +429,12 @@ mod tests {
         }
 
         // Add an 11th item
-        store_invocation_span_id("inv-10", "trace-10".to_string(), "span-10".to_string());
+        store_invocation_span_id(
+            "inv-10",
+            "trace-10".to_string(),
+            "span-10".to_string(),
+            String::new(),
+        );
 
         // Verify the map still has only 10 items
         assert_eq!(invocation_span_ids_len(), 10);
@@ -457,6 +472,7 @@ mod tests {
                 &format!("inv-{}", i),
                 format!("trace-{}", i),
                 format!("span-{}", i),
+                String::new(),
             );
             std::thread::sleep(std::time::Duration::from_millis(5));
         }
@@ -468,6 +484,7 @@ mod tests {
             "inv-0",
             "trace-0-updated".to_string(),
             "span-0-updated".to_string(),
+            String::new(),
         );
 
         // Verify still 10 items

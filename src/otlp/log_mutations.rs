@@ -505,6 +505,7 @@ mod tests {
             invocation_id,
             trace_id_hex.to_string(),
             span_id_hex.to_string(),
+            String::new(),
         );
 
         let logs = vec![TelemetryLog {

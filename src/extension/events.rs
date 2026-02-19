@@ -99,6 +99,28 @@ pub async fn get_next() {
                     if let Some(arn) = json.get("invokedFunctionArn").and_then(|v| v.as_str()) {
                         state::global::store_function_arn(arn);
                     }
+
+                    // Parse trace context from _X_AMZN_TRACE_ID tracing header
+                    if let Some(request_id) = json.get("requestId").and_then(|v| v.as_str()) {
+                        if let Some(trace_value) = json
+                            .get("tracing")
+                            .and_then(|t| t.get("value"))
+                            .and_then(|v| v.as_str())
+                        {
+                            if let Some((trace_id_bytes, parent_span_id_bytes)) =
+                                crate::otlp::span_link_extractor::parse_amzn_trace_id(trace_value)
+                            {
+                                let trace_id = hex::encode(&trace_id_bytes);
+                                let parent_span_id = hex::encode(&parent_span_id_bytes);
+                                state::invocation_data::store_invocation_span_id(
+                                    request_id,
+                                    trace_id,
+                                    String::new(),
+                                    parent_span_id,
+                                );
+                            }
+                        }
+                    }
                 }
 
                 let event_type = json.get("eventType").and_then(|v| v.as_str());

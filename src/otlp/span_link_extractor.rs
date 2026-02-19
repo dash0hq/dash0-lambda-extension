@@ -225,7 +225,7 @@ fn parse_traceparent(traceparent: &str) -> Option<(Vec<u8>, Vec<u8>)> {
 /// Example: Root=1-698f814c-7708a2b018bc2cc4726a6288;Parent=f21a582b8b8134b9;Sampled=1
 /// The 16-byte trace_id is the concatenation of the two hex parts after "Root=1-".
 /// The 8-byte span_id is the hex part after "Parent=".
-fn parse_amzn_trace_id(value: &str) -> Option<(Vec<u8>, Vec<u8>)> {
+pub fn parse_amzn_trace_id(value: &str) -> Option<(Vec<u8>, Vec<u8>)> {
     let mut root_hex: Option<String> = None;
     let mut parent_hex: Option<&str> = None;
 

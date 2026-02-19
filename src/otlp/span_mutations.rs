@@ -584,10 +584,16 @@ pub fn process_trace_request(
                                     .iter()
                                     .map(|b| format!("{:02x}", b))
                                     .collect::<String>();
+                                let parent_span_id_hex = span
+                                    .parent_span_id
+                                    .iter()
+                                    .map(|b| format!("{:02x}", b))
+                                    .collect::<String>();
                                 crate::state::invocation_data::store_invocation_span_id(
                                     invocation_id,
                                     trace_id_hex,
                                     span_id_hex,
+                                    parent_span_id_hex,
                                 );
                                 tracing::debug!(
                                     "[{}] stored trace/span id for invocation_id={}",
@@ -1513,9 +1519,6 @@ fn env_as_json_string() -> String {
 }
 
 fn get_trace_span_ids(invocation_id: &str, existing_traces: &[StoredTrace]) -> (Vec<u8>, Vec<u8>) {
-    let mut found_trace_id: Option<Vec<u8>> = None;
-    let mut found_parent_span_id: Option<Vec<u8>> = None;
-
     for trace in existing_traces {
         if !trace.invocation_ids.contains(&invocation_id.to_string()) {
             continue;
@@ -1533,28 +1536,34 @@ fn get_trace_span_ids(invocation_id: &str, existing_traces: &[StoredTrace]) -> (
                 .flat_map(|ss| ss.spans)
                 .next()
             {
-                if span.trace_id.len() == 16 {
-                    found_trace_id = Some(span.trace_id.clone());
-                }
-                if !span.parent_span_id.is_empty() {
-                    found_parent_span_id = Some(span.parent_span_id.clone());
-                }
                 crate::state::invocation_data::store_invocation_span_id(
                     invocation_id,
                     hex::encode(&span.trace_id),
+                    hex::encode(&span.span_id),
                     hex::encode(&span.parent_span_id),
                 );
-                if found_trace_id.is_some() {
-                    break;
+                if span.trace_id.len() == 16 && !span.parent_span_id.is_empty() {
+                    return (span.trace_id, span.parent_span_id);
                 }
             }
         }
     }
 
-    let trace_id = found_trace_id.unwrap_or_else(|| get_trace_id_from_invocation_id(invocation_id));
+    let stored = crate::state::invocation_data::get_invocation_span_id(invocation_id);
 
-    let span_id =
-        found_parent_span_id.unwrap_or_else(|| get_span_id_from_invocation_id(invocation_id));
+    let trace_id = stored
+        .as_ref()
+        .filter(|s| !s.trace_id.is_empty())
+        .and_then(|s| hex::decode(&s.trace_id).ok())
+        .filter(|t| t.len() == 16)
+        .unwrap_or_else(|| get_trace_id_from_invocation_id(invocation_id));
+
+    let span_id = stored
+        .as_ref()
+        .filter(|s| !s.span_id.is_empty())
+        .and_then(|s| hex::decode(&s.span_id).ok())
+        .filter(|p| p.len() == 8)
+        .unwrap_or_else(|| get_span_id_from_invocation_id(invocation_id));
 
     (trace_id, span_id)
 }
