@@ -1,5 +1,5 @@
 use crate::otlp::log_mutations::try_read_env_from_file;
-use crate::state::invocation_data::{store_traces, take_traces, StoredTrace};
+use crate::state::invocation_data::StoredTrace;
 use crate::state::invocation_entry;
 use crate::util::parsers::{
     extract_invocation_id, get_span_id_from_invocation_id, get_span_scope_name,
@@ -384,7 +384,7 @@ pub fn add_return_payload_to_lambda_server_spans(
     invocation_id: &str,
     return_payload: &str,
 ) -> bool {
-    let mut traces = take_traces();
+    let mut traces = invocation_entry::take_all_traces();
     let mut updated_traces: Vec<StoredTrace> = Vec::new();
     let mut added = false;
 
@@ -413,7 +413,7 @@ pub fn add_return_payload_to_lambda_server_spans(
         updated_traces.push(trace);
     }
 
-    store_traces(updated_traces);
+    invocation_entry::store_traces(updated_traces);
     if !added {
         let payload = return_payload.to_string();
         invocation_entry::update(invocation_id, |entry| {
@@ -617,7 +617,7 @@ mod tests {
         add_event_payload_to_lambda_server_spans, add_return_payload_to_lambda_server_spans,
         annotate_return_payload, build_synthetic_trace, StatusCode,
     };
-    use crate::state::invocation_data::{snapshot_traces, store_trace, take_traces, StoredTrace};
+    use crate::state::invocation_data::StoredTrace;
     use crate::state::invocation_entry;
     use hyper::{header, Method};
     use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
@@ -658,6 +658,18 @@ mod tests {
             });
         }
         value
+    }
+
+    fn store_trace(trace: StoredTrace) {
+        invocation_entry::store_trace(trace);
+    }
+
+    fn take_traces() -> Vec<StoredTrace> {
+        invocation_entry::take_all_traces()
+    }
+
+    fn snapshot_traces() -> Vec<StoredTrace> {
+        invocation_entry::snapshot_all_traces()
     }
 
     #[test]

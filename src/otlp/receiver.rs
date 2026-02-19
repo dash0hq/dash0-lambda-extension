@@ -5,7 +5,8 @@ use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 
 use crate::otlp::span_mutations::{drop_duplicate_java_instrumenations, process_trace_request};
-use crate::state::invocation_data::{store_trace, StoredTrace};
+use crate::state::invocation_data::StoredTrace;
+use crate::state::invocation_entry;
 
 pub async fn traces(req: Request<Body>) -> Result<Response<Body>, Error> {
     let start = Instant::now();
@@ -89,7 +90,7 @@ pub async fn traces(req: Request<Body>) -> Result<Response<Body>, Error> {
     }
 
     let seen_invocation_ids = invocation_ids.clone();
-    store_trace(StoredTrace {
+    invocation_entry::store_trace(StoredTrace {
         method: parts.method,
         path_and_query: parts
             .uri

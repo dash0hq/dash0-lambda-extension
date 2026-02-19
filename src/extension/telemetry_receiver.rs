@@ -1,7 +1,7 @@
 use crate::config::user::is_logs_instrumentation_enabled;
 use crate::otlp::exporter::{flush_telemetry_logs, flush_traces, send_traces};
 use crate::otlp::span_mutations::build_synthetic_trace;
-use crate::state::invocation_data::take_traces;
+use crate::state::invocation_entry;
 use crate::util::parsers::extract_error_invocation_ids;
 use hyper::{Body, Error, Request, Response};
 
@@ -61,7 +61,7 @@ pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
             body_text
         );
 
-        let mut traces_to_send = take_traces();
+        let mut traces_to_send = invocation_entry::take_all_traces();
 
         for (invocation_id, error_type) in &error_invocation_ids {
             match build_synthetic_trace(invocation_id, Some(error_type), None, &traces_to_send) {

@@ -12,7 +12,7 @@ use crate::otlp::masking::mask_json_string;
 use crate::otlp::span_mutations::{
     add_return_payload_to_lambda_server_spans, build_synthetic_trace,
 };
-use crate::state::invocation_data::{store_current_invocation_id, store_trace};
+use crate::state::invocation_data::store_current_invocation_id;
 use crate::state::invocation_entry;
 use crate::util::parsers::extract_invocation_id_from_path;
 
@@ -260,7 +260,7 @@ pub async fn invocation_response_proxy(req: Request<Body>) -> Result<Response<Bo
             if let Some(trace) =
                 build_synthetic_trace(&id, None, Some(return_payload.as_str()), &Vec::new())
             {
-                store_trace(trace);
+                invocation_entry::store_trace_by_id(&id, trace);
             }
         } else {
             if !add_return_payload_to_lambda_server_spans(&id, &return_payload) {

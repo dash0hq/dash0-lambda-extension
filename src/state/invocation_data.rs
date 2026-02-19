@@ -2,23 +2,6 @@ use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
-pub fn store_trace(trace: StoredTrace) {
-    TRACE_STORE.lock().push(trace);
-}
-
-pub fn store_traces(traces: Vec<StoredTrace>) {
-    TRACE_STORE.lock().extend(traces);
-}
-
-pub fn take_traces() -> Vec<StoredTrace> {
-    std::mem::take(&mut *TRACE_STORE.lock())
-}
-
-#[allow(dead_code)]
-pub fn snapshot_traces() -> Vec<StoredTrace> {
-    TRACE_STORE.lock().clone()
-}
-
 #[derive(Clone)]
 pub struct StoredTrace {
     pub method: hyper::Method,
@@ -27,12 +10,6 @@ pub struct StoredTrace {
     pub body: Vec<u8>,
     pub invocation_ids: Vec<String>,
 }
-
-pub fn force_init_trace_store() {
-    Lazy::force(&TRACE_STORE);
-}
-
-static TRACE_STORE: Lazy<Mutex<Vec<StoredTrace>>> = Lazy::new(|| Mutex::new(Vec::new()));
 
 #[derive(Clone)]
 pub struct StoredLog {

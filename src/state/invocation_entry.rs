@@ -107,3 +107,74 @@ pub fn snapshot_all_telemetry_logs() -> Vec<TelemetryLog> {
         .flat_map(|entry| entry.logs.iter().cloned())
         .collect()
 }
+
+/// Store a trace under a known invocation ID directly.
+pub fn store_trace_by_id(invocation_id: &str, trace: StoredTrace) {
+    INVOCATION_STORE
+        .lock()
+        .entry(invocation_id.to_string())
+        .or_default()
+        .traces
+        .push(trace);
+}
+
+/// Store a single trace, filing it under each of its invocation IDs.
+/// If the trace has no invocation IDs, it is stored under "__unknown__".
+pub fn store_trace(trace: StoredTrace) {
+    let mut store = INVOCATION_STORE.lock();
+    if trace.invocation_ids.is_empty() {
+        store
+            .entry("__unknown__".to_string())
+            .or_default()
+            .traces
+            .push(trace);
+    } else {
+        // For a single invocation id (common case), move the trace directly.
+        // For multiple, clone for all but the last.
+        let mut ids = trace.invocation_ids.iter();
+        let last_id = ids.next_back().unwrap();
+        for id in ids {
+            store
+                .entry(id.clone())
+                .or_default()
+                .traces
+                .push(trace.clone());
+        }
+        store
+            .entry(last_id.clone())
+            .or_default()
+            .traces
+            .push(trace);
+    }
+}
+
+/// Store multiple traces.
+pub fn store_traces(traces: Vec<StoredTrace>) {
+    for trace in traces {
+        store_trace(trace);
+    }
+}
+
+/// Take all traces from every invocation entry, draining each entry's traces.
+pub fn take_all_traces() -> Vec<StoredTrace> {
+    let mut store = INVOCATION_STORE.lock();
+    let mut all_traces = Vec::new();
+    for entry in store.values_mut() {
+        all_traces.append(&mut entry.traces);
+    }
+    all_traces
+}
+
+/// Snapshot all traces from every invocation entry (non-destructive).
+#[allow(dead_code)]
+pub fn snapshot_all_traces() -> Vec<StoredTrace> {
+    let store = INVOCATION_STORE.lock();
+    store
+        .values()
+        .flat_map(|entry| entry.traces.iter().cloned())
+        .collect()
+}
+
+pub fn force_init() {
+    Lazy::force(&INVOCATION_STORE);
+}
