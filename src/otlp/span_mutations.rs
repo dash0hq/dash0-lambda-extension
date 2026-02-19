@@ -34,8 +34,8 @@ pub fn build_synthetic_trace(
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_nanos() as u64)
         .unwrap_or(0);
-    let start_nanos = crate::state::invocation_data::get_invocation_data(invocation_id)
-        .map(|data| (data.start_time * 1_000_000.0) as u64)
+    let start_nanos = invocation_entry::get(invocation_id)
+        .map(|entry| (entry.start_time * 1_000_000.0) as u64)
         .filter(|&t| t > 0)
         .unwrap_or(now_nanos);
 
@@ -461,9 +461,7 @@ pub fn merge_telemetry_invocation_data(request: &mut ExportTraceServiceRequest) 
                 if is_lambda_instrumentation_scope(&scope.name) {
                     for span in &mut scope_span.spans {
                         if let Some(invocation_id) = extract_invocation_id(span) {
-                            if let Some(data) =
-                                crate::state::invocation_data::get_invocation_data(&invocation_id)
-                            {
+                            if let Some(data) = invocation_entry::get(&invocation_id) {
                                 if data.init_duration > 0.0 {
                                     span.attributes.push(KeyValue {
                                         key: "dash0.faas.init_duration".to_string(),
@@ -1447,13 +1445,13 @@ mod tests {
     fn test_merge_telemetry_invocation_data_updates_span() {
         let invocation_id = "inv-merge-data";
 
-        // Setup InvocationData
-        crate::state::invocation_data::update_invocation_data(invocation_id, |data| {
-            data.init_duration = 100.0;
-            data.billed_duration = 200.0;
-            data.memory_usage = 128;
-            data.start_time = 1_000.0; // 1 second
-            data.end_time = 2_000.0; // 2 seconds
+        // Setup InvocationEntry data
+        invocation_entry::update(invocation_id, |entry| {
+            entry.init_duration = 100.0;
+            entry.billed_duration = 200.0;
+            entry.memory_usage = 128;
+            entry.start_time = 1_000.0; // 1 second
+            entry.end_time = 2_000.0; // 2 seconds
         });
 
         let span = make_span_with_invocation(invocation_id);

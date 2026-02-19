@@ -43,7 +43,7 @@ pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
                 flush_traces().await;
             }
             for id in &report_invocation_ids {
-                crate::state::invocation_data::cleanup_invocation(id);
+                crate::state::invocation_entry::remove(id);
             }
         }
     } else {
