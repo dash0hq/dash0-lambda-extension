@@ -1,0 +1,142 @@
+
+buildscript {
+  repositories {
+    maven {
+      url = "https://plugins.gradle.org/m2/"
+    }
+    maven {
+      name = "sonatype"
+      url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+    }
+  }
+  dependencies {
+    classpath "com.diffplug.spotless:spotless-plugin-gradle:8.0.0"
+    classpath "com.gradleup.shadow:shadow-gradle-plugin:8.3.9"
+    classpath "io.opentelemetry.instrumentation:gradle-plugins:2.10.0-alpha"
+  }
+}
+
+group = 'io.dash0.javaagent'
+
+subprojects {
+  version = rootProject.version
+
+  apply plugin: "java"
+  // Exclude OTeL instrumentation override sub projects
+  if (it.name != "apache-httpclient-5.0"
+      && it.name != "java-http-client"
+      && it.name != "library"
+      && !it.path.contains("aws-sdk-2.2")
+      && !it.path.contains("spring-webmvc-3.1")
+      && !it.path.contains("spring-webflux-5.0")
+      && !it.path.contains("rabbitmq-2.7")
+      && !it.path.contains("lettuce-5.1")
+  ) {
+    apply plugin: "com.diffplug.spotless"
+
+    spotless {
+      java {
+        googleJavaFormat()
+        licenseHeaderFile(rootProject.file("./gradle/spotless.license.java"), "(package|import|public)")
+        target("src/**/*.java")
+      }
+    }
+  }
+
+  tasks.withType(Test) {
+    testLogging {
+      exceptionFormat = "full"
+      events "started", "skipped", "passed", "failed"
+      showStandardStreams = true
+    }
+  }
+
+  ext {
+    versions = [
+      opentelemetrySdk           : "1.49.0",
+      opentelemetryContrib       : "1.49.0-alpha",
+      opentelemetryJavaagent     : "2.15.0",
+      opentelemetryJavaagentAlpha: "2.15.0-alpha",
+      opentelemetrySemconv       : "1.32.0",
+      opentelemetrySemconvIncubating: "1.32.0-alpha",
+
+      // Instrumentation versions
+      apachehttpclient50         : "5.0",
+      awssdk11                   : "1.11.106",
+      awssdk22                   : "2.2.0",
+      grpc16                     : "1.6.0",
+      jedis14                    : "1.4.0",
+      kafkaclients011            : "0.11.0.0",
+      rabbitmq27                 : "2.7.0",
+      servlet30                  : "3.0.1",
+      springwebmvc31             : "3.1.0.RELEASE",
+      springboot                 : "2.7.14",
+      storm                      : "2.8.3",
+      lettuce51                  : "6.3.2.RELEASE",
+      netty41                    : "4.1.0.Final",
+      awsLambdaJavaCore          : "1.2.2",
+      awsLambdaJavaEvents        : "3.11.0",
+
+      jackson                    : "2.15.2",
+      bytebuddy                  : "1.14.5",
+      autoservice                : "1.1.1",
+      autovalue                  : "1.10.1",
+      junit                      : "5.11.3",
+      mockito                    : "5.4.0",
+      testcontainers             : "1.17.6",
+      hamcrest                   : "2.2"
+    ]
+
+    deps = [
+      bytebuddy  : "net.bytebuddy:byte-buddy-dep:${versions.bytebuddy}",
+      autoservice: [
+        "com.google.auto.service:auto-service:${versions.autoservice}",
+        "com.google.auto.service:auto-service-annotations:${versions.autoservice}",
+      ]
+    ]
+  }
+
+  repositories {
+    mavenCentral()
+    maven {
+      name = "sonatype"
+      url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+    }
+  }
+
+  configurations.all {
+    resolutionStrategy {
+      // Force semconv 1.30.0 to override BOM's 1.28.0-alpha
+      force "io.opentelemetry.semconv:opentelemetry-semconv:${versions.opentelemetrySemconv}"
+      force "io.opentelemetry.semconv:opentelemetry-semconv-incubating:${versions.opentelemetrySemconvIncubating}"
+    }
+  }
+
+  dependencies {
+    // otel BOM
+    implementation(platform("io.opentelemetry:opentelemetry-bom:${versions.opentelemetrySdk}"))
+
+    // these serve as a test of the instrumentation BOMs
+    implementation(platform("io.opentelemetry.instrumentation:opentelemetry-instrumentation-bom:${versions.opentelemetryJavaagent}"))
+    implementation(platform("io.opentelemetry.instrumentation:opentelemetry-instrumentation-bom-alpha:${versions.opentelemetryJavaagentAlpha}"))
+
+    testImplementation("org.mockito:mockito-core:${versions.mockito}")
+    testImplementation("org.mockito:mockito-junit-jupiter:${versions.mockito}")
+    testImplementation("org.awaitility:awaitility:4.2.0")
+    testImplementation(enforcedPlatform("org.junit:junit-bom:${versions.junit}"))
+    testImplementation("org.junit.jupiter:junit-jupiter-api")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")  // Required for Gradle 9.x
+    testImplementation("org.junit.jupiter:junit-jupiter-params")
+  }
+
+  tasks {
+    test {
+      useJUnitPlatform()
+    }
+
+    compileJava {
+      options.release.set(17)
+    }
+  }
+}

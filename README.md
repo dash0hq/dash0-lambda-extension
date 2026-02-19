@@ -29,7 +29,7 @@ arn:aws:lambda:<region>:285732642181:layer:dash0-extension-python:1
 * `AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper` - This environment variable must be set in order to enable tracing. If this environment variable will not be set, only logs will be collected.
 
 * `DASH0_ENDPOINT` - The integration endpoint for you organization in Dash0, i.e. `https://ingress.eu-west-1.aws.dash0.com:4318`.
-* 
+
 * `DASH0_TOKEN` - The API token for your Dash0 project.
 
 ### Optional
@@ -37,8 +37,6 @@ arn:aws:lambda:<region>:285732642181:layer:dash0-extension-python:1
 * `DASH0_DISABLE_AUTO_INSTRUMENTATION` - Auto-instrumentation can be turned off by this environment variable, which will result in creating synthetic traces by the extension for all invocations.
 
 * `DASH0_SEND_ON_INVOCATION_END` - The extension has two modes of sending to the backend, either on invocation end or on the next invocation. The default is `true`. Sending on invocation end will increase the billed duration of the lambda, but not the response time. Sending on next invocation will decrease the billed duration since the sending will take place in parallel of the regular execution, but might delay the sending up to 7 minutes in case of last invocation in the container.
-
-* `DASH0_ENDPOINT` - Custom endpoint URL for sending telemetry data. Default: Dash0 ingestion endpoint.
 
 * `DASH0_EXTENSION_LOG_LEVEL` - Log level for the extension itself. Valid values: `trace`, `debug`, `info`, `warn`, `error`. Default: `warn`.
 

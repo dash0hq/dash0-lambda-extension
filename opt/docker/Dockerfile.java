@@ -12,18 +12,12 @@
 #   make docker-java
 #
 # Or manually:
-#   # First build the binaries
+#   # First build the binaries and Java distro
 #   make build/lrap_x86_64 build/lrap_aarch64
+#   cd opt/java/opentelemetry-java-distro && ./gradlew -Pversion=1.0.0-SNAPSHOT assemble -x javadoc
 #   # Then build the Docker image
 #   docker build -f opt/docker/Dockerfile.java -t dash0/extension-java:latest .
 
-# Stage 1: Download the Java agent JAR
-FROM public.ecr.aws/lambda/java:21 AS downloader
-
-RUN curl -L -o /tmp/lumigo-opentelemetry.jar \
-    https://github.com/lumigo-io/opentelemetry-java-distro/releases/download/v0.19.1/lumigo-opentelemetry-0.19.1.jar
-
-# Stage 2: Final image with extension
 FROM scratch
 
 # Copy extension binaries (both architectures - entrypoint selects at runtime)
@@ -36,5 +30,8 @@ COPY opt/entrypoint /opt/extensions/lrap
 # Copy wrapper script
 COPY opt/java/wrapper /opt/wrapper
 
-# Copy Java agent JAR
-COPY --from=downloader /tmp/lumigo-opentelemetry.jar /opt/java/lib/lumigo-opentelemetry.jar
+# Copy Java agent JAR (built locally from opt/java/opentelemetry-java-distro)
+COPY opt/java/opentelemetry-java-distro/agent/build/libs/agent-1.0.0-SNAPSHOT-all.jar /opt/java/lib/dash0-opentelemetry.jar
+
+# Copy classpath libs (OTel Lambda wrapper classes needed by the Lambda runtime via Class.forName)
+COPY opt/java/opentelemetry-java-distro/agent/build/classpath-libs/*.jar /opt/java/lib/

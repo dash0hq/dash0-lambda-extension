@@ -14,8 +14,6 @@ fi
 [ -n "$DASH0_MASK_QUERY_PARAMS" ] && export LUMIGO_SECRET_MASKING_REGEX_HTTP_QUERY_PARAMS="$DASH0_MASK_QUERY_PARAMS"
 
 export AWS_LAMBDA_RUNTIME_API="127.0.0.1:9009"
-export LUMIGO_ENDPOINT="http://127.0.0.1:9009/v1/traces"
-export LUMIGO_TRACER_TOKEN="t_xxxx"
 
 export LAMBDA_RESOURCE_ATTRIBUTES="cloud.region=$AWS_REGION,cloud.provider=aws,faas.name=$AWS_LAMBDA_FUNCTION_NAME,faas.version=$AWS_LAMBDA_FUNCTION_VERSION,faas.instance=$AWS_LAMBDA_LOG_STREAM_NAME";
 
@@ -29,6 +27,14 @@ if [ -z "${OTEL_SERVICE_NAME}" ]; then
     export OTEL_SERVICE_NAME=$AWS_LAMBDA_FUNCTION_NAME;
 fi
 
+if [[ -z "$OTEL_PROPAGATORS" ]]; then
+  export OTEL_PROPAGATORS="tracecontext,baggage,xray"
+fi
+
+if [[ -z "$OTEL_TRACES_SAMPLER" ]]; then
+  export OTEL_TRACES_SAMPLER="always_on"
+fi
+
 # Write env vars to a file for the extension to read
 echo "{\"OTEL_SERVICE_NAME\": \"$OTEL_SERVICE_NAME\", \"OTEL_RESOURCE_ATTRIBUTES\": \"$OTEL_RESOURCE_ATTRIBUTES\"}" > /tmp/lumigo_env_vars || true
 
@@ -37,7 +43,7 @@ if [ -z "$DASH0_DISABLE_AUTO_INSTRUMENTATION" ] || [ "${DASH0_DISABLE_AUTO_INSTR
 
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-  export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS} -javaagent:/opt/java/lib/lumigo-opentelemetry.jar"
+  export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS} -javaagent:/opt/java/lib/dash0-opentelemetry.jar"
 fi
 
 exec "${args[@]}"

@@ -1,0 +1,38 @@
+apply from: "$rootDir/gradle/instrumentation.gradle"
+
+muzzle {
+  pass {
+    group.set("io.netty")
+    module.set("netty-codec-http")
+    versions.set("[4.1.0.Final,5.0.0)")
+    assertInverse.set(true)
+  }
+  pass {
+    group.set("io.netty")
+    module.set("netty-all")
+    versions.set("[4.1.0.Final,5.0.0)")
+    excludeDependency("io.netty:netty-tcnative")
+    assertInverse.set(true)
+  }
+  fail {
+    group.set("io.netty")
+    module.set("netty")
+    versions.set("[,]")
+  }
+}
+
+dependencies {
+  compileOnly project(":bootstrap")
+  compileOnly("io.netty:netty-codec-http:${versions.netty41}")
+
+  implementation project(":instrumentation:netty:netty-4.1:library")
+
+// Instrumentations for testing
+  testInstrumentation("io.opentelemetry.javaagent.instrumentation:opentelemetry-javaagent-netty-4.1:${versions.opentelemetryJavaagentAlpha}")
+  // Artifact renamed: opentelemetry-javaagent-netty-4-common → opentelemetry-javaagent-netty-common-4.0
+  testInstrumentation("io.opentelemetry.javaagent.instrumentation:opentelemetry-javaagent-netty-common-4.0:${versions.opentelemetryJavaagentAlpha}")
+
+  testImplementation("io.netty:netty-codec-http:${versions.netty41}")
+
+
+}
