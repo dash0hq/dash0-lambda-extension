@@ -75,6 +75,6 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
 }
 
 describe.concurrent('Lambdainvocation java timeout', () => {
-    const runtimes = ['java17', 'java21'];
+    const runtimes = ['java17', 'java21', 'java25'];
     runAllTests('timeout', runtimes, verifySuccessInvocation);
 });

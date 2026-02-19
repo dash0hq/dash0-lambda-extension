@@ -71,6 +71,7 @@ fn extract_sqs_link(record: &serde_json::Value) -> Option<Link> {
 fn extract_link_from_amzn_trace_id(message_attrs: &serde_json::Value) -> Option<Link> {
     let amzn_trace_str = message_attrs
         .get("x-amzn-trace-id")
+        .or_else(|| message_attrs.get("X-Amzn-Trace-Id"))
         .and_then(|tp| tp.get("stringValue"))
         .and_then(|sv| sv.as_str())?;
 
@@ -101,9 +102,10 @@ fn extract_link_from_sqs_body(record: &serde_json::Value) -> Option<Link> {
     let body_json: serde_json::Value = serde_json::from_str(body_str).ok()?;
     let sns_attrs = body_json.get("MessageAttributes")?;
 
-    // Try x-amzn-trace-id first, then traceparent
+    // Try x-amzn-trace-id / X-Amzn-Trace-Id first, then traceparent
     if let Some(amzn_val) = sns_attrs
         .get("x-amzn-trace-id")
+        .or_else(|| sns_attrs.get("X-Amzn-Trace-Id"))
         .and_then(|tp| tp.get("Value"))
         .and_then(|v| v.as_str())
     {
@@ -134,9 +136,10 @@ fn extract_sns_link(record: &serde_json::Value) -> Option<Link> {
         .get("Sns")
         .and_then(|sns| sns.get("MessageAttributes"))?;
 
-    // Try x-amzn-trace-id first, then traceparent
+    // Try x-amzn-trace-id / X-Amzn-Trace-Id first, then traceparent
     if let Some(amzn_val) = sns_attrs
         .get("x-amzn-trace-id")
+        .or_else(|| sns_attrs.get("X-Amzn-Trace-Id"))
         .and_then(|tp| tp.get("Value"))
         .and_then(|v| v.as_str())
     {
@@ -518,6 +521,39 @@ mod tests {
             "698f814c7708a2b018bc2cc4726a6288"
         );
         assert_eq!(hex::encode(&links[0].span_id), "f21a582b8b8134b9");
+        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
+    }
+
+    #[test]
+    #[serial]
+    fn extract_sns_link_from_pascal_case_amzn_trace_id() {
+        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
+        let payload = r#"{
+            "Records": [{
+                "EventSource": "aws:sns",
+                "Sns": {
+                    "MessageAttributes": {
+                        "X-Amzn-Trace-Id": {
+                            "Type": "String",
+                            "Value": "Root=1-6996a6f9-08f32e7c20ec74d82d37db76;Parent=15f532e60157ff64;Sampled=1;Lineage=1:0f5e8d6a:0"
+                        },
+                        "traceparent": {
+                            "Type": "String",
+                            "Value": "00-6996a6f908f32e7c20ec74d82d37db76-15f532e60157ff64-01"
+                        }
+                    }
+                }
+            }]
+        }"#;
+
+        let links = extract_span_links(payload);
+
+        assert_eq!(links.len(), 1);
+        assert_eq!(
+            hex::encode(&links[0].trace_id),
+            "6996a6f908f32e7c20ec74d82d37db76"
+        );
+        assert_eq!(hex::encode(&links[0].span_id), "15f532e60157ff64");
         std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
     }
 

@@ -8,6 +8,7 @@ import * as cr from 'aws-cdk-lib/custom-resources';
 import * as path from 'path';
 import { PythonTracingScenariosStack, createPythonCode } from './python-tracing-scenarios-stack';
 import { NodeTracingScenariosStack } from './node-tracing-scenarios-stack';
+import { JavaTracingScenariosStack } from './java-tracing-scenarios-stack';
 
 function getLatestLayerVersion(scope: Construct, id: string, layerName: string): lambda.ILayerVersion {
   const stack = cdk.Stack.of(scope);
@@ -191,8 +192,9 @@ class JavaStack extends cdk.NestedStack {
       code: javaCode,
       memorySize: 512,
     };
+    const runtimes = [lambda.Runtime.JAVA_25, lambda.Runtime.JAVA_21, lambda.Runtime.JAVA_17];
 
-    createLambdas(this, [lambda.Runtime.JAVA_21, lambda.Runtime.JAVA_17], props.layer, props.role, props.logGroup, overrides);
+    createLambdas(this, runtimes, props.layer, props.role, props.logGroup, overrides);
   }
 }
 
@@ -339,6 +341,11 @@ export class IntegrationTestsStack extends cdk.Stack {
 
     new NodeTracingScenariosStack(this, 'NodeTracingScenariosStack', {
       layer: nodeLayer,
+      logGroup: sharedLogGroup,
+    });
+
+    new JavaTracingScenariosStack(this, 'JavaTracingScenariosStack', {
+      layer: javaLayer,
       logGroup: sharedLogGroup,
     });
   }

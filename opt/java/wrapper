@@ -28,7 +28,7 @@ if [ -z "${OTEL_SERVICE_NAME}" ]; then
 fi
 
 if [[ -z "$OTEL_PROPAGATORS" ]]; then
-  export OTEL_PROPAGATORS="tracecontext,baggage,xray"
+  export OTEL_PROPAGATORS="tracecontext,baggage,xray-lambda"
 fi
 
 if [[ -z "$OTEL_TRACES_SAMPLER" ]]; then
