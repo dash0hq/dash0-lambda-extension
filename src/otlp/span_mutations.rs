@@ -1,8 +1,8 @@
 use crate::otlp::log_mutations::try_read_env_from_file;
 use crate::state::invocation_data::{
-    get_event_payload, store_return_payload, store_traces, take_return_payload, take_traces,
-    StoredTrace,
+    store_return_payload, store_traces, take_return_payload, take_traces, StoredTrace,
 };
+use crate::state::invocation_entry;
 use crate::util::parsers::{
     extract_invocation_id, get_span_id_from_invocation_id, get_span_scope_name,
     get_trace_id_from_invocation_id,
@@ -68,7 +68,8 @@ pub fn build_synthetic_trace(
     ];
 
     let mut sqs_links = Vec::new();
-    if let Some(event_payload) = get_event_payload(invocation_id) {
+    if let Some(event_payload) = invocation_entry::get(invocation_id).and_then(|e| e.event_payload)
+    {
         // Extract span links before consuming event_payload
         sqs_links = extract_span_links(&event_payload);
 
@@ -347,7 +348,9 @@ fn annotate_server_spans(spans: &mut Vec<Span>, invocation_ids: &mut Vec<String>
         if let Some(invocation_id) = extract_invocation_id(span) {
             invocation_ids.push(invocation_id.clone());
 
-            if let Some(event_payload) = get_event_payload(&invocation_id) {
+            if let Some(event_payload) =
+                invocation_entry::get(&invocation_id).and_then(|e| e.event_payload)
+            {
                 // Extract span links before consuming event_payload
                 let sqs_links = extract_span_links(&event_payload);
                 if !sqs_links.is_empty() {
@@ -619,9 +622,10 @@ mod tests {
         annotate_return_payload, build_synthetic_trace, StatusCode,
     };
     use crate::state::invocation_data::{
-        snapshot_traces, store_event_payload, store_return_payload, store_trace,
-        take_return_payload, take_traces, StoredTrace,
+        snapshot_traces, store_return_payload, store_trace, take_return_payload, take_traces,
+        StoredTrace,
     };
+    use crate::state::invocation_entry;
     use hyper::{header, Method};
     use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
     use opentelemetry_proto::tonic::common::v1::any_value::Value;
@@ -636,6 +640,13 @@ mod tests {
             .iter()
             .find(|kv| kv.key == key)
             .and_then(|kv| kv.value.as_ref())
+    }
+
+    fn store_event_payload(invocation_id: &str, payload: &str) {
+        let payload = payload.to_string();
+        invocation_entry::update(invocation_id, |entry| {
+            entry.event_payload = Some(payload);
+        });
     }
 
     #[test]
@@ -1519,7 +1530,10 @@ fn env_as_json_string() -> String {
     crate::otlp::masking::mask_env_vars(map)
 }
 
-fn get_trace_span_ids(invocation_id: &str, existing_traces: &[StoredTrace]) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+fn get_trace_span_ids(
+    invocation_id: &str,
+    existing_traces: &[StoredTrace],
+) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
     let mut trace_id: Option<Vec<u8>> = None;
     let mut span_id: Option<Vec<u8>> = None;
     let parent_span_id: Option<Vec<u8>> = None;

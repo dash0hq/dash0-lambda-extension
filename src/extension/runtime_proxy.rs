@@ -12,9 +12,8 @@ use crate::otlp::masking::mask_json_string;
 use crate::otlp::span_mutations::{
     add_return_payload_to_lambda_server_spans, build_synthetic_trace,
 };
-use crate::state::invocation_data::{
-    store_current_invocation_id, store_event_payload, store_trace,
-};
+use crate::state::invocation_data::{store_current_invocation_id, store_trace};
+use crate::state::invocation_entry;
 use crate::util::parsers::extract_invocation_id_from_path;
 
 static HTTP_CLIENT: Lazy<hyper::Client<hyper::client::HttpConnector, Body>> =
@@ -295,7 +294,10 @@ async fn validate_and_mangle_next_event(
     });
 
     let processed_payload = process_payload(&body_bytes);
-    store_event_payload(&_aws_request_id, &processed_payload);
+    let payload = processed_payload;
+    invocation_entry::update(&_aws_request_id, |entry| {
+        entry.event_payload = Some(payload);
+    });
 
     // Reconstruct the response with the same parts and body
     let response = Response::from_parts(parts, Body::from(body_bytes));

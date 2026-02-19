@@ -5,23 +5,6 @@ use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
-pub fn take_event_payload(invocation_id: &str) -> Option<String> {
-    EVENT_PAYLOADS.lock().remove(invocation_id)
-}
-
-pub fn get_event_payload(invocation_id: &str) -> Option<String> {
-    EVENT_PAYLOADS.lock().get(invocation_id).cloned()
-}
-
-pub fn store_event_payload(invocation_id: &str, payload: &str) {
-    EVENT_PAYLOADS
-        .lock()
-        .insert(invocation_id.to_string(), payload.to_string());
-}
-
-static EVENT_PAYLOADS: Lazy<Mutex<HashMap<String, String>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
-
 pub fn store_trace(trace: StoredTrace) {
     TRACE_STORE.lock().push(trace);
 }
@@ -256,7 +239,6 @@ pub fn take_invocation_data(invocation_id: &str) -> Option<InvocationData> {
 }
 
 pub(crate) fn cleanup_invocation(invocation_id: &str) {
-    take_event_payload(invocation_id);
     take_return_payload(invocation_id);
     take_invocation_data(invocation_id);
 }
@@ -288,64 +270,6 @@ mod tests {
         store_telemetry_logs(logs.clone());
         let stored = get_telemetry_logs();
         assert!(stored.len() >= 2);
-    }
-
-    // ============================================================================
-    // Tests for event payload storage functions
-    // ============================================================================
-
-    #[test]
-    #[serial]
-    fn test_store_and_get_event_payload() {
-        let invocation_id = "test-invocation-store-get";
-        let payload = r#"{"test": "data"}"#;
-
-        store_event_payload(invocation_id, payload);
-        let result = get_event_payload(invocation_id);
-
-        assert_eq!(result, Some(payload.to_string()));
-    }
-
-    #[test]
-    #[serial]
-    fn test_get_event_payload_not_found() {
-        let result = get_event_payload("non-existent-invocation-id");
-        assert_eq!(result, None);
-    }
-
-    #[test]
-    #[serial]
-    fn test_take_event_payload_removes_entry() {
-        let invocation_id = "test-invocation-take";
-        let payload = r#"{"test": "data to take"}"#;
-
-        store_event_payload(invocation_id, payload);
-
-        // First take should return the payload
-        let result1 = take_event_payload(invocation_id);
-        assert_eq!(result1, Some(payload.to_string()));
-
-        // Second take should return None (already removed)
-        let result2 = take_event_payload(invocation_id);
-        assert_eq!(result2, None);
-
-        // get should also return None
-        let result3 = get_event_payload(invocation_id);
-        assert_eq!(result3, None);
-    }
-
-    #[test]
-    #[serial]
-    fn test_store_overwrites_existing_payload() {
-        let invocation_id = "test-invocation-overwrite";
-        let payload1 = r#"{"first": "payload"}"#;
-        let payload2 = r#"{"second": "payload"}"#;
-
-        store_event_payload(invocation_id, payload1);
-        store_event_payload(invocation_id, payload2);
-
-        let result = get_event_payload(invocation_id);
-        assert_eq!(result, Some(payload2.to_string()));
     }
 
     // ============================================================================

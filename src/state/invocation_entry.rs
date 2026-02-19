@@ -55,10 +55,7 @@ static INVOCATION_STORE: Lazy<Mutex<HashMap<String, InvocationEntry>>> =
 
 pub fn get_or_create(invocation_id: &str) -> InvocationEntry {
     let mut store = INVOCATION_STORE.lock();
-    store
-        .entry(invocation_id.to_string())
-        .or_default()
-        .clone()
+    store.entry(invocation_id.to_string()).or_default().clone()
 }
 
 pub fn update<F>(invocation_id: &str, update_fn: F)
