@@ -109,21 +109,6 @@ pub struct TelemetryLog {
     pub invocation_id: Option<String>,
 }
 
-pub fn store_telemetry_logs(logs: Vec<TelemetryLog>) {
-    TELEMETRY_LOGS.lock().extend(logs);
-}
-
-#[allow(dead_code)]
-pub fn get_telemetry_logs() -> Vec<TelemetryLog> {
-    TELEMETRY_LOGS.lock().clone()
-}
-
-pub fn take_telemetry_logs() -> Vec<TelemetryLog> {
-    std::mem::take(&mut *TELEMETRY_LOGS.lock())
-}
-
-static TELEMETRY_LOGS: Lazy<Mutex<Vec<TelemetryLog>>> = Lazy::new(|| Mutex::new(Vec::new()));
-
 pub fn store_runtime_done_notifier(sender: tokio::sync::oneshot::Sender<()>) {
     *RUNTIME_DONE_NOTIFIER.lock() = Some(sender);
 }
@@ -134,33 +119,3 @@ pub fn take_runtime_done_notifier() -> Option<tokio::sync::oneshot::Sender<()>> 
 
 static RUNTIME_DONE_NOTIFIER: Lazy<Mutex<Option<tokio::sync::oneshot::Sender<()>>>> =
     Lazy::new(|| Mutex::new(None));
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serial_test::serial;
-
-    // ... tests ...
-
-    #[test]
-    #[serial]
-    fn test_store_telemetry_logs() {
-        let logs = vec![
-            TelemetryLog {
-                time: "2025-01-01".to_string(),
-                r#type: "test".to_string(),
-                record: serde_json::Value::String("rec1".to_string()),
-                invocation_id: None,
-            },
-            TelemetryLog {
-                time: "2025-01-02".to_string(),
-                r#type: "test2".to_string(),
-                record: serde_json::json!({"foo": "bar"}),
-                invocation_id: Some("id1".to_string()),
-            },
-        ];
-        store_telemetry_logs(logs.clone());
-        let stored = get_telemetry_logs();
-        assert!(stored.len() >= 2);
-    }
-}

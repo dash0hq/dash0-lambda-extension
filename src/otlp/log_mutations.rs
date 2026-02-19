@@ -1,5 +1,5 @@
 use crate::config::is_auto_instrumented_disabled;
-use crate::state::invocation_data::{store_telemetry_logs, TelemetryLog};
+use crate::state::invocation_data::TelemetryLog;
 use crate::state::invocation_entry;
 use crate::util::parsers::{get_span_id_from_invocation_id, get_trace_id_from_invocation_id};
 use chrono::DateTime;
@@ -186,7 +186,7 @@ pub fn map_logs_to_otlp(logs: &[TelemetryLog], is_invocation_end: bool) -> Vec<L
                     crate::log_prefix(),
                     invocation_id
                 );
-                store_telemetry_logs(vec![log.clone()]);
+                invocation_entry::store_telemetry_logs(vec![log.clone()]);
                 continue;
             }
         }

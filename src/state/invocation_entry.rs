@@ -74,3 +74,36 @@ pub fn get(invocation_id: &str) -> Option<InvocationEntry> {
 pub fn remove(invocation_id: &str) -> Option<InvocationEntry> {
     INVOCATION_STORE.lock().remove(invocation_id)
 }
+
+/// Store telemetry logs, grouping each log into its invocation entry.
+/// Logs without an invocation_id are stored under a shared "__unknown__" key.
+pub fn store_telemetry_logs(logs: Vec<TelemetryLog>) {
+    let mut store = INVOCATION_STORE.lock();
+    for log in logs {
+        let key = log
+            .invocation_id
+            .clone()
+            .unwrap_or_else(|| "__unknown__".to_string());
+        store.entry(key).or_default().logs.push(log);
+    }
+}
+
+/// Take all telemetry logs from every invocation entry, draining each entry's logs.
+pub fn take_all_telemetry_logs() -> Vec<TelemetryLog> {
+    let mut store = INVOCATION_STORE.lock();
+    let mut all_logs = Vec::new();
+    for entry in store.values_mut() {
+        all_logs.append(&mut entry.logs);
+    }
+    all_logs
+}
+
+/// Snapshot all telemetry logs from every invocation entry (non-destructive).
+#[allow(dead_code)]
+pub fn snapshot_all_telemetry_logs() -> Vec<TelemetryLog> {
+    let store = INVOCATION_STORE.lock();
+    store
+        .values()
+        .flat_map(|entry| entry.logs.iter().cloned())
+        .collect()
+}

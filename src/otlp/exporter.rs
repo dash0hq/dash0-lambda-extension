@@ -9,7 +9,7 @@ use crate::otlp::log_mutations::{get_resources_attributes, map_logs_to_otlp};
 use crate::otlp::span_mutations::merge_telemetry_invocation_data;
 use crate::route::HTTPS_CLIENT;
 use crate::state::invocation_data::{
-    take_logs, take_metrics, take_telemetry_logs, take_traces, StoredLog, StoredMetric, StoredTrace,
+    take_logs, take_metrics, take_traces, StoredLog, StoredMetric, StoredTrace,
 };
 use crate::util::parsers::parse_otlp_endpoint;
 
@@ -30,7 +30,7 @@ pub async fn flush_logs(is_invocation_end: bool) {
 }
 
 pub async fn flush_telemetry_logs(is_invocation_end: bool) {
-    let logs = take_telemetry_logs();
+    let logs = crate::state::invocation_entry::take_all_telemetry_logs();
 
     if logs.is_empty() {
         return;

@@ -35,7 +35,7 @@ pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
         }
 
         if !is_logs_instrumentation_enabled() {
-            crate::state::invocation_data::store_telemetry_logs(logs);
+            crate::state::invocation_entry::store_telemetry_logs(logs);
         }
 
         if !report_invocation_ids.is_empty() {
