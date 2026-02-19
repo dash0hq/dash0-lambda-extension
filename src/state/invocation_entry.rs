@@ -108,6 +108,16 @@ pub fn snapshot_all_telemetry_logs() -> Vec<TelemetryLog> {
         .collect()
 }
 
+/// Take all traces for a specific invocation ID, draining that entry's traces.
+pub fn take_traces_by_id(invocation_id: &str) -> Vec<StoredTrace> {
+    let mut store = INVOCATION_STORE.lock();
+    if let Some(entry) = store.get_mut(invocation_id) {
+        std::mem::take(&mut entry.traces)
+    } else {
+        Vec::new()
+    }
+}
+
 /// Store a trace under a known invocation ID directly.
 pub fn store_trace_by_id(invocation_id: &str, trace: StoredTrace) {
     INVOCATION_STORE
@@ -140,18 +150,7 @@ pub fn store_trace(trace: StoredTrace) {
                 .traces
                 .push(trace.clone());
         }
-        store
-            .entry(last_id.clone())
-            .or_default()
-            .traces
-            .push(trace);
-    }
-}
-
-/// Store multiple traces.
-pub fn store_traces(traces: Vec<StoredTrace>) {
-    for trace in traces {
-        store_trace(trace);
+        store.entry(last_id.clone()).or_default().traces.push(trace);
     }
 }
 

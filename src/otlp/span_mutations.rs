@@ -384,18 +384,13 @@ pub fn add_return_payload_to_lambda_server_spans(
     invocation_id: &str,
     return_payload: &str,
 ) -> bool {
-    let mut traces = invocation_entry::take_all_traces();
-    let mut updated_traces: Vec<StoredTrace> = Vec::new();
+    let mut traces = invocation_entry::take_traces_by_id(invocation_id);
     let mut added = false;
 
-    for mut trace in traces.drain(..) {
-        let mut modified = false;
+    for trace in &mut traces {
         match ExportTraceServiceRequest::decode(trace.body.as_slice()) {
             Ok(mut decoded) => {
-                modified = annotate_return_payload(&mut decoded, invocation_id, return_payload)
-                    || modified;
-
-                if modified {
+                if annotate_return_payload(&mut decoded, invocation_id, return_payload) {
                     trace.body = decoded.encode_to_vec();
                     added = true;
                 }
@@ -409,17 +404,14 @@ pub fn add_return_payload_to_lambda_server_spans(
                 );
             }
         }
-
-        updated_traces.push(trace);
     }
 
-    invocation_entry::store_traces(updated_traces);
-    if !added {
-        let payload = return_payload.to_string();
-        invocation_entry::update(invocation_id, |entry| {
-            entry.return_value = Some(payload);
-        });
-    }
+    invocation_entry::update(invocation_id, |entry| {
+        entry.traces = traces;
+        if !added {
+            entry.return_value = Some(return_payload.to_string());
+        }
+    });
     added
 }
 

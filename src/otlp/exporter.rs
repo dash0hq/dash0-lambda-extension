@@ -8,7 +8,9 @@ use crate::config::{request_retries, request_timeout_ms};
 use crate::otlp::log_mutations::{get_resources_attributes, map_logs_to_otlp};
 use crate::otlp::span_mutations::merge_telemetry_invocation_data;
 use crate::route::HTTPS_CLIENT;
-use crate::state::invocation_data::{take_logs, take_metrics, StoredLog, StoredMetric, StoredTrace};
+use crate::state::invocation_data::{
+    take_logs, take_metrics, StoredLog, StoredMetric, StoredTrace,
+};
 use crate::util::parsers::parse_otlp_endpoint;
 
 pub async fn flush_traces() {
