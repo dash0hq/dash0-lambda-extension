@@ -53,7 +53,7 @@ public class TracingExecutionInterceptor implements ExecutionInterceptor {
 
   private static final boolean USE_MESSAGING_PROPAGATOR =
       ConfigPropertiesUtil.getBoolean(
-          "otel.instrumentation.aws-sdk.experimental-use-propagator-for-messaging", false);
+          "otel.instrumentation.aws-sdk.experimental-use-propagator-for-messaging", true);
 
   private static final boolean RECORD_INDIVIDUAL_HTTP_ERROR =
       ConfigPropertiesUtil.getBoolean(

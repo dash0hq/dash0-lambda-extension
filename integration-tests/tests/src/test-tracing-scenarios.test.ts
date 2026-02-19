@@ -6,11 +6,12 @@ import { getAttributesMap, getRequestPayload, invokeFunction } from './utils';
 
 const pythonRuntimes = ['python3-11', 'python3-12', 'python3-13', 'python3-14'];
 const nodeRuntimes = ['nodejs20-x', 'nodejs22-x', 'nodejs24-x'];
+const javaRuntimes = ['java17', 'java21', 'java25'];
 
 const scenarios = [
-    { name: 'sqs', producerPrefix: 'tracing-sqs-producer', consumerPrefix: 'tracing-sqs-consumer', runtimes: [...pythonRuntimes, ...nodeRuntimes] },
-    { name: 'sns', producerPrefix: 'tracing-sns-producer', consumerPrefix: 'tracing-sns-consumer', runtimes: [...pythonRuntimes, ...nodeRuntimes] },
-    { name: 'sns-sqs', producerPrefix: 'tracing-sns-sqs-producer', consumerPrefix: 'tracing-sns-sqs-consumer', runtimes: [...pythonRuntimes, ...nodeRuntimes] },
+    { name: 'sqs', producerPrefix: 'tracing-sqs-producer', consumerPrefix: 'tracing-sqs-consumer', runtimes: [...pythonRuntimes, ...nodeRuntimes, ...javaRuntimes] },
+    { name: 'sns', producerPrefix: 'tracing-sns-producer', consumerPrefix: 'tracing-sns-consumer', runtimes: [...pythonRuntimes, ...nodeRuntimes, ...javaRuntimes] },
+    { name: 'sns-sqs', producerPrefix: 'tracing-sns-sqs-producer', consumerPrefix: 'tracing-sns-sqs-consumer', runtimes: [...pythonRuntimes, ...nodeRuntimes, ...javaRuntimes] },
     { name: 'kinesis', producerPrefix: 'tracing-kinesis-producer', consumerPrefix: 'tracing-kinesis-consumer', runtimes: [...pythonRuntimes, ...nodeRuntimes] },
 ] as const;
 
@@ -27,8 +28,8 @@ const verifyTracingScenario = async (
     let producerSpanId: string | undefined;
 
     const expectedScopeName = producerFunctionName.includes('python') ?
-        'opentelemetry.instrumentation.aws_lambda' :
-        '@opentelemetry/instrumentation-aws-lambda';
+        'opentelemetry.instrumentation.aws_lambda' : producerFunctionName.includes('nodejs') ?
+        '@opentelemetry/instrumentation-aws-lambda' : 'io.opentelemetry.aws-lambda-events-2.2';
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         await delay(RETRY_DELAY_MS);
