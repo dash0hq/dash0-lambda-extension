@@ -28,6 +28,92 @@ fn make_uri(path: &str) -> hyper::Uri {
     }
 }
 
+fn handle_invoke_event(json: &serde_json::Value) {
+    if let Some(arn) = json.get("invokedFunctionArn").and_then(|v| v.as_str()) {
+        state::global::store_function_arn(arn);
+    }
+
+    // Parse trace context from _X_AMZN_TRACE_ID tracing header
+    if let Some(request_id) = json.get("requestId").and_then(|v| v.as_str()) {
+        if let Some(trace_value) = json
+            .get("tracing")
+            .and_then(|t| t.get("value"))
+            .and_then(|v| v.as_str())
+        {
+            if let Some((trace_id_bytes, parent_span_id_bytes)) =
+                crate::otlp::span_link_extractor::parse_amzn_trace_id(trace_value)
+            {
+                let trace_id = hex::encode(&trace_id_bytes);
+                let parent_span_id = hex::encode(&parent_span_id_bytes);
+                state::invocation_data::store_invocation_span_id(
+                    request_id,
+                    trace_id,
+                    String::new(),
+                    parent_span_id,
+                );
+            }
+        }
+    }
+}
+
+async fn flush_if_needed(event_type: Option<&str>, shutdown_reason: Option<&str>) {
+    let should_flush = (matches!(event_type, Some("INVOKE"))
+        && !crate::config::is_send_on_invocation_end())
+        || (matches!(event_type, Some("SHUTDOWN")) && shutdown_reason == Some("spindown"));
+
+    if !should_flush {
+        return;
+    }
+
+    let is_invocation_end = matches!(event_type, Some("SHUTDOWN"));
+    if is_invocation_end {
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        crate::otlp::exporter::flush_traces().await;
+    } else {
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    crate::otlp::exporter::flush_logs(is_invocation_end).await;
+}
+
+async fn wait_for_runtime_done() {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    crate::state::invocation_data::store_runtime_done_notifier(tx);
+
+    tracing::info!(
+        "[{}] Waiting for platform.runtimeDone",
+        crate::log_prefix_with("Extension")
+    );
+
+    // Wait for the signal with a timeout to prevent indefinite blocking
+    match tokio::time::timeout(
+        std::time::Duration::from_secs(900), // 15 minute timeout (max Lambda duration)
+        rx,
+    )
+    .await
+    {
+        Ok(Ok(())) => {
+            tracing::info!(
+                "[{}] Received platform.runtimeDone signal",
+                crate::log_prefix_with("Extension")
+            );
+            crate::otlp::exporter::flush_traces().await;
+            crate::otlp::exporter::flush_logs(true).await;
+        }
+        Ok(Err(_)) => {
+            tracing::warn!(
+                "[{}] platform.runtimeDone channel closed",
+                crate::log_prefix_with("Extension")
+            );
+        }
+        Err(_) => {
+            tracing::error!(
+                "[{}] Timeout waiting for platform.runtimeDone",
+                crate::log_prefix_with("Extension")
+            );
+        }
+    }
+}
+
 /// Get next event from the Lambda Extensions API
 ///
 pub async fn get_next() {
@@ -90,101 +176,21 @@ pub async fn get_next() {
             );
 
             if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&body_bytes) {
-                if json
-                    .get("eventType")
-                    .and_then(|v| v.as_str())
-                    .map(|t| t == "INVOKE")
-                    == Some(true)
-                {
-                    if let Some(arn) = json.get("invokedFunctionArn").and_then(|v| v.as_str()) {
-                        state::global::store_function_arn(arn);
-                    }
+                let event_type = json.get("eventType").and_then(|v| v.as_str());
+                let is_invoke = matches!(event_type, Some("INVOKE"));
 
-                    // Parse trace context from _X_AMZN_TRACE_ID tracing header
-                    if let Some(request_id) = json.get("requestId").and_then(|v| v.as_str()) {
-                        if let Some(trace_value) = json
-                            .get("tracing")
-                            .and_then(|t| t.get("value"))
-                            .and_then(|v| v.as_str())
-                        {
-                            if let Some((trace_id_bytes, parent_span_id_bytes)) =
-                                crate::otlp::span_link_extractor::parse_amzn_trace_id(trace_value)
-                            {
-                                let trace_id = hex::encode(&trace_id_bytes);
-                                let parent_span_id = hex::encode(&parent_span_id_bytes);
-                                state::invocation_data::store_invocation_span_id(
-                                    request_id,
-                                    trace_id,
-                                    String::new(),
-                                    parent_span_id,
-                                );
-                            }
-                        }
-                    }
+                if is_invoke {
+                    handle_invoke_event(&json);
                 }
 
-                let event_type = json.get("eventType").and_then(|v| v.as_str());
                 let shutdown_reason = json
                     .get("shutdownReason")
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_lowercase());
+                flush_if_needed(event_type, shutdown_reason.as_deref()).await;
 
-                let should_flush = (matches!(event_type, Some("INVOKE"))
-                    && !crate::config::is_send_on_invocation_end())
-                    || (matches!(event_type, Some("SHUTDOWN"))
-                        && shutdown_reason.as_deref() == Some("spindown"));
-
-                if should_flush {
-                    let is_invocation_end = matches!(event_type, Some("SHUTDOWN"));
-                    if is_invocation_end {
-                        tokio::time::sleep(Duration::from_millis(200)).await;
-                        crate::otlp::exporter::flush_traces().await;
-                    } else {
-                        tokio::time::sleep(Duration::from_millis(20)).await;
-                    }
-                    crate::otlp::exporter::flush_logs(is_invocation_end).await;
-                }
-
-                if matches!(event_type, Some("INVOKE"))
-                    && crate::config::is_send_on_invocation_end()
-                {
-                    // Block execution until platform.runtimeDone is received
-                    let (tx, rx) = tokio::sync::oneshot::channel();
-                    crate::state::invocation_data::store_runtime_done_notifier(tx);
-
-                    tracing::info!(
-                        "[{}] Waiting for platform.runtimeDone",
-                        crate::log_prefix_with("Extension")
-                    );
-
-                    // Wait for the signal with a timeout to prevent indefinite blocking
-                    match tokio::time::timeout(
-                        std::time::Duration::from_secs(900), // 15 minute timeout (max Lambda duration)
-                        rx,
-                    )
-                    .await
-                    {
-                        Ok(Ok(())) => {
-                            tracing::info!(
-                                "[{}] Received platform.runtimeDone signal",
-                                crate::log_prefix_with("Extension")
-                            );
-                            crate::otlp::exporter::flush_traces().await;
-                            crate::otlp::exporter::flush_logs(true).await;
-                        }
-                        Ok(Err(_)) => {
-                            tracing::warn!(
-                                "[{}] platform.runtimeDone channel closed",
-                                crate::log_prefix_with("Extension")
-                            );
-                        }
-                        Err(_) => {
-                            tracing::error!(
-                                "[{}] Timeout waiting for platform.runtimeDone",
-                                crate::log_prefix_with("Extension")
-                            );
-                        }
-                    }
+                if is_invoke && crate::config::is_send_on_invocation_end() {
+                    wait_for_runtime_done().await;
                 }
             }
         }
