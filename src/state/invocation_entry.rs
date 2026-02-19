@@ -128,32 +128,6 @@ pub fn store_trace_by_id(invocation_id: &str, trace: StoredTrace) {
         .push(trace);
 }
 
-/// Store a single trace, filing it under each of its invocation IDs.
-/// If the trace has no invocation IDs, it is stored under "__unknown__".
-pub fn store_trace(trace: StoredTrace) {
-    let mut store = INVOCATION_STORE.lock();
-    if trace.invocation_ids.is_empty() {
-        store
-            .entry("__unknown__".to_string())
-            .or_default()
-            .traces
-            .push(trace);
-    } else {
-        // For a single invocation id (common case), move the trace directly.
-        // For multiple, clone for all but the last.
-        let mut ids = trace.invocation_ids.iter();
-        let last_id = ids.next_back().unwrap();
-        for id in ids {
-            store
-                .entry(id.clone())
-                .or_default()
-                .traces
-                .push(trace.clone());
-        }
-        store.entry(last_id.clone()).or_default().traces.push(trace);
-    }
-}
-
 /// Take all traces from every invocation entry, draining each entry's traces.
 pub fn take_all_traces() -> Vec<StoredTrace> {
     let mut store = INVOCATION_STORE.lock();

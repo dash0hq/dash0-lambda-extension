@@ -652,8 +652,8 @@ mod tests {
         value
     }
 
-    fn store_trace(trace: StoredTrace) {
-        invocation_entry::store_trace(trace);
+    fn store_trace(invocation_id: &str, trace: StoredTrace) {
+        invocation_entry::store_trace_by_id(invocation_id, trace);
     }
 
     fn take_traces() -> Vec<StoredTrace> {
@@ -874,7 +874,7 @@ mod tests {
             body: request.encode_to_vec(),
             invocation_ids: vec![invocation_id.to_string()],
         };
-        store_trace(trace);
+        store_trace(invocation_id, trace);
 
         add_return_payload_to_lambda_server_spans(invocation_id, "result");
 
@@ -901,7 +901,7 @@ mod tests {
             body: request.encode_to_vec(),
             invocation_ids: vec!["other-inv".to_string()],
         };
-        store_trace(trace);
+        store_trace("other-inv", trace);
 
         add_return_payload_to_lambda_server_spans("inv-return-2", "result");
 
@@ -978,7 +978,7 @@ mod tests {
             body: request.encode_to_vec(),
             invocation_ids: vec![invocation_id.to_string()],
         };
-        store_trace(trace);
+        store_trace(invocation_id, trace);
 
         let traces = snapshot_traces();
         let synthetic = build_synthetic_trace(invocation_id, Some("CopiedError"), None, &traces)
@@ -1429,7 +1429,7 @@ mod tests {
             body: request.encode_to_vec(),
             invocation_ids: vec![invocation_id.to_string()],
         };
-        store_trace(trace);
+        store_trace(invocation_id, trace);
 
         add_return_payload_to_lambda_server_spans(invocation_id, "node_result");
 
