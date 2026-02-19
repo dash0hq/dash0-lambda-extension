@@ -30,7 +30,7 @@ pub fn build_synthetic_trace(
     return_value: Option<&str>,
     existing_traces: &[StoredTrace],
 ) -> Option<StoredTrace> {
-    let (trace_id, span_id) = get_trace_span_ids(invocation_id, existing_traces);
+    let (trace_id, span_id, parent_span_id) = get_trace_span_ids(invocation_id, existing_traces);
 
     let now_nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -111,6 +111,7 @@ pub fn build_synthetic_trace(
     let span = Span {
         trace_id,
         span_id,
+        parent_span_id,
         name: "unknown".to_string(),
         kind: SpanKind::Server as i32,
         start_time_unix_nano: start_nanos,
@@ -1518,7 +1519,7 @@ fn env_as_json_string() -> String {
     crate::otlp::masking::mask_env_vars(map)
 }
 
-fn get_trace_span_ids(invocation_id: &str, existing_traces: &[StoredTrace]) -> (Vec<u8>, Vec<u8>) {
+fn get_trace_span_ids(invocation_id: &str, existing_traces: &[StoredTrace]) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
     for trace in existing_traces {
         if !trace.invocation_ids.contains(&invocation_id.to_string()) {
             continue;
@@ -1543,7 +1544,7 @@ fn get_trace_span_ids(invocation_id: &str, existing_traces: &[StoredTrace]) -> (
                     hex::encode(&span.parent_span_id),
                 );
                 if span.trace_id.len() == 16 && !span.parent_span_id.is_empty() {
-                    return (span.trace_id, span.parent_span_id);
+                    return (span.trace_id, span.parent_span_id, vec![]);
                 }
             }
         }
@@ -1565,5 +1566,12 @@ fn get_trace_span_ids(invocation_id: &str, existing_traces: &[StoredTrace]) -> (
         .filter(|p| p.len() == 8)
         .unwrap_or_else(|| get_span_id_from_invocation_id(invocation_id));
 
-    (trace_id, span_id)
+    let parent_span_id = stored
+        .as_ref()
+        .filter(|s| !s.parent_span_id.is_empty())
+        .and_then(|s| hex::decode(&s.parent_span_id).ok())
+        .filter(|p| p.len() == 8)
+        .unwrap_or_default();
+
+    (trace_id, span_id, parent_span_id)
 }
