@@ -2,6 +2,7 @@ use hyper::Body;
 use std::time::{Duration, Instant};
 
 use crate::state;
+use crate::util::parsers::get_span_id_from_invocation_id;
 
 const EXTENSION_API_VERSION: &str = "2020-01-01";
 
@@ -48,7 +49,7 @@ fn handle_invoke_event(json: &serde_json::Value) {
                 state::invocation_data::store_invocation_span_id(
                     request_id,
                     trace_id,
-                    String::new(),
+                    hex::encode(get_span_id_from_invocation_id(request_id)),
                     parent_span_id,
                 );
             }
