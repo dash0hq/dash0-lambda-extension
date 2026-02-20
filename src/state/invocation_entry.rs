@@ -152,6 +152,23 @@ pub fn snapshot_all_traces() -> Vec<StoredTrace> {
         .collect()
 }
 
+/// Remove all invocation entries whose state is Done and whose traces and logs are empty.
+pub fn delete_done_invocations() {
+    INVOCATION_STORE.lock().retain(|id, entry| {
+        let should_delete = entry.state == InvocationState::Done
+            && entry.traces.is_empty()
+            && entry.logs.is_empty();
+        if should_delete {
+            tracing::trace!(
+                "[{}] Deleting done invocation entry: {}",
+                crate::log_prefix(),
+                id
+            );
+        }
+        !should_delete
+    });
+}
+
 pub fn force_init() {
     Lazy::force(&INVOCATION_STORE);
 }

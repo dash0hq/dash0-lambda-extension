@@ -25,11 +25,12 @@ pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
     {
         crate::util::log_processing::process_telemetry_logs(&mut logs);
 
-        let mut report_invocation_ids: Vec<String> = Vec::new();
         for log in &logs {
             if log.r#type == "platform.report" {
                 if let Some(id) = &log.invocation_id {
-                    report_invocation_ids.push(id.clone());
+                    invocation_entry::update(id, |entry| {
+                        entry.state = crate::state::invocation_entry::InvocationState::Done;
+                    });
                 }
             }
         }

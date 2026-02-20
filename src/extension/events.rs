@@ -78,6 +78,7 @@ async fn flush_if_needed(
     }
     crate::otlp::exporter::flush_traces().await;
     crate::otlp::exporter::flush_logs(invocation_id).await;
+    crate::state::invocation_entry::delete_done_invocations();
 }
 
 async fn wait_for_runtime_done() {
@@ -103,6 +104,7 @@ async fn wait_for_runtime_done() {
             );
             crate::otlp::exporter::flush_traces().await;
             crate::otlp::exporter::flush_logs(None).await;
+            crate::state::invocation_entry::delete_done_invocations();
         }
         Ok(Err(_)) => {
             tracing::warn!(
