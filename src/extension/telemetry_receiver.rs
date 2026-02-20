@@ -1,5 +1,5 @@
 use crate::config::user::is_logs_instrumentation_enabled;
-use crate::otlp::exporter::{flush_telemetry_logs, flush_traces, send_traces};
+use crate::otlp::exporter::{flush_telemetry_logs, send_traces};
 use crate::otlp::span_mutations::build_synthetic_trace;
 use crate::state::invocation_entry;
 use crate::util::parsers::extract_error_invocation_ids;
@@ -36,12 +36,6 @@ pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
 
         if !is_logs_instrumentation_enabled() {
             crate::state::invocation_entry::store_telemetry_logs(logs);
-        }
-
-        if !report_invocation_ids.is_empty() {
-            if !crate::config::is_send_on_invocation_end() {
-                flush_traces().await;
-            }
         }
     } else {
         tracing::debug!(

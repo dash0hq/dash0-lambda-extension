@@ -68,11 +68,10 @@ async fn flush_if_needed(event_type: Option<&str>, shutdown_reason: Option<&str>
 
     let is_invocation_end = matches!(event_type, Some("SHUTDOWN"));
     if is_invocation_end {
+        // on shutdown/spindown wait for logs to arrive
         tokio::time::sleep(Duration::from_millis(200)).await;
-        crate::otlp::exporter::flush_traces().await;
-    } else {
-        tokio::time::sleep(Duration::from_millis(20)).await;
     }
+    crate::otlp::exporter::flush_traces().await;
     crate::otlp::exporter::flush_logs(is_invocation_end).await;
 }
 
