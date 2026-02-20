@@ -93,7 +93,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::175948133317:role/GitHubActionsDeployRole
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
       - name: Install dependencies
         working-directory: integration-tests/iac

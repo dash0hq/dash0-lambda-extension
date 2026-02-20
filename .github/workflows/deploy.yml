@@ -1,13 +1,29 @@
 name: Deploy
 
 on:
-  workflow_dispatch: # TODO: re-enable push trigger once secrets are configured
-  # push:
-  #   branches: [main, master]
+  push:
+    branches: [master]
+  workflow_dispatch:
 
 jobs:
-  deploy:
+  deploy-dev:
+    if: github.event_name == 'push'
+    strategy:
+      matrix:
+        region: [eu-central-1, us-east-2]
     uses: ./.github/workflows/build-and-publish.yml
     with:
-      environment: prod
+      environment: dev-integration
+      region: ${{ matrix.region }}
+    secrets: inherit
+
+  deploy-prod:
+    if: github.event_name == 'workflow_dispatch'
+    strategy:
+      matrix:
+        region: [eu-central-1, us-east-2, us-west-2]
+    uses: ./.github/workflows/build-and-publish.yml
+    with:
+      environment: prod-integration
+      region: ${{ matrix.region }}
     secrets: inherit

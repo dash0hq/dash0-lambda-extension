@@ -1,0 +1,47 @@
+name: Cleanup PR Resources
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main, master]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      RESOURCE_PREFIX: pr-${{ github.event.pull_request.number }}-
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Install CDK dependencies
+        working-directory: integration-tests/iac
+        run: npm ci
+      - name: Destroy CDK stack
+        working-directory: integration-tests/iac
+        run: npx cdk destroy ${RESOURCE_PREFIX}IntegrationTestsStack --force || true
+        env:
+          DASH0_DEV_API_TOKEN: ${{ secrets.DASH0_DEV_API_TOKEN }}
+      - name: Delete PR-specific Lambda layers
+        run: |
+          for layer in ${RESOURCE_PREFIX}dash0-extension-python ${RESOURCE_PREFIX}dash0-extension-node ${RESOURCE_PREFIX}dash0-extension-java ${RESOURCE_PREFIX}dash0-extension-manual; do
+            versions=$(aws lambda list-layer-versions --layer-name $layer --query 'LayerVersions[].Version' --output text 2>/dev/null || true)
+            for v in $versions; do
+              aws lambda delete-layer-version --layer-name $layer --version-number $v || true
+            done
+          done
+      - name: Delete PR-specific ECR repos
+        run: |
+          for repo in ${RESOURCE_PREFIX}dash0-extension-python ${RESOURCE_PREFIX}dash0-extension-node ${RESOURCE_PREFIX}dash0-extension-java; do
+            aws ecr delete-repository --repository-name $repo --force || true
+          done
