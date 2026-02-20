@@ -48,8 +48,8 @@ fn parse_platform_start(log: &TelemetryLog, current_invocation_id: &mut Option<S
 
             if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&log.time) {
                 let start_time = dt.timestamp_millis() as f64;
-                crate::state::invocation_data::update_invocation_data(req_id, |data| {
-                    data.start_time = start_time;
+                crate::state::invocation_entry::update(req_id, |entry| {
+                    entry.start_time = start_time;
                 });
             } else {
                 tracing::info!(
@@ -70,8 +70,8 @@ fn parse_platform_init_report(log: &TelemetryLog) {
         .and_then(|d| d.as_f64())
     {
         if let Some(req_id) = crate::state::invocation_data::get_current_invocation_id() {
-            crate::state::invocation_data::update_invocation_data(&req_id, |data| {
-                data.init_duration = duration_ms;
+            crate::state::invocation_entry::update(&req_id, |entry| {
+                entry.init_duration = duration_ms;
             });
         }
     }
@@ -98,12 +98,12 @@ fn parse_platform_runtime_done(log: &TelemetryLog) {
                 .unwrap_or(0.0);
 
             if end_time > 0.0 || duration > 0.0 {
-                crate::state::invocation_data::update_invocation_data(req_id, |data| {
+                crate::state::invocation_entry::update(req_id, |entry| {
                     if end_time > 0.0 {
-                        data.end_time = end_time;
+                        entry.end_time = end_time;
                     }
                     if duration > 0.0 {
-                        data.duration = duration;
+                        entry.duration = duration;
                     }
                 });
             }
@@ -147,18 +147,18 @@ fn parse_platform_report(log: &TelemetryLog) {
                     .and_then(|v| v.as_f64())
                     .unwrap_or(0.0);
 
-                crate::state::invocation_data::update_invocation_data(req_id, |data| {
-                    if data.start_time > 0.0 {
-                        data.end_time = data.start_time + duration;
+                crate::state::invocation_entry::update(req_id, |entry| {
+                    if entry.start_time > 0.0 {
+                        entry.end_time = entry.start_time + duration;
                     } else if log_timestamp > 0.0 {
-                        data.end_time = log_timestamp;
+                        entry.end_time = log_timestamp;
                     }
 
-                    data.duration = duration;
-                    data.billed_duration = billed_duration;
-                    data.memory_usage = memory_usage;
+                    entry.duration = duration;
+                    entry.billed_duration = billed_duration;
+                    entry.memory_usage = memory_usage;
                     if init_duration > 0.0 {
-                        data.init_duration = init_duration;
+                        entry.init_duration = init_duration;
                     }
                 });
             }
@@ -169,7 +169,8 @@ fn parse_platform_report(log: &TelemetryLog) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::invocation_data::{get_invocation_data, TelemetryLog};
+    use crate::state::invocation_data::TelemetryLog;
+    use crate::state::invocation_entry;
     use serde_json::json;
     use serial_test::serial;
 
@@ -202,7 +203,7 @@ mod tests {
         let mut logs = logs;
         process_telemetry_logs(&mut logs);
 
-        let data = get_invocation_data(req_id).expect("Should have data");
+        let data = invocation_entry::get(req_id).expect("Should have data");
         let expected_time = chrono::DateTime::parse_from_rfc3339(time_str)
             .unwrap()
             .timestamp_millis() as f64;
@@ -228,7 +229,7 @@ mod tests {
         let mut logs = logs;
         process_telemetry_logs(&mut logs);
 
-        let data = get_invocation_data(req_id).expect("Should have data");
+        let data = invocation_entry::get(req_id).expect("Should have data");
         assert_eq!(data.init_duration, 123.45);
     }
 
@@ -250,7 +251,7 @@ mod tests {
         let mut logs = logs;
         process_telemetry_logs(&mut logs);
 
-        let data = get_invocation_data(req_id).expect("Should have data");
+        let data = invocation_entry::get(req_id).expect("Should have data");
         let expected_end = chrono::DateTime::parse_from_rfc3339(time_str)
             .unwrap()
             .timestamp_millis() as f64;
@@ -281,7 +282,7 @@ mod tests {
         let mut logs = logs;
         process_telemetry_logs(&mut logs);
 
-        let data = get_invocation_data(req_id).expect("Should have data");
+        let data = invocation_entry::get(req_id).expect("Should have data");
         let expected_end = chrono::DateTime::parse_from_rfc3339(time_str)
             .unwrap()
             .timestamp_millis() as f64;
@@ -334,7 +335,7 @@ mod tests {
 
         process_telemetry_logs(&mut logs);
 
-        let data = get_invocation_data(req_id).expect("Should have data");
+        let data = invocation_entry::get(req_id).expect("Should have data");
         let expected_start = chrono::DateTime::parse_from_rfc3339(start_time)
             .unwrap()
             .timestamp_millis() as f64;

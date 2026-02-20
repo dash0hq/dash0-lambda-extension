@@ -7,6 +7,10 @@ on:
         required: true
         type: string
 
+permissions:
+  id-token: write
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -50,8 +54,7 @@ jobs:
         run: chmod +x build/lrap_x86_64 build/lrap_aarch64 && touch build/lrap_x86_64 build/lrap_aarch64
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::175948133317:role/GitHubActionsDeployRole
           aws-region: ${{ vars.AWS_REGION }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -78,8 +81,7 @@ jobs:
         run: chmod +x build/lrap_x86_64 build/lrap_aarch64 && touch build/lrap_x86_64 build/lrap_aarch64
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::175948133317:role/GitHubActionsDeployRole
           aws-region: ${{ vars.AWS_REGION }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -103,8 +105,7 @@ jobs:
         run: chmod +x build/lrap_x86_64 build/lrap_aarch64 && touch build/lrap_x86_64 build/lrap_aarch64
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::175948133317:role/GitHubActionsDeployRole
           aws-region: ${{ vars.AWS_REGION }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -128,8 +129,7 @@ jobs:
         run: chmod +x build/lrap_x86_64 build/lrap_aarch64 && touch build/lrap_x86_64 build/lrap_aarch64
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::175948133317:role/GitHubActionsDeployRole
           aws-region: ${{ vars.AWS_REGION }}
       - name: Build and publish Manual layer
         run: make manual

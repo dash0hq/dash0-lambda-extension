@@ -5,7 +5,8 @@ use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 
 use crate::otlp::span_mutations::{drop_duplicate_java_instrumenations, process_trace_request};
-use crate::state::invocation_data::{store_trace, StoredTrace};
+use crate::state::invocation_data::StoredTrace;
+use crate::state::invocation_entry;
 
 pub async fn traces(req: Request<Body>) -> Result<Response<Body>, Error> {
     let start = Instant::now();
@@ -88,24 +89,40 @@ pub async fn traces(req: Request<Body>) -> Result<Response<Body>, Error> {
         );
     }
 
-    let seen_invocation_ids = invocation_ids.clone();
-    store_trace(StoredTrace {
-        method: parts.method,
-        path_and_query: parts
-            .uri
-            .path_and_query()
-            .map(|pq| pq.as_str().to_string())
-            .unwrap_or_else(|| "/".to_string()),
-        headers,
-        body: encoded_body,
-        invocation_ids,
-    });
+    if invocation_ids.is_empty() {
+        tracing::error!(
+            "[{}] /v1/traces has no invocation IDs, discarding trace",
+            crate::log_prefix(),
+        );
+    } else {
+        if invocation_ids.len() > 1 {
+            tracing::error!(
+                "[{}] /v1/traces has multiple invocation IDs: {:?}, using first",
+                crate::log_prefix(),
+                invocation_ids,
+            );
+        }
+        let invocation_id = invocation_ids[0].clone();
+        invocation_entry::store_trace_by_id(
+            &invocation_id,
+            StoredTrace {
+                method: parts.method,
+                path_and_query: parts
+                    .uri
+                    .path_and_query()
+                    .map(|pq| pq.as_str().to_string())
+                    .unwrap_or_else(|| "/".to_string()),
+                headers,
+                body: encoded_body,
+                invocation_ids,
+            },
+        );
+    }
 
     tracing::info!(
-        "[{}] Total handle time for /v1/traces {} ms. seen invocation ids: {:?}",
+        "[{}] Total handle time for /v1/traces {} ms",
         crate::log_prefix(),
         start.elapsed().as_millis(),
-        seen_invocation_ids
     );
     Ok(Response::builder().status(200).body(Body::empty()).unwrap())
 }

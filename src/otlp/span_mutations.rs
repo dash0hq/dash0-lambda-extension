@@ -1,8 +1,6 @@
 use crate::otlp::log_mutations::try_read_env_from_file;
-use crate::state::invocation_data::{
-    get_event_payload, store_return_payload, store_traces, take_return_payload, take_traces,
-    StoredTrace,
-};
+use crate::state::invocation_data::StoredTrace;
+use crate::state::invocation_entry;
 use crate::util::parsers::{
     extract_invocation_id, get_span_id_from_invocation_id, get_span_scope_name,
     get_trace_id_from_invocation_id,
@@ -30,15 +28,14 @@ pub fn build_synthetic_trace(
     return_value: Option<&str>,
     existing_traces: &[StoredTrace],
 ) -> Option<StoredTrace> {
-    let (trace_id, span_id) = get_trace_span_ids(invocation_id, existing_traces);
+    let (trace_id, span_id, parent_span_id) = get_trace_span_ids(invocation_id, existing_traces);
 
     let now_nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_nanos() as u64)
         .unwrap_or(0);
-    let start_nanos = crate::state::invocation_data::get_invocation_data(invocation_id)
-        .map(|data| (data.start_time * 1_000_000.0) as u64)
-        .filter(|&t| t > 0)
+    let start_nanos = invocation_entry::get_start_time(invocation_id)
+        .map(|t| (t * 1_000_000.0) as u64)
         .unwrap_or(now_nanos);
 
     let mut attributes = vec![
@@ -68,7 +65,7 @@ pub fn build_synthetic_trace(
     ];
 
     let mut sqs_links = Vec::new();
-    if let Some(event_payload) = get_event_payload(invocation_id) {
+    if let Some(event_payload) = invocation_entry::get_event_payload(invocation_id) {
         // Extract span links before consuming event_payload
         sqs_links = extract_span_links(&event_payload);
 
@@ -111,6 +108,7 @@ pub fn build_synthetic_trace(
     let span = Span {
         trace_id,
         span_id,
+        parent_span_id,
         name: "unknown".to_string(),
         kind: SpanKind::Server as i32,
         start_time_unix_nano: start_nanos,
@@ -346,7 +344,7 @@ fn annotate_server_spans(spans: &mut Vec<Span>, invocation_ids: &mut Vec<String>
         if let Some(invocation_id) = extract_invocation_id(span) {
             invocation_ids.push(invocation_id.clone());
 
-            if let Some(event_payload) = get_event_payload(&invocation_id) {
+            if let Some(event_payload) = invocation_entry::get_event_payload(&invocation_id) {
                 // Extract span links before consuming event_payload
                 let sqs_links = extract_span_links(&event_payload);
                 if !sqs_links.is_empty() {
@@ -382,18 +380,13 @@ pub fn add_return_payload_to_lambda_server_spans(
     invocation_id: &str,
     return_payload: &str,
 ) -> bool {
-    let mut traces = take_traces();
-    let mut updated_traces: Vec<StoredTrace> = Vec::new();
+    let mut traces = invocation_entry::take_traces_by_id(invocation_id);
     let mut added = false;
 
-    for mut trace in traces.drain(..) {
-        let mut modified = false;
+    for trace in &mut traces {
         match ExportTraceServiceRequest::decode(trace.body.as_slice()) {
             Ok(mut decoded) => {
-                modified = annotate_return_payload(&mut decoded, invocation_id, return_payload)
-                    || modified;
-
-                if modified {
+                if annotate_return_payload(&mut decoded, invocation_id, return_payload) {
                     trace.body = decoded.encode_to_vec();
                     added = true;
                 }
@@ -407,17 +400,14 @@ pub fn add_return_payload_to_lambda_server_spans(
                 );
             }
         }
-
-        updated_traces.push(trace);
     }
 
-    store_traces(updated_traces);
-    if added {
-        // Clean up any pending payload stored earlier for this invocation.
-        let _ = take_return_payload(invocation_id);
-    } else {
-        store_return_payload(invocation_id, return_payload);
-    }
+    invocation_entry::update(invocation_id, |entry| {
+        entry.traces = traces;
+        if !added {
+            entry.return_value = Some(return_payload.to_string());
+        }
+    });
     added
 }
 
@@ -459,8 +449,7 @@ pub fn merge_telemetry_invocation_data(request: &mut ExportTraceServiceRequest) 
                 if is_lambda_instrumentation_scope(&scope.name) {
                     for span in &mut scope_span.spans {
                         if let Some(invocation_id) = extract_invocation_id(span) {
-                            if let Some(data) =
-                                crate::state::invocation_data::get_invocation_data(&invocation_id)
+                            if let Some(data) = invocation_entry::get_telemetry_data(&invocation_id)
                             {
                                 if data.init_duration > 0.0 {
                                     span.attributes.push(KeyValue {
@@ -551,7 +540,8 @@ pub fn process_trace_request(
     // If we have pending return payloads for these invocation IDs, apply them now.
     let mut updated_with_return = false;
     for id in invocation_ids.iter() {
-        if let Some(payload) = crate::state::invocation_data::take_return_payload(id) {
+        let payload = invocation_entry::get_return_value(id);
+        if let Some(payload) = payload {
             if annotate_return_payload(decoded, id, &payload) {
                 updated_with_return = true;
             }
@@ -584,11 +574,16 @@ pub fn process_trace_request(
                                     .iter()
                                     .map(|b| format!("{:02x}", b))
                                     .collect::<String>();
-                                crate::state::invocation_data::store_invocation_span_id(
-                                    invocation_id,
-                                    trace_id_hex,
-                                    span_id_hex,
-                                );
+                                let parent_span_id_hex = span
+                                    .parent_span_id
+                                    .iter()
+                                    .map(|b| format!("{:02x}", b))
+                                    .collect::<String>();
+                                invocation_entry::update(invocation_id, |entry| {
+                                    entry.trace_id = Some(trace_id_hex);
+                                    entry.span_id = Some(span_id_hex);
+                                    entry.parent_span_id = Some(parent_span_id_hex);
+                                });
                                 tracing::debug!(
                                     "[{}] stored trace/span id for invocation_id={}",
                                     crate::log_prefix(),
@@ -611,10 +606,8 @@ mod tests {
         add_event_payload_to_lambda_server_spans, add_return_payload_to_lambda_server_spans,
         annotate_return_payload, build_synthetic_trace, StatusCode,
     };
-    use crate::state::invocation_data::{
-        snapshot_traces, store_event_payload, store_return_payload, store_trace,
-        take_return_payload, take_traces, StoredTrace,
-    };
+    use crate::state::invocation_data::StoredTrace;
+    use crate::state::invocation_entry;
     use hyper::{header, Method};
     use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
     use opentelemetry_proto::tonic::common::v1::any_value::Value;
@@ -629,6 +622,43 @@ mod tests {
             .iter()
             .find(|kv| kv.key == key)
             .and_then(|kv| kv.value.as_ref())
+    }
+
+    fn store_event_payload(invocation_id: &str, payload: &str) {
+        let payload = payload.to_string();
+        invocation_entry::update(invocation_id, |entry| {
+            entry.event_payload = Some(payload);
+        });
+    }
+
+    fn store_return_payload(invocation_id: &str, payload: &str) {
+        let payload = payload.to_string();
+        invocation_entry::update(invocation_id, |entry| {
+            entry.return_value = Some(payload);
+        });
+    }
+
+    fn take_return_payload(invocation_id: &str) -> Option<String> {
+        let entry = invocation_entry::get(invocation_id)?;
+        let value = entry.return_value.clone();
+        if value.is_some() {
+            invocation_entry::update(invocation_id, |entry| {
+                entry.return_value = None;
+            });
+        }
+        value
+    }
+
+    fn store_trace(invocation_id: &str, trace: StoredTrace) {
+        invocation_entry::store_trace_by_id(invocation_id, trace);
+    }
+
+    fn take_traces() -> Vec<StoredTrace> {
+        invocation_entry::take_all_traces()
+    }
+
+    fn snapshot_traces() -> Vec<StoredTrace> {
+        invocation_entry::snapshot_all_traces()
     }
 
     #[test]
@@ -841,7 +871,7 @@ mod tests {
             body: request.encode_to_vec(),
             invocation_ids: vec![invocation_id.to_string()],
         };
-        store_trace(trace);
+        store_trace(invocation_id, trace);
 
         add_return_payload_to_lambda_server_spans(invocation_id, "result");
 
@@ -868,7 +898,7 @@ mod tests {
             body: request.encode_to_vec(),
             invocation_ids: vec!["other-inv".to_string()],
         };
-        store_trace(trace);
+        store_trace("other-inv", trace);
 
         add_return_payload_to_lambda_server_spans("inv-return-2", "result");
 
@@ -945,7 +975,7 @@ mod tests {
             body: request.encode_to_vec(),
             invocation_ids: vec![invocation_id.to_string()],
         };
-        store_trace(trace);
+        store_trace(invocation_id, trace);
 
         let traces = snapshot_traces();
         let synthetic = build_synthetic_trace(invocation_id, Some("CopiedError"), None, &traces)
@@ -1011,12 +1041,6 @@ mod tests {
             return_attr.is_some(),
             "dash0.faas.return_value should be added"
         );
-
-        // Verify the pending payload was consumed
-        assert!(
-            take_return_payload(invocation_id).is_none(),
-            "pending return payload should be consumed"
-        );
     }
 
     #[test]
@@ -1037,7 +1061,7 @@ mod tests {
         super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
 
         // Verify the span IDs were stored
-        let stored = crate::state::invocation_data::get_invocation_span_id(invocation_id);
+        let stored = invocation_entry::get(invocation_id);
         assert!(stored.is_some(), "invocation span IDs should be stored");
 
         let stored = stored.unwrap();
@@ -1050,8 +1074,8 @@ mod tests {
             .map(|b| format!("{:02x}", b))
             .collect::<String>();
 
-        assert_eq!(stored.trace_id, expected_trace_id);
-        assert_eq!(stored.span_id, expected_span_id);
+        assert_eq!(stored.trace_id.unwrap(), expected_trace_id);
+        assert_eq!(stored.span_id.unwrap(), expected_span_id);
     }
 
     #[test]
@@ -1402,7 +1426,7 @@ mod tests {
             body: request.encode_to_vec(),
             invocation_ids: vec![invocation_id.to_string()],
         };
-        store_trace(trace);
+        store_trace(invocation_id, trace);
 
         add_return_payload_to_lambda_server_spans(invocation_id, "node_result");
 
@@ -1422,13 +1446,13 @@ mod tests {
     fn test_merge_telemetry_invocation_data_updates_span() {
         let invocation_id = "inv-merge-data";
 
-        // Setup InvocationData
-        crate::state::invocation_data::update_invocation_data(invocation_id, |data| {
-            data.init_duration = 100.0;
-            data.billed_duration = 200.0;
-            data.memory_usage = 128;
-            data.start_time = 1_000.0; // 1 second
-            data.end_time = 2_000.0; // 2 seconds
+        // Setup InvocationEntry data
+        invocation_entry::update(invocation_id, |entry| {
+            entry.init_duration = 100.0;
+            entry.billed_duration = 200.0;
+            entry.memory_usage = 128;
+            entry.start_time = 1_000.0; // 1 second
+            entry.end_time = 2_000.0; // 2 seconds
         });
 
         let span = make_span_with_invocation(invocation_id);
@@ -1503,6 +1527,171 @@ mod tests {
         assert_eq!(hex::encode(&span.links[0].span_id), "fedcba9876543210");
         std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
     }
+
+    // --- get_trace_span_ids tests ---
+
+    fn build_stored_trace_with_ids(
+        invocation_id: &str,
+        trace_id: Vec<u8>,
+        span_id: Vec<u8>,
+        parent_span_id: Vec<u8>,
+    ) -> StoredTrace {
+        let span = Span {
+            trace_id,
+            span_id,
+            parent_span_id,
+            ..Default::default()
+        };
+        let request = ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans {
+                scope_spans: vec![ScopeSpans {
+                    spans: vec![span],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        StoredTrace {
+            method: Method::POST,
+            path_and_query: "/v1/traces".to_string(),
+            headers: hyper::HeaderMap::new(),
+            body: request.encode_to_vec(),
+            invocation_ids: vec![invocation_id.to_string()],
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn get_trace_span_ids_from_existing_trace() {
+        let invocation_id = "inv-ids-from-trace";
+        let trace_id = vec![0xAA; 16];
+        let span_id = vec![0xBB; 8];
+        let parent_span_id = vec![0xCC; 8];
+
+        let stored_trace = build_stored_trace_with_ids(
+            invocation_id,
+            trace_id.clone(),
+            span_id.clone(),
+            parent_span_id.clone(),
+        );
+
+        let (got_trace, got_span, _got_parent) =
+            super::get_trace_span_ids(invocation_id, &[stored_trace]);
+
+        assert_eq!(got_trace, trace_id);
+        // span_id is taken from the existing span's parent_span_id
+        assert_eq!(got_span, parent_span_id);
+    }
+
+    #[test]
+    #[serial]
+    fn get_trace_span_ids_from_stored_entry() {
+        let invocation_id = "inv-ids-from-entry";
+        let trace_id_hex = "aa".repeat(16);
+        let span_id_hex = "bb".repeat(8);
+        let parent_span_id_hex = "cc".repeat(8);
+
+        invocation_entry::update(invocation_id, |entry| {
+            entry.trace_id = Some(trace_id_hex.clone());
+            entry.span_id = Some(span_id_hex.clone());
+            entry.parent_span_id = Some(parent_span_id_hex.clone());
+        });
+
+        let (got_trace, got_span, _got_parent) = super::get_trace_span_ids(invocation_id, &[]);
+
+        assert_eq!(hex::encode(&got_trace), trace_id_hex);
+        assert_eq!(hex::encode(&got_span), span_id_hex);
+        assert_eq!(hex::encode(_got_parent), parent_span_id_hex);
+    }
+
+    #[test]
+    #[serial]
+    fn get_trace_span_ids_falls_back_to_hash() {
+        let invocation_id = "inv-ids-hash-fallback";
+        // No traces, no stored entry → should generate from hash
+        let (got_trace, got_span, got_parent) = super::get_trace_span_ids(invocation_id, &[]);
+
+        let expected_trace = crate::util::parsers::get_trace_id_from_invocation_id(invocation_id);
+        let expected_span = crate::util::parsers::get_span_id_from_invocation_id(invocation_id);
+
+        assert_eq!(got_trace, expected_trace);
+        assert_eq!(got_span, expected_span);
+        assert!(
+            got_parent.is_empty(),
+            "parent_span_id should be empty when nothing is stored"
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn get_trace_span_ids_trace_overrides_stored_entry() {
+        let invocation_id = "inv-ids-trace-wins";
+        let trace_trace_id = vec![0x11; 16];
+        let trace_parent_span_id = vec![0x22; 8];
+
+        // Store different IDs in the invocation entry
+        invocation_entry::update(invocation_id, |entry| {
+            entry.trace_id = Some("ff".repeat(16));
+            entry.span_id = Some("ee".repeat(8));
+            entry.parent_span_id = Some("dd".repeat(8));
+        });
+
+        let stored_trace = build_stored_trace_with_ids(
+            invocation_id,
+            trace_trace_id.clone(),
+            vec![0x33; 8], // span's own span_id (not used directly)
+            trace_parent_span_id.clone(),
+        );
+
+        let (got_trace, got_span, _got_parent) =
+            super::get_trace_span_ids(invocation_id, &[stored_trace]);
+
+        // trace_id and span_id should come from the existing trace, not the stored entry
+        assert_eq!(got_trace, trace_trace_id);
+        assert_eq!(got_span, trace_parent_span_id);
+    }
+
+    #[test]
+    #[serial]
+    fn get_trace_span_ids_skips_non_matching_traces() {
+        let invocation_id = "inv-ids-no-match";
+        let other_trace = build_stored_trace_with_ids(
+            "other-invocation",
+            vec![0xAA; 16],
+            vec![0xBB; 8],
+            vec![0xCC; 8],
+        );
+
+        let (got_trace, got_span, _) = super::get_trace_span_ids(invocation_id, &[other_trace]);
+
+        // Should fall through to hash-based generation
+        let expected_trace = crate::util::parsers::get_trace_id_from_invocation_id(invocation_id);
+        let expected_span = crate::util::parsers::get_span_id_from_invocation_id(invocation_id);
+
+        assert_eq!(got_trace, expected_trace);
+        assert_eq!(got_span, expected_span);
+    }
+
+    #[test]
+    #[serial]
+    fn get_trace_span_ids_updates_invocation_entry() {
+        let invocation_id = "inv-ids-updates-entry";
+        let trace_id = vec![0xDE; 16];
+        let parent_span_id = vec![0xAD; 8];
+
+        let stored_trace = build_stored_trace_with_ids(
+            invocation_id,
+            trace_id.clone(),
+            vec![0xFF; 8],
+            parent_span_id.clone(),
+        );
+
+        super::get_trace_span_ids(invocation_id, &[stored_trace]);
+
+        let entry = invocation_entry::get(invocation_id).expect("entry should exist after call");
+        assert_eq!(entry.trace_id.unwrap(), hex::encode(&trace_id));
+        assert_eq!(entry.span_id.unwrap(), hex::encode(&parent_span_id));
+    }
 }
 
 fn env_as_json_string() -> String {
@@ -1512,9 +1701,13 @@ fn env_as_json_string() -> String {
     crate::otlp::masking::mask_env_vars(map)
 }
 
-fn get_trace_span_ids(invocation_id: &str, existing_traces: &[StoredTrace]) -> (Vec<u8>, Vec<u8>) {
-    let mut found_trace_id: Option<Vec<u8>> = None;
-    let mut found_parent_span_id: Option<Vec<u8>> = None;
+fn get_trace_span_ids(
+    invocation_id: &str,
+    existing_traces: &[StoredTrace],
+) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+    let mut trace_id: Option<Vec<u8>> = None;
+    let mut span_id: Option<Vec<u8>> = None;
+    let parent_span_id: Option<Vec<u8>> = None;
 
     for trace in existing_traces {
         if !trace.invocation_ids.contains(&invocation_id.to_string()) {
@@ -1534,27 +1727,52 @@ fn get_trace_span_ids(invocation_id: &str, existing_traces: &[StoredTrace]) -> (
                 .next()
             {
                 if span.trace_id.len() == 16 {
-                    found_trace_id = Some(span.trace_id.clone());
+                    trace_id = Some(span.trace_id);
                 }
                 if !span.parent_span_id.is_empty() {
-                    found_parent_span_id = Some(span.parent_span_id.clone());
-                }
-                crate::state::invocation_data::store_invocation_span_id(
-                    invocation_id,
-                    hex::encode(&span.trace_id),
-                    hex::encode(&span.parent_span_id),
-                );
-                if found_trace_id.is_some() {
-                    break;
+                    span_id = Some(span.parent_span_id);
                 }
             }
         }
     }
 
-    let trace_id = found_trace_id.unwrap_or_else(|| get_trace_id_from_invocation_id(invocation_id));
+    let stored_ids = invocation_entry::get_trace_span_ids(invocation_id);
 
-    let span_id =
-        found_parent_span_id.unwrap_or_else(|| get_span_id_from_invocation_id(invocation_id));
+    let trace_id = trace_id.unwrap_or_else(|| {
+        stored_ids
+            .as_ref()
+            .and_then(|(t, _, _)| t.as_deref())
+            .filter(|t| !t.is_empty())
+            .and_then(|t| hex::decode(t).ok())
+            .filter(|t| t.len() == 16)
+            .unwrap_or_else(|| get_trace_id_from_invocation_id(invocation_id))
+    });
 
-    (trace_id, span_id)
+    let span_id = span_id.unwrap_or_else(|| {
+        stored_ids
+            .as_ref()
+            .and_then(|(_, s, _)| s.as_deref())
+            .filter(|s| !s.is_empty())
+            .and_then(|s| hex::decode(s).ok())
+            .filter(|p| p.len() == 8)
+            .unwrap_or_else(|| get_span_id_from_invocation_id(invocation_id))
+    });
+
+    let parent_span_id = parent_span_id.unwrap_or_else(|| {
+        stored_ids
+            .as_ref()
+            .and_then(|(_, _, p)| p.as_deref())
+            .filter(|p| !p.is_empty())
+            .and_then(|p| hex::decode(p).ok())
+            .filter(|p| p.len() == 8)
+            .unwrap_or_default()
+    });
+
+    invocation_entry::update(invocation_id, |entry| {
+        entry.trace_id = Some(hex::encode(&trace_id));
+        entry.span_id = Some(hex::encode(&span_id));
+        entry.parent_span_id = Some(hex::encode(&parent_span_id));
+    });
+
+    (trace_id, span_id, parent_span_id)
 }

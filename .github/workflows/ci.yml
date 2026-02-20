@@ -4,6 +4,10 @@ on:
   pull_request:
     branches: [main, master]
 
+permissions:
+  id-token: write
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -87,8 +91,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::175948133317:role/GitHubActionsDeployRole
           aws-region: ${{ vars.AWS_REGION }}
       - name: Install dependencies
         working-directory: integration-tests/iac
