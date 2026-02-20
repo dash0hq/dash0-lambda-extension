@@ -2,7 +2,7 @@ import fetch from 'node-fetch';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
 import { DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS } from "./config";
-import {checkLogs, compareJsonStrings, getAttributesMap, getRequestPayload, invokeFunction} from "./utils";
+import {checkLogs, compareJsonStrings, getAttributesMap, getRequestPayload, invokeFunction, RESOURCE_PREFIX} from "./utils";
 
 const verifyManualInstrumentation = async (functionName: string) => {
     const invocationId = await invokeFunction(functionName, true, false);
@@ -66,7 +66,7 @@ const verifyManualInstrumentation = async (functionName: string) => {
 describe('Manual instrumentation Lambda', () => {
     const runtimes = ['nodejs20-x', 'nodejs22-x', 'nodejs24-x'];
     for (const runtime of runtimes) {
-        const functionName = `manual-instrumentation-${runtime}`
+        const functionName = `${RESOURCE_PREFIX}manual-instrumentation-${runtime}`
         it(
             `invokes ${functionName} and receives trace`,
             async () => {

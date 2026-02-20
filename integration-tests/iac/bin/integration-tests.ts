@@ -2,8 +2,9 @@
 import * as cdk from 'aws-cdk-lib/core';
 import { IntegrationTestsStack } from '../lib/integration-tests-stack';
 
+const prefix = process.env.RESOURCE_PREFIX ?? '';
 const app = new cdk.App();
-new IntegrationTestsStack(app, 'IntegrationTestsStack', {
+new IntegrationTestsStack(app, `${prefix}IntegrationTestsStack`, {
   /* If you don't specify 'env', this stack will be environment-agnostic.
    * Account/Region-dependent features and context lookups will not work,
    * but a single synthesized template can be deployed anywhere. */

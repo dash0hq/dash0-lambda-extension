@@ -4,6 +4,8 @@ import {expect, it} from "vitest";
 import {DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./config";
 import {InvokeCommand, LambdaClient} from "@aws-sdk/client-lambda";
 
+export const RESOURCE_PREFIX = process.env.RESOURCE_PREFIX ?? '';
+
 const lambdaClient = new LambdaClient({
     region: process.env.AWS_REGION ?? 'us-west-2',
 });
@@ -247,7 +249,7 @@ export const runAllTests = (scenario: string, runtimes: string[], verifySuccessI
             for (const invocationEnd of invocationEndValues) {
                 for (const traced of tracedValues) {
                     const invocationEndLabel = invocationEnd ? 'true' : 'false';
-                    const functionName = `${runtime}-${scenario}-${traced}-invocation-end-${invocationEndLabel}-${architecture}`;
+                    const functionName = `${RESOURCE_PREFIX}${runtime}-${scenario}-${traced}-invocation-end-${invocationEndLabel}-${architecture}`;
                     it(
                         `invokes ${functionName} successfully`,
                         async () => {

@@ -13,6 +13,7 @@ import * as path from 'path';
 export interface NodeTracingScenariosStackProps extends cdk.NestedStackProps {
   layer: lambda.ILayerVersion;
   logGroup: logs.ILogGroup;
+  prefix: string;
 }
 
 export class NodeTracingScenariosStack extends cdk.NestedStack {
@@ -42,17 +43,18 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
       lambda.Runtime.NODEJS_22_X,
       lambda.Runtime.NODEJS_24_X,
     ];
+    const prefix = props.prefix;
     for (const runtime of runtimes) {
       const runtimeName = runtime.name.replace(/\./g, '-');
 
       // Scenario 1: Lambda > SQS > Lambda
       const sqsQueue = new sqs.Queue(this, `TracingTestSqsQueue-${runtimeName}`, {
-        queueName: `tracing-test-sqs-queue-${runtimeName}`,
+        queueName: `${prefix}tracing-test-sqs-queue-${runtimeName}`,
         visibilityTimeout: cdk.Duration.seconds(30),
       });
 
       const sqsProducer = new lambda.Function(this, `SqsProducerLambda-${runtimeName}`, {
-        functionName: `tracing-sqs-producer-${runtimeName}`,
+        functionName: `${prefix}tracing-sqs-producer-${runtimeName}`,
         runtime,
         handler: 'sqs_producer.handler',
         code: nodeCode,
@@ -67,7 +69,7 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
       });
 
       const sqsConsumer = new lambda.Function(this, `SqsConsumerLambda-${runtimeName}`, {
-        functionName: `tracing-sqs-consumer-${runtimeName}`,
+        functionName: `${prefix}tracing-sqs-consumer-${runtimeName}`,
         runtime,
         handler: 'consumer.handler',
         code: nodeCode,
@@ -83,11 +85,11 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
 
       // Scenario 2: Lambda > SNS > Lambda
       const snsTopic = new sns.Topic(this, `TracingTestSnsTopic-${runtimeName}`, {
-        topicName: `tracing-test-sns-topic-${runtimeName}`,
+        topicName: `${prefix}tracing-test-sns-topic-${runtimeName}`,
       });
 
       const snsProducer = new lambda.Function(this, `SnsProducerLambda-${runtimeName}`, {
-        functionName: `tracing-sns-producer-${runtimeName}`,
+        functionName: `${prefix}tracing-sns-producer-${runtimeName}`,
         runtime,
         handler: 'sns_producer.handler',
         code: nodeCode,
@@ -102,7 +104,7 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
       });
 
       const snsConsumer = new lambda.Function(this, `SnsConsumerLambda-${runtimeName}`, {
-        functionName: `tracing-sns-consumer-${runtimeName}`,
+        functionName: `${prefix}tracing-sns-consumer-${runtimeName}`,
         runtime,
         handler: 'consumer.handler',
         code: nodeCode,
@@ -116,11 +118,11 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
 
       // Scenario 3: Lambda > SNS > SQS > Lambda
       const snsSqsTopic = new sns.Topic(this, `TracingTestSnsSqsTopic-${runtimeName}`, {
-        topicName: `tracing-test-sns-sqs-topic-${runtimeName}`,
+        topicName: `${prefix}tracing-test-sns-sqs-topic-${runtimeName}`,
       });
 
       const snsSqsQueue = new sqs.Queue(this, `TracingTestSnsSqsQueue-${runtimeName}`, {
-        queueName: `tracing-test-sns-sqs-queue-${runtimeName}`,
+        queueName: `${prefix}tracing-test-sns-sqs-queue-${runtimeName}`,
         visibilityTimeout: cdk.Duration.seconds(30),
       });
       snsSqsTopic.addSubscription(new sns_subscriptions.SqsSubscription(snsSqsQueue, {
@@ -128,7 +130,7 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
       }));
 
       const snsSqsProducer = new lambda.Function(this, `SnsSqsProducerLambda-${runtimeName}`, {
-        functionName: `tracing-sns-sqs-producer-${runtimeName}`,
+        functionName: `${prefix}tracing-sns-sqs-producer-${runtimeName}`,
         runtime,
         handler: 'sns_producer.handler',
         code: nodeCode,
@@ -143,7 +145,7 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
       });
 
       const snsSqsConsumer = new lambda.Function(this, `SnsSqsConsumerLambda-${runtimeName}`, {
-        functionName: `tracing-sns-sqs-consumer-${runtimeName}`,
+        functionName: `${prefix}tracing-sns-sqs-consumer-${runtimeName}`,
         runtime,
         handler: 'consumer.handler',
         code: nodeCode,
@@ -159,12 +161,12 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
 
       // Scenario 4: Lambda > Kinesis > Lambda
       const kinesisStream = new kinesis.Stream(this, `TracingTestKinesisStream-${runtimeName}`, {
-        streamName: `tracing-test-kinesis-stream-${runtimeName}`,
+        streamName: `${prefix}tracing-test-kinesis-stream-${runtimeName}`,
         shardCount: 1,
       });
 
       const kinesisProducer = new lambda.Function(this, `KinesisProducerLambda-${runtimeName}`, {
-        functionName: `tracing-kinesis-producer-${runtimeName}`,
+        functionName: `${prefix}tracing-kinesis-producer-${runtimeName}`,
         runtime,
         handler: 'kinesis_producer.handler',
         code: nodeCode,
@@ -179,7 +181,7 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
       });
 
       const kinesisConsumer = new lambda.Function(this, `KinesisConsumerLambda-${runtimeName}`, {
-        functionName: `tracing-kinesis-consumer-${runtimeName}`,
+        functionName: `${prefix}tracing-kinesis-consumer-${runtimeName}`,
         runtime,
         handler: 'consumer.handler',
         code: nodeCode,

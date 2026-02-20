@@ -6,6 +6,10 @@ on:
       environment:
         required: true
         type: string
+      prefix:
+        required: false
+        type: string
+        default: ''
 
 permissions:
   id-token: write
@@ -61,7 +65,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Build and publish Python layer and Docker image
-        run: make python docker-python
+        run: make python docker-python LAYER_NAME_PREFIX=${{ inputs.prefix }} ECR_REPO_PREFIX=${{ inputs.prefix }}
 
   deploy-node:
     name: Build and Publish Node.js
@@ -88,7 +92,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Build and publish Node.js layer and Docker image
-        run: make node docker-node
+        run: make node docker-node LAYER_NAME_PREFIX=${{ inputs.prefix }} ECR_REPO_PREFIX=${{ inputs.prefix }}
 
   deploy-java:
     name: Build and Publish Java
@@ -112,7 +116,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Build and publish Java layer and Docker image
-        run: make java docker-java
+        run: make java docker-java LAYER_NAME_PREFIX=${{ inputs.prefix }} ECR_REPO_PREFIX=${{ inputs.prefix }}
 
   deploy-manual:
     name: Build and Publish Manual
@@ -132,4 +136,4 @@ jobs:
           role-to-assume: arn:aws:iam::175948133317:role/GitHubActionsDeployRole
           aws-region: ${{ vars.AWS_REGION }}
       - name: Build and publish Manual layer
-        run: make manual
+        run: make manual LAYER_NAME_PREFIX=${{ inputs.prefix }}

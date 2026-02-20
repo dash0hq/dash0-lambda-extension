@@ -9,6 +9,7 @@ import {
     getAttributesMap,
     getRequestPayload,
     invokeFunction,
+    RESOURCE_PREFIX,
 } from "./utils";
 
 
@@ -85,7 +86,7 @@ describe.concurrent('Dockerized Lambda invocation', () => {
 
     for (const runtime of runtimes) {
         for (const architecture of architectures) {
-            const functionName = `dockerized-${runtime}-${architecture}`;
+            const functionName = `${RESOURCE_PREFIX}dockerized-${runtime}-${architecture}`;
             it(functionName, async () => {
                 await verifyDockerizedInvocation(functionName, runtime);
             }, 120_000);

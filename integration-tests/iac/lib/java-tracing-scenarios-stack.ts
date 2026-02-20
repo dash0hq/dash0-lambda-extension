@@ -24,6 +24,7 @@ export function createJavaCode(): lambda.Code {
 export interface JavaTracingScenariosStackProps extends cdk.NestedStackProps {
   layer: lambda.ILayerVersion;
   logGroup: logs.ILogGroup;
+  prefix: string;
 }
 
 export class JavaTracingScenariosStack extends cdk.NestedStack {
@@ -52,17 +53,18 @@ export class JavaTracingScenariosStack extends cdk.NestedStack {
       lambda.Runtime.JAVA_21,
       lambda.Runtime.JAVA_25,
     ];
+    const prefix = props.prefix;
     for (const runtime of runtimes) {
       const runtimeName = runtime.name.replace(/\./g, '-');
 
       // Scenario 1: Lambda > SQS > Lambda
       const sqsQueue = new sqs.Queue(this, `TracingTestSqsQueue-${runtimeName}`, {
-        queueName: `tracing-test-sqs-queue-${runtimeName}`,
+        queueName: `${prefix}tracing-test-sqs-queue-${runtimeName}`,
         visibilityTimeout: cdk.Duration.seconds(30),
       });
 
       const sqsProducer = new lambda.Function(this, `SqsProducerLambda-${runtimeName}`, {
-        functionName: `tracing-sqs-producer-${runtimeName}`,
+        functionName: `${prefix}tracing-sqs-producer-${runtimeName}`,
         runtime,
         handler: 'org.example.SqsProducerHandler::handleRequest',
         code: javaCode,
@@ -78,7 +80,7 @@ export class JavaTracingScenariosStack extends cdk.NestedStack {
       });
 
       const sqsConsumer = new lambda.Function(this, `SqsConsumerLambda-${runtimeName}`, {
-        functionName: `tracing-sqs-consumer-${runtimeName}`,
+        functionName: `${prefix}tracing-sqs-consumer-${runtimeName}`,
         runtime,
         handler: 'org.example.ConsumerHandler::handleRequest',
         code: javaCode,
@@ -95,11 +97,11 @@ export class JavaTracingScenariosStack extends cdk.NestedStack {
 
       // Scenario 2: Lambda > SNS > Lambda
       const snsTopic = new sns.Topic(this, `TracingTestSnsTopic-${runtimeName}`, {
-        topicName: `tracing-test-sns-topic-${runtimeName}`,
+        topicName: `${prefix}tracing-test-sns-topic-${runtimeName}`,
       });
 
       const snsProducer = new lambda.Function(this, `SnsProducerLambda-${runtimeName}`, {
-        functionName: `tracing-sns-producer-${runtimeName}`,
+        functionName: `${prefix}tracing-sns-producer-${runtimeName}`,
         runtime,
         handler: 'org.example.SnsProducerHandler::handleRequest',
         code: javaCode,
@@ -115,7 +117,7 @@ export class JavaTracingScenariosStack extends cdk.NestedStack {
       });
 
       const snsConsumer = new lambda.Function(this, `SnsConsumerLambda-${runtimeName}`, {
-        functionName: `tracing-sns-consumer-${runtimeName}`,
+        functionName: `${prefix}tracing-sns-consumer-${runtimeName}`,
         runtime,
         handler: 'org.example.SnsConsumerHandler::handleRequest',
         code: javaCode,
@@ -130,11 +132,11 @@ export class JavaTracingScenariosStack extends cdk.NestedStack {
 
       // Scenario 3: Lambda > SNS > SQS > Lambda
       const snsSqsTopic = new sns.Topic(this, `TracingTestSnsSqsTopic-${runtimeName}`, {
-        topicName: `tracing-test-sns-sqs-topic-${runtimeName}`,
+        topicName: `${prefix}tracing-test-sns-sqs-topic-${runtimeName}`,
       });
 
       const snsSqsQueue = new sqs.Queue(this, `TracingTestSnsSqsQueue-${runtimeName}`, {
-        queueName: `tracing-test-sns-sqs-queue-${runtimeName}`,
+        queueName: `${prefix}tracing-test-sns-sqs-queue-${runtimeName}`,
         visibilityTimeout: cdk.Duration.seconds(30),
       });
       snsSqsTopic.addSubscription(new sns_subscriptions.SqsSubscription(snsSqsQueue, {
@@ -142,7 +144,7 @@ export class JavaTracingScenariosStack extends cdk.NestedStack {
       }));
 
       const snsSqsProducer = new lambda.Function(this, `SnsSqsProducerLambda-${runtimeName}`, {
-        functionName: `tracing-sns-sqs-producer-${runtimeName}`,
+        functionName: `${prefix}tracing-sns-sqs-producer-${runtimeName}`,
         runtime,
         handler: 'org.example.SnsProducerHandler::handleRequest',
         code: javaCode,
@@ -158,7 +160,7 @@ export class JavaTracingScenariosStack extends cdk.NestedStack {
       });
 
       const snsSqsConsumer = new lambda.Function(this, `SnsSqsConsumerLambda-${runtimeName}`, {
-        functionName: `tracing-sns-sqs-consumer-${runtimeName}`,
+        functionName: `${prefix}tracing-sns-sqs-consumer-${runtimeName}`,
         runtime,
         handler: 'org.example.ConsumerHandler::handleRequest',
         code: javaCode,
