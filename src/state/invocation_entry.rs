@@ -212,9 +212,14 @@ pub fn snapshot_all_traces() -> Vec<StoredTrace> {
         .collect()
 }
 
+const MAX_INVOCATION_ENTRIES: usize = 10;
+
 /// Remove all invocation entries whose state is Done and whose traces and logs are empty.
+/// Then, if the store still exceeds MAX_INVOCATION_ENTRIES, evict the oldest entries
+/// by start_time to keep the store bounded.
 pub fn delete_done_invocations() {
-    INVOCATION_STORE.lock().retain(|id, entry| {
+    let mut store = INVOCATION_STORE.lock();
+    store.retain(|id, entry| {
         let should_delete = entry.state == InvocationState::Done
             && entry.traces.is_empty()
             && entry.logs.is_empty();
@@ -227,6 +232,23 @@ pub fn delete_done_invocations() {
         }
         !should_delete
     });
+
+    if store.len() > MAX_INVOCATION_ENTRIES {
+        let excess = store.len() - MAX_INVOCATION_ENTRIES;
+        let mut entries: Vec<(String, f64)> = store
+            .iter()
+            .map(|(id, entry)| (id.clone(), entry.start_time))
+            .collect();
+        entries.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+        for (id, _) in entries.into_iter().take(excess) {
+            tracing::warn!(
+                "[{}] Evicting old invocation entry to stay within limit: {}",
+                crate::log_prefix(),
+                id
+            );
+            store.remove(&id);
+        }
+    }
 }
 
 pub fn force_init() {
@@ -376,5 +398,59 @@ mod tests {
         assert!(get("inv-done").is_none());
         assert!(get("inv-pending").is_some());
         assert!(get("inv-done-with-traces").is_some());
+    }
+
+    #[test]
+    #[serial]
+    fn delete_done_invocations_evicts_oldest_when_over_limit() {
+        reset_store();
+        // Create MAX + 2 entries, all Pending, with ascending start_times
+        for i in 0..(MAX_INVOCATION_ENTRIES + 2) {
+            update(&format!("inv-{}", i), |e| {
+                e.start_time = (i + 1) as f64; // 1.0, 2.0, ...
+            });
+        }
+        assert_eq!(INVOCATION_STORE.lock().len(), MAX_INVOCATION_ENTRIES + 2);
+
+        delete_done_invocations();
+
+        let store = INVOCATION_STORE.lock();
+        assert_eq!(store.len(), MAX_INVOCATION_ENTRIES);
+        // The two oldest (start_time 1.0 and 2.0) should be evicted
+        assert!(
+            !store.contains_key("inv-0"),
+            "inv-0 (oldest) should be evicted"
+        );
+        assert!(
+            !store.contains_key("inv-1"),
+            "inv-1 (second oldest) should be evicted"
+        );
+        // The newest should remain
+        assert!(
+            store.contains_key(&format!("inv-{}", MAX_INVOCATION_ENTRIES + 1)),
+            "newest entry should remain"
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn delete_done_invocations_evicts_zero_start_time_first() {
+        reset_store();
+        // Create MAX + 1 entries; one has start_time 0 (never got a platform.start)
+        update("inv-no-start", |_| {}); // start_time defaults to 0.0
+        for i in 1..=MAX_INVOCATION_ENTRIES {
+            update(&format!("inv-{}", i), |e| {
+                e.start_time = i as f64;
+            });
+        }
+
+        delete_done_invocations();
+
+        let store = INVOCATION_STORE.lock();
+        assert_eq!(store.len(), MAX_INVOCATION_ENTRIES);
+        assert!(
+            !store.contains_key("inv-no-start"),
+            "entry with start_time=0 should be evicted first"
+        );
     }
 }
