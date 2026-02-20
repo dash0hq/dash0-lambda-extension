@@ -42,9 +42,6 @@ pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
             if !crate::config::is_send_on_invocation_end() {
                 flush_traces().await;
             }
-            for id in &report_invocation_ids {
-                crate::state::invocation_entry::remove(id);
-            }
         }
     } else {
         tracing::debug!(
