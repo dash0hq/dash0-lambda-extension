@@ -160,15 +160,16 @@ pub fn map_logs_to_otlp(logs: &[TelemetryLog]) -> Vec<LogRecord> {
                 }),
             });
 
-            if let Some(entry) = invocation_entry::get(invocation_id) {
-                if let Some(ref tid_hex) = entry.trace_id {
+            if let Some((tid_opt, sid_opt, _)) = invocation_entry::get_trace_span_ids(invocation_id)
+            {
+                if let Some(ref tid_hex) = tid_opt {
                     if let Ok(tid) = hex::decode(tid_hex) {
                         if tid.len() == 16 {
                             trace_id = tid;
                         }
                     }
                 }
-                if let Some(ref sid_hex) = entry.span_id {
+                if let Some(ref sid_hex) = sid_opt {
                     if let Ok(sid) = hex::decode(sid_hex) {
                         if sid.len() == 8 {
                             span_id = sid;

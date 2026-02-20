@@ -71,6 +71,66 @@ pub fn get(invocation_id: &str) -> Option<InvocationEntry> {
     INVOCATION_STORE.lock().get(invocation_id).cloned()
 }
 
+/// Lightweight getter: returns only the event_payload, avoiding a full entry clone.
+pub fn get_event_payload(invocation_id: &str) -> Option<String> {
+    INVOCATION_STORE
+        .lock()
+        .get(invocation_id)
+        .and_then(|e| e.event_payload.clone())
+}
+
+/// Lightweight getter: returns only the start_time.
+pub fn get_start_time(invocation_id: &str) -> Option<f64> {
+    INVOCATION_STORE
+        .lock()
+        .get(invocation_id)
+        .map(|e| e.start_time)
+        .filter(|&t| t > 0.0)
+}
+
+/// Lightweight getter: returns only the return_value, avoiding a full entry clone.
+pub fn get_return_value(invocation_id: &str) -> Option<String> {
+    INVOCATION_STORE
+        .lock()
+        .get(invocation_id)
+        .and_then(|e| e.return_value.clone())
+}
+
+/// Lightweight getter: returns (trace_id, span_id, parent_span_id) without cloning traces/logs.
+pub fn get_trace_span_ids(
+    invocation_id: &str,
+) -> Option<(Option<String>, Option<String>, Option<String>)> {
+    INVOCATION_STORE.lock().get(invocation_id).map(|e| {
+        (
+            e.trace_id.clone(),
+            e.span_id.clone(),
+            e.parent_span_id.clone(),
+        )
+    })
+}
+
+/// Lightweight getter: returns the telemetry data fields needed for span annotation.
+pub struct TelemetryData {
+    pub init_duration: f64,
+    pub billed_duration: f64,
+    pub memory_usage: u64,
+    pub start_time: f64,
+    pub end_time: f64,
+}
+
+pub fn get_telemetry_data(invocation_id: &str) -> Option<TelemetryData> {
+    INVOCATION_STORE
+        .lock()
+        .get(invocation_id)
+        .map(|e| TelemetryData {
+            init_duration: e.init_duration,
+            billed_duration: e.billed_duration,
+            memory_usage: e.memory_usage,
+            start_time: e.start_time,
+            end_time: e.end_time,
+        })
+}
+
 pub fn remove(invocation_id: &str) -> Option<InvocationEntry> {
     INVOCATION_STORE.lock().remove(invocation_id)
 }

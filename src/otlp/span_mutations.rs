@@ -34,9 +34,8 @@ pub fn build_synthetic_trace(
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_nanos() as u64)
         .unwrap_or(0);
-    let start_nanos = invocation_entry::get(invocation_id)
-        .map(|entry| (entry.start_time * 1_000_000.0) as u64)
-        .filter(|&t| t > 0)
+    let start_nanos = invocation_entry::get_start_time(invocation_id)
+        .map(|t| (t * 1_000_000.0) as u64)
         .unwrap_or(now_nanos);
 
     let mut attributes = vec![
@@ -66,8 +65,7 @@ pub fn build_synthetic_trace(
     ];
 
     let mut sqs_links = Vec::new();
-    if let Some(event_payload) = invocation_entry::get(invocation_id).and_then(|e| e.event_payload)
-    {
+    if let Some(event_payload) = invocation_entry::get_event_payload(invocation_id) {
         // Extract span links before consuming event_payload
         sqs_links = extract_span_links(&event_payload);
 
@@ -346,9 +344,7 @@ fn annotate_server_spans(spans: &mut Vec<Span>, invocation_ids: &mut Vec<String>
         if let Some(invocation_id) = extract_invocation_id(span) {
             invocation_ids.push(invocation_id.clone());
 
-            if let Some(event_payload) =
-                invocation_entry::get(&invocation_id).and_then(|e| e.event_payload)
-            {
+            if let Some(event_payload) = invocation_entry::get_event_payload(&invocation_id) {
                 // Extract span links before consuming event_payload
                 let sqs_links = extract_span_links(&event_payload);
                 if !sqs_links.is_empty() {
@@ -453,7 +449,8 @@ pub fn merge_telemetry_invocation_data(request: &mut ExportTraceServiceRequest) 
                 if is_lambda_instrumentation_scope(&scope.name) {
                     for span in &mut scope_span.spans {
                         if let Some(invocation_id) = extract_invocation_id(span) {
-                            if let Some(data) = invocation_entry::get(&invocation_id) {
+                            if let Some(data) = invocation_entry::get_telemetry_data(&invocation_id)
+                            {
                                 if data.init_duration > 0.0 {
                                     span.attributes.push(KeyValue {
                                         key: "dash0.faas.init_duration".to_string(),
@@ -543,7 +540,7 @@ pub fn process_trace_request(
     // If we have pending return payloads for these invocation IDs, apply them now.
     let mut updated_with_return = false;
     for id in invocation_ids.iter() {
-        let payload = invocation_entry::get(id).and_then(|e| e.return_value.clone());
+        let payload = invocation_entry::get_return_value(id);
         if let Some(payload) = payload {
             if annotate_return_payload(decoded, id, &payload) {
                 updated_with_return = true;
@@ -1739,12 +1736,12 @@ fn get_trace_span_ids(
         }
     }
 
-    let stored = invocation_entry::get(invocation_id);
+    let stored_ids = invocation_entry::get_trace_span_ids(invocation_id);
 
     let trace_id = trace_id.unwrap_or_else(|| {
-        stored
+        stored_ids
             .as_ref()
-            .and_then(|s| s.trace_id.as_deref())
+            .and_then(|(t, _, _)| t.as_deref())
             .filter(|t| !t.is_empty())
             .and_then(|t| hex::decode(t).ok())
             .filter(|t| t.len() == 16)
@@ -1752,9 +1749,9 @@ fn get_trace_span_ids(
     });
 
     let span_id = span_id.unwrap_or_else(|| {
-        stored
+        stored_ids
             .as_ref()
-            .and_then(|s| s.span_id.as_deref())
+            .and_then(|(_, s, _)| s.as_deref())
             .filter(|s| !s.is_empty())
             .and_then(|s| hex::decode(s).ok())
             .filter(|p| p.len() == 8)
@@ -1762,9 +1759,9 @@ fn get_trace_span_ids(
     });
 
     let parent_span_id = parent_span_id.unwrap_or_else(|| {
-        stored
+        stored_ids
             .as_ref()
-            .and_then(|s| s.parent_span_id.as_deref())
+            .and_then(|(_, _, p)| p.as_deref())
             .filter(|p| !p.is_empty())
             .and_then(|p| hex::decode(p).ok())
             .filter(|p| p.len() == 8)
