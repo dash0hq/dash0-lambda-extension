@@ -23,20 +23,20 @@ use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequ
 
 use opentelemetry_proto::tonic::logs::v1::{ResourceLogs, ScopeLogs};
 
-pub async fn flush_logs(is_invocation_end: bool) {
+pub async fn flush_logs(exclude_invocation_id: Option<&str>) {
     flush_otlp_logs().await;
-    flush_telemetry_logs(is_invocation_end).await;
+    flush_telemetry_logs(exclude_invocation_id).await;
     flush_metrics().await;
 }
 
-pub async fn flush_telemetry_logs(is_invocation_end: bool) {
-    let logs = crate::state::invocation_entry::take_all_telemetry_logs();
+pub async fn flush_telemetry_logs(exclude_invocation_id: Option<&str>) {
+    let logs = crate::state::invocation_entry::take_all_telemetry_logs(exclude_invocation_id);
 
     if logs.is_empty() {
         return;
     }
 
-    let log_records = map_logs_to_otlp(&logs, is_invocation_end);
+    let log_records = map_logs_to_otlp(&logs);
 
     if log_records.is_empty() {
         return;

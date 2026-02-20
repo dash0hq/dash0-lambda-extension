@@ -57,22 +57,16 @@ fn handle_invoke_event(json: &serde_json::Value) {
     }
 }
 
-async fn flush_if_needed(event_type: Option<&str>, shutdown_reason: Option<&str>) {
-    let should_flush = (matches!(event_type, Some("INVOKE"))
-        && !crate::config::is_send_on_invocation_end())
-        || (matches!(event_type, Some("SHUTDOWN")) && shutdown_reason == Some("spindown"));
-
-    if !should_flush {
-        return;
-    }
-
+async fn flush_on_invoke(event_type: Option<&str>, invocation_id: Option<&str>) {
     let is_invocation_end = matches!(event_type, Some("SHUTDOWN"));
     if is_invocation_end {
         // on shutdown/spindown wait for logs to arrive
         tokio::time::sleep(Duration::from_millis(200)).await;
+    } else {
+        tokio::time::sleep(Duration::from_millis(20)).await;
     }
     crate::otlp::exporter::flush_traces().await;
-    crate::otlp::exporter::flush_logs(is_invocation_end).await;
+    crate::otlp::exporter::flush_logs(invocation_id).await;
 }
 
 async fn wait_for_runtime_done() {
@@ -97,7 +91,7 @@ async fn wait_for_runtime_done() {
                 crate::log_prefix_with("Extension")
             );
             crate::otlp::exporter::flush_traces().await;
-            crate::otlp::exporter::flush_logs(true).await;
+            crate::otlp::exporter::flush_logs(None).await;
         }
         Ok(Err(_)) => {
             tracing::warn!(
@@ -183,11 +177,8 @@ pub async fn get_next() {
                     handle_invoke_event(&json);
                 }
 
-                let shutdown_reason = json
-                    .get("shutdownReason")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_lowercase());
-                flush_if_needed(event_type, shutdown_reason.as_deref()).await;
+                let invocation_id = json.get("requestId").and_then(|v| v.as_str());
+                flush_on_invoke(event_type, invocation_id).await;
 
                 if is_invoke && crate::config::is_send_on_invocation_end() {
                     wait_for_runtime_done().await;

@@ -89,10 +89,14 @@ pub fn store_telemetry_logs(logs: Vec<TelemetryLog>) {
 }
 
 /// Take all telemetry logs from every invocation entry, draining each entry's logs.
-pub fn take_all_telemetry_logs() -> Vec<TelemetryLog> {
+/// If `exclude_invocation_id` is provided, logs belonging to that invocation are left in place.
+pub fn take_all_telemetry_logs(exclude_invocation_id: Option<&str>) -> Vec<TelemetryLog> {
     let mut store = INVOCATION_STORE.lock();
     let mut all_logs = Vec::new();
-    for entry in store.values_mut() {
+    for (key, entry) in store.iter_mut() {
+        if exclude_invocation_id.is_some_and(|id| key == id) {
+            continue;
+        }
         all_logs.append(&mut entry.logs);
     }
     all_logs

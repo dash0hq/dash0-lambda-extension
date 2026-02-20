@@ -70,7 +70,7 @@ pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
         if !traces_to_send.is_empty() {
             send_traces(traces_to_send).await;
         }
-        flush_telemetry_logs(true).await;
+        flush_telemetry_logs(None).await;
     }
 
     Ok(Response::builder().status(200).body(Body::empty()).unwrap())
