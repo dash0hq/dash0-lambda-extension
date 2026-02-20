@@ -1530,6 +1530,171 @@ mod tests {
         assert_eq!(hex::encode(&span.links[0].span_id), "fedcba9876543210");
         std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
     }
+
+    // --- get_trace_span_ids tests ---
+
+    fn build_stored_trace_with_ids(
+        invocation_id: &str,
+        trace_id: Vec<u8>,
+        span_id: Vec<u8>,
+        parent_span_id: Vec<u8>,
+    ) -> StoredTrace {
+        let span = Span {
+            trace_id,
+            span_id,
+            parent_span_id,
+            ..Default::default()
+        };
+        let request = ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans {
+                scope_spans: vec![ScopeSpans {
+                    spans: vec![span],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        StoredTrace {
+            method: Method::POST,
+            path_and_query: "/v1/traces".to_string(),
+            headers: hyper::HeaderMap::new(),
+            body: request.encode_to_vec(),
+            invocation_ids: vec![invocation_id.to_string()],
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn get_trace_span_ids_from_existing_trace() {
+        let invocation_id = "inv-ids-from-trace";
+        let trace_id = vec![0xAA; 16];
+        let span_id = vec![0xBB; 8];
+        let parent_span_id = vec![0xCC; 8];
+
+        let stored_trace = build_stored_trace_with_ids(
+            invocation_id,
+            trace_id.clone(),
+            span_id.clone(),
+            parent_span_id.clone(),
+        );
+
+        let (got_trace, got_span, _got_parent) =
+            super::get_trace_span_ids(invocation_id, &[stored_trace]);
+
+        assert_eq!(got_trace, trace_id);
+        // span_id is taken from the existing span's parent_span_id
+        assert_eq!(got_span, parent_span_id);
+    }
+
+    #[test]
+    #[serial]
+    fn get_trace_span_ids_from_stored_entry() {
+        let invocation_id = "inv-ids-from-entry";
+        let trace_id_hex = "aa".repeat(16);
+        let span_id_hex = "bb".repeat(8);
+        let parent_span_id_hex = "cc".repeat(8);
+
+        invocation_entry::update(invocation_id, |entry| {
+            entry.trace_id = Some(trace_id_hex.clone());
+            entry.span_id = Some(span_id_hex.clone());
+            entry.parent_span_id = Some(parent_span_id_hex.clone());
+        });
+
+        let (got_trace, got_span, _got_parent) = super::get_trace_span_ids(invocation_id, &[]);
+
+        assert_eq!(hex::encode(&got_trace), trace_id_hex);
+        assert_eq!(hex::encode(&got_span), span_id_hex);
+        assert_eq!(hex::encode(_got_parent), parent_span_id_hex);
+    }
+
+    #[test]
+    #[serial]
+    fn get_trace_span_ids_falls_back_to_hash() {
+        let invocation_id = "inv-ids-hash-fallback";
+        // No traces, no stored entry → should generate from hash
+        let (got_trace, got_span, got_parent) = super::get_trace_span_ids(invocation_id, &[]);
+
+        let expected_trace = crate::util::parsers::get_trace_id_from_invocation_id(invocation_id);
+        let expected_span = crate::util::parsers::get_span_id_from_invocation_id(invocation_id);
+
+        assert_eq!(got_trace, expected_trace);
+        assert_eq!(got_span, expected_span);
+        assert!(
+            got_parent.is_empty(),
+            "parent_span_id should be empty when nothing is stored"
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn get_trace_span_ids_trace_overrides_stored_entry() {
+        let invocation_id = "inv-ids-trace-wins";
+        let trace_trace_id = vec![0x11; 16];
+        let trace_parent_span_id = vec![0x22; 8];
+
+        // Store different IDs in the invocation entry
+        invocation_entry::update(invocation_id, |entry| {
+            entry.trace_id = Some("ff".repeat(16));
+            entry.span_id = Some("ee".repeat(8));
+            entry.parent_span_id = Some("dd".repeat(8));
+        });
+
+        let stored_trace = build_stored_trace_with_ids(
+            invocation_id,
+            trace_trace_id.clone(),
+            vec![0x33; 8], // span's own span_id (not used directly)
+            trace_parent_span_id.clone(),
+        );
+
+        let (got_trace, got_span, _got_parent) =
+            super::get_trace_span_ids(invocation_id, &[stored_trace]);
+
+        // trace_id and span_id should come from the existing trace, not the stored entry
+        assert_eq!(got_trace, trace_trace_id);
+        assert_eq!(got_span, trace_parent_span_id);
+    }
+
+    #[test]
+    #[serial]
+    fn get_trace_span_ids_skips_non_matching_traces() {
+        let invocation_id = "inv-ids-no-match";
+        let other_trace = build_stored_trace_with_ids(
+            "other-invocation",
+            vec![0xAA; 16],
+            vec![0xBB; 8],
+            vec![0xCC; 8],
+        );
+
+        let (got_trace, got_span, _) = super::get_trace_span_ids(invocation_id, &[other_trace]);
+
+        // Should fall through to hash-based generation
+        let expected_trace = crate::util::parsers::get_trace_id_from_invocation_id(invocation_id);
+        let expected_span = crate::util::parsers::get_span_id_from_invocation_id(invocation_id);
+
+        assert_eq!(got_trace, expected_trace);
+        assert_eq!(got_span, expected_span);
+    }
+
+    #[test]
+    #[serial]
+    fn get_trace_span_ids_updates_invocation_entry() {
+        let invocation_id = "inv-ids-updates-entry";
+        let trace_id = vec![0xDE; 16];
+        let parent_span_id = vec![0xAD; 8];
+
+        let stored_trace = build_stored_trace_with_ids(
+            invocation_id,
+            trace_id.clone(),
+            vec![0xFF; 8],
+            parent_span_id.clone(),
+        );
+
+        super::get_trace_span_ids(invocation_id, &[stored_trace]);
+
+        let entry = invocation_entry::get(invocation_id).expect("entry should exist after call");
+        assert_eq!(entry.trace_id.unwrap(), hex::encode(&trace_id));
+        assert_eq!(entry.span_id.unwrap(), hex::encode(&parent_span_id));
+    }
 }
 
 fn env_as_json_string() -> String {

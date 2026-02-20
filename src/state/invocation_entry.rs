@@ -172,3 +172,149 @@ pub fn delete_done_invocations() {
 pub fn force_init() {
     Lazy::force(&INVOCATION_STORE);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serial_test::serial;
+
+    fn reset_store() {
+        INVOCATION_STORE.lock().clear();
+    }
+
+    fn make_log(invocation_id: Option<&str>) -> TelemetryLog {
+        TelemetryLog {
+            time: "2024-01-01T00:00:00Z".to_string(),
+            r#type: "function".to_string(),
+            record: serde_json::json!({"msg": "hello"}),
+            invocation_id: invocation_id.map(String::from),
+        }
+    }
+
+    fn make_trace(invocation_ids: Vec<&str>) -> StoredTrace {
+        StoredTrace {
+            method: hyper::Method::POST,
+            path_and_query: "/v1/traces".to_string(),
+            headers: hyper::HeaderMap::new(),
+            body: vec![],
+            invocation_ids: invocation_ids.into_iter().map(String::from).collect(),
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn get_or_create_returns_default_for_new_id() {
+        reset_store();
+        let entry = get_or_create("inv-1");
+        assert_eq!(entry.state, InvocationState::Pending);
+        assert_eq!(entry.span_id, None);
+        assert_eq!(entry.duration, 0.0);
+    }
+
+    #[test]
+    #[serial]
+    fn update_modifies_entry_in_place() {
+        reset_store();
+        update("inv-1", |e| {
+            e.state = InvocationState::Done;
+            e.duration = 42.0;
+        });
+        let entry = get("inv-1").unwrap();
+        assert_eq!(entry.state, InvocationState::Done);
+        assert_eq!(entry.duration, 42.0);
+    }
+
+    #[test]
+    #[serial]
+    fn get_returns_none_for_missing_id() {
+        reset_store();
+        assert!(get("nonexistent").is_none());
+    }
+
+    #[test]
+    #[serial]
+    fn remove_returns_entry_and_deletes_it() {
+        reset_store();
+        get_or_create("inv-1");
+        let removed = remove("inv-1");
+        assert!(removed.is_some());
+        assert!(get("inv-1").is_none());
+    }
+
+    #[test]
+    #[serial]
+    fn store_telemetry_logs_groups_by_invocation_id() {
+        reset_store();
+        let logs = vec![
+            make_log(Some("inv-1")),
+            make_log(Some("inv-2")),
+            make_log(None),
+        ];
+        store_telemetry_logs(logs);
+
+        assert_eq!(get("inv-1").unwrap().logs.len(), 1);
+        assert_eq!(get("inv-2").unwrap().logs.len(), 1);
+        assert_eq!(get("__unknown__").unwrap().logs.len(), 1);
+    }
+
+    #[test]
+    #[serial]
+    fn take_all_telemetry_logs_drains_and_respects_exclude() {
+        reset_store();
+        store_telemetry_logs(vec![make_log(Some("inv-1")), make_log(Some("inv-2"))]);
+
+        let taken = take_all_telemetry_logs(Some("inv-1"));
+        assert_eq!(taken.len(), 1);
+        // inv-1 logs should still be there
+        assert_eq!(get("inv-1").unwrap().logs.len(), 1);
+        // inv-2 logs should be drained
+        assert!(get("inv-2").unwrap().logs.is_empty());
+    }
+
+    #[test]
+    #[serial]
+    fn store_and_take_traces_by_id() {
+        reset_store();
+        store_trace_by_id("inv-1", make_trace(vec!["inv-1"]));
+        store_trace_by_id("inv-1", make_trace(vec!["inv-1"]));
+
+        let traces = take_traces_by_id("inv-1");
+        assert_eq!(traces.len(), 2);
+        // After take, traces should be drained
+        assert!(take_traces_by_id("inv-1").is_empty());
+    }
+
+    #[test]
+    #[serial]
+    fn take_all_traces_drains_all_entries() {
+        reset_store();
+        store_trace_by_id("inv-1", make_trace(vec!["inv-1"]));
+        store_trace_by_id("inv-2", make_trace(vec!["inv-2"]));
+
+        let all = take_all_traces();
+        assert_eq!(all.len(), 2);
+        assert!(take_all_traces().is_empty());
+    }
+
+    #[test]
+    #[serial]
+    fn delete_done_invocations_removes_only_done_empty_entries() {
+        reset_store();
+        // Done + empty → should be deleted
+        update("inv-done", |e| e.state = InvocationState::Done);
+        // Pending → should remain
+        get_or_create("inv-pending");
+        // Done but has traces → should remain
+        update("inv-done-with-traces", |e| e.state = InvocationState::Done);
+        store_trace_by_id(
+            "inv-done-with-traces",
+            make_trace(vec!["inv-done-with-traces"]),
+        );
+
+        delete_done_invocations();
+
+        assert!(get("inv-done").is_none());
+        assert!(get("inv-pending").is_some());
+        assert!(get("inv-done-with-traces").is_some());
+    }
+}
