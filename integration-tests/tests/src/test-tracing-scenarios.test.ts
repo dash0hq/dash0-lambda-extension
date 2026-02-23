@@ -2,17 +2,17 @@ import fetch from 'node-fetch';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
 import { DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS } from './config';
-import { getAttributesMap, getRequestPayload, invokeFunction } from './utils';
+import { getAttributesMap, getRequestPayload, invokeFunction, RESOURCE_PREFIX } from './utils';
 
 const pythonRuntimes = ['python3-11', 'python3-12', 'python3-13', 'python3-14'];
 const nodeRuntimes = ['nodejs20-x', 'nodejs22-x', 'nodejs24-x'];
 const javaRuntimes = ['java17', 'java21', 'java25'];
 
 const scenarios = [
-    { name: 'sqs', producerPrefix: 'tracing-sqs-producer', consumerPrefix: 'tracing-sqs-consumer', runtimes: [...pythonRuntimes, ...nodeRuntimes, ...javaRuntimes] },
-    { name: 'sns', producerPrefix: 'tracing-sns-producer', consumerPrefix: 'tracing-sns-consumer', runtimes: [...pythonRuntimes, ...nodeRuntimes, ...javaRuntimes] },
-    { name: 'sns-sqs', producerPrefix: 'tracing-sns-sqs-producer', consumerPrefix: 'tracing-sns-sqs-consumer', runtimes: [...pythonRuntimes, ...nodeRuntimes, ...javaRuntimes] },
-    { name: 'kinesis', producerPrefix: 'tracing-kinesis-producer', consumerPrefix: 'tracing-kinesis-consumer', runtimes: [...pythonRuntimes, ...nodeRuntimes] },
+    { name: 'sqs', producerPrefix: `${RESOURCE_PREFIX}tracing-sqs-producer`, consumerPrefix: `${RESOURCE_PREFIX}tracing-sqs-consumer`, runtimes: [...pythonRuntimes, ...nodeRuntimes, ...javaRuntimes] },
+    { name: 'sns', producerPrefix: `${RESOURCE_PREFIX}tracing-sns-producer`, consumerPrefix: `${RESOURCE_PREFIX}tracing-sns-consumer`, runtimes: [...pythonRuntimes, ...nodeRuntimes, ...javaRuntimes] },
+    { name: 'sns-sqs', producerPrefix: `${RESOURCE_PREFIX}tracing-sns-sqs-producer`, consumerPrefix: `${RESOURCE_PREFIX}tracing-sns-sqs-consumer`, runtimes: [...pythonRuntimes, ...nodeRuntimes, ...javaRuntimes] },
+    { name: 'kinesis', producerPrefix: `${RESOURCE_PREFIX}tracing-kinesis-producer`, consumerPrefix: `${RESOURCE_PREFIX}tracing-kinesis-consumer`, runtimes: [...pythonRuntimes, ...nodeRuntimes] },
 ] as const;
 
 const verifyTracingScenario = async (

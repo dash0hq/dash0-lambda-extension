@@ -10,6 +10,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  RESOURCE_PREFIX: pr-${{ github.event.pull_request.number }}-
 
 jobs:
   fmt:
@@ -69,6 +70,7 @@ jobs:
     uses: ./.github/workflows/build-and-publish.yml
     with:
       environment: staging
+      prefix: pr-${{ github.event.pull_request.number }}-
     secrets: inherit
 
   integration-test:
@@ -91,7 +93,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::175948133317:role/GitHubActionsDeployRole
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
       - name: Install dependencies
         working-directory: integration-tests/iac
@@ -101,9 +103,12 @@ jobs:
         run: npm run deploy
         env:
           DASH0_DEV_API_TOKEN: ${{ secrets.DASH0_DEV_API_TOKEN }}
+          RESOURCE_PREFIX: ${{ env.RESOURCE_PREFIX }}
       - name: Install test dependencies
         working-directory: integration-tests/tests
         run: npm ci
       - name: Run integration tests
         working-directory: integration-tests/tests
         run: npm run test
+        env:
+          RESOURCE_PREFIX: ${{ env.RESOURCE_PREFIX }}

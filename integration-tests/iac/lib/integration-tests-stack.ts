@@ -37,6 +37,7 @@ interface SubStackProps extends cdk.NestedStackProps {
   role: iam.Role;
   layer: lambda.ILayerVersion;
   logGroup: logs.ILogGroup;
+  prefix: string;
 }
 
 function createLambdas(
@@ -45,6 +46,7 @@ function createLambdas(
     layer: lambda.ILayerVersion,
     role: iam.Role,
     logGroup: logs.ILogGroup,
+    prefix: string,
     overrides?: { handler?: string; code?: lambda.Code; memorySize?: number }
 ) {
   for (const runtime of runtimes) {
@@ -77,7 +79,7 @@ function createLambdas(
               environment["SLEEP_DURATION_MS"] = "20000";
             }
 
-            const functionName = `${runtimeName}-${scenario}-${traced}-invocation-end-${invocationEnd}-${architecture.name}`;
+            const functionName = `${prefix}${runtimeName}-${scenario}-${traced}-invocation-end-${invocationEnd}-${architecture.name}`;
             const handler = overrides?.handler ?? `${scenario}.handler`;
             const code = overrides?.code ?? lambda.Code.fromAsset(path.join(__dirname, '../lambdas/node'));
             const memorySize = overrides?.memorySize ?? 128;
@@ -115,7 +117,7 @@ class PythonStack extends cdk.NestedStack {
       lambda.Runtime.PYTHON_3_14,
     ];
 
-    createLambdas(this, runtimes, props.layer, props.role, props.logGroup, {
+    createLambdas(this, runtimes, props.layer, props.role, props.logGroup, props.prefix, {
       code: createPythonCode(),
     });
 
@@ -137,7 +139,7 @@ class PythonStack extends cdk.NestedStack {
     for (const runtime of dependencyConflictRuntimes) {
       const runtimeName = runtime.name.replace(/\./g, '-');
       new lambda.Function(this, `dependency-conflict-${runtimeName}`, {
-        functionName: `dependency-conflict-${runtimeName}`,
+        functionName: `${props.prefix}dependency-conflict-${runtimeName}`,
         runtime,
         memorySize: 128,
         handler: 'handler.handler',
@@ -169,7 +171,7 @@ class NodeStack extends cdk.NestedStack {
       lambda.Runtime.NODEJS_24_X,
     ];
 
-    createLambdas(this, runtimes, props.layer, props.role, props.logGroup);
+    createLambdas(this, runtimes, props.layer, props.role, props.logGroup, props.prefix);
   }
 }
 
@@ -194,7 +196,7 @@ class JavaStack extends cdk.NestedStack {
     };
     const runtimes = [lambda.Runtime.JAVA_25, lambda.Runtime.JAVA_21, lambda.Runtime.JAVA_17];
 
-    createLambdas(this, runtimes, props.layer, props.role, props.logGroup, overrides);
+    createLambdas(this, runtimes, props.layer, props.role, props.logGroup, props.prefix, overrides);
   }
 }
 
@@ -219,7 +221,7 @@ class ManualStack extends cdk.NestedStack {
     for (const runtime of runtimes) {
       const runtimeName = runtime.name.replace(/\./g, '-');
       new lambda.Function(this, `manual-instrumentation-${runtimeName}`, {
-        functionName: `manual-instrumentation-${runtimeName}`,
+        functionName: `${props.prefix}manual-instrumentation-${runtimeName}`,
         runtime,
         memorySize: 512,
         handler: 'index.hello',
@@ -244,6 +246,7 @@ class ManualStack extends cdk.NestedStack {
 interface DockerizedStackProps extends cdk.NestedStackProps {
   role: iam.Role;
   logGroup: logs.ILogGroup;
+  prefix: string;
 }
 
 class DockerizedStack extends cdk.NestedStack {
@@ -255,12 +258,12 @@ class DockerizedStack extends cdk.NestedStack {
 
     for (const runtime of ["python", "node", "java"]) {
       for (const architecture of [lambda.Architecture.X86_64, lambda.Architecture.ARM_64]) {
-        const extensionImage = `${account}.dkr.ecr.${region}.amazonaws.com/dash0-extension-${runtime}:latest`;
+        const extensionImage = `${account}.dkr.ecr.${region}.amazonaws.com/${props.prefix}dash0-extension-${runtime}:latest`;
         const platform = architecture === lambda.Architecture.ARM_64
           ? ecr_assets.Platform.LINUX_ARM64
           : ecr_assets.Platform.LINUX_AMD64;
         new lambda.DockerImageFunction(this, `dockerized-${runtime}-${architecture.name}`, {
-          functionName: `dockerized-${runtime}-${architecture.name}`,
+          functionName: `${props.prefix}dockerized-${runtime}-${architecture.name}`,
           code: lambda.DockerImageCode.fromImageAsset(path.join(__dirname, `../lambdas/dockerized-${runtime}`), {
             buildArgs: {
               EXTENSION_IMAGE: extensionImage,
@@ -289,10 +292,12 @@ export class IntegrationTestsStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    const pythonLayer = getLatestLayerVersion(this, 'pythonLrapLayer', 'dash0-extension-python');
-    const nodeLayer = getLatestLayerVersion(this, 'nodeLrapLayer', 'dash0-extension-node');
-    const javaLayer = getLatestLayerVersion(this, 'javaLrapLayer', 'dash0-extension-java');
-    const manualLayer = getLatestLayerVersion(this, 'manualLrapLayer', 'dash0-extension-manual');
+    const prefix = process.env.RESOURCE_PREFIX ?? '';
+
+    const pythonLayer = getLatestLayerVersion(this, 'pythonLrapLayer', `${prefix}dash0-extension-python`);
+    const nodeLayer = getLatestLayerVersion(this, 'nodeLrapLayer', `${prefix}dash0-extension-node`);
+    const javaLayer = getLatestLayerVersion(this, 'javaLrapLayer', `${prefix}dash0-extension-java`);
+    const manualLayer = getLatestLayerVersion(this, 'manualLrapLayer', `${prefix}dash0-extension-manual`);
     const role = new iam.Role(this, 'IntegrationTestsLambdaRole', {
       assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
       managedPolicies: [
@@ -309,44 +314,52 @@ export class IntegrationTestsStack extends cdk.Stack {
       role,
       layer: pythonLayer,
       logGroup: sharedLogGroup,
+      prefix,
     });
 
     new NodeStack(this, 'NodeStack', {
       role,
       layer: nodeLayer,
       logGroup: sharedLogGroup,
+      prefix,
     });
 
     new JavaStack(this, 'JavaStack', {
       role,
       layer: javaLayer,
       logGroup: sharedLogGroup,
+      prefix,
     });
 
     new ManualStack(this, 'ManualStack', {
       role,
       layer: manualLayer,
       logGroup: sharedLogGroup,
+      prefix,
     });
 
     new DockerizedStack(this, 'DockerizedStack', {
       role,
       logGroup: sharedLogGroup,
+      prefix,
     });
 
     new PythonTracingScenariosStack(this, 'TracingScenariosStack', {
       layer: pythonLayer,
       logGroup: sharedLogGroup,
+      prefix,
     });
 
     new NodeTracingScenariosStack(this, 'NodeTracingScenariosStack', {
       layer: nodeLayer,
       logGroup: sharedLogGroup,
+      prefix,
     });
 
     new JavaTracingScenariosStack(this, 'JavaTracingScenariosStack', {
       layer: javaLayer,
       logGroup: sharedLogGroup,
+      prefix,
     });
   }
 }

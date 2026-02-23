@@ -2,7 +2,7 @@ import fetch from 'node-fetch';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
 import { DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS } from "./config";
-import { invokeFunction } from "./utils";
+import { invokeFunction, RESOURCE_PREFIX } from "./utils";
 
 
 const verifyDependencyConflict = async (functionName: string) => {
@@ -59,7 +59,7 @@ describe.concurrent('Python dependency conflict', { retry: 1 }, () => {
     const runtimes = ['python3-10', 'python3-11', 'python3-12', 'python3-13'];
 
     for (const runtime of runtimes) {
-        const functionName = `dependency-conflict-${runtime}`;
+        const functionName = `${RESOURCE_PREFIX}dependency-conflict-${runtime}`;
         it(
             `verifies dependency conflict detection for ${functionName}`,
             async () => {
