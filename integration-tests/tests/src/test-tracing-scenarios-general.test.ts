@@ -71,12 +71,13 @@ const verifyTracingScenario = async (
     expect(producerTraceId).toBeDefined();
     expect(producerSpanId).toBeDefined();
 
-    // Step 3: Fetch the client span (child of producer) by service.name + time range
-    let clientSpanId: string | undefined;
+    // Step 3: Fetch producer's child spans by service.name + time range, walk the
+    //         hierarchy to find the deepest descendant (e.g. producer > eventbridge > http)
+    let leafSpanId: string | undefined;
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         await delay(RETRY_DELAY_MS);
-        console.log(`Attempt ${attempt} to fetch client span for ${producerFunctionName}`);
+        console.log(`Attempt ${attempt} to fetch client spans for ${producerFunctionName}`);
         try {
             const now = Date.now();
             const spanResponse = await fetch(DASH0_ENDPOINT + 'spans', {
@@ -105,32 +106,42 @@ const verifyTracingScenario = async (
             const spanPayload = await spanResponse.json() as any;
             expect(spanPayload?.resourceSpans.length).toBeGreaterThanOrEqual(1);
 
-            // Find the client span that is a child of the producer span
+            // Collect all spans from the producer's service into a flat list
+            const allSpans: any[] = [];
             for (const resourceSpan of spanPayload.resourceSpans) {
                 for (const scopeSpan of resourceSpan.scopeSpans) {
                     for (const span of scopeSpan.spans) {
-                        if (span.traceId === producerTraceId && span.parentSpanId === producerSpanId) {
-                            clientSpanId = span.spanId;
-                            console.log(`Client span found: spanId=${clientSpanId}, scope=${scopeSpan.scope.name}`);
-                            break;
+                        if (span.traceId === producerTraceId) {
+                            allSpans.push(span);
                         }
                     }
-                    if (clientSpanId) break;
                 }
-                if (clientSpanId) break;
             }
 
-            expect(clientSpanId).toBeDefined();
+            // Walk the chain from the producer span to the deepest descendant
+            let currentSpanId = producerSpanId;
+            let depth = 0;
+            while (true) {
+                const child = allSpans.find(s => s.parentSpanId === currentSpanId);
+                if (!child) break;
+                depth++;
+                currentSpanId = child.spanId;
+                console.log(`  depth ${depth}: spanId=${child.spanId}, scope child of ${child.parentSpanId}`);
+            }
+
+            expect(depth).toBeGreaterThanOrEqual(1);
+            leafSpanId = currentSpanId;
+            console.log(`Leaf client span found: spanId=${leafSpanId} (depth=${depth})`);
             break;
         } catch (error) {
-            console.error(`Error fetching client span on attempt ${attempt}:`, error);
+            console.error(`Error fetching client spans on attempt ${attempt}:`, error);
             if (attempt === MAX_ATTEMPTS) {
                 throw error;
             }
         }
     }
 
-    expect(clientSpanId).toBeDefined();
+    expect(leafSpanId).toBeDefined();
 
     // Step 4: Fetch consumer span and verify it is a child of the client span (grandchild of producer)
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -170,7 +181,7 @@ const verifyTracingScenario = async (
                 for (const scopeSpan of resourceSpan.scopeSpans) {
                     if (scopeSpan.scope.name === expectedScopeName) {
                         for (const span of scopeSpan.spans) {
-                            if (span.traceId === producerTraceId && span.parentSpanId === clientSpanId) {
+                            if (span.traceId === producerTraceId && span.parentSpanId === leafSpanId) {
                                 consumerSpan = span;
                                 break;
                             }
@@ -183,7 +194,7 @@ const verifyTracingScenario = async (
 
             expect(consumerSpan).not.toBeNull();
             console.log(`Consumer span found: traceId=${consumerSpan!.traceId}, spanId=${consumerSpan!.spanId}, parentSpanId=${consumerSpan!.parentSpanId}`);
-            console.log(`Trace chain verified: producer(${producerSpanId}) -> client(${clientSpanId}) -> consumer(${consumerSpan!.spanId})`);
+            console.log(`Trace chain verified: producer(${producerSpanId}) -> client(${leafSpanId}) -> consumer(${consumerSpan!.spanId})`);
             break;
         } catch (error) {
             console.error(`Error fetching consumer span on attempt ${attempt}:`, error);
