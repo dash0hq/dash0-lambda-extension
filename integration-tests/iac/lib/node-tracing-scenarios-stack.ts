@@ -7,6 +7,7 @@ import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 import * as kinesis from 'aws-cdk-lib/aws-kinesis';
+import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as events from 'aws-cdk-lib/aws-events';
 import * as events_targets from 'aws-cdk-lib/aws-events-targets';
 import * as lambda_event_sources from 'aws-cdk-lib/aws-lambda-event-sources';
@@ -238,6 +239,40 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         environment: {
           ...baseEnvironment,
           EVENT_BUS_NAME: eventBus.eventBusName,
+        },
+      });
+
+      // Scenario 6: Lambda > API Gateway > Lambda
+      const apiGatewayConsumer = new lambda.Function(this, `ApiGatewayConsumerLambda-${runtimeName}`, {
+        functionName: `${prefix}tracing-apigateway-consumer-${runtimeName}`,
+        runtime,
+        handler: 'consumer.handler',
+        code: nodeCode,
+        layers: [props.layer],
+        role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: baseEnvironment,
+      });
+
+      const api = new apigateway.LambdaRestApi(this, `TracingTestApi-${runtimeName}`, {
+        restApiName: `${prefix}tracing-test-api-${runtimeName}`,
+        handler: apiGatewayConsumer,
+        proxy: true,
+      });
+
+      const apiGatewayProducer = new lambda.Function(this, `ApiGatewayProducerLambda-${runtimeName}`, {
+        functionName: `${prefix}tracing-apigateway-producer-${runtimeName}`,
+        runtime,
+        handler: 'apigateway_producer.handler',
+        code: nodeCode,
+        layers: [props.layer],
+        role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: {
+          ...baseEnvironment,
+          API_URL: api.url,
         },
       });
 
