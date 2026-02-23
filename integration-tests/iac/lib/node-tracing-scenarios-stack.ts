@@ -7,6 +7,8 @@ import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 import * as kinesis from 'aws-cdk-lib/aws-kinesis';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as events_targets from 'aws-cdk-lib/aws-events-targets';
 import * as lambda_event_sources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as path from 'path';
 
@@ -27,6 +29,7 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSQSFullAccess'),
         iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSNSFullAccess'),
         iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonKinesisFullAccess'),
+        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonEventBridgeFullAccess'),
       ],
     });
 
@@ -195,6 +198,48 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         startingPosition: lambda.StartingPosition.TRIM_HORIZON,
         batchSize: 1,
       }));
+
+      // Scenario 5: Lambda > EventBridge > Lambda
+      const eventBus = new events.EventBus(this, `TracingTestEventBus-${runtimeName}`, {
+        eventBusName: `${prefix}tracing-test-event-bus-${runtimeName}`,
+      });
+
+      const eventBridgeConsumer = new lambda.Function(this, `EventBridgeConsumerLambda-${runtimeName}`, {
+        functionName: `${prefix}tracing-eventbridge-consumer-${runtimeName}`,
+        runtime,
+        handler: 'consumer.handler',
+        code: nodeCode,
+        layers: [props.layer],
+        role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: baseEnvironment,
+      });
+
+      new events.Rule(this, `TracingTestEventBridgeRule-${runtimeName}`, {
+        ruleName: `${prefix}tracing-test-eventbridge-rule-${runtimeName}`,
+        eventBus,
+        eventPattern: {
+          source: ['tracing-tests.producer'],
+          detailType: ['TestMessage'],
+        },
+        targets: [new events_targets.LambdaFunction(eventBridgeConsumer)],
+      });
+
+      const eventBridgeProducer = new lambda.Function(this, `EventBridgeProducerLambda-${runtimeName}`, {
+        functionName: `${prefix}tracing-eventbridge-producer-${runtimeName}`,
+        runtime,
+        handler: 'eventbridge_producer.handler',
+        code: nodeCode,
+        layers: [props.layer],
+        role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: {
+          ...baseEnvironment,
+          EVENT_BUS_NAME: eventBus.eventBusName,
+        },
+      });
 
     }
   }
