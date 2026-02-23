@@ -7,6 +7,8 @@ import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 import * as kinesis from 'aws-cdk-lib/aws-kinesis';
+import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as events from 'aws-cdk-lib/aws-events';
 import * as events_targets from 'aws-cdk-lib/aws-events-targets';
@@ -31,6 +33,7 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSNSFullAccess'),
         iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonKinesisFullAccess'),
         iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonEventBridgeFullAccess'),
+        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonS3FullAccess'),
       ],
     });
 
@@ -273,6 +276,46 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         environment: {
           ...baseEnvironment,
           API_URL: api.url,
+        },
+      });
+
+      // Scenario 7: Lambda > S3 > Lambda
+      const s3Bucket = new s3.Bucket(this, `TracingTestS3Bucket-${runtimeName}`, {
+        bucketName: `${prefix}tracing-test-s3-bucket-${runtimeName}`,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+        autoDeleteObjects: true,
+      });
+
+      const s3Consumer = new lambda.Function(this, `S3ConsumerLambda-${runtimeName}`, {
+        functionName: `${prefix}tracing-s3-consumer-${runtimeName}`,
+        runtime,
+        handler: 'consumer.handler',
+        code: nodeCode,
+        layers: [props.layer],
+        role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: baseEnvironment,
+      });
+
+      s3Bucket.addEventNotification(
+        s3.EventType.OBJECT_CREATED,
+        new s3n.LambdaDestination(s3Consumer),
+        { prefix: 'test-events/' },
+      );
+
+      const s3Producer = new lambda.Function(this, `S3ProducerLambda-${runtimeName}`, {
+        functionName: `${prefix}tracing-s3-producer-${runtimeName}`,
+        runtime,
+        handler: 's3_producer.handler',
+        code: nodeCode,
+        layers: [props.layer],
+        role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: {
+          ...baseEnvironment,
+          BUCKET_NAME: s3Bucket.bucketName,
         },
       });
 

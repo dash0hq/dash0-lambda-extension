@@ -10,6 +10,7 @@ const nodeRuntimes = ['nodejs20-x', 'nodejs22-x', 'nodejs24-x'];
 const scenarios = [
     { name: 'eventbridge', producerPrefix: `${RESOURCE_PREFIX}tracing-eventbridge-producer`, consumerPrefix: `${RESOURCE_PREFIX}tracing-eventbridge-consumer`, runtimes: [...pythonRuntimes, ...nodeRuntimes] },
     { name: 'apigateway', producerPrefix: `${RESOURCE_PREFIX}tracing-apigateway-producer`, consumerPrefix: `${RESOURCE_PREFIX}tracing-apigateway-consumer`, runtimes: [...pythonRuntimes, ...nodeRuntimes] },
+    { name: 's3', producerPrefix: `${RESOURCE_PREFIX}tracing-s3-producer`, consumerPrefix: `${RESOURCE_PREFIX}tracing-s3-consumer`, runtimes: [...pythonRuntimes, ...nodeRuntimes] },
 ] as const;
 
 const getLambdaScopeName = (functionName: string) =>
