@@ -8,8 +8,8 @@ const pythonRuntimes = ['python3-11', 'python3-12', 'python3-13', 'python3-14'];
 const nodeRuntimes = ['nodejs20-x', 'nodejs22-x', 'nodejs24-x'];
 
 const scenarios = [
-    { name: 'eventbridge', producerPrefix: `${RESOURCE_PREFIX}tracing-eventbridge-producer`, consumerPrefix: `${RESOURCE_PREFIX}tracing-eventbridge-consumer`, runtimes: ['python3-14'] },
-    // { name: 'apigateway', producerPrefix: `${RESOURCE_PREFIX}tracing-apigateway-producer`, consumerPrefix: `${RESOURCE_PREFIX}tracing-apigateway-consumer`, runtimes: [...pythonRuntimes, ...nodeRuntimes] },
+    { name: 'eventbridge', producerPrefix: `${RESOURCE_PREFIX}tracing-eventbridge-producer`, consumerPrefix: `${RESOURCE_PREFIX}tracing-eventbridge-consumer`, runtimes: [...pythonRuntimes, ...nodeRuntimes] },
+    { name: 'apigateway', producerPrefix: `${RESOURCE_PREFIX}tracing-apigateway-producer`, consumerPrefix: `${RESOURCE_PREFIX}tracing-apigateway-consumer`, runtimes: [...pythonRuntimes, ...nodeRuntimes] },
 ] as const;
 
 const getLambdaScopeName = (functionName: string) =>
@@ -181,9 +181,9 @@ const verifyTracingScenario = async (
                 if (consumerSpan) break;
             }
 
-            expect(consumerSpan).toBeDefined();
-            console.log(`Consumer span found: traceId=${consumerSpan.traceId}, spanId=${consumerSpan.spanId}, parentSpanId=${consumerSpan.parentSpanId}`);
-            console.log(`Trace chain verified: producer(${producerSpanId}) -> client(${clientSpanId}) -> consumer(${consumerSpan.spanId})`);
+            expect(consumerSpan).not.toBeNull();
+            console.log(`Consumer span found: traceId=${consumerSpan!.traceId}, spanId=${consumerSpan!.spanId}, parentSpanId=${consumerSpan!.parentSpanId}`);
+            console.log(`Trace chain verified: producer(${producerSpanId}) -> client(${clientSpanId}) -> consumer(${consumerSpan!.spanId})`);
             break;
         } catch (error) {
             console.error(`Error fetching consumer span on attempt ${attempt}:`, error);
