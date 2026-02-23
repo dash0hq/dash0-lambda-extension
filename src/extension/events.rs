@@ -41,7 +41,7 @@ fn handle_invoke_event(json: &serde_json::Value) {
             .and_then(|t| t.get("value"))
             .and_then(|v| v.as_str())
         {
-            if let Some((trace_id_bytes, parent_span_id_bytes)) =
+            if let Some((trace_id_bytes, parent_span_id_bytes, sampled)) =
                 crate::otlp::span_link_extractor::parse_amzn_trace_id(trace_value)
             {
                 let trace_id = hex::encode(&trace_id_bytes);
@@ -51,6 +51,7 @@ fn handle_invoke_event(json: &serde_json::Value) {
                     entry.trace_id = Some(trace_id);
                     entry.span_id = Some(span_id);
                     entry.parent_span_id = Some(parent_span_id);
+                    entry.sampled = sampled;
                 });
             }
         }

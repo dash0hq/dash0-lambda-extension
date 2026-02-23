@@ -75,7 +75,7 @@ fn extract_link_from_amzn_trace_id(message_attrs: &serde_json::Value) -> Option<
         .and_then(|tp| tp.get("stringValue"))
         .and_then(|sv| sv.as_str())?;
 
-    let (trace_id, span_id) = parse_amzn_trace_id(amzn_trace_str)?;
+    let (trace_id, span_id, _sampled) = parse_amzn_trace_id(amzn_trace_str)?;
     Some(Link {
         trace_id,
         span_id,
@@ -109,7 +109,7 @@ fn extract_link_from_sqs_body(record: &serde_json::Value) -> Option<Link> {
         .and_then(|tp| tp.get("Value"))
         .and_then(|v| v.as_str())
     {
-        if let Some((trace_id, span_id)) = parse_amzn_trace_id(amzn_val) {
+        if let Some((trace_id, span_id, _sampled)) = parse_amzn_trace_id(amzn_val) {
             return Some(Link {
                 trace_id,
                 span_id,
@@ -143,7 +143,7 @@ fn extract_sns_link(record: &serde_json::Value) -> Option<Link> {
         .and_then(|tp| tp.get("Value"))
         .and_then(|v| v.as_str())
     {
-        if let Some((trace_id, span_id)) = parse_amzn_trace_id(amzn_val) {
+        if let Some((trace_id, span_id, _sampled)) = parse_amzn_trace_id(amzn_val) {
             return Some(Link {
                 trace_id,
                 span_id,
@@ -183,7 +183,7 @@ fn extract_kinesis_link(record: &serde_json::Value) -> Option<Link> {
         .or_else(|| data_json.get("x-amzn-trace-id"))
         .and_then(|v| v.as_str())
     {
-        if let Some((trace_id, span_id)) = parse_amzn_trace_id(amzn_val) {
+        if let Some((trace_id, span_id, _sampled)) = parse_amzn_trace_id(amzn_val) {
             return Some(Link {
                 trace_id,
                 span_id,
@@ -225,9 +225,10 @@ fn parse_traceparent(traceparent: &str) -> Option<(Vec<u8>, Vec<u8>)> {
 /// Example: Root=1-698f814c-7708a2b018bc2cc4726a6288;Parent=f21a582b8b8134b9;Sampled=1
 /// The 16-byte trace_id is the concatenation of the two hex parts after "Root=1-".
 /// The 8-byte span_id is the hex part after "Parent=".
-pub fn parse_amzn_trace_id(value: &str) -> Option<(Vec<u8>, Vec<u8>)> {
+pub fn parse_amzn_trace_id(value: &str) -> Option<(Vec<u8>, Vec<u8>, bool)> {
     let mut root_hex: Option<String> = None;
     let mut parent_hex: Option<&str> = None;
+    let mut sampled = false;
 
     for part in value.split(';') {
         let part = part.trim();
@@ -240,6 +241,8 @@ pub fn parse_amzn_trace_id(value: &str) -> Option<(Vec<u8>, Vec<u8>)> {
             }
         } else if let Some(parent_val) = part.strip_prefix("Parent=") {
             parent_hex = Some(parent_val);
+        } else if let Some(sampled_val) = part.strip_prefix("Sampled=") {
+            sampled = sampled_val == "1";
         }
     }
 
@@ -250,7 +253,7 @@ pub fn parse_amzn_trace_id(value: &str) -> Option<(Vec<u8>, Vec<u8>)> {
         return None;
     }
 
-    Some((trace_id, span_id))
+    Some((trace_id, span_id, sampled))
 }
 
 #[cfg(test)]
@@ -284,12 +287,13 @@ mod tests {
     #[test]
     fn parse_amzn_trace_id_valid() {
         let val = "Root=1-698f814c-7708a2b018bc2cc4726a6288;Parent=f21a582b8b8134b9;Sampled=1";
-        let (trace_id, span_id) = parse_amzn_trace_id(val).expect("should parse");
+        let (trace_id, span_id, sampled) = parse_amzn_trace_id(val).expect("should parse");
 
         assert_eq!(trace_id.len(), 16);
         assert_eq!(span_id.len(), 8);
         assert_eq!(hex::encode(&trace_id), "698f814c7708a2b018bc2cc4726a6288");
         assert_eq!(hex::encode(&span_id), "f21a582b8b8134b9");
+        assert!(sampled);
     }
 
     #[test]
