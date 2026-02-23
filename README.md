@@ -11,15 +11,7 @@ This extension has four main functionalities:
 
 ## Layer ARNs
 
-Python:
-```
-arn:aws:lambda:<region>:285732642181:layer:dash0-extension-node:1
-```
-
-Node:
-```
-arn:aws:lambda:<region>:285732642181:layer:dash0-extension-python:1
-```
+See the release page for the latest ARNs of the extension layers for each runtime.
 
 
 ## Configuration
