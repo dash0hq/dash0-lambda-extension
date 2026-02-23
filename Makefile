@@ -159,30 +159,42 @@ manual: $(LAMBDA_LAYER_MARKER_MANUAL)
 
 $(LAMBDA_LAYER_MARKER_PYTHON): build/$(ZIP_NAME_PYTHON)
 	@echo "Publishing Lambda Extension to layer \"$(LAYER_NAME_PYTHON)\""
-	@aws lambda publish-layer-version --layer-name $(LAYER_NAME_PYTHON) --zip-file fileb://build/$(ZIP_NAME_PYTHON) \
+	@LAYER_VERSION=$$(aws lambda publish-layer-version --layer-name $(LAYER_NAME_PYTHON) --zip-file fileb://build/$(ZIP_NAME_PYTHON) \
 		--description "Layer to intercept and sanitize Lambda input and output data. Compatible with all runtimes" \
-		--compatible-architectures x86_64 arm64 --no-cli-pager
+		--compatible-architectures x86_64 arm64 --no-cli-pager --query Version --output text) && \
+		echo "Making $(LAYER_NAME_PYTHON) version $$LAYER_VERSION public" && \
+		aws lambda add-layer-version-permission --layer-name $(LAYER_NAME_PYTHON) --version-number $$LAYER_VERSION \
+		--statement-id public --action lambda:GetLayerVersion --principal "*" --no-cli-pager
 	@touch $(LAMBDA_LAYER_MARKER_PYTHON)
 
 $(LAMBDA_LAYER_MARKER_NODE): build/$(ZIP_NAME_NODE)
 	@echo "Publishing Lambda Extension to layer \"$(LAYER_NAME_NODE)\""
-	@aws lambda publish-layer-version --layer-name $(LAYER_NAME_NODE) --zip-file fileb://build/$(ZIP_NAME_NODE) \
+	@LAYER_VERSION=$$(aws lambda publish-layer-version --layer-name $(LAYER_NAME_NODE) --zip-file fileb://build/$(ZIP_NAME_NODE) \
 		--description "Layer to intercept and sanitize Lambda input and output data. Compatible with all runtimes" \
-		--compatible-architectures x86_64 arm64 --no-cli-pager
+		--compatible-architectures x86_64 arm64 --no-cli-pager --query Version --output text) && \
+		echo "Making $(LAYER_NAME_NODE) version $$LAYER_VERSION public" && \
+		aws lambda add-layer-version-permission --layer-name $(LAYER_NAME_NODE) --version-number $$LAYER_VERSION \
+		--statement-id public --action lambda:GetLayerVersion --principal "*" --no-cli-pager
 	@touch $(LAMBDA_LAYER_MARKER_NODE)
 
 $(LAMBDA_LAYER_MARKER_JAVA): build/$(ZIP_NAME_JAVA)
 	@echo "Publishing Lambda Extension to layer \"$(LAYER_NAME_JAVA)\""
-	@aws lambda publish-layer-version --layer-name $(LAYER_NAME_JAVA) --zip-file fileb://build/$(ZIP_NAME_JAVA) \
+	@LAYER_VERSION=$$(aws lambda publish-layer-version --layer-name $(LAYER_NAME_JAVA) --zip-file fileb://build/$(ZIP_NAME_JAVA) \
 		--description "Layer to intercept and sanitize Lambda input and output data. Compatible with all runtimes" \
-		--compatible-architectures x86_64 arm64 --no-cli-pager
+		--compatible-architectures x86_64 arm64 --no-cli-pager --query Version --output text) && \
+		echo "Making $(LAYER_NAME_JAVA) version $$LAYER_VERSION public" && \
+		aws lambda add-layer-version-permission --layer-name $(LAYER_NAME_JAVA) --version-number $$LAYER_VERSION \
+		--statement-id public --action lambda:GetLayerVersion --principal "*" --no-cli-pager
 	@touch $(LAMBDA_LAYER_MARKER_JAVA)
 
 $(LAMBDA_LAYER_MARKER_MANUAL): build/$(ZIP_NAME_MANUAL)
 	@echo "Publishing Lambda Extension to layer \"$(LAYER_NAME_MANUAL)\""
-	@aws lambda publish-layer-version --layer-name $(LAYER_NAME_MANUAL) --zip-file fileb://build/$(ZIP_NAME_MANUAL) \
+	@LAYER_VERSION=$$(aws lambda publish-layer-version --layer-name $(LAYER_NAME_MANUAL) --zip-file fileb://build/$(ZIP_NAME_MANUAL) \
 		--description "Layer to intercept and sanitize Lambda input and output data. Compatible with all runtimes" \
-		--compatible-architectures x86_64 arm64 --no-cli-pager
+		--compatible-architectures x86_64 arm64 --no-cli-pager --query Version --output text) && \
+		echo "Making $(LAYER_NAME_MANUAL) version $$LAYER_VERSION public" && \
+		aws lambda add-layer-version-permission --layer-name $(LAYER_NAME_MANUAL) --version-number $$LAYER_VERSION \
+		--statement-id public --action lambda:GetLayerVersion --principal "*" --no-cli-pager
 	@touch $(LAMBDA_LAYER_MARKER_MANUAL)
 
 
