@@ -6,12 +6,16 @@ on:
   workflow_dispatch:
 
 jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+
   deploy-dev:
     if: github.event_name == 'push'
+    needs: build
     strategy:
       matrix:
         region: [eu-central-1, us-east-2]
-    uses: ./.github/workflows/build-and-publish.yml
+    uses: ./.github/workflows/publish.yml
     with:
       environment: dev-integration
       region: ${{ matrix.region }}
@@ -19,10 +23,11 @@ jobs:
 
   deploy-prod:
     if: github.event_name == 'workflow_dispatch'
+    needs: build
     strategy:
       matrix:
         region: [eu-central-1, us-east-2, us-west-2]
-    uses: ./.github/workflows/build-and-publish.yml
+    uses: ./.github/workflows/publish.yml
     with:
       environment: prod-integration
       region: ${{ matrix.region }}

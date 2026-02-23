@@ -65,9 +65,14 @@ jobs:
         working-directory: opt/node
         run: npm test
 
+  build:
+    name: Build Rust Binaries
+    uses: ./.github/workflows/build.yml
+
   deploy:
-    name: Build and Publish
-    uses: ./.github/workflows/build-and-publish.yml
+    name: Publish Layers
+    needs: build
+    uses: ./.github/workflows/publish.yml
     with:
       environment: staging
       prefix: pr-${{ github.event.pull_request.number }}-
