@@ -488,8 +488,7 @@ fn add_return_payload_to_span(span: &mut Span, invocation_id: &str) {
 }
 
 fn remove_parent_span(span: &mut Span, invocation_id: &str) {
-    let sampled = invocation_entry::get(invocation_id)
-        .map_or(false, |entry| entry.sampled);
+    let sampled = invocation_entry::get(invocation_id).map_or(false, |entry| entry.sampled);
     if sampled {
         tracing::info!(
             "[{}] invocation_id={} is sampled, keeping parent span id",
