@@ -488,6 +488,9 @@ fn add_return_payload_to_span(span: &mut Span, invocation_id: &str) {
 }
 
 fn remove_parent_span(span: &mut Span, invocation_id: &str) {
+    if !crate::config::user::is_remove_lambda_parent_span() {
+        return;
+    }
     let sampled = invocation_entry::get(invocation_id).map_or(false, |entry| entry.sampled);
     if sampled {
         tracing::info!(
@@ -959,6 +962,31 @@ mod tests {
             span.parent_span_id.is_empty(),
             "parent_span_id should be cleared when not sampled"
         );
+    }
+
+    #[test]
+    #[serial]
+    fn process_trace_request_keeps_parent_span_when_env_var_false() {
+        std::env::set_var("DASH0_REMOVE_LAMBDA_PARENT_SPAN", "false");
+        let invocation_id = "inv-process-parent-env";
+        store_event_payload(invocation_id, r#"{"test":"data"}"#);
+
+        let mut span = make_span_with_invocation(invocation_id);
+        span.parent_span_id = vec![0xBB; 8];
+
+        let mut request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
+        let mut invocation_ids = Vec::new();
+        let mut encoded_body = Vec::new();
+
+        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+
+        let span = &request.resource_spans[0].scope_spans[0].spans[0];
+        assert_eq!(
+            span.parent_span_id,
+            vec![0xBB; 8],
+            "parent_span_id should be preserved when DASH0_REMOVE_LAMBDA_PARENT_SPAN is false"
+        );
+        std::env::remove_var("DASH0_REMOVE_LAMBDA_PARENT_SPAN");
     }
 
     #[test]

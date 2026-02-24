@@ -55,6 +55,16 @@ pub fn is_extract_span_links_in_consumer() -> bool {
     }
 }
 
+pub fn is_remove_lambda_parent_span() -> bool {
+    match std::env::var("DASH0_REMOVE_LAMBDA_PARENT_SPAN") {
+        Ok(val) => matches!(
+            val.as_str(),
+            "1" | "true" | "TRUE" | "True" | "yes" | "YES" | "Yes" | "y" | "Y"
+        ),
+        Err(_) => true,
+    }
+}
+
 pub fn is_logs_instrumentation_enabled() -> bool {
     match std::env::var("DASH0_LOGS_INSTRUMENTATION_ENABLED") {
         Ok(val) => matches!(
