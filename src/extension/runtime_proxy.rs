@@ -7,40 +7,17 @@ use once_cell::sync::Lazy;
 use hyper::HeaderMap;
 
 use crate::config::endpoints;
-use crate::config::{is_auto_instrumented_disabled, max_event_payload_size};
-use crate::otlp::masking::mask_json_string;
+use crate::config::is_auto_instrumented_disabled;
 use crate::otlp::span_mutations::{
     add_return_payload_to_lambda_server_spans, build_synthetic_trace,
 };
 use crate::state::invocation_data::store_current_invocation_id;
 use crate::state::invocation_entry;
 use crate::util::parsers::extract_invocation_id_from_path;
+use crate::util::truncate::process_payload;
 
 static HTTP_CLIENT: Lazy<hyper::Client<hyper::client::HttpConnector, Body>> =
     Lazy::new(|| hyper::Client::new());
-
-fn process_payload(payload_bytes: &[u8]) -> String {
-    let payload_str = String::from_utf8_lossy(payload_bytes);
-    let masked_payload = mask_json_string(&payload_str);
-
-    let max_size = max_event_payload_size();
-    if masked_payload.len() > max_size {
-        // Find a valid UTF-8 character boundary at or before max_size
-        let mut truncate_at = max_size;
-        while truncate_at > 0 && !masked_payload.is_char_boundary(truncate_at) {
-            truncate_at -= 1;
-        }
-        tracing::info!(
-            "[{}] Truncating payload from {} to {} bytes.",
-            crate::log_prefix(),
-            masked_payload.len(),
-            truncate_at
-        );
-        masked_payload[..truncate_at].to_string()
-    } else {
-        masked_payload
-    }
-}
 
 pub async fn next(headers: &HeaderMap, path: &str) -> Result<(Arc<String>, Response<Body>), Error> {
     let uri = match hyper::Uri::builder()
@@ -303,65 +280,4 @@ async fn validate_and_mangle_next_event(
     let response = Response::from_parts(parts, Body::from(body_bytes));
 
     Ok(response)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::process_payload;
-    use serial_test::serial;
-
-    #[test]
-    #[serial]
-    fn process_payload_truncates_at_char_boundary_for_multibyte_utf8() {
-        // Set a small max payload size (1KB)
-        std::env::set_var("DASH0_MAX_EVENT_PAYLOAD", "1");
-
-        // Create a payload with multi-byte UTF-8 characters (Korean '생' is 3 bytes)
-        // The payload is designed so truncation at exactly 1024 bytes would fall mid-character
-        let base = "a".repeat(1020);
-        let payload = format!("{}생생생생", base); // Each '생' is 3 bytes, total = 1020 + 12 = 1032 bytes
-
-        let result = process_payload(payload.as_bytes());
-
-        // Should not panic and should produce valid UTF-8
-        assert!(result.len() <= 1024);
-        // Verify it's valid UTF-8 by checking we can iterate chars
-        assert!(result.chars().count() > 0);
-        // The result should end at a character boundary (not mid-character)
-        assert!(result.is_char_boundary(result.len()));
-
-        std::env::remove_var("DASH0_MAX_EVENT_PAYLOAD");
-    }
-
-    #[test]
-    #[serial]
-    fn process_payload_handles_truncation_mid_emoji() {
-        // Set a small max payload size (1KB)
-        std::env::set_var("DASH0_MAX_EVENT_PAYLOAD", "1");
-
-        // Emoji '😀' is 4 bytes (F0 9F 98 80)
-        let base = "x".repeat(1022);
-        let payload = format!("{}😀😀", base); // 1022 + 8 = 1030 bytes
-
-        let result = process_payload(payload.as_bytes());
-
-        // Should not panic and should produce valid UTF-8
-        assert!(result.len() <= 1024);
-        assert!(result.chars().count() > 0);
-
-        std::env::remove_var("DASH0_MAX_EVENT_PAYLOAD");
-    }
-
-    #[test]
-    #[serial]
-    fn process_payload_no_truncation_when_under_limit() {
-        std::env::set_var("DASH0_MAX_EVENT_PAYLOAD", "1");
-
-        let payload = "short payload";
-        let result = process_payload(payload.as_bytes());
-
-        assert_eq!(result, payload);
-
-        std::env::remove_var("DASH0_MAX_EVENT_PAYLOAD");
-    }
 }
