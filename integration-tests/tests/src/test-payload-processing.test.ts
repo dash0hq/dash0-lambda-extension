@@ -2,11 +2,11 @@ import fetch from 'node-fetch';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
 import { DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS } from "./config";
-import { getAttributesMap, getRequestPayload, invokeFunction } from "./utils";
+import {getAttributesMap, getRequestPayload, invokeFunction, RESOURCE_PREFIX} from "./utils";
 
 describe.concurrent('Payload processing', () => {
     it('truncates large event payload (~30KB)', async () => {
-        const functionName = 'python3-14-success-true-invocation-end-true-arm64';
+        const functionName = `${RESOURCE_PREFIX}python3-14-success-true-invocation-end-true-arm64`;
 
         // Build a ~30KB JSON payload
         const largeValue = 'x'.repeat(30_000);
