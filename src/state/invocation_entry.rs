@@ -90,6 +90,14 @@ pub fn get_start_time(invocation_id: &str) -> Option<f64> {
         .filter(|&t| t > 0.0)
 }
 
+/// Lightweight getter: returns only the sampled flag.
+pub fn get_sampled(invocation_id: &str) -> bool {
+    INVOCATION_STORE
+        .lock()
+        .get(invocation_id)
+        .map_or(false, |e| e.sampled)
+}
+
 /// Lightweight getter: returns only the return_value, avoiding a full entry clone.
 pub fn get_return_value(invocation_id: &str) -> Option<String> {
     INVOCATION_STORE

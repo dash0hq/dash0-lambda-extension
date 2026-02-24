@@ -491,7 +491,7 @@ fn remove_parent_span(span: &mut Span, invocation_id: &str) {
     if !crate::config::user::is_remove_lambda_parent_span() {
         return;
     }
-    let sampled = invocation_entry::get(invocation_id).map_or(false, |entry| entry.sampled);
+    let sampled = invocation_entry::get_sampled(invocation_id);
     if sampled {
         tracing::info!(
             "[{}] invocation_id={} is sampled, keeping parent span id",
