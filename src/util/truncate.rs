@@ -96,7 +96,8 @@ pub fn process_payload(payload_bytes: &[u8]) -> String {
         return masked_payload;
     }
 
-    truncate_json_strings(&masked_payload, max_size)
+    std::panic::catch_unwind(|| truncate_json_strings(&masked_payload, max_size))
+        .unwrap_or_else(|_| truncate_plain(&masked_payload, max_size))
 }
 
 #[cfg(test)]
