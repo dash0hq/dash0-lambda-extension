@@ -38,6 +38,12 @@ See the release page for the latest ARNs of the extension layers for each runtim
 
 * `DASH0_MAX_EVENT_PAYLOAD` - Maximum size in KB for event payloads (request/response bodies) captured in traces. Payloads exceeding this limit are truncated. Default: `20`.
 
+* `DASH0_REMOVE_LAMBDA_PARENT_SPAN` - When set to `true` (the default), the extension removes the parent span ID from Lambda server spans for non-sampled invocations. Set to `false` to preserve the original parent span ID.
+
+* `DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER` - When set to `true`, the extension extracts span links from message attributes for SQS, SNS, Kinesis, and adds them to the Lambda server span. Default: `false`.
+
+* `DASH0_LOGS_INSTRUMENTATION_ENABLED` - When set to `true`, logs won't be collected from the Telemetry API, to prevent duplicates from the OTEL instrumentation. Default: `false`.
+
 ### Secret Masking
 
 The extension automatically masks sensitive data in traces payloads. By default, any JSON key matching these patterns (case-insensitive) will have its value replaced with `****`:
