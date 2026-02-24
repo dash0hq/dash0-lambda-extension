@@ -46,6 +46,7 @@ export class PythonTracingScenariosStack extends cdk.NestedStack {
         iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonKinesisFullAccess'),
         iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonEventBridgeFullAccess'),
         iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonS3FullAccess'),
+        iam.ManagedPolicy.fromAwsManagedPolicyName('AWSLambda_FullAccess'),
       ],
     });
 
@@ -329,6 +330,34 @@ export class PythonTracingScenariosStack extends cdk.NestedStack {
         environment: {
           ...baseEnvironment,
           BUCKET_NAME: s3Bucket.bucketName,
+        },
+      });
+
+      // Scenario 8: Lambda > Lambda
+      const lambdaConsumer = new lambda.Function(this, `LambdaConsumerLambda-${runtimeName}`, {
+        functionName: `${prefix}tracing-lambda-consumer-${runtimeName}`,
+        runtime,
+        handler: 'consumer.handler',
+        code: pythonCode,
+        layers: [props.layer],
+        role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: baseEnvironment,
+      });
+
+      const lambdaInvoker = new lambda.Function(this, `LambdaInvokerLambda-${runtimeName}`, {
+        functionName: `${prefix}tracing-lambda-invoker-${runtimeName}`,
+        runtime,
+        handler: 'lambda_invoker.handler',
+        code: pythonCode,
+        layers: [props.layer],
+        role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: {
+          ...baseEnvironment,
+          TARGET_FUNCTION_NAME: lambdaConsumer.functionName,
         },
       });
 
