@@ -487,6 +487,20 @@ fn add_return_payload_to_span(span: &mut Span, invocation_id: &str) {
     }
 }
 
+fn remove_parent_span(span: &mut Span, invocation_id: &str) {
+    let sampled = invocation_entry::get(invocation_id)
+        .map_or(false, |entry| entry.sampled);
+    if sampled {
+        tracing::info!(
+            "[{}] invocation_id={} is sampled, keeping parent span id",
+            crate::log_prefix(),
+            invocation_id
+        );
+    } else {
+        span.parent_span_id = Vec::new();
+    }
+}
+
 fn store_span_ids(span: &Span, invocation_id: &str) {
     let trace_id_hex = span
         .trace_id
@@ -540,6 +554,7 @@ pub fn process_trace_request(
                 invocation_ids.push(invocation_id.clone());
                 add_event_payload_to_span(span, &invocation_id);
                 add_return_payload_to_span(span, &invocation_id);
+                remove_parent_span(span, &invocation_id);
                 store_span_ids(span, &invocation_id);
             }
         }
@@ -921,6 +936,29 @@ mod tests {
         assert!(
             return_attr.is_some(),
             "dash0.faas.return_value should be added"
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn process_trace_request_removes_parent_span_when_not_sampled() {
+        let invocation_id = "inv-process-parent";
+        store_event_payload(invocation_id, r#"{"test":"data"}"#);
+
+        let mut span = make_span_with_invocation(invocation_id);
+        span.parent_span_id = vec![0xAA; 8];
+
+        let mut request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
+        let mut invocation_ids = Vec::new();
+        let mut encoded_body = Vec::new();
+
+        // sampled defaults to false, so parent_span_id should be cleared
+        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+
+        let span = &request.resource_spans[0].scope_spans[0].spans[0];
+        assert!(
+            span.parent_span_id.is_empty(),
+            "parent_span_id should be cleared when not sampled"
         );
     }
 
