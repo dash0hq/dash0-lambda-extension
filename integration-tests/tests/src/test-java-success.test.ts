@@ -46,7 +46,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
             expect(spanAttributes['dash0.faas.event'].stringValue).toEqual('{"parameter1":"right"}');
             expect(spanAttributes['dash0.faas.return_value'].stringValue).toEqual('"Hello World from Java Lambda!"');
-            expect(spanAttributes['dash0.faas.init_duration'].doubleValue).toBeGreaterThan(0);
+            expect(spanAttributes['faas.init_duration'].doubleValue).toBeGreaterThan(0);
             traceId = span.traceId;
             parentSpanId = span.spanId;
             break;

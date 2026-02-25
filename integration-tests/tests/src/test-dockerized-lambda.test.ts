@@ -50,7 +50,7 @@ const verifyDockerizedInvocation = async (functionName: string, runtime: string)
             expect(spanAttributes['dash0.faas.event'].stringValue).toEqual('{"parameter1":"right"}');
             const returnValue = runtime === 'java' ? '"Hello World from Java Lambda!"' : '{"statusCode":200,"body":"{\\"message\\":\\"Success\\"}"}';
             compareJsonStrings(spanAttributes['dash0.faas.return_value'].stringValue, returnValue);
-            expect(spanAttributes['dash0.faas.init_duration'].doubleValue).toBeGreaterThan(0);
+            expect(spanAttributes['faas.init_duration'].doubleValue).toBeGreaterThan(0);
 
             const resourceAttributes = getAttributesMap(spanPayload?.resourceSpans[0].resource.attributes);
             expect(resourceAttributes['service.name'].stringValue).toEqual(functionName);

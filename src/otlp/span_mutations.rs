@@ -398,7 +398,7 @@ pub fn merge_telemetry_invocation_data(request: &mut ExportTraceServiceRequest) 
                             {
                                 if data.init_duration > 0.0 {
                                     span.attributes.push(KeyValue {
-                                        key: "dash0.faas.init_duration".to_string(),
+                                        key: "faas.init_duration".to_string(),
                                         value: Some(AnyValue {
                                             value: Some(Value::DoubleValue(data.init_duration)),
                                         }),
@@ -1381,7 +1381,7 @@ mod tests {
 
         // attributes
         let init_attr =
-            find_attribute(span, "dash0.faas.init_duration").and_then(|v| match &v.value {
+            find_attribute(span, "faas.init_duration").and_then(|v| match &v.value {
                 Some(Value::DoubleValue(d)) => Some(*d),
                 _ => None,
             });
