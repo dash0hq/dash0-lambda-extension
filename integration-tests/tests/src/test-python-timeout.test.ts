@@ -42,7 +42,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             const spanAttributes = getAttributesMap(span.attributes);
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
             expect(spanAttributes['dash0.faas.event'].stringValue).toEqual('{"parameter1":"right"}');
-            expect(spanAttributes['dash0.faas.init_duration'].doubleValue).toBeGreaterThan(0);
+            expect(spanAttributes['faas.init_duration'].doubleValue).toBeGreaterThan(0);
 
             checkException(span, 'timeout');
             traceId = spanPayload.resourceSpans[0].scopeSpans[0].spans[0].traceId;

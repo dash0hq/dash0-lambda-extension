@@ -19,6 +19,7 @@ pub struct InvocationEntry {
     pub span_id: Option<String>,
     pub trace_id: Option<String>,
     pub parent_span_id: Option<String>,
+    pub sampled: bool,
     pub init_duration: f64,
     pub duration: f64,
     pub billed_duration: f64,
@@ -38,6 +39,7 @@ impl Default for InvocationEntry {
             span_id: None,
             trace_id: None,
             parent_span_id: None,
+            sampled: false,
             init_duration: 0.0,
             duration: 0.0,
             billed_duration: 0.0,
@@ -86,6 +88,14 @@ pub fn get_start_time(invocation_id: &str) -> Option<f64> {
         .get(invocation_id)
         .map(|e| e.start_time)
         .filter(|&t| t > 0.0)
+}
+
+/// Lightweight getter: returns only the sampled flag.
+pub fn get_sampled(invocation_id: &str) -> bool {
+    INVOCATION_STORE
+        .lock()
+        .get(invocation_id)
+        .map_or(false, |e| e.sampled)
 }
 
 /// Lightweight getter: returns only the return_value, avoiding a full entry clone.

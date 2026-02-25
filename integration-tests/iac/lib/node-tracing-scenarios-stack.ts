@@ -7,6 +7,11 @@ import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 import * as kinesis from 'aws-cdk-lib/aws-kinesis';
+import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
+import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as events_targets from 'aws-cdk-lib/aws-events-targets';
 import * as lambda_event_sources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as path from 'path';
 
@@ -27,6 +32,9 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSQSFullAccess'),
         iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSNSFullAccess'),
         iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonKinesisFullAccess'),
+        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonEventBridgeFullAccess'),
+        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonS3FullAccess'),
+        iam.ManagedPolicy.fromAwsManagedPolicyName('AWSLambda_FullAccess'),
       ],
     });
 
@@ -195,6 +203,150 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         startingPosition: lambda.StartingPosition.TRIM_HORIZON,
         batchSize: 1,
       }));
+
+      // Scenario 5: Lambda > EventBridge > Lambda
+      const eventBus = new events.EventBus(this, `TracingTestEventBus-${runtimeName}`, {
+        eventBusName: `${prefix}tracing-test-event-bus-${runtimeName}`,
+      });
+
+      const eventBridgeConsumer = new lambda.Function(this, `EventBridgeConsumerLambda-${runtimeName}`, {
+        functionName: `${prefix}tracing-eventbridge-consumer-${runtimeName}`,
+        runtime,
+        handler: 'consumer.handler',
+        code: nodeCode,
+        layers: [props.layer],
+        role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: baseEnvironment,
+      });
+
+      new events.Rule(this, `TracingTestEventBridgeRule-${runtimeName}`, {
+        ruleName: `${prefix}tracing-test-eventbridge-rule-${runtimeName}`,
+        eventBus,
+        eventPattern: {
+          source: ['tracing-tests.producer'],
+          detailType: ['TestMessage'],
+        },
+        targets: [new events_targets.LambdaFunction(eventBridgeConsumer)],
+      });
+
+      const eventBridgeProducer = new lambda.Function(this, `EventBridgeProducerLambda-${runtimeName}`, {
+        functionName: `${prefix}tracing-eventbridge-producer-${runtimeName}`,
+        runtime,
+        handler: 'eventbridge_producer.handler',
+        code: nodeCode,
+        layers: [props.layer],
+        role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: {
+          ...baseEnvironment,
+          EVENT_BUS_NAME: eventBus.eventBusName,
+        },
+      });
+
+      // Scenario 6: Lambda > API Gateway > Lambda
+      const apiGatewayConsumer = new lambda.Function(this, `ApiGatewayConsumerLambda-${runtimeName}`, {
+        functionName: `${prefix}tracing-apigateway-consumer-${runtimeName}`,
+        runtime,
+        handler: 'consumer.handler',
+        code: nodeCode,
+        layers: [props.layer],
+        role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: baseEnvironment,
+      });
+
+      const api = new apigateway.LambdaRestApi(this, `TracingTestApi-${runtimeName}`, {
+        restApiName: `${prefix}tracing-test-api-${runtimeName}`,
+        handler: apiGatewayConsumer,
+        proxy: true,
+      });
+
+      const apiGatewayProducer = new lambda.Function(this, `ApiGatewayProducerLambda-${runtimeName}`, {
+        functionName: `${prefix}tracing-apigateway-producer-${runtimeName}`,
+        runtime,
+        handler: 'apigateway_producer.handler',
+        code: nodeCode,
+        layers: [props.layer],
+        role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: {
+          ...baseEnvironment,
+          API_URL: api.url,
+        },
+      });
+
+      // Scenario 7: Lambda > S3 > Lambda
+      const s3Bucket = new s3.Bucket(this, `TracingTestS3Bucket-${runtimeName}`, {
+        bucketName: `${prefix}tracing-test-s3-bucket-${runtimeName}`,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+        autoDeleteObjects: true,
+      });
+
+      const s3Consumer = new lambda.Function(this, `S3ConsumerLambda-${runtimeName}`, {
+        functionName: `${prefix}tracing-s3-consumer-${runtimeName}`,
+        runtime,
+        handler: 'consumer.handler',
+        code: nodeCode,
+        layers: [props.layer],
+        role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: baseEnvironment,
+      });
+
+      s3Bucket.addEventNotification(
+        s3.EventType.OBJECT_CREATED,
+        new s3n.LambdaDestination(s3Consumer),
+        { prefix: 'test-events/' },
+      );
+
+      const s3Producer = new lambda.Function(this, `S3ProducerLambda-${runtimeName}`, {
+        functionName: `${prefix}tracing-s3-producer-${runtimeName}`,
+        runtime,
+        handler: 's3_producer.handler',
+        code: nodeCode,
+        layers: [props.layer],
+        role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: {
+          ...baseEnvironment,
+          BUCKET_NAME: s3Bucket.bucketName,
+        },
+      });
+
+      // Scenario 8: Lambda > Lambda
+      const lambdaConsumer = new lambda.Function(this, `LambdaConsumerLambda-${runtimeName}`, {
+        functionName: `${prefix}tracing-lambda-consumer-${runtimeName}`,
+        runtime,
+        handler: 'consumer.handler',
+        code: nodeCode,
+        layers: [props.layer],
+        role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: baseEnvironment,
+      });
+
+      const lambdaInvoker = new lambda.Function(this, `LambdaInvokerLambda-${runtimeName}`, {
+        functionName: `${prefix}tracing-lambda-invoker-${runtimeName}`,
+        runtime,
+        handler: 'lambda_invoker.handler',
+        code: nodeCode,
+        layers: [props.layer],
+        role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: {
+          ...baseEnvironment,
+          TARGET_FUNCTION_NAME: lambdaConsumer.functionName,
+        },
+      });
 
     }
   }

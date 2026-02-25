@@ -116,4 +116,5 @@ jobs:
         working-directory: integration-tests/tests
         run: npm run test
         env:
+          DASH0_DEV_API_TOKEN: ${{ secrets.DASH0_DEV_API_TOKEN }}
           RESOURCE_PREFIX: ${{ env.RESOURCE_PREFIX }}

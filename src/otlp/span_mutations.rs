@@ -321,61 +321,6 @@ fn extract_span_links(event_payload: &str) -> Vec<Link> {
     crate::otlp::span_link_extractor::extract_span_links(event_payload)
 }
 
-pub fn add_event_payload_to_lambda_server_spans(
-    request: &mut ExportTraceServiceRequest,
-    invocation_ids: &mut Vec<String>,
-) -> bool {
-    let mut added = false;
-    for resource_span in &mut request.resource_spans {
-        for scope_span in &mut resource_span.scope_spans {
-            if let Some(scope) = &scope_span.scope {
-                if is_lambda_instrumentation_scope(&scope.name) {
-                    added |= annotate_server_spans(&mut scope_span.spans, invocation_ids);
-                }
-            }
-        }
-    }
-    added
-}
-
-fn annotate_server_spans(spans: &mut Vec<Span>, invocation_ids: &mut Vec<String>) -> bool {
-    let mut touched = false;
-    for span in spans {
-        if let Some(invocation_id) = extract_invocation_id(span) {
-            invocation_ids.push(invocation_id.clone());
-
-            if let Some(event_payload) = invocation_entry::get_event_payload(&invocation_id) {
-                // Extract span links before consuming event_payload
-                let sqs_links = extract_span_links(&event_payload);
-                if !sqs_links.is_empty() {
-                    tracing::trace!(
-                        "[{}] Adding {} SQS span links to lambda span for invocation_id={}",
-                        crate::log_prefix(),
-                        sqs_links.len(),
-                        invocation_id
-                    );
-                    span.links.extend(sqs_links);
-                }
-
-                span.attributes.push(KeyValue {
-                    key: "dash0.faas.event".to_string(),
-                    value: Some(AnyValue {
-                        value: Some(Value::StringValue(event_payload)),
-                    }),
-                });
-                touched = true;
-            } else {
-                tracing::warn!(
-                    "[{}] No stored event payload found for invocation id {}",
-                    crate::log_prefix(),
-                    invocation_id
-                );
-            }
-        }
-    }
-    touched
-}
-
 pub fn add_return_payload_to_lambda_server_spans(
     invocation_id: &str,
     return_payload: &str,
@@ -453,7 +398,7 @@ pub fn merge_telemetry_invocation_data(request: &mut ExportTraceServiceRequest) 
                             {
                                 if data.init_duration > 0.0 {
                                     span.attributes.push(KeyValue {
-                                        key: "dash0.faas.init_duration".to_string(),
+                                        key: "faas.init_duration".to_string(),
                                         value: Some(AnyValue {
                                             value: Some(Value::DoubleValue(data.init_duration)),
                                         }),
@@ -498,30 +443,123 @@ pub fn merge_telemetry_invocation_data(request: &mut ExportTraceServiceRequest) 
     modified
 }
 
+fn add_event_payload_to_span(span: &mut Span, invocation_id: &str) {
+    if let Some(event_payload) = invocation_entry::get_event_payload(invocation_id) {
+        let sqs_links = extract_span_links(&event_payload);
+        if !sqs_links.is_empty() {
+            tracing::trace!(
+                "[{}] Adding {} SQS span links to lambda span for invocation_id={}",
+                crate::log_prefix(),
+                sqs_links.len(),
+                invocation_id
+            );
+            span.links.extend(sqs_links);
+        }
+
+        span.attributes.push(KeyValue {
+            key: "dash0.faas.event".to_string(),
+            value: Some(AnyValue {
+                value: Some(Value::StringValue(event_payload)),
+            }),
+        });
+    } else {
+        tracing::warn!(
+            "[{}] No stored event payload found for invocation id {}",
+            crate::log_prefix(),
+            invocation_id
+        );
+    }
+}
+
+fn add_return_payload_to_span(span: &mut Span, invocation_id: &str) {
+    if let Some(return_payload) = invocation_entry::get_return_value(invocation_id) {
+        span.attributes.push(KeyValue {
+            key: "dash0.faas.return_value".to_string(),
+            value: Some(AnyValue {
+                value: Some(Value::StringValue(return_payload)),
+            }),
+        });
+        tracing::info!(
+            "[{}] /v1/traces added pending dash0.faas.return_value to lambda server span. invocation_id={}",
+            crate::log_prefix(),
+            invocation_id
+        );
+    }
+}
+
+fn remove_parent_span(span: &mut Span, invocation_id: &str) {
+    if !crate::config::user::is_remove_lambda_parent_span() {
+        return;
+    }
+    let sampled = invocation_entry::get_sampled(invocation_id);
+    if sampled {
+        tracing::info!(
+            "[{}] invocation_id={} is sampled, keeping parent span id",
+            crate::log_prefix(),
+            invocation_id
+        );
+    } else {
+        span.parent_span_id = Vec::new();
+    }
+}
+
+fn store_span_ids(span: &Span, invocation_id: &str) {
+    let trace_id_hex = span
+        .trace_id
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect::<String>();
+    let span_id_hex = span
+        .span_id
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect::<String>();
+    let parent_span_id_hex = span
+        .parent_span_id
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect::<String>();
+    invocation_entry::update(invocation_id, |entry| {
+        entry.trace_id = Some(trace_id_hex);
+        entry.span_id = Some(span_id_hex);
+        entry.parent_span_id = Some(parent_span_id_hex);
+    });
+    tracing::debug!(
+        "[{}] stored trace/span id for invocation_id={}",
+        crate::log_prefix(),
+        invocation_id
+    );
+}
+
 /// Process a decoded trace request by adding event payloads, return payloads, and storing invocation span IDs.
-/// Returns true if the request was modified and needs to be re-encoded.
 pub fn process_trace_request(
     decoded: &mut ExportTraceServiceRequest,
     invocation_ids: &mut Vec<String>,
     encoded_body: &mut Vec<u8>,
-) -> bool {
-    let mut modified = false;
+) {
+    for resource_span in &mut decoded.resource_spans {
+        for scope_span in &mut resource_span.scope_spans {
+            let is_lambda = scope_span
+                .scope
+                .as_ref()
+                .map_or(false, |s| is_lambda_instrumentation_scope(&s.name));
+            if !is_lambda {
+                continue;
+            }
 
-    // Add event payload to lambda server spans
-    let added = add_event_payload_to_lambda_server_spans(decoded, invocation_ids);
-    if added {
-        *encoded_body = decoded.encode_to_vec();
-        tracing::info!(
-            "[{}] /v1/traces added dash0.faas.event payload to lambda server span. invocation_ids={:?}",
-            crate::log_prefix(),
-            invocation_ids
-        );
-        modified = true;
-    } else {
-        tracing::info!(
-            "[{}] /v1/traces no lambda server span found to annotate",
-            crate::log_prefix()
-        );
+            for span in &mut scope_span.spans {
+                let invocation_id = match extract_invocation_id(span) {
+                    Some(id) => id,
+                    None => continue,
+                };
+
+                invocation_ids.push(invocation_id.clone());
+                add_event_payload_to_span(span, &invocation_id);
+                add_return_payload_to_span(span, &invocation_id);
+                remove_parent_span(span, &invocation_id);
+                store_span_ids(span, &invocation_id);
+            }
+        }
     }
 
     match serde_json::to_string(&decoded) {
@@ -537,74 +575,14 @@ pub fn process_trace_request(
         ),
     }
 
-    // If we have pending return payloads for these invocation IDs, apply them now.
-    let mut updated_with_return = false;
-    for id in invocation_ids.iter() {
-        let payload = invocation_entry::get_return_value(id);
-        if let Some(payload) = payload {
-            if annotate_return_payload(decoded, id, &payload) {
-                updated_with_return = true;
-            }
-        }
-    }
-    if updated_with_return {
-        *encoded_body = decoded.encode_to_vec();
-        tracing::info!(
-            "[{}] /v1/traces added pending dash0.faas.return_value to lambda server span. invocation_ids={:?}", crate::log_prefix(),
-            invocation_ids
-        );
-        modified = true;
-    }
-
-    // Check for faas.invocation_id and store trace/span id mapping
-    for resource_span in &decoded.resource_spans {
-        for scope_span in &resource_span.scope_spans {
-            for span in &scope_span.spans {
-                for attribute in &span.attributes {
-                    if attribute.key == "faas.invocation_id" {
-                        if let Some(val) = &attribute.value {
-                            if let Some(Value::StringValue(invocation_id)) = &val.value {
-                                let trace_id_hex = span
-                                    .trace_id
-                                    .iter()
-                                    .map(|b| format!("{:02x}", b))
-                                    .collect::<String>();
-                                let span_id_hex = span
-                                    .span_id
-                                    .iter()
-                                    .map(|b| format!("{:02x}", b))
-                                    .collect::<String>();
-                                let parent_span_id_hex = span
-                                    .parent_span_id
-                                    .iter()
-                                    .map(|b| format!("{:02x}", b))
-                                    .collect::<String>();
-                                invocation_entry::update(invocation_id, |entry| {
-                                    entry.trace_id = Some(trace_id_hex);
-                                    entry.span_id = Some(span_id_hex);
-                                    entry.parent_span_id = Some(parent_span_id_hex);
-                                });
-                                tracing::debug!(
-                                    "[{}] stored trace/span id for invocation_id={}",
-                                    crate::log_prefix(),
-                                    invocation_id
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    modified
+    *encoded_body = decoded.encode_to_vec();
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        add_event_payload_to_lambda_server_spans, add_return_payload_to_lambda_server_spans,
-        annotate_return_payload, build_synthetic_trace, StatusCode,
+        add_return_payload_to_lambda_server_spans, annotate_return_payload, build_synthetic_trace,
+        StatusCode,
     };
     use crate::state::invocation_data::StoredTrace;
     use crate::state::invocation_entry;
@@ -788,76 +766,6 @@ mod tests {
 
     #[test]
     #[serial]
-    fn add_event_payload_adds_attribute_and_invocation_id() {
-        let invocation_id = "inv-event-1";
-        store_event_payload(invocation_id, r#"{"hello":"world"}"#);
-        let span = make_span_with_invocation(invocation_id);
-        let mut request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
-        let mut invocation_ids = Vec::new();
-
-        let added = add_event_payload_to_lambda_server_spans(&mut request, &mut invocation_ids);
-
-        assert!(added, "expected dash0.faas.event to be added");
-        assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
-        let span = &request.resource_spans[0].scope_spans[0].spans[0];
-        let event_attr = find_attribute(span, "dash0.faas.event");
-        assert!(
-            event_attr.is_some(),
-            "dash0.faas.event attribute should exist"
-        );
-    }
-
-    #[test]
-    #[serial]
-    fn add_event_payload_handles_missing_payload() {
-        let invocation_id = "inv-event-2";
-        let span = make_span_with_invocation(invocation_id);
-        let mut request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
-        let mut invocation_ids = Vec::new();
-
-        let added = add_event_payload_to_lambda_server_spans(&mut request, &mut invocation_ids);
-
-        assert!(
-            !added,
-            "no dash0.faas.event should be added without payload"
-        );
-        assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
-        let span = &request.resource_spans[0].scope_spans[0].spans[0];
-        let event_attr = find_attribute(span, "dash0.faas.event");
-        assert!(
-            event_attr.is_none(),
-            "dash0.faas.event attribute should be absent"
-        );
-    }
-
-    #[test]
-    fn add_event_payload_ignores_other_scopes() {
-        let invocation_id = "inv-event-3";
-        store_event_payload(invocation_id, r#"{"foo":"bar"}"#);
-        let span = make_span_with_invocation(invocation_id);
-        let mut request = make_request_with_scope("other.scope", span);
-        let mut invocation_ids = Vec::new();
-
-        let added = add_event_payload_to_lambda_server_spans(&mut request, &mut invocation_ids);
-
-        assert!(
-            !added,
-            "non-lambda scopes should not be annotated with payloads"
-        );
-        assert!(
-            invocation_ids.is_empty(),
-            "invocation_ids should remain empty for non-matching scopes"
-        );
-        let span = &request.resource_spans[0].scope_spans[0].spans[0];
-        let event_attr = find_attribute(span, "dash0.faas.event");
-        assert!(
-            event_attr.is_none(),
-            "dash0.faas.event attribute should be absent"
-        );
-    }
-
-    #[test]
-    #[serial]
     fn add_return_payload_adds_attribute_for_matching_server_span() {
         take_traces();
         let invocation_id = "inv-return-1";
@@ -999,13 +907,8 @@ mod tests {
         let mut invocation_ids = Vec::new();
         let mut encoded_body = Vec::new();
 
-        let modified =
-            super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
 
-        assert!(
-            modified,
-            "request should be modified when event payload is added"
-        );
         assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
         assert!(!encoded_body.is_empty(), "encoded_body should be updated");
 
@@ -1026,13 +929,8 @@ mod tests {
         let mut invocation_ids = Vec::new();
         let mut encoded_body = Vec::new();
 
-        let modified =
-            super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
 
-        assert!(
-            modified,
-            "request should be modified when return payload is added"
-        );
         assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
 
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
@@ -1041,6 +939,54 @@ mod tests {
             return_attr.is_some(),
             "dash0.faas.return_value should be added"
         );
+    }
+
+    #[test]
+    #[serial]
+    fn process_trace_request_removes_parent_span_when_not_sampled() {
+        let invocation_id = "inv-process-parent";
+        store_event_payload(invocation_id, r#"{"test":"data"}"#);
+
+        let mut span = make_span_with_invocation(invocation_id);
+        span.parent_span_id = vec![0xAA; 8];
+
+        let mut request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
+        let mut invocation_ids = Vec::new();
+        let mut encoded_body = Vec::new();
+
+        // sampled defaults to false, so parent_span_id should be cleared
+        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+
+        let span = &request.resource_spans[0].scope_spans[0].spans[0];
+        assert!(
+            span.parent_span_id.is_empty(),
+            "parent_span_id should be cleared when not sampled"
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn process_trace_request_keeps_parent_span_when_env_var_false() {
+        std::env::set_var("DASH0_REMOVE_LAMBDA_PARENT_SPAN", "false");
+        let invocation_id = "inv-process-parent-env";
+        store_event_payload(invocation_id, r#"{"test":"data"}"#);
+
+        let mut span = make_span_with_invocation(invocation_id);
+        span.parent_span_id = vec![0xBB; 8];
+
+        let mut request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
+        let mut invocation_ids = Vec::new();
+        let mut encoded_body = Vec::new();
+
+        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+
+        let span = &request.resource_spans[0].scope_spans[0].spans[0];
+        assert_eq!(
+            span.parent_span_id,
+            vec![0xBB; 8],
+            "parent_span_id should be preserved when DASH0_REMOVE_LAMBDA_PARENT_SPAN is false"
+        );
+        std::env::remove_var("DASH0_REMOVE_LAMBDA_PARENT_SPAN");
     }
 
     #[test]
@@ -1109,10 +1055,8 @@ mod tests {
         let mut invocation_ids = Vec::new();
         let mut encoded_body = Vec::new();
 
-        let modified =
-            super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
 
-        assert!(modified, "request should be modified");
         assert_eq!(invocation_ids.len(), 2);
         assert!(invocation_ids.contains(&invocation_id_1.to_string()));
         assert!(invocation_ids.contains(&invocation_id_2.to_string()));
@@ -1139,7 +1083,7 @@ mod tests {
 
     #[test]
     #[serial]
-    fn process_trace_request_returns_false_when_no_modifications() {
+    fn process_trace_request_no_modifications_still_encodes() {
         let invocation_id = "inv-process-5";
 
         // Don't store any event payload or return payload
@@ -1148,15 +1092,13 @@ mod tests {
         let mut invocation_ids = Vec::new();
         let mut encoded_body = Vec::new();
 
-        let modified =
-            super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
 
-        assert!(
-            !modified,
-            "request should not be modified when no payloads are available"
-        );
         assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
-        assert!(encoded_body.is_empty(), "encoded_body should remain empty");
+        assert!(
+            !encoded_body.is_empty(),
+            "encoded_body should always be set"
+        );
     }
 
     #[test]
@@ -1170,10 +1112,8 @@ mod tests {
         let mut invocation_ids = Vec::new();
         let mut encoded_body = Vec::new();
 
-        let modified =
-            super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
 
-        assert!(!modified, "non-lambda scopes should not be modified");
         assert!(
             invocation_ids.is_empty(),
             "invocation_ids should remain empty for non-lambda scopes"
@@ -1388,31 +1328,6 @@ mod tests {
 
     #[test]
     #[serial]
-    fn add_event_payload_support_nodejs_scope() {
-        let invocation_id = "inv-event-node";
-        store_event_payload(invocation_id, r#"{"hello":"node"}"#);
-        let span = make_span_with_invocation(invocation_id);
-        let mut request =
-            make_request_with_scope("@opentelemetry/instrumentation-aws-lambda", span);
-        let mut invocation_ids = Vec::new();
-
-        let added = add_event_payload_to_lambda_server_spans(&mut request, &mut invocation_ids);
-
-        assert!(
-            added,
-            "expected dash0.faas.event to be added for nodejs scope"
-        );
-        assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
-        let span = &request.resource_spans[0].scope_spans[0].spans[0];
-        let event_attr = find_attribute(span, "dash0.faas.event");
-        assert!(
-            event_attr.is_some(),
-            "dash0.faas.event attribute should exist"
-        );
-    }
-
-    #[test]
-    #[serial]
     fn add_return_payload_support_nodejs_scope() {
         take_traces();
         let invocation_id = "inv-return-node";
@@ -1465,11 +1380,10 @@ mod tests {
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
 
         // attributes
-        let init_attr =
-            find_attribute(span, "dash0.faas.init_duration").and_then(|v| match &v.value {
-                Some(Value::DoubleValue(d)) => Some(*d),
-                _ => None,
-            });
+        let init_attr = find_attribute(span, "faas.init_duration").and_then(|v| match &v.value {
+            Some(Value::DoubleValue(d)) => Some(*d),
+            _ => None,
+        });
         assert_eq!(init_attr, Some(100.0));
 
         let billed_attr =
@@ -1489,43 +1403,6 @@ mod tests {
         // timestamps (ms -> ns)
         assert_eq!(span.start_time_unix_nano, 1_000_000_000);
         assert_eq!(span.end_time_unix_nano, 2_000_000_000);
-    }
-
-    #[test]
-    #[serial]
-    fn add_event_payload_adds_sqs_span_links() {
-        std::env::set_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER", "true");
-        let invocation_id = "inv-sqs-links";
-        let sqs_event = r#"{
-            "Records": [
-                {
-                    "eventSource": "aws:sqs",
-                    "messageAttributes": {
-                        "traceparent": {
-                            "stringValue": "00-abcdef01234567890123456789abcdef-fedcba9876543210-01"
-                        }
-                    }
-                }
-            ]
-        }"#;
-        store_event_payload(invocation_id, sqs_event);
-        let span = make_span_with_invocation(invocation_id);
-        let mut request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
-        let mut invocation_ids = Vec::new();
-
-        let added = add_event_payload_to_lambda_server_spans(&mut request, &mut invocation_ids);
-
-        assert!(added, "expected dash0.faas.event to be added");
-        let span = &request.resource_spans[0].scope_spans[0].spans[0];
-
-        // Verify span links were added
-        assert_eq!(span.links.len(), 1, "expected 1 span link from SQS message");
-        assert_eq!(
-            hex::encode(&span.links[0].trace_id),
-            "abcdef01234567890123456789abcdef"
-        );
-        assert_eq!(hex::encode(&span.links[0].span_id), "fedcba9876543210");
-        std::env::remove_var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER");
     }
 
     // --- get_trace_span_ids tests ---

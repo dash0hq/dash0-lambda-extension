@@ -55,8 +55,18 @@ pub fn is_extract_span_links_in_consumer() -> bool {
     }
 }
 
+pub fn is_remove_lambda_parent_span() -> bool {
+    match std::env::var("DASH0_REMOVE_LAMBDA_PARENT_SPAN") {
+        Ok(val) => matches!(
+            val.as_str(),
+            "1" | "true" | "TRUE" | "True" | "yes" | "YES" | "Yes" | "y" | "Y"
+        ),
+        Err(_) => true,
+    }
+}
+
 pub fn is_logs_instrumentation_enabled() -> bool {
-    match std::env::var("LUMIGO_ENABLE_LOGS") {
+    match std::env::var("DASH0_LOGS_INSTRUMENTATION_ENABLED") {
         Ok(val) => matches!(
             val.as_str(),
             "1" | "true" | "TRUE" | "True" | "yes" | "YES" | "Yes" | "y" | "Y"
@@ -152,7 +162,7 @@ mod tests {
     #[test]
     #[serial]
     fn logs_instrumentation_disabled_by_default() {
-        std::env::remove_var("LUMIGO_ENABLE_LOGS");
+        std::env::remove_var("DASH0_LOGS_INSTRUMENTATION_ENABLED");
         assert!(!is_logs_instrumentation_enabled());
     }
 
@@ -160,19 +170,19 @@ mod tests {
     #[serial]
     fn logs_instrumentation_enabled_with_truthy_values() {
         for val in ["1", "true", "TRUE", "True", "yes", "YES", "Yes", "y", "Y"] {
-            std::env::set_var("LUMIGO_ENABLE_LOGS", val);
+            std::env::set_var("DASH0_LOGS_INSTRUMENTATION_ENABLED", val);
             assert!(is_logs_instrumentation_enabled(), "value {}", val);
         }
-        std::env::remove_var("LUMIGO_ENABLE_LOGS");
+        std::env::remove_var("DASH0_LOGS_INSTRUMENTATION_ENABLED");
     }
 
     #[test]
     #[serial]
     fn logs_instrumentation_disabled_with_falsy_values() {
         for val in ["0", "false", "no", "maybe", ""] {
-            std::env::set_var("LUMIGO_ENABLE_LOGS", val);
+            std::env::set_var("DASH0_LOGS_INSTRUMENTATION_ENABLED", val);
             assert!(!is_logs_instrumentation_enabled(), "value {}", val);
         }
-        std::env::remove_var("LUMIGO_ENABLE_LOGS");
+        std::env::remove_var("DASH0_LOGS_INSTRUMENTATION_ENABLED");
     }
 }
