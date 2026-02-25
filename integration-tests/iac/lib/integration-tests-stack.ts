@@ -180,7 +180,7 @@ class NodeStack extends cdk.NestedStack {
         functionName: `${props.prefix}cjs-success-${runtimeName}`,
         runtime,
         memorySize: 128,
-        entry: path.join(__dirname, '../lambdas/node/success.ts'),
+        entry: path.join(__dirname, '../lambdas/node/check-cjs-bundle.ts'),
         handler: 'handler',
         architecture: lambda.Architecture.X86_64,
         timeout: cdk.Duration.seconds(10),
