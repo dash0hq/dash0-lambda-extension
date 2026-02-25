@@ -5,6 +5,7 @@ import * as ecr_assets from 'aws-cdk-lib/aws-ecr-assets';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as cr from 'aws-cdk-lib/custom-resources';
+import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as path from 'path';
 import { PythonTracingScenariosStack, createPythonCode } from './python-tracing-scenarios-stack';
 import { NodeTracingScenariosStack } from './node-tracing-scenarios-stack';
@@ -172,6 +173,32 @@ class NodeStack extends cdk.NestedStack {
     ];
 
     createLambdas(this, runtimes, props.layer, props.role, props.logGroup, props.prefix);
+
+    for (const runtime of runtimes) {
+      const runtimeName = runtime.name.replace(/\./g, '-');
+      new lambdaNodejs.NodejsFunction(this, `cjs-success-${runtimeName}`, {
+        functionName: `${props.prefix}cjs-success-${runtimeName}`,
+        runtime,
+        memorySize: 128,
+        entry: path.join(__dirname, '../lambdas/node/success.ts'),
+        handler: 'handler',
+        architecture: lambda.Architecture.X86_64,
+        timeout: cdk.Duration.seconds(10),
+        bundling: {
+          format: lambdaNodejs.OutputFormat.CJS,
+        },
+        layers: [props.layer],
+        role: props.role,
+        environment: {
+          AWS_LAMBDA_EXEC_WRAPPER: "/opt/wrapper",
+          DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
+          DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
+          DASH0_EXTENSION_LOG_LEVEL: "info",
+        },
+        logGroup: props.logGroup,
+        loggingFormat: lambda.LoggingFormat.TEXT,
+      });
+    }
   }
 }
 
