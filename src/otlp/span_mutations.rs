@@ -1380,11 +1380,10 @@ mod tests {
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
 
         // attributes
-        let init_attr =
-            find_attribute(span, "faas.init_duration").and_then(|v| match &v.value {
-                Some(Value::DoubleValue(d)) => Some(*d),
-                _ => None,
-            });
+        let init_attr = find_attribute(span, "faas.init_duration").and_then(|v| match &v.value {
+            Some(Value::DoubleValue(d)) => Some(*d),
+            _ => None,
+        });
         assert_eq!(init_attr, Some(100.0));
 
         let billed_attr =
