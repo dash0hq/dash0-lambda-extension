@@ -443,6 +443,25 @@ pub fn merge_telemetry_invocation_data(request: &mut ExportTraceServiceRequest) 
     modified
 }
 
+fn add_resource_attributes(span: &mut Span) {
+    if let Some(account_id) = crate::state::global::get_account_id() {
+        span.attributes.push(KeyValue {
+            key: "cloud.account.id".to_string(),
+            value: Some(AnyValue {
+                value: Some(Value::StringValue(account_id)),
+            }),
+        });
+    }
+    if let Some(function_arn) = crate::state::global::get_function_arn() {
+        span.attributes.push(KeyValue {
+            key: "cloud.resource_id".to_string(),
+            value: Some(AnyValue {
+                value: Some(Value::StringValue(function_arn)),
+            }),
+        });
+    }
+}
+
 fn add_event_payload_to_span(span: &mut Span, invocation_id: &str) {
     if let Some(event_payload) = invocation_entry::get_event_payload(invocation_id) {
         let sqs_links = extract_span_links(&event_payload);
@@ -544,6 +563,9 @@ pub fn process_trace_request(
                 .as_ref()
                 .map_or(false, |s| is_lambda_instrumentation_scope(&s.name));
             if !is_lambda {
+                for span in &mut scope_span.spans {
+                    add_resource_attributes(span);
+                }
                 continue;
             }
 
