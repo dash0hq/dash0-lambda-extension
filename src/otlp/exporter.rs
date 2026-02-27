@@ -49,6 +49,11 @@ pub async fn flush_telemetry_logs(exclude_invocation_id: Option<&str>) {
             ..Default::default()
         }),
         scope_logs: vec![ScopeLogs {
+            scope: Some(opentelemetry_proto::tonic::common::v1::InstrumentationScope {
+                name: "dash0.lambda-extension".to_string(),
+                version: "1.0".to_string(),
+                ..Default::default()
+            }),
             log_records,
             ..Default::default()
         }],
