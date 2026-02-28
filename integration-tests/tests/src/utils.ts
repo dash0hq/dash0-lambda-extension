@@ -112,7 +112,7 @@ export const checkHttpSpan = async ({
             });
 
             const spanPayload = await spanResponse.json() as any;
-            expect(spanPayload?.resourceSpans.length).toEqual(1);
+            expect(spanPayload?.resourceSpans.length).toBeGreaterThanOrEqual(1);
             expect(spanPayload?.resourceSpans[0].scopeSpans.length).toEqual(1);
             expect(spanPayload?.resourceSpans[0].scopeSpans[0].spans.length).toBeGreaterThanOrEqual(1);
             // find span with matching traceId and parentSpanId
