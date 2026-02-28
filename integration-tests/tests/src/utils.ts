@@ -253,9 +253,6 @@ export const runAllTests = (scenario: string, runtimes: string[], verifySuccessI
                 for (const traced of tracedValues) {
                     const invocationEndLabel = invocationEnd ? 'true' : 'false';
                     const functionName = `${RESOURCE_PREFIX}${runtime}-${scenario}-${traced}-invocation-end-${invocationEndLabel}-${architecture}`;
-                    if (functionName !== 'python3-13-timeout-true-invocation-end-false-arm64') {
-                        continue;
-                    }
                     it(
                         `invokes ${functionName} successfully`,
                         async () => {
