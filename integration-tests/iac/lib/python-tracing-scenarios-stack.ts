@@ -56,7 +56,6 @@ export class PythonTracingScenariosStack extends cdk.NestedStack {
       DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
       DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
       DASH0_EXTENSION_LOG_LEVEL: "info",
-      DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER: "true",
     };
     const runtimes = [
       lambda.Runtime.PYTHON_3_11,
