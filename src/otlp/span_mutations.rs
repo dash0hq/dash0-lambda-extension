@@ -502,6 +502,31 @@ fn extract_span_attributes_from_event(event_payload: &str) -> Vec<KeyValue> {
                     });
                 }
             }
+        } else if json_val.get("source").and_then(|v| v.as_str()).is_some()
+            && json_val.get("detail-type").and_then(|v| v.as_str()).is_some()
+        {
+            attributes.push(KeyValue {
+                key: "faas.trigger".to_string(),
+                value: Some(AnyValue {
+                    value: Some(Value::StringValue("aws:event_bridge".to_string())),
+                }),
+            });
+            if let Some(source) = json_val.get("source").and_then(|v| v.as_str()) {
+                attributes.push(KeyValue {
+                    key: "dash0.faas.event_bridge_source".to_string(),
+                    value: Some(AnyValue {
+                        value: Some(Value::StringValue(source.to_string())),
+                    }),
+                });
+            }
+            if let Some(detail_type) = json_val.get("detail-type").and_then(|v| v.as_str()) {
+                attributes.push(KeyValue {
+                    key: "dash0.faas.event_bridge_detail_type".to_string(),
+                    value: Some(AnyValue {
+                        value: Some(Value::StringValue(detail_type.to_string())),
+                    }),
+                });
+            }
         }
     }
 
@@ -1711,6 +1736,40 @@ mod tests {
         assert_eq!(get_int_attr(&attrs, "dash0.faas.record_count"), Some(1));
         assert!(find_extracted_attr(&attrs, "faas.trigger").is_none());
         assert!(find_extracted_attr(&attrs, "dash0.faas.trigger_arn").is_none());
+    }
+
+    #[test]
+    fn extract_span_attributes_eventbridge_event() {
+        let payload = r#"{"version":"0","source":"aws.ec2","detail-type":"EC2 Instance State-change Notification","account":"123456789012","region":"us-east-1","detail":{}}"#;
+        let attrs = super::extract_span_attributes_from_event(payload);
+        assert_eq!(get_string_attr(&attrs, "faas.trigger"), Some("aws:event_bridge".to_string()));
+        assert_eq!(
+            get_string_attr(&attrs, "dash0.faas.event_bridge_source"),
+            Some("aws.ec2".to_string())
+        );
+        assert_eq!(
+            get_string_attr(&attrs, "dash0.faas.event_bridge_detail_type"),
+            Some("EC2 Instance State-change Notification".to_string())
+        );
+        assert!(find_extracted_attr(&attrs, "dash0.faas.record_count").is_none());
+    }
+
+    #[test]
+    fn extract_span_attributes_eventbridge_not_detected_with_records() {
+        // If Records is present, it should be treated as a Records-based event, not EventBridge
+        let payload = r#"{"Records":[{"eventSource":"aws:sqs"}],"source":"aws.ec2","detail-type":"something"}"#;
+        let attrs = super::extract_span_attributes_from_event(payload);
+        assert_eq!(get_string_attr(&attrs, "faas.trigger"), Some("aws:sqs".to_string()));
+        assert!(find_extracted_attr(&attrs, "dash0.faas.event_bridge_source").is_none());
+    }
+
+    #[test]
+    fn extract_span_attributes_eventbridge_requires_both_fields() {
+        // Only "source" without "detail-type" should not match EventBridge
+        let payload = r#"{"source":"aws.ec2","account":"123"}"#;
+        let attrs = super::extract_span_attributes_from_event(payload);
+        assert!(find_extracted_attr(&attrs, "faas.trigger").is_none());
+        assert!(find_extracted_attr(&attrs, "dash0.faas.event_bridge_source").is_none());
     }
 }
 
