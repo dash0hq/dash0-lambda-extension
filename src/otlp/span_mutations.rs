@@ -491,8 +491,13 @@ fn extract_span_attributes_from_event(event_payload: &str) -> Vec<KeyValue> {
 
                 if let Some(arn) = first
                     .get("eventSourceARN")
-                    .or_else(|| first.get("EventSubscriptionArn"))
                     .and_then(|v| v.as_str())
+                    .or_else(|| {
+                        first
+                            .get("Sns")
+                            .and_then(|sns| sns.get("TopicArn"))
+                            .and_then(|v| v.as_str())
+                    })
                 {
                     attributes.push(KeyValue {
                         key: "dash0.faas.trigger_arn".to_string(),
@@ -503,7 +508,10 @@ fn extract_span_attributes_from_event(event_payload: &str) -> Vec<KeyValue> {
                 }
             }
         } else if json_val.get("source").and_then(|v| v.as_str()).is_some()
-            && json_val.get("detail-type").and_then(|v| v.as_str()).is_some()
+            && json_val
+                .get("detail-type")
+                .and_then(|v| v.as_str())
+                .is_some()
         {
             attributes.push(KeyValue {
                 key: "faas.trigger".to_string(),
@@ -1710,7 +1718,10 @@ mod tests {
         let payload = r#"{"Records":[{"eventSource":"aws:sqs","eventSourceARN":"arn:aws:sqs:us-east-1:123:my-queue","body":"hello"},{"eventSource":"aws:sqs","body":"world"}]}"#;
         let attrs = super::extract_span_attributes_from_event(payload);
         assert_eq!(get_int_attr(&attrs, "dash0.faas.record_count"), Some(2));
-        assert_eq!(get_string_attr(&attrs, "faas.trigger"), Some("aws:sqs".to_string()));
+        assert_eq!(
+            get_string_attr(&attrs, "faas.trigger"),
+            Some("aws:sqs".to_string())
+        );
         assert_eq!(
             get_string_attr(&attrs, "dash0.faas.trigger_arn"),
             Some("arn:aws:sqs:us-east-1:123:my-queue".to_string())
@@ -1719,13 +1730,16 @@ mod tests {
 
     #[test]
     fn extract_span_attributes_sns_event() {
-        let payload = r#"{"Records":[{"EventSource":"aws:sns","EventSubscriptionArn":"arn:aws:sns:us-east-1:123:my-topic:sub-id"}]}"#;
+        let payload = r#"{"Records":[{"EventSource":"aws:sns","Sns":{"TopicArn":"arn:aws:sns:us-east-1:123:my-topic","Message":"hello"}}]}"#;
         let attrs = super::extract_span_attributes_from_event(payload);
         assert_eq!(get_int_attr(&attrs, "dash0.faas.record_count"), Some(1));
-        assert_eq!(get_string_attr(&attrs, "faas.trigger"), Some("aws:sns".to_string()));
+        assert_eq!(
+            get_string_attr(&attrs, "faas.trigger"),
+            Some("aws:sns".to_string())
+        );
         assert_eq!(
             get_string_attr(&attrs, "dash0.faas.trigger_arn"),
-            Some("arn:aws:sns:us-east-1:123:my-topic:sub-id".to_string())
+            Some("arn:aws:sns:us-east-1:123:my-topic".to_string())
         );
     }
 
@@ -1742,7 +1756,10 @@ mod tests {
     fn extract_span_attributes_eventbridge_event() {
         let payload = r#"{"version":"0","source":"aws.ec2","detail-type":"EC2 Instance State-change Notification","account":"123456789012","region":"us-east-1","detail":{}}"#;
         let attrs = super::extract_span_attributes_from_event(payload);
-        assert_eq!(get_string_attr(&attrs, "faas.trigger"), Some("aws:event_bridge".to_string()));
+        assert_eq!(
+            get_string_attr(&attrs, "faas.trigger"),
+            Some("aws:event_bridge".to_string())
+        );
         assert_eq!(
             get_string_attr(&attrs, "dash0.faas.event_bridge_source"),
             Some("aws.ec2".to_string())
@@ -1759,7 +1776,10 @@ mod tests {
         // If Records is present, it should be treated as a Records-based event, not EventBridge
         let payload = r#"{"Records":[{"eventSource":"aws:sqs"}],"source":"aws.ec2","detail-type":"something"}"#;
         let attrs = super::extract_span_attributes_from_event(payload);
-        assert_eq!(get_string_attr(&attrs, "faas.trigger"), Some("aws:sqs".to_string()));
+        assert_eq!(
+            get_string_attr(&attrs, "faas.trigger"),
+            Some("aws:sqs".to_string())
+        );
         assert!(find_extracted_attr(&attrs, "dash0.faas.event_bridge_source").is_none());
     }
 
