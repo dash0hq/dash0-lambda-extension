@@ -474,6 +474,34 @@ fn extract_span_attributes_from_event(event_payload: &str) -> Vec<KeyValue> {
                     value: Some(Value::IntValue(records.len() as i64)),
                 }),
             });
+
+            if let Some(first) = records.first() {
+                if let Some(trigger) = first
+                    .get("eventSource")
+                    .or_else(|| first.get("EventSource"))
+                    .and_then(|v| v.as_str())
+                {
+                    attributes.push(KeyValue {
+                        key: "faas.trigger".to_string(),
+                        value: Some(AnyValue {
+                            value: Some(Value::StringValue(trigger.to_string())),
+                        }),
+                    });
+                }
+
+                if let Some(arn) = first
+                    .get("eventSourceARN")
+                    .or_else(|| first.get("EventSubscriptionArn"))
+                    .and_then(|v| v.as_str())
+                {
+                    attributes.push(KeyValue {
+                        key: "dash0.faas.trigger_arn".to_string(),
+                        value: Some(AnyValue {
+                            value: Some(Value::StringValue(arn.to_string())),
+                        }),
+                    });
+                }
+            }
         }
     }
 
@@ -1604,6 +1632,85 @@ mod tests {
         let entry = invocation_entry::get(invocation_id).expect("entry should exist after call");
         assert_eq!(entry.trace_id.unwrap(), hex::encode(&trace_id));
         assert_eq!(entry.span_id.unwrap(), hex::encode(&parent_span_id));
+    }
+
+    // --- extract_span_attributes_from_event tests ---
+
+    fn find_extracted_attr<'a>(attrs: &'a [KeyValue], key: &str) -> Option<&'a AnyValue> {
+        attrs
+            .iter()
+            .find(|kv| kv.key == key)
+            .and_then(|kv| kv.value.as_ref())
+    }
+
+    fn get_string_attr(attrs: &[KeyValue], key: &str) -> Option<String> {
+        find_extracted_attr(attrs, key).and_then(|v| match &v.value {
+            Some(Value::StringValue(s)) => Some(s.clone()),
+            _ => None,
+        })
+    }
+
+    fn get_int_attr(attrs: &[KeyValue], key: &str) -> Option<i64> {
+        find_extracted_attr(attrs, key).and_then(|v| match &v.value {
+            Some(Value::IntValue(i)) => Some(*i),
+            _ => None,
+        })
+    }
+
+    #[test]
+    fn extract_span_attributes_non_json_payload() {
+        let attrs = super::extract_span_attributes_from_event("not json");
+        assert_eq!(attrs.len(), 1);
+        assert!(get_string_attr(&attrs, "dash0.faas.event").is_some());
+    }
+
+    #[test]
+    fn extract_span_attributes_json_without_records() {
+        let attrs = super::extract_span_attributes_from_event(r#"{"key":"value"}"#);
+        assert_eq!(attrs.len(), 1);
+        assert!(get_string_attr(&attrs, "dash0.faas.event").is_some());
+        assert!(find_extracted_attr(&attrs, "dash0.faas.record_count").is_none());
+    }
+
+    #[test]
+    fn extract_span_attributes_empty_records() {
+        let attrs = super::extract_span_attributes_from_event(r#"{"Records":[]}"#);
+        assert_eq!(get_int_attr(&attrs, "dash0.faas.record_count"), Some(0));
+        assert!(find_extracted_attr(&attrs, "faas.trigger").is_none());
+        assert!(find_extracted_attr(&attrs, "dash0.faas.trigger_arn").is_none());
+    }
+
+    #[test]
+    fn extract_span_attributes_sqs_event() {
+        let payload = r#"{"Records":[{"eventSource":"aws:sqs","eventSourceARN":"arn:aws:sqs:us-east-1:123:my-queue","body":"hello"},{"eventSource":"aws:sqs","body":"world"}]}"#;
+        let attrs = super::extract_span_attributes_from_event(payload);
+        assert_eq!(get_int_attr(&attrs, "dash0.faas.record_count"), Some(2));
+        assert_eq!(get_string_attr(&attrs, "faas.trigger"), Some("aws:sqs".to_string()));
+        assert_eq!(
+            get_string_attr(&attrs, "dash0.faas.trigger_arn"),
+            Some("arn:aws:sqs:us-east-1:123:my-queue".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_span_attributes_sns_event() {
+        let payload = r#"{"Records":[{"EventSource":"aws:sns","EventSubscriptionArn":"arn:aws:sns:us-east-1:123:my-topic:sub-id"}]}"#;
+        let attrs = super::extract_span_attributes_from_event(payload);
+        assert_eq!(get_int_attr(&attrs, "dash0.faas.record_count"), Some(1));
+        assert_eq!(get_string_attr(&attrs, "faas.trigger"), Some("aws:sns".to_string()));
+        assert_eq!(
+            get_string_attr(&attrs, "dash0.faas.trigger_arn"),
+            Some("arn:aws:sns:us-east-1:123:my-topic:sub-id".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_span_attributes_record_without_source_or_arn() {
+        let payload = r#"{"Records":[{"body":"data"}]}"#;
+        let attrs = super::extract_span_attributes_from_event(payload);
+        assert_eq!(get_int_attr(&attrs, "dash0.faas.record_count"), Some(1));
+        assert!(find_extracted_attr(&attrs, "faas.trigger").is_none());
+        assert!(find_extracted_attr(&attrs, "dash0.faas.trigger_arn").is_none());
     }
 }
 
