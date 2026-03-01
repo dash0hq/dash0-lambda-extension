@@ -459,12 +459,25 @@ fn add_resource_attributes(span: &mut Span) {
 
 fn extract_span_attributes_from_event(event_payload: &str) -> Vec<KeyValue> {
     let processed = crate::util::truncate::process_payload(event_payload);
-    vec![KeyValue {
+    let mut attributes = vec![KeyValue {
         key: "dash0.faas.event".to_string(),
         value: Some(AnyValue {
             value: Some(Value::StringValue(processed)),
         }),
-    }]
+    }];
+
+    if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(event_payload) {
+        if let Some(records) = json_val.get("Records").and_then(|v| v.as_array()) {
+            attributes.push(KeyValue {
+                key: "dash0.faas.record_count".to_string(),
+                value: Some(AnyValue {
+                    value: Some(Value::IntValue(records.len() as i64)),
+                }),
+            });
+        }
+    }
+
+    attributes
 }
 
 fn add_event_payload_to_span(span: &mut Span, invocation_id: &str) {
