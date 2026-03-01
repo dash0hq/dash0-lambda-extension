@@ -87,9 +87,8 @@ fn truncate_json_strings(json: &str, max_size: usize) -> String {
     }
 }
 
-pub fn process_payload(payload_bytes: &[u8]) -> String {
-    let payload_str = String::from_utf8_lossy(payload_bytes);
-    let masked_payload = mask_json_string(&payload_str);
+pub fn process_payload(payload_str: &str) -> String {
+    let masked_payload = mask_json_string(payload_str);
 
     let max_size = max_event_payload_size();
     if masked_payload.len() <= max_size {
@@ -113,7 +112,7 @@ mod tests {
         let base = "a".repeat(1020);
         let payload = format!("{}생생생생", base); // 1020 + 12 = 1032 bytes
 
-        let result = process_payload(payload.as_bytes());
+        let result = process_payload(&payload);
 
         assert!(result.len() <= 1024);
         assert!(result.chars().count() > 0);
@@ -128,7 +127,7 @@ mod tests {
         std::env::set_var("DASH0_MAX_EVENT_PAYLOAD", "1");
 
         let payload = "short payload";
-        let result = process_payload(payload.as_bytes());
+        let result = process_payload(&payload);
 
         assert_eq!(result, payload);
 
@@ -143,7 +142,7 @@ mod tests {
         // "b" is the longest string — it gets replaced with [truncated]
         let payload = format!(r#"{{"a":"small","b":"{}"}}"#, "x".repeat(2000));
 
-        let result = process_payload(payload.as_bytes());
+        let result = process_payload(&payload);
 
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
         assert_eq!(parsed["a"], "small");
@@ -165,7 +164,7 @@ mod tests {
             "z".repeat(1000)
         );
 
-        let result = process_payload(payload.as_bytes());
+        let result = process_payload(&payload);
 
         assert!(result.len() <= 1024);
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
@@ -183,7 +182,7 @@ mod tests {
 
         let payload = format!(r#"["{}"]"#, "a".repeat(2000));
 
-        let result = process_payload(payload.as_bytes());
+        let result = process_payload(&payload);
 
         assert!(result.len() <= 1024);
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
@@ -202,7 +201,7 @@ mod tests {
             "x".repeat(2000)
         );
 
-        let result = process_payload(payload.as_bytes());
+        let result = process_payload(&payload);
 
         assert!(result.len() <= 1024);
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
@@ -224,7 +223,7 @@ mod tests {
             "z".repeat(900)
         );
 
-        let result = process_payload(payload.as_bytes());
+        let result = process_payload(&payload);
 
         assert!(result.len() <= 1024);
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();

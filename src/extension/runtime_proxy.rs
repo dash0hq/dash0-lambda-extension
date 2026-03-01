@@ -228,7 +228,7 @@ pub async fn invocation_response_proxy(req: Request<Body>) -> Result<Response<Bo
     let (parts, body) = req.into_parts();
     let body_bytes = hyper::body::to_bytes(body).await?;
 
-    let return_payload = process_payload(&body_bytes);
+    let return_payload = process_payload(&String::from_utf8_lossy(&body_bytes));
     let req = Request::from_parts(parts, Body::from(body_bytes));
 
     let res = passthru_proxy(req).await;
@@ -270,8 +270,7 @@ async fn validate_and_mangle_next_event(
         hyper::body::Bytes::new()
     });
 
-    let processed_payload = process_payload(&body_bytes);
-    let payload = processed_payload;
+    let payload = String::from_utf8_lossy(&body_bytes).to_string();
     invocation_entry::update(&_aws_request_id, |entry| {
         entry.event_payload = Some(payload);
     });

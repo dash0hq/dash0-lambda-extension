@@ -458,10 +458,11 @@ fn add_resource_attributes(span: &mut Span) {
 }
 
 fn extract_span_attributes_from_event(event_payload: &str) -> Vec<KeyValue> {
+    let processed = crate::util::truncate::process_payload(event_payload);
     vec![KeyValue {
         key: "dash0.faas.event".to_string(),
         value: Some(AnyValue {
-            value: Some(Value::StringValue(event_payload.to_string())),
+            value: Some(Value::StringValue(processed)),
         }),
     }]
 }
@@ -479,7 +480,8 @@ fn add_event_payload_to_span(span: &mut Span, invocation_id: &str) {
             span.links.extend(sqs_links);
         }
 
-        span.attributes.extend(extract_span_attributes_from_event(&event_payload));
+        span.attributes
+            .extend(extract_span_attributes_from_event(&event_payload));
     } else {
         tracing::warn!(
             "[{}] No stored event payload found for invocation id {}",
