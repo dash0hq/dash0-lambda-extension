@@ -2,7 +2,7 @@ import fetch from 'node-fetch';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
 import { DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS } from './config';
-import { getRequestPayload, invokeFunction, RESOURCE_PREFIX } from './utils';
+import { getAttributesMap, getRequestPayload, invokeFunction, RESOURCE_PREFIX } from './utils';
 
 const pythonRuntimes = ['python3-11', 'python3-12', 'python3-13', 'python3-14'];
 const nodeRuntimes = ['nodejs20-x', 'nodejs22-x', 'nodejs24-x'];
@@ -138,6 +138,7 @@ const fetchAndVerifyConsumerSpan = async (
     producerTraceId: string,
     producerSpanId: string,
     leafSpanId: string,
+    scenarioName: string,
 ) => {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         await delay(RETRY_DELAY_MS);
@@ -190,6 +191,15 @@ const fetchAndVerifyConsumerSpan = async (
             expect(consumerSpan).not.toBeNull();
             console.log(`Consumer span found: traceId=${consumerSpan!.traceId}, spanId=${consumerSpan!.spanId}, parentSpanId=${consumerSpan!.parentSpanId}`);
             console.log(`Trace chain verified: producer(${producerSpanId}) -> leaf(${leafSpanId}) -> consumer(${consumerSpan!.spanId})`);
+
+            if (scenarioName === 'eventbridge') {
+                const consumerAttrs = getAttributesMap(consumerSpan!.attributes);
+                expect(consumerAttrs['faas.trigger']).toBeDefined();
+                expect(consumerAttrs['dash0.faas.event_bridge_source']).toBeDefined();
+                expect(consumerAttrs['dash0.faas.event_bridge_detail_type']).toBeDefined();
+                console.log(`EventBridge attributes: faas.trigger=${JSON.stringify(consumerAttrs['faas.trigger'])}, source=${JSON.stringify(consumerAttrs['dash0.faas.event_bridge_source'])}, detail_type=${JSON.stringify(consumerAttrs['dash0.faas.event_bridge_detail_type'])}`);
+            }
+
             return;
         } catch (error) {
             console.error(`Error fetching consumer span on attempt ${attempt}:`, error);
@@ -203,6 +213,7 @@ const fetchAndVerifyConsumerSpan = async (
 const verifyTracingScenario = async (
     producerFunctionName: string,
     consumerFunctionName: string,
+    scenarioName: string,
 ) => {
     const producerInvocationId = await invokeFunction(producerFunctionName, true, false);
     console.log(`Producer invocation ID: ${producerInvocationId}`);
@@ -216,7 +227,7 @@ const verifyTracingScenario = async (
         await fetchLeafClientSpanId(producerFunctionName, producerTraceId, producerSpanId);
 
     await fetchAndVerifyConsumerSpan(
-        consumerFunctionName, expectedScopeName, producerTraceId, producerSpanId, leafSpanId,
+        consumerFunctionName, expectedScopeName, producerTraceId, producerSpanId, leafSpanId, scenarioName,
     );
 };
 
@@ -230,7 +241,7 @@ describe.concurrent('Tracing Scenarios', () => {
                 `verifies ${scenario.name} tracing for ${runtime}`,
                 async () => {
                     console.log(`Starting test for ${scenario.name} scenario with ${runtime}`, new Date().toISOString());
-                    await verifyTracingScenario(producerFunctionName, consumerFunctionName);
+                    await verifyTracingScenario(producerFunctionName, consumerFunctionName, scenario.name);
                 },
                 180_000
             );
