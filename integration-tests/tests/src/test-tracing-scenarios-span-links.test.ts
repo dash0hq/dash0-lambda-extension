@@ -127,6 +127,13 @@ const verifyTracingScenario = async (
             const link = consumerSpanWithLinks.links[0];
             expect(link.traceId).toEqual(producerTraceId);
             console.log(`Span link traceId matches producer: ${link.traceId}`);
+
+            // Verify span attributes extracted from the event payload
+            const consumerAttrs = getAttributesMap(consumerSpanWithLinks.attributes);
+            expect(consumerAttrs['faas.trigger']).toBeDefined();
+            expect(consumerAttrs['dash0.faas.trigger_arn']).toBeDefined();
+            expect(consumerAttrs['dash0.faas.record_count']).toBeDefined();
+            console.log(`Consumer span attributes: faas.trigger=${JSON.stringify(consumerAttrs['faas.trigger'])}, dash0.faas.trigger_arn=${JSON.stringify(consumerAttrs['dash0.faas.trigger_arn'])}, dash0.faas.record_count=${JSON.stringify(consumerAttrs['dash0.faas.record_count'])}`);
             break;
         } catch (error) {
             console.error(`Error fetching consumer span on attempt ${attempt}:`, error);
