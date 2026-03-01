@@ -69,12 +69,7 @@ pub fn build_synthetic_trace(
         // Extract span links before consuming event_payload
         sqs_links = extract_span_links(&event_payload);
 
-        attributes.push(KeyValue {
-            key: "dash0.faas.event".to_string(),
-            value: Some(AnyValue {
-                value: Some(Value::StringValue(event_payload)),
-            }),
-        });
+        attributes.extend(extract_span_attributes_from_event(&event_payload));
     } else {
         tracing::warn!(
             "[{}] No stored event payload found for invocation id {}",
@@ -462,6 +457,15 @@ fn add_resource_attributes(span: &mut Span) {
     }
 }
 
+fn extract_span_attributes_from_event(event_payload: &str) -> Vec<KeyValue> {
+    vec![KeyValue {
+        key: "dash0.faas.event".to_string(),
+        value: Some(AnyValue {
+            value: Some(Value::StringValue(event_payload.to_string())),
+        }),
+    }]
+}
+
 fn add_event_payload_to_span(span: &mut Span, invocation_id: &str) {
     if let Some(event_payload) = invocation_entry::get_event_payload(invocation_id) {
         let sqs_links = extract_span_links(&event_payload);
@@ -475,12 +479,7 @@ fn add_event_payload_to_span(span: &mut Span, invocation_id: &str) {
             span.links.extend(sqs_links);
         }
 
-        span.attributes.push(KeyValue {
-            key: "dash0.faas.event".to_string(),
-            value: Some(AnyValue {
-                value: Some(Value::StringValue(event_payload)),
-            }),
-        });
+        span.attributes.extend(extract_span_attributes_from_event(&event_payload));
     } else {
         tracing::warn!(
             "[{}] No stored event payload found for invocation id {}",
