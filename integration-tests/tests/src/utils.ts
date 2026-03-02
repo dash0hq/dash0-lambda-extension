@@ -182,7 +182,7 @@ export const checkLogs = async ({
                         logsToBeCheckedCount[logMessage] = true;
                     }
                 }
-                const expectedSeverity = logRecord.body.stringValue.toLowerCase().includes("warning") ? "warn" : "info";
+                const expectedSeverity = logRecord.body.stringValue.toLowerCase().includes("parse this as a warning") ? "warn" : "info";
                 expect(logRecord.severityText.toLowerCase()).toEqual(expectedSeverity);
                 if (logRecord.body.stringValue.startsWith("REPORT RequestId: ")) {
                     reportLog = logRecord.body.stringValue;
