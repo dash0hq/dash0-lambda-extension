@@ -112,7 +112,7 @@ const verifyTracingScenario = async (
                 for (const scopeSpan of resourceSpan.scopeSpans) {
                     if (scopeSpan.scope.name === expectedScopeName) {
                         for (const span of scopeSpan.spans) {
-                            if (span.links && span.links.length > 0) {
+                            if (span.links && span.links.length > 0 && span.kind === 2) {
                                 consumerSpanWithLinks = span;
                                 break;
                             }
