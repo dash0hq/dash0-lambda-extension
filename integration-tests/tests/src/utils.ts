@@ -121,6 +121,7 @@ export const checkHttpSpan = async ({
             const httpSpans = spanPayload.resourceSpans[0].scopeSpans[0].spans;
             const matchingSpan = httpSpans.find((span: any) => span.traceId === traceId && span.parentSpanId === parentSpanId);
             expect(matchingSpan).toBeDefined();
+            checkResourceAttributes(spanPayload, functionName);
             break;
         } catch (error) {
             console.error(`Error fetching spans on attempt ${attempt}:`, error);
@@ -198,6 +199,13 @@ export const checkLogs = async ({
         }
     }
     return reportLog;
+}
+
+export const checkResourceAttributes = (spanPayload: any, functionName: string) => {
+    const resourceAttributes = getAttributesMap(spanPayload.resourceSpans[0].resource.attributes);
+    expect(resourceAttributes['cloud.platform'].stringValue).toEqual('aws_lambda');
+    expect(resourceAttributes['cloud.resource_id'].stringValue).toContain(functionName);
+    expect(resourceAttributes['cloud.account.id'].stringValue).toMatch(/^\d+$/);
 }
 
 export const checkException = (span: any, exception_type: string) => {

@@ -5,6 +5,7 @@ import {DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./confi
 import {
     checkHttpSpan,
     checkLogs,
+    checkResourceAttributes,
     checkSpanAttributesFromReport, compareJsonStrings,
     getAttributesMap,
     getRequestPayload,
@@ -48,6 +49,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
 
             const resourceAttributes = getAttributesMap(spanPayload.resourceSpans[0].resource.attributes);
             expect(JSON.parse(resourceAttributes['process.environ'].stringValue)['MASKED_FIELD']).toEqual('****');
+            checkResourceAttributes(spanPayload, functionName);
 
             traceId = span.traceId;
             parentSpanId = span.spanId;
