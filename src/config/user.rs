@@ -51,7 +51,7 @@ pub fn is_extract_span_links_in_consumer() -> bool {
             val.as_str(),
             "1" | "true" | "TRUE" | "True" | "yes" | "YES" | "Yes" | "y" | "Y"
         ),
-        Err(_) => false,
+        Err(_) => true,
     }
 }
 

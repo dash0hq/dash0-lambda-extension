@@ -216,6 +216,16 @@ pub fn try_read_env_from_file(key: &str) -> Option<String> {
 pub fn get_resources_attributes() -> Vec<opentelemetry_proto::tonic::common::v1::KeyValue> {
     let mut attributes = vec![
         opentelemetry_proto::tonic::common::v1::KeyValue {
+            key: "cloud.platform".to_string(),
+            value: Some(AnyValue {
+                value: Some(
+                    opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(
+                        "aws_lambda".to_string(),
+                    ),
+                ),
+            }),
+        },
+        opentelemetry_proto::tonic::common::v1::KeyValue {
             key: "cloud.resource.id".to_string(),
             value: Some(AnyValue {
                 value: Some(

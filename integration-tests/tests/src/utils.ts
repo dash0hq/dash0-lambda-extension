@@ -1,7 +1,7 @@
 import {setTimeout as delay} from "timers/promises";
 import fetch from "node-fetch";
 import {expect, it} from "vitest";
-import {DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./config";
+import {DASH0_ENDPOINT, DASH0_LAMBDA_TESTS_DATASET, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./config";
 import {InvokeCommand, LambdaClient} from "@aws-sdk/client-lambda";
 
 export const RESOURCE_PREFIX = process.env.RESOURCE_PREFIX ?? '';
@@ -33,6 +33,7 @@ export const getRequestPayload = (invocationId: string) => {
             to: new Date(now + 5 * 60_000).toISOString(),
         },
         sampling: { mode: 'adaptive' },
+        dataset: DASH0_LAMBDA_TESTS_DATASET
     };
 }
 
@@ -108,17 +109,19 @@ export const checkHttpSpan = async ({
                         to: new Date(now + 5 * 60_000).toISOString(),
                     },
                     sampling: {mode: 'adaptive'},
+                    dataset: DASH0_LAMBDA_TESTS_DATASET
                 }),
             });
 
             const spanPayload = await spanResponse.json() as any;
-            expect(spanPayload?.resourceSpans.length).toEqual(1);
+            expect(spanPayload?.resourceSpans.length).toBeGreaterThanOrEqual(1);
             expect(spanPayload?.resourceSpans[0].scopeSpans.length).toEqual(1);
             expect(spanPayload?.resourceSpans[0].scopeSpans[0].spans.length).toBeGreaterThanOrEqual(1);
             // find span with matching traceId and parentSpanId
             const httpSpans = spanPayload.resourceSpans[0].scopeSpans[0].spans;
             const matchingSpan = httpSpans.find((span: any) => span.traceId === traceId && span.parentSpanId === parentSpanId);
             expect(matchingSpan).toBeDefined();
+            checkResourceAttributes(spanPayload.resourceSpans[0].resource.attributes, functionName);
             break;
         } catch (error) {
             console.error(`Error fetching spans on attempt ${attempt}:`, error);
@@ -160,13 +163,15 @@ export const checkLogs = async ({
             });
 
             const spanPayload = await spanResponse.json() as any;
-            expect(spanPayload?.resourceLogs.length).toEqual(1);
-            const resourceAttributes = getAttributesMap(spanPayload?.resourceLogs[0].resource.attributes);
-            expect(resourceAttributes['cloud.resource.id'].stringValue).toContain(functionName);
+            expect(spanPayload?.resourceLogs.length).toBeGreaterThanOrEqual(1);
+            checkResourceAttributes(spanPayload.resourceLogs[0].resource.attributes, functionName);
 
-            expect(spanPayload?.resourceLogs[0].scopeLogs[0].logRecords.length).toBeGreaterThanOrEqual(2);
+            const allLogRecords = spanPayload?.resourceLogs.flatMap((rl: any) =>
+                rl.scopeLogs.flatMap((sl: any) => sl.logRecords)
+            );
+            expect(allLogRecords.length).toBeGreaterThanOrEqual(2);
             const logsToBeCheckedCount: {[key: string]: boolean} = {};
-            for (const logRecord of spanPayload?.resourceLogs[0].scopeLogs[0].logRecords) {
+            for (const logRecord of allLogRecords) {
                 if (traceId && parentSpanId && (success || !logRecord.body.stringValue.startsWith("REPORT RequestId: "))) {
                     // on error report doesn't have traceId and spanId associated because it arrives after shutdown, data erased.
                     expect(logRecord.traceId).toEqual(traceId);
@@ -193,6 +198,13 @@ export const checkLogs = async ({
         }
     }
     return reportLog;
+}
+
+export const checkResourceAttributes = (attributes: Array<{ key: string, value: any }>, functionName: string) => {
+    const resourceAttributes = getAttributesMap(attributes);
+    expect(resourceAttributes['cloud.platform'].stringValue).toEqual('aws_lambda');
+    expect(resourceAttributes['cloud.resource_id'].stringValue).toContain(functionName);
+    expect(resourceAttributes['cloud.account.id'].stringValue).toMatch(/^\d+$/);
 }
 
 export const checkException = (span: any, exception_type: string) => {

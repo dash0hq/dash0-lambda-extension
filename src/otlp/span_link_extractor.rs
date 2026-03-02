@@ -1030,6 +1030,6 @@ mod tests {
         }"#;
 
         let links = extract_span_links(payload);
-        assert!(links.is_empty());
+        assert!(!links.is_empty());
     }
 }

@@ -6,6 +6,7 @@ import {
     checkException,
     checkHttpSpan,
     checkLogs,
+    checkResourceAttributes,
     checkSpanAttributesFromReport,
     getAttributesMap,
     getRequestPayload,
@@ -40,6 +41,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             expect(spanPayload?.resourceSpans[0].scopeSpans[0].spans.length).toEqual(1);
             const resourceAttributes = getAttributesMap(spanPayload?.resourceSpans[0].resource.attributes);
             expect(resourceAttributes['service.name'].stringValue).toEqual(functionName);
+            checkResourceAttributes(spanPayload.resourceSpans[0].resource.attributes, functionName);
             // check span attributes
             span = spanPayload.resourceSpans[0].scopeSpans[0].spans[0];
             const spanAttributes = getAttributesMap(span.attributes);

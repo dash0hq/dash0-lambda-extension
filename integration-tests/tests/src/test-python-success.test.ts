@@ -5,6 +5,7 @@ import { DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS } from "./con
 import {
     checkHttpSpan,
     checkLogs,
+    checkResourceAttributes,
     checkSpanAttributesFromReport, compareJsonStrings,
     getAttributesMap,
     getRequestPayload,
@@ -44,6 +45,9 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             expect(spanAttributes['dash0.faas.event'].stringValue).toEqual('{"parameter1":"right"}');
             compareJsonStrings(spanAttributes['dash0.faas.return_value'].stringValue, '{"statusCode": 200, "body": "\\"Hello from Lambda!\\""}');
             expect(spanAttributes['faas.init_duration'].doubleValue).toBeGreaterThan(0);
+
+            checkResourceAttributes(spanPayload.resourceSpans[0].resource.attributes, functionName);
+
             traceId = span.traceId;
             parentSpanId = span.spanId;
             break;

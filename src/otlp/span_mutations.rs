@@ -69,12 +69,7 @@ pub fn build_synthetic_trace(
         // Extract span links before consuming event_payload
         sqs_links = extract_span_links(&event_payload);
 
-        attributes.push(KeyValue {
-            key: "dash0.faas.event".to_string(),
-            value: Some(AnyValue {
-                value: Some(Value::StringValue(event_payload)),
-            }),
-        });
+        attributes.extend(extract_span_attributes_from_event(&event_payload));
     } else {
         tracing::warn!(
             "[{}] No stored event payload found for invocation id {}",
@@ -443,6 +438,109 @@ pub fn merge_telemetry_invocation_data(request: &mut ExportTraceServiceRequest) 
     modified
 }
 
+fn add_resource_attributes(span: &mut Span) {
+    if let Some(account_id) = crate::state::global::get_account_id() {
+        span.attributes.push(KeyValue {
+            key: "cloud.account.id".to_string(),
+            value: Some(AnyValue {
+                value: Some(Value::StringValue(account_id)),
+            }),
+        });
+    }
+    if let Some(function_arn) = crate::state::global::get_function_arn() {
+        span.attributes.push(KeyValue {
+            key: "cloud.resource_id".to_string(),
+            value: Some(AnyValue {
+                value: Some(Value::StringValue(function_arn)),
+            }),
+        });
+    }
+}
+
+fn extract_span_attributes_from_event(event_payload: &str) -> Vec<KeyValue> {
+    let processed = crate::util::truncate::process_payload(event_payload);
+    let mut attributes = vec![KeyValue {
+        key: "dash0.faas.event".to_string(),
+        value: Some(AnyValue {
+            value: Some(Value::StringValue(processed)),
+        }),
+    }];
+
+    if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(event_payload) {
+        if let Some(records) = json_val.get("Records").and_then(|v| v.as_array()) {
+            attributes.push(KeyValue {
+                key: "dash0.faas.record_count".to_string(),
+                value: Some(AnyValue {
+                    value: Some(Value::IntValue(records.len() as i64)),
+                }),
+            });
+
+            if let Some(first) = records.first() {
+                if let Some(trigger) = first
+                    .get("eventSource")
+                    .or_else(|| first.get("EventSource"))
+                    .and_then(|v| v.as_str())
+                {
+                    attributes.push(KeyValue {
+                        key: "faas.trigger".to_string(),
+                        value: Some(AnyValue {
+                            value: Some(Value::StringValue(trigger.to_string())),
+                        }),
+                    });
+                }
+
+                if let Some(arn) = first
+                    .get("eventSourceARN")
+                    .and_then(|v| v.as_str())
+                    .or_else(|| {
+                        first
+                            .get("Sns")
+                            .and_then(|sns| sns.get("TopicArn"))
+                            .and_then(|v| v.as_str())
+                    })
+                {
+                    attributes.push(KeyValue {
+                        key: "dash0.faas.trigger_arn".to_string(),
+                        value: Some(AnyValue {
+                            value: Some(Value::StringValue(arn.to_string())),
+                        }),
+                    });
+                }
+            }
+        } else if json_val.get("source").and_then(|v| v.as_str()).is_some()
+            && json_val
+                .get("detail-type")
+                .and_then(|v| v.as_str())
+                .is_some()
+        {
+            attributes.push(KeyValue {
+                key: "faas.trigger".to_string(),
+                value: Some(AnyValue {
+                    value: Some(Value::StringValue("aws:event_bridge".to_string())),
+                }),
+            });
+            if let Some(source) = json_val.get("source").and_then(|v| v.as_str()) {
+                attributes.push(KeyValue {
+                    key: "dash0.faas.event_bridge_source".to_string(),
+                    value: Some(AnyValue {
+                        value: Some(Value::StringValue(source.to_string())),
+                    }),
+                });
+            }
+            if let Some(detail_type) = json_val.get("detail-type").and_then(|v| v.as_str()) {
+                attributes.push(KeyValue {
+                    key: "dash0.faas.event_bridge_detail_type".to_string(),
+                    value: Some(AnyValue {
+                        value: Some(Value::StringValue(detail_type.to_string())),
+                    }),
+                });
+            }
+        }
+    }
+
+    attributes
+}
+
 fn add_event_payload_to_span(span: &mut Span, invocation_id: &str) {
     if let Some(event_payload) = invocation_entry::get_event_payload(invocation_id) {
         let sqs_links = extract_span_links(&event_payload);
@@ -456,12 +554,8 @@ fn add_event_payload_to_span(span: &mut Span, invocation_id: &str) {
             span.links.extend(sqs_links);
         }
 
-        span.attributes.push(KeyValue {
-            key: "dash0.faas.event".to_string(),
-            value: Some(AnyValue {
-                value: Some(Value::StringValue(event_payload)),
-            }),
-        });
+        span.attributes
+            .extend(extract_span_attributes_from_event(&event_payload));
     } else {
         tracing::warn!(
             "[{}] No stored event payload found for invocation id {}",
@@ -544,6 +638,9 @@ pub fn process_trace_request(
                 .as_ref()
                 .map_or(false, |s| is_lambda_instrumentation_scope(&s.name));
             if !is_lambda {
+                for span in &mut scope_span.spans {
+                    add_resource_attributes(span);
+                }
                 continue;
             }
 
@@ -1568,6 +1665,131 @@ mod tests {
         let entry = invocation_entry::get(invocation_id).expect("entry should exist after call");
         assert_eq!(entry.trace_id.unwrap(), hex::encode(&trace_id));
         assert_eq!(entry.span_id.unwrap(), hex::encode(&parent_span_id));
+    }
+
+    // --- extract_span_attributes_from_event tests ---
+
+    fn find_extracted_attr<'a>(attrs: &'a [KeyValue], key: &str) -> Option<&'a AnyValue> {
+        attrs
+            .iter()
+            .find(|kv| kv.key == key)
+            .and_then(|kv| kv.value.as_ref())
+    }
+
+    fn get_string_attr(attrs: &[KeyValue], key: &str) -> Option<String> {
+        find_extracted_attr(attrs, key).and_then(|v| match &v.value {
+            Some(Value::StringValue(s)) => Some(s.clone()),
+            _ => None,
+        })
+    }
+
+    fn get_int_attr(attrs: &[KeyValue], key: &str) -> Option<i64> {
+        find_extracted_attr(attrs, key).and_then(|v| match &v.value {
+            Some(Value::IntValue(i)) => Some(*i),
+            _ => None,
+        })
+    }
+
+    #[test]
+    fn extract_span_attributes_non_json_payload() {
+        let attrs = super::extract_span_attributes_from_event("not json");
+        assert_eq!(attrs.len(), 1);
+        assert!(get_string_attr(&attrs, "dash0.faas.event").is_some());
+    }
+
+    #[test]
+    fn extract_span_attributes_json_without_records() {
+        let attrs = super::extract_span_attributes_from_event(r#"{"key":"value"}"#);
+        assert_eq!(attrs.len(), 1);
+        assert!(get_string_attr(&attrs, "dash0.faas.event").is_some());
+        assert!(find_extracted_attr(&attrs, "dash0.faas.record_count").is_none());
+    }
+
+    #[test]
+    fn extract_span_attributes_empty_records() {
+        let attrs = super::extract_span_attributes_from_event(r#"{"Records":[]}"#);
+        assert_eq!(get_int_attr(&attrs, "dash0.faas.record_count"), Some(0));
+        assert!(find_extracted_attr(&attrs, "faas.trigger").is_none());
+        assert!(find_extracted_attr(&attrs, "dash0.faas.trigger_arn").is_none());
+    }
+
+    #[test]
+    fn extract_span_attributes_sqs_event() {
+        let payload = r#"{"Records":[{"eventSource":"aws:sqs","eventSourceARN":"arn:aws:sqs:us-east-1:123:my-queue","body":"hello"},{"eventSource":"aws:sqs","body":"world"}]}"#;
+        let attrs = super::extract_span_attributes_from_event(payload);
+        assert_eq!(get_int_attr(&attrs, "dash0.faas.record_count"), Some(2));
+        assert_eq!(
+            get_string_attr(&attrs, "faas.trigger"),
+            Some("aws:sqs".to_string())
+        );
+        assert_eq!(
+            get_string_attr(&attrs, "dash0.faas.trigger_arn"),
+            Some("arn:aws:sqs:us-east-1:123:my-queue".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_span_attributes_sns_event() {
+        let payload = r#"{"Records":[{"EventSource":"aws:sns","Sns":{"TopicArn":"arn:aws:sns:us-east-1:123:my-topic","Message":"hello"}}]}"#;
+        let attrs = super::extract_span_attributes_from_event(payload);
+        assert_eq!(get_int_attr(&attrs, "dash0.faas.record_count"), Some(1));
+        assert_eq!(
+            get_string_attr(&attrs, "faas.trigger"),
+            Some("aws:sns".to_string())
+        );
+        assert_eq!(
+            get_string_attr(&attrs, "dash0.faas.trigger_arn"),
+            Some("arn:aws:sns:us-east-1:123:my-topic".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_span_attributes_record_without_source_or_arn() {
+        let payload = r#"{"Records":[{"body":"data"}]}"#;
+        let attrs = super::extract_span_attributes_from_event(payload);
+        assert_eq!(get_int_attr(&attrs, "dash0.faas.record_count"), Some(1));
+        assert!(find_extracted_attr(&attrs, "faas.trigger").is_none());
+        assert!(find_extracted_attr(&attrs, "dash0.faas.trigger_arn").is_none());
+    }
+
+    #[test]
+    fn extract_span_attributes_eventbridge_event() {
+        let payload = r#"{"version":"0","source":"aws.ec2","detail-type":"EC2 Instance State-change Notification","account":"123456789012","region":"us-east-1","detail":{}}"#;
+        let attrs = super::extract_span_attributes_from_event(payload);
+        assert_eq!(
+            get_string_attr(&attrs, "faas.trigger"),
+            Some("aws:event_bridge".to_string())
+        );
+        assert_eq!(
+            get_string_attr(&attrs, "dash0.faas.event_bridge_source"),
+            Some("aws.ec2".to_string())
+        );
+        assert_eq!(
+            get_string_attr(&attrs, "dash0.faas.event_bridge_detail_type"),
+            Some("EC2 Instance State-change Notification".to_string())
+        );
+        assert!(find_extracted_attr(&attrs, "dash0.faas.record_count").is_none());
+    }
+
+    #[test]
+    fn extract_span_attributes_eventbridge_not_detected_with_records() {
+        // If Records is present, it should be treated as a Records-based event, not EventBridge
+        let payload = r#"{"Records":[{"eventSource":"aws:sqs"}],"source":"aws.ec2","detail-type":"something"}"#;
+        let attrs = super::extract_span_attributes_from_event(payload);
+        assert_eq!(
+            get_string_attr(&attrs, "faas.trigger"),
+            Some("aws:sqs".to_string())
+        );
+        assert!(find_extracted_attr(&attrs, "dash0.faas.event_bridge_source").is_none());
+    }
+
+    #[test]
+    fn extract_span_attributes_eventbridge_requires_both_fields() {
+        // Only "source" without "detail-type" should not match EventBridge
+        let payload = r#"{"source":"aws.ec2","account":"123"}"#;
+        let attrs = super::extract_span_attributes_from_event(payload);
+        assert!(find_extracted_attr(&attrs, "faas.trigger").is_none());
+        assert!(find_extracted_attr(&attrs, "dash0.faas.event_bridge_source").is_none());
     }
 }
 

@@ -1,7 +1,7 @@
 import fetch from 'node-fetch';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
-import { DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS } from './config';
+import {DASH0_ENDPOINT, DASH0_LAMBDA_TESTS_DATASET, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from './config';
 import { getAttributesMap, getRequestPayload, invokeFunction, RESOURCE_PREFIX } from './utils';
 
 const pythonRuntimes = ['python3-11', 'python3-12', 'python3-13', 'python3-14'];
@@ -99,6 +99,7 @@ const verifyTracingScenario = async (
                         to: new Date(now + 5 * 60_000).toISOString(),
                     },
                     sampling: { mode: 'adaptive' },
+                    dataset: DASH0_LAMBDA_TESTS_DATASET
                 }),
             });
 
@@ -111,7 +112,7 @@ const verifyTracingScenario = async (
                 for (const scopeSpan of resourceSpan.scopeSpans) {
                     if (scopeSpan.scope.name === expectedScopeName) {
                         for (const span of scopeSpan.spans) {
-                            if (span.links && span.links.length > 0) {
+                            if (span.links && span.links.length > 0 && span.name !== "aws:sqs process") {
                                 consumerSpanWithLinks = span;
                                 break;
                             }
@@ -127,6 +128,13 @@ const verifyTracingScenario = async (
             const link = consumerSpanWithLinks.links[0];
             expect(link.traceId).toEqual(producerTraceId);
             console.log(`Span link traceId matches producer: ${link.traceId}`);
+
+            // Verify span attributes extracted from the event payload
+            const consumerAttrs = getAttributesMap(consumerSpanWithLinks.attributes);
+            expect(consumerAttrs['faas.trigger']).toBeDefined();
+            expect(consumerAttrs['dash0.faas.trigger_arn']).toBeDefined();
+            expect(consumerAttrs['dash0.faas.record_count']).toBeDefined();
+            console.log(`Consumer span attributes: faas.trigger=${JSON.stringify(consumerAttrs['faas.trigger'])}, dash0.faas.trigger_arn=${JSON.stringify(consumerAttrs['dash0.faas.trigger_arn'])}, dash0.faas.record_count=${JSON.stringify(consumerAttrs['dash0.faas.record_count'])}`);
             break;
         } catch (error) {
             console.error(`Error fetching consumer span on attempt ${attempt}:`, error);

@@ -110,7 +110,6 @@ def init() -> Dict[str, Any]:
 
     # Activate instrumentations
     from dash0_opentelemetry.instrumentations import instrumentations  # noqa
-    from dash0_opentelemetry.instrumentations.instrumentations import framework
     from dash0_opentelemetry.libs.general_utils import get_max_size
     from dash0_opentelemetry.resources.detectors import (
         get_process_resource,
@@ -121,7 +120,7 @@ def init() -> Dict[str, Any]:
     process_resource = get_process_resource()
 
     resource = get_resource(
-        process_resource, {"framework": framework}
+        process_resource, {}
     )
 
     tracer_provider = TracerProvider(
