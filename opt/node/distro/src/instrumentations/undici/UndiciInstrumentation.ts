@@ -56,20 +56,26 @@ let fetchWrapped = false;
 
 function wrapFetch() {
   if (fetchWrapped || typeof globalThis.fetch !== 'function') return;
-  fetchWrapped = true;
 
   const origFetch = globalThis.fetch;
-  globalThis.fetch = function (
-    input: RequestInfo | URL,
-    init?: RequestInit
-  ): Promise<Response> {
-    capturedFetchBody = extractBody(init?.body);
-    try {
-      return origFetch.apply(globalThis, arguments as unknown as Parameters<typeof fetch>);
-    } finally {
-      capturedFetchBody = undefined;
-    }
-  };
+  try {
+    globalThis.fetch = function (
+      input: RequestInfo | URL,
+      init?: RequestInit
+    ): Promise<Response> {
+      safeExecute(() => {
+        capturedFetchBody = extractBody(init?.body);
+      })();
+      try {
+        return origFetch.apply(globalThis, arguments as unknown as Parameters<typeof fetch>);
+      } finally {
+        capturedFetchBody = undefined;
+      }
+    };
+    fetchWrapped = true;
+  } catch {
+    globalThis.fetch = origFetch;
+  }
 }
 
 export default class Dash0UndiciInstrumentation extends TracingInstrumentor<UndiciInstrumentation> {
