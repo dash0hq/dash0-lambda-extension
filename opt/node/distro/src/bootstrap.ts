@@ -151,15 +151,8 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
       })
     );
 
-    const framework = instrumentedModules.includes('express') ? 'express' : 'node';
-
     const processEnvDetectedResource = new ProcessEnvironmentDetector().detect();
     const resource = defaultResource()
-      .merge(
-        resourceFromAttributes({
-          framework,
-        })
-      )
       .merge(infrastructureResource)
       .merge(resourceFromAttributes(processEnvDetectedResource.attributes || {}));
 
