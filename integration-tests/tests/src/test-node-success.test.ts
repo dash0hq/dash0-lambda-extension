@@ -64,6 +64,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
     const logsToBeChecked = [
         'START RequestId: ',
         "Handler invoked with event:",
+        "let's parse this as a warning",
         'END RequestId: ',
     ]
     if (!invocationEnd) {
