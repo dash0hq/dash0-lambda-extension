@@ -7,7 +7,7 @@ import {
     checkLogs,
     checkResourceAttributes,
     checkSpanAttributesFromReport, compareJsonStrings,
-    getAttributesMap,
+    getAttributesMap, LogToCheck,
     getRequestPayload,
     invokeFunction, runAllTests
 } from "./utils";
@@ -66,13 +66,13 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             parentSpanId: parentSpanId!,
         });
     }
-    const logsToBeChecked = [
-        'START RequestId: ',
-        'END RequestId: ',
-        "response.status_code:",
+    const logsToBeChecked: LogToCheck[] = [
+        { message: 'START RequestId: ' },
+        { message: 'END RequestId: ' },
+        { message: "response.status_code:" },
     ]
     if (!invocationEnd) {
-        logsToBeChecked.push('REPORT RequestId: ');
+        logsToBeChecked.push({ message: 'REPORT RequestId: ' });
     }
     const reportLog = await checkLogs({
         invocationId: invocationId!,

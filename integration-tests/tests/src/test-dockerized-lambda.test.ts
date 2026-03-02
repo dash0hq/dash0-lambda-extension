@@ -7,7 +7,7 @@ import {
     checkSpanAttributesFromReport,
     compareJsonStrings,
     getAttributesMap,
-    getRequestPayload,
+    getRequestPayload, LogToCheck,
     invokeFunction,
     RESOURCE_PREFIX,
 } from "./utils";
@@ -66,9 +66,9 @@ const verifyDockerizedInvocation = async (functionName: string, runtime: string)
         }
     }
 
-    const logsToBeChecked = [
-        'START RequestId: ',
-        'END RequestId: ',
+    const logsToBeChecked: LogToCheck[] = [
+        { message: 'START RequestId: ' },
+        { message: 'END RequestId: ' },
     ]
     await checkLogs({
         invocationId: invocationId!,

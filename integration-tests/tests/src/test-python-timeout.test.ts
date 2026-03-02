@@ -7,7 +7,7 @@ import {
     checkHttpSpan,
     checkLogs,
     checkResourceAttributes,
-    getAttributesMap,
+    getAttributesMap, LogToCheck,
     getRequestPayload,
     invokeFunction,
     runAllTests
@@ -65,13 +65,13 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             parentSpanId: parentSpanId!,
         });
     }
-    const logsToBeChecked = [
-        'START RequestId: ',
-        'END RequestId: ',
-        "response.status_code:",
+    const logsToBeChecked: LogToCheck[] = [
+        { message: 'START RequestId: ' },
+        { message: 'END RequestId: ' },
+        { message: "response.status_code:" },
     ];
     if (!invocationEnd) {
-        logsToBeChecked.push("REPORT RequestId: ", "Status: timeout");
+        logsToBeChecked.push({ message: "REPORT RequestId: " }, { message: "Status: timeout" });
     }
     await checkLogs({
         invocationId: invocationId!,

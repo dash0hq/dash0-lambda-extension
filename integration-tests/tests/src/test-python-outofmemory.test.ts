@@ -2,7 +2,7 @@ import fetch from 'node-fetch';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
 import {DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./config";
-import {checkLogs, getAttributesMap, getRequestPayload, invokeFunction, runAllTests} from "./utils";
+import {checkLogs, getAttributesMap, getRequestPayload, invokeFunction, LogToCheck, runAllTests} from "./utils";
 
 
 const verifySuccessInvocation = async (functionName: string, invocationEnd: boolean, traced: boolean) => {
@@ -53,13 +53,13 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             }
         }
     }
-    const logsToBeChecked = [
-        'START RequestId: ',
-        'END RequestId: ',
-        "response.status_code:",
+    const logsToBeChecked: LogToCheck[] = [
+        { message: 'START RequestId: ' },
+        { message: 'END RequestId: ' },
+        { message: "response.status_code:" },
     ];
     if (!invocationEnd) {
-        logsToBeChecked.push("REPORT RequestId: ", "Runtime.OutOfMemory");
+        logsToBeChecked.push({ message: "REPORT RequestId: " }, { message: "Runtime.OutOfMemory" });
     }
     await checkLogs({
         invocationId: invocationId!,

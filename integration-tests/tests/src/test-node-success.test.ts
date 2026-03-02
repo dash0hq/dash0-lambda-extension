@@ -9,7 +9,7 @@ import {
     checkSpanAttributesFromReport, compareJsonStrings,
     getAttributesMap,
     getRequestPayload,
-    invokeFunction, runAllTests
+    invokeFunction, LogToCheck, runAllTests
 } from "./utils";
 
 
@@ -61,14 +61,14 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             }
         }
     }
-    const logsToBeChecked = [
-        'START RequestId: ',
-        "Handler invoked with event:",
-        "let's parse this as a warning",
-        'END RequestId: ',
+    const logsToBeChecked: LogToCheck[] = [
+        { message: 'START RequestId: ' },
+        { message: "Handler invoked with event:" },
+        { message: "let's parse this as a warning", severity: "warn" },
+        { message: 'END RequestId: ' },
     ]
     if (!invocationEnd) {
-        logsToBeChecked.push('REPORT RequestId: ');
+        logsToBeChecked.push({ message: 'REPORT RequestId: ' });
     }
     const reportLog = await checkLogs({
         invocationId: invocationId!,
