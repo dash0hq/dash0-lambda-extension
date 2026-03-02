@@ -25,7 +25,7 @@ export const scrubHttpPayload = (
   scrubContext: ScrubContext,
   maxScrubbedPayloadSize = getSpanAttributeMaxLength()
 ): string => {
-  if (contentType?.startsWith('application/json')) {
+  if (contentType?.startsWith('application/json') || contentType?.startsWith('application/x-amz-json')) {
     if (typeof payload === 'string') {
       try {
         payload = JSON.parse(payload);
