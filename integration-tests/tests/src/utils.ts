@@ -1,7 +1,7 @@
 import {setTimeout as delay} from "timers/promises";
 import fetch from "node-fetch";
 import {expect, it} from "vitest";
-import {DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./config";
+import {DASH0_ENDPOINT, DASH0_LAMBDA_TESTS_DATASET, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./config";
 import {InvokeCommand, LambdaClient} from "@aws-sdk/client-lambda";
 
 export const RESOURCE_PREFIX = process.env.RESOURCE_PREFIX ?? '';
@@ -33,6 +33,7 @@ export const getRequestPayload = (invocationId: string) => {
             to: new Date(now + 5 * 60_000).toISOString(),
         },
         sampling: { mode: 'adaptive' },
+        dataset: DASH0_LAMBDA_TESTS_DATASET
     };
 }
 
@@ -108,6 +109,7 @@ export const checkHttpSpan = async ({
                         to: new Date(now + 5 * 60_000).toISOString(),
                     },
                     sampling: {mode: 'adaptive'},
+                    dataset: DASH0_LAMBDA_TESTS_DATASET
                 }),
             });
 

@@ -1,7 +1,7 @@
 import fetch from 'node-fetch';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
-import { DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS } from './config';
+import {DASH0_ENDPOINT, DASH0_LAMBDA_TESTS_DATASET, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from './config';
 import { getAttributesMap, getRequestPayload, invokeFunction, RESOURCE_PREFIX } from './utils';
 
 const pythonRuntimes = ['python3-11', 'python3-12', 'python3-13', 'python3-14'];
@@ -99,6 +99,7 @@ const verifyTracingScenario = async (
                         to: new Date(now + 5 * 60_000).toISOString(),
                     },
                     sampling: { mode: 'adaptive' },
+                    dataset: DASH0_LAMBDA_TESTS_DATASET
                 }),
             });
 
