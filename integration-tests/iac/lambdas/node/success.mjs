@@ -12,6 +12,7 @@ export async function handler(event) {
     });
 
     console.log(`response.statusCode: ${response.status}`);
+    console.warn("let's parse this as a warning");
 
     return {
         statusCode: 200,

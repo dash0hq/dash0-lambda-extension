@@ -92,6 +92,52 @@ fn format_platform_runtime_done_message(
     format!("END RequestId: {}", request_id)
 }
 
+/// Attempts to parse the severity level from a Node.js Lambda log message.
+/// Node.js Lambda logs follow the format:
+///   <ISO-8601 timestamp>\t<UUID request-id>\t<SEVERITY>\t<message>
+/// e.g.: 2026-03-02T11:53:38.040Z\tf0ae1bc7-ae4b-4317-abf9-3a562e3127ef\tINFO\tresponse.statusCode: 201
+/// Returns the severity text (e.g. "INFO", "WARN", "ERROR") if found.
+fn parse_severity_from_log_message(message: &str) -> Option<&str> {
+    use once_cell::sync::Lazy;
+    use regex::Regex;
+
+    static TIMESTAMP_RE: Lazy<Regex> =
+        Lazy::new(|| Regex::new(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z$").unwrap());
+    static REQUEST_ID_RE: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$").unwrap()
+    });
+
+    let mut parts = message.splitn(4, '\t');
+    let timestamp = parts.next()?;
+    let request_id = parts.next()?;
+    let severity = parts.next()?.trim();
+
+    if !TIMESTAMP_RE.is_match(timestamp) {
+        return None;
+    }
+    if !REQUEST_ID_RE.is_match(request_id) {
+        return None;
+    }
+    if severity.is_empty() {
+        return None;
+    }
+    Some(severity)
+}
+
+/// Maps a severity text to its OTLP severity number.
+/// See https://opentelemetry.io/docs/specs/otel/logs/data-model/#severity-fields
+fn severity_text_to_number(severity: &str) -> i32 {
+    match severity.to_uppercase().as_str() {
+        "TRACE" => 1,
+        "DEBUG" => 5,
+        "INFO" => 9,
+        "WARN" | "WARNING" => 13,
+        "ERROR" => 17,
+        "FATAL" | "CRITICAL" => 21,
+        _ => 9, // default to INFO
+    }
+}
+
 pub fn map_logs_to_otlp(logs: &[TelemetryLog]) -> Vec<LogRecord> {
     let mut log_records = Vec::new();
     for log in logs {
@@ -179,15 +225,17 @@ pub fn map_logs_to_otlp(logs: &[TelemetryLog]) -> Vec<LogRecord> {
             }
         }
 
+        let severity = if is_platform_log {
+            "INFO"
+        } else {
+            parse_severity_from_log_message(&body_message).unwrap_or("INFO")
+        };
+
         let log_record = LogRecord {
             time_unix_nano: timestamp_nanos,
             observed_time_unix_nano: timestamp_nanos,
-            severity_number: if is_platform_log { 9 } else { 0 }, // 9 = INFO
-            severity_text: if is_platform_log {
-                "INFO".to_string()
-            } else {
-                String::new()
-            },
+            severity_number: severity_text_to_number(severity),
+            severity_text: severity.to_uppercase(),
             body: Some(AnyValue {
                 value: Some(
                     opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(
@@ -950,9 +998,9 @@ mod tests {
         assert_eq!(result[0].severity_number, 9); // INFO
         assert_eq!(result[0].severity_text, "INFO");
 
-        // Verify function log has no severity (0)
-        assert_eq!(result[1].severity_number, 0);
-        assert_eq!(result[1].severity_text, "");
+        // Verify function log defaults to INFO when no severity pattern found
+        assert_eq!(result[1].severity_number, 9); // INFO (fallback)
+        assert_eq!(result[1].severity_text, "INFO");
 
         // Verify END has INFO severity
         assert_eq!(result[2].severity_number, 9); // INFO
@@ -961,5 +1009,100 @@ mod tests {
         // Verify REPORT has INFO severity
         assert_eq!(result[3].severity_number, 9); // INFO
         assert_eq!(result[3].severity_text, "INFO");
+    }
+
+    #[test]
+    fn test_parse_severity_from_node_log_message() {
+        assert_eq!(
+            parse_severity_from_log_message(
+                "2026-03-02T11:53:38.040Z\tf0ae1bc7-ae4b-4317-abf9-3a562e3127ef\tINFO\tresponse.statusCode: 201"
+            ),
+            Some("INFO")
+        );
+        assert_eq!(
+            parse_severity_from_log_message(
+                "2026-03-02T11:53:38.040Z\tf0ae1bc7-ae4b-4317-abf9-3a562e3127ef\tERROR\tsomething went wrong"
+            ),
+            Some("ERROR")
+        );
+        assert_eq!(
+            parse_severity_from_log_message(
+                "2026-03-02T11:53:38.040Z\tf0ae1bc7-ae4b-4317-abf9-3a562e3127ef\tWARN\tlow memory"
+            ),
+            Some("WARN")
+        );
+        assert_eq!(
+            parse_severity_from_log_message(
+                "2026-03-02T11:53:38.040Z\tf0ae1bc7-ae4b-4317-abf9-3a562e3127ef\tDEBUG\tverbose output"
+            ),
+            Some("DEBUG")
+        );
+        // No tabs, can't parse
+        assert_eq!(parse_severity_from_log_message("Hello World"), None);
+        // Only one tab
+        assert_eq!(parse_severity_from_log_message("a\tb"), None);
+        // Invalid timestamp format
+        assert_eq!(
+            parse_severity_from_log_message(
+                "not-a-timestamp\tf0ae1bc7-ae4b-4317-abf9-3a562e3127ef\tINFO\tmsg"
+            ),
+            None
+        );
+        // Invalid request ID format
+        assert_eq!(
+            parse_severity_from_log_message("2026-03-02T11:53:38.040Z\tnot-a-uuid\tINFO\tmsg"),
+            None
+        );
+        // Uppercase hex in request ID should not match
+        assert_eq!(
+            parse_severity_from_log_message(
+                "2026-03-02T11:53:38.040Z\tF0AE1BC7-AE4B-4317-ABF9-3A562E3127EF\tINFO\tmsg"
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn test_severity_text_to_number_mapping() {
+        assert_eq!(severity_text_to_number("TRACE"), 1);
+        assert_eq!(severity_text_to_number("DEBUG"), 5);
+        assert_eq!(severity_text_to_number("INFO"), 9);
+        assert_eq!(severity_text_to_number("WARN"), 13);
+        assert_eq!(severity_text_to_number("WARNING"), 13);
+        assert_eq!(severity_text_to_number("ERROR"), 17);
+        assert_eq!(severity_text_to_number("FATAL"), 21);
+        assert_eq!(severity_text_to_number("CRITICAL"), 21);
+        // Unknown falls back to INFO
+        assert_eq!(severity_text_to_number("UNKNOWN"), 9);
+    }
+
+    #[test]
+    fn test_function_log_with_node_severity_parsed() {
+        let logs = vec![TelemetryLog {
+            time: "2026-03-02T11:53:38.040Z".to_string(),
+            r#type: "function".to_string(),
+            record: json!("2026-03-02T11:53:38.040Z\tf0ae1bc7-ae4b-4317-abf9-3a562e3127ef\tERROR\tsomething failed"),
+            invocation_id: Some("inv-sev-1".to_string()),
+        }];
+
+        let result = map_logs_to_otlp(&logs);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].severity_number, 17); // ERROR
+        assert_eq!(result[0].severity_text, "ERROR");
+    }
+
+    #[test]
+    fn test_function_log_without_node_pattern_defaults_to_info() {
+        let logs = vec![TelemetryLog {
+            time: "2026-03-02T11:53:38.040Z".to_string(),
+            r#type: "function".to_string(),
+            record: json!("just a plain log message"),
+            invocation_id: Some("inv-sev-2".to_string()),
+        }];
+
+        let result = map_logs_to_otlp(&logs);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].severity_number, 9); // INFO (fallback)
+        assert_eq!(result[0].severity_text, "INFO");
     }
 }
