@@ -46,7 +46,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             compareJsonStrings(spanAttributes['dash0.faas.return_value'].stringValue, '{"statusCode": 200, "body": "\\"Hello from Lambda!\\""}');
             expect(spanAttributes['faas.init_duration'].doubleValue).toBeGreaterThan(0);
 
-            checkResourceAttributes(spanPayload, functionName);
+            checkResourceAttributes(spanPayload.resourceSpans[0].resource.attributes, functionName);
 
             traceId = span.traceId;
             parentSpanId = span.spanId;

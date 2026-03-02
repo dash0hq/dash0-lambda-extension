@@ -121,7 +121,7 @@ export const checkHttpSpan = async ({
             const httpSpans = spanPayload.resourceSpans[0].scopeSpans[0].spans;
             const matchingSpan = httpSpans.find((span: any) => span.traceId === traceId && span.parentSpanId === parentSpanId);
             expect(matchingSpan).toBeDefined();
-            checkResourceAttributes(spanPayload, functionName);
+            checkResourceAttributes(spanPayload.resourceSpans[0].resource.attributes, functionName);
             break;
         } catch (error) {
             console.error(`Error fetching spans on attempt ${attempt}:`, error);
@@ -164,8 +164,7 @@ export const checkLogs = async ({
 
             const spanPayload = await spanResponse.json() as any;
             expect(spanPayload?.resourceLogs.length).toBeGreaterThanOrEqual(1);
-            const resourceAttributes = getAttributesMap(spanPayload?.resourceLogs[0].resource.attributes);
-            expect(resourceAttributes['cloud.resource.id'].stringValue).toContain(functionName);
+            checkResourceAttributes(spanPayload.resourceLogs[0].resource.attributes, functionName);
 
             const allLogRecords = spanPayload?.resourceLogs.flatMap((rl: any) =>
                 rl.scopeLogs.flatMap((sl: any) => sl.logRecords)
@@ -201,8 +200,8 @@ export const checkLogs = async ({
     return reportLog;
 }
 
-export const checkResourceAttributes = (spanPayload: any, functionName: string) => {
-    const resourceAttributes = getAttributesMap(spanPayload.resourceSpans[0].resource.attributes);
+export const checkResourceAttributes = (attributes: Array<{ key: string, value: any }>, functionName: string) => {
+    const resourceAttributes = getAttributesMap(attributes);
     expect(resourceAttributes['cloud.platform'].stringValue).toEqual('aws_lambda');
     expect(resourceAttributes['cloud.resource_id'].stringValue).toContain(functionName);
     expect(resourceAttributes['cloud.account.id'].stringValue).toMatch(/^\d+$/);

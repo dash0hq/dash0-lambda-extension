@@ -49,7 +49,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
 
             const resourceAttributes = getAttributesMap(spanPayload.resourceSpans[0].resource.attributes);
             expect(JSON.parse(resourceAttributes['process.environ'].stringValue)['MASKED_FIELD']).toEqual('****');
-            checkResourceAttributes(spanPayload, functionName);
+            checkResourceAttributes(spanPayload.resourceSpans[0].resource.attributes, functionName);
 
             traceId = span.traceId;
             parentSpanId = span.spanId;
