@@ -65,6 +65,16 @@ pub fn is_remove_lambda_parent_span() -> bool {
     }
 }
 
+pub fn is_create_payload_log_records() -> bool {
+    match std::env::var("DASH0_CREATE_PAYLOAD_LOG_RECORDS") {
+        Ok(val) => matches!(
+            val.as_str(),
+            "1" | "true" | "TRUE" | "True" | "yes" | "YES" | "Yes" | "y" | "Y"
+        ),
+        Err(_) => true,
+    }
+}
+
 pub fn is_logs_instrumentation_enabled() -> bool {
     match std::env::var("DASH0_LOGS_INSTRUMENTATION_ENABLED") {
         Ok(val) => matches!(

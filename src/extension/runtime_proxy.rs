@@ -231,10 +231,11 @@ pub async fn invocation_response_proxy(req: Request<Body>) -> Result<Response<Bo
 
     let res = passthru_proxy(req).await;
     if let Some(id) = invocation_id {
-        let log = build_payload_log(&return_payload, "lambda_return_value", &id);
-        invocation_entry::update(&id, |entry| {
-            entry.logs.push(log);
-        });
+        if let Some(log) = build_payload_log(&return_payload, "lambda_return_value", &id) {
+            invocation_entry::update(&id, |entry| {
+                entry.logs.push(log);
+            });
+        }
 
         if is_auto_instrumented_disabled() {
             if let Some(trace) =
@@ -271,7 +272,9 @@ async fn validate_and_mangle_next_event(
     let event_log = build_payload_log(&payload, "lambda_event", _aws_request_id.as_ref());
     invocation_entry::update(&_aws_request_id, |entry| {
         entry.event_payload = Some(payload);
-        entry.logs.push(event_log);
+        if let Some(log) = event_log {
+            entry.logs.push(log);
+        }
     });
 
     // Reconstruct the response with the same parts and body
@@ -280,10 +283,13 @@ async fn validate_and_mangle_next_event(
     Ok(response)
 }
 
-fn build_payload_log(payload: &str, payload_type: &str, invocation_id: &str) -> TelemetryLog {
+fn build_payload_log(payload: &str, payload_type: &str, invocation_id: &str) -> Option<TelemetryLog> {
+    if !crate::config::user::is_create_payload_log_records() {
+        return None;
+    }
     let message = serde_json::from_str::<serde_json::Value>(payload)
         .unwrap_or_else(|_| serde_json::Value::String(payload.to_string()));
-    TelemetryLog {
+    Some(TelemetryLog {
         time: chrono::Utc::now().to_rfc3339(),
         r#type: "function".to_string(),
         record: serde_json::Value::String(
@@ -295,5 +301,5 @@ fn build_payload_log(payload: &str, payload_type: &str, invocation_id: &str) -> 
             .to_string(),
         ),
         invocation_id: Some(invocation_id.to_string()),
-    }
+    })
 }
