@@ -31,7 +31,6 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             const span = spanPayload.resourceSpans[0].scopeSpans[0].spans[0];
             const spanAttributes = getAttributesMap(span.attributes);
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
-            expect(spanAttributes['dash0.faas.event'].stringValue).toEqual('{"parameter1":"right"}');
             // check exception event
             const events = span.events;
             expect(events.length).toEqual(1);
@@ -57,6 +56,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
         { message: 'START RequestId: ' },
         { message: 'END RequestId: ' },
         { message: "response.status_code:" },
+        { message: JSON.stringify({ name: "dash0_payload", type: "lambda_event", message: { parameter1: "right" } }), isJson: true },
     ];
     if (!invocationEnd) {
         logsToBeChecked.push({ message: "REPORT RequestId: " }, { message: "Runtime.OutOfMemory" });

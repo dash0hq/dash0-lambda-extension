@@ -2,7 +2,7 @@ import fetch from 'node-fetch';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
 import { DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS } from "./config";
-import {checkLogs, compareJsonStrings, getAttributesMap, getRequestPayload, invokeFunction, LogToCheck, RESOURCE_PREFIX} from "./utils";
+import {checkLogs, getAttributesMap, getRequestPayload, invokeFunction, LogToCheck, RESOURCE_PREFIX} from "./utils";
 
 const verifyManualInstrumentation = async (functionName: string) => {
     const invocationId = await invokeFunction(functionName, true, false);
@@ -35,8 +35,6 @@ const verifyManualInstrumentation = async (functionName: string) => {
             const span = spanPayload.resourceSpans[0].scopeSpans[0].spans[0];
             const spanAttributes = getAttributesMap(span.attributes);
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
-            compareJsonStrings(spanAttributes['dash0.faas.event'].stringValue, '{"parameter1":"right"}');
-            compareJsonStrings(spanAttributes['dash0.faas.return_value'].stringValue, '{"statusCode":200,"body":"{\\"message\\":\\"Success\\"}"}');
 
             traceId = span.traceId;
             parentSpanId = span.spanId;
@@ -52,6 +50,8 @@ const verifyManualInstrumentation = async (functionName: string) => {
         { message: 'START RequestId: ' },
         { message: '[tracing] forceFlush complete' },
         { message: 'END RequestId: ' },
+        { message: JSON.stringify({ name: "dash0_payload", type: "lambda_event", message: { parameter1: "right" } }), isJson: true },
+        { message: JSON.stringify({ name: "dash0_payload", type: "lambda_return_value", message: { statusCode: 200 } }), isJson: true },
     ]
     await checkLogs({
         invocationId: invocationId!,
