@@ -283,7 +283,11 @@ async fn validate_and_mangle_next_event(
     Ok(response)
 }
 
-fn build_payload_log(payload: &str, payload_type: &str, invocation_id: &str) -> Option<TelemetryLog> {
+fn build_payload_log(
+    payload: &str,
+    payload_type: &str,
+    invocation_id: &str,
+) -> Option<TelemetryLog> {
     if !crate::config::user::is_create_payload_log_records() {
         return None;
     }
