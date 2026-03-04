@@ -458,13 +458,7 @@ fn add_resource_attributes(span: &mut Span) {
 }
 
 fn extract_span_attributes_from_event(event_payload: &str) -> Vec<KeyValue> {
-    let processed = crate::util::truncate::process_payload(event_payload);
-    let mut attributes = vec![KeyValue {
-        key: "dash0.faas.event".to_string(),
-        value: Some(AnyValue {
-            value: Some(Value::StringValue(processed)),
-        }),
-    }];
+    let mut attributes = Vec::new();
 
     if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(event_payload) {
         if let Some(records) = json_val.get("Records").and_then(|v| v.as_array()) {
@@ -771,9 +765,6 @@ mod tests {
             Some(&invocation_id.to_string())
         );
 
-        let event_attr = find_attribute(&span, "dash0.faas.event");
-        assert!(event_attr.is_some(), "dash0.faas.event should be included");
-
         let exception = span
             .events
             .iter()
@@ -807,12 +798,6 @@ mod tests {
         let decoded = ExportTraceServiceRequest::decode(trace.body.as_slice())
             .expect("should decode otlp payload");
         let span = decoded.resource_spans[0].scope_spans[0].spans[0].clone();
-
-        let event_attr = find_attribute(&span, "dash0.faas.event");
-        assert!(
-            event_attr.is_none(),
-            "dash0.faas.event should be absent when not stored"
-        );
 
         let exception = span
             .events
@@ -1008,10 +993,6 @@ mod tests {
 
         assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
         assert!(!encoded_body.is_empty(), "encoded_body should be updated");
-
-        let span = &request.resource_spans[0].scope_spans[0].spans[0];
-        let event_attr = find_attribute(span, "dash0.faas.event");
-        assert!(event_attr.is_some(), "dash0.faas.event should be added");
     }
 
     #[test]
@@ -1158,17 +1139,8 @@ mod tests {
         assert!(invocation_ids.contains(&invocation_id_1.to_string()));
         assert!(invocation_ids.contains(&invocation_id_2.to_string()));
 
-        // Verify both spans were annotated
         let spans = &request.resource_spans[0].scope_spans[0].spans;
         assert_eq!(spans.len(), 2);
-
-        for span in spans {
-            let event_attr = find_attribute(span, "dash0.faas.event");
-            assert!(
-                event_attr.is_some(),
-                "both spans should have dash0.faas.event"
-            );
-        }
 
         // Verify only the second span has return value
         let span2_return = find_attribute(&spans[1], "dash0.faas.return_value");
@@ -1239,11 +1211,6 @@ mod tests {
         let request_span = &request.resource_spans[0].scope_spans[0].spans[0];
 
         assert_eq!(decoded_span.attributes.len(), request_span.attributes.len());
-        let event_attr = find_attribute(decoded_span, "dash0.faas.event");
-        assert!(
-            event_attr.is_some(),
-            "decoded span should have dash0.faas.event"
-        );
     }
 
     #[test]
@@ -1691,17 +1658,9 @@ mod tests {
     }
 
     #[test]
-    fn extract_span_attributes_non_json_payload() {
-        let attrs = super::extract_span_attributes_from_event("not json");
-        assert_eq!(attrs.len(), 1);
-        assert!(get_string_attr(&attrs, "dash0.faas.event").is_some());
-    }
-
-    #[test]
     fn extract_span_attributes_json_without_records() {
         let attrs = super::extract_span_attributes_from_event(r#"{"key":"value"}"#);
-        assert_eq!(attrs.len(), 1);
-        assert!(get_string_attr(&attrs, "dash0.faas.event").is_some());
+        assert!(attrs.is_empty());
         assert!(find_extracted_attr(&attrs, "dash0.faas.record_count").is_none());
     }
 
