@@ -11,7 +11,7 @@ use crate::config::is_auto_instrumented_disabled;
 use crate::otlp::span_mutations::{
     add_return_payload_to_lambda_server_spans, build_synthetic_trace,
 };
-use crate::state::invocation_data::store_current_invocation_id;
+use crate::state::invocation_data::{store_current_invocation_id, TelemetryLog};
 use crate::state::invocation_entry;
 use crate::util::parsers::extract_invocation_id_from_path;
 use crate::util::truncate::process_payload;
@@ -233,6 +233,22 @@ pub async fn invocation_response_proxy(req: Request<Body>) -> Result<Response<Bo
 
     let res = passthru_proxy(req).await;
     if let Some(id) = invocation_id {
+        let message = serde_json::from_str::<serde_json::Value>(&return_payload)
+            .unwrap_or_else(|_| serde_json::Value::String(return_payload.clone()));
+        let return_value_log = TelemetryLog {
+            time: chrono::Utc::now().to_rfc3339(),
+            r#type: "function".to_string(),
+            record: serde_json::Value::String(serde_json::json!({
+                "name": "dash0_payload",
+                "type": "lambda_return_value",
+                "message": message,
+            }).to_string()),
+            invocation_id: Some(id.clone()),
+        };
+        invocation_entry::update(&id, |entry| {
+            entry.logs.push(return_value_log);
+        });
+
         if is_auto_instrumented_disabled() {
             if let Some(trace) =
                 build_synthetic_trace(&id, None, Some(return_payload.as_str()), &Vec::new())
@@ -271,8 +287,21 @@ async fn validate_and_mangle_next_event(
     });
 
     let payload = String::from_utf8_lossy(&body_bytes).to_string();
+    let message = serde_json::from_str::<serde_json::Value>(&payload)
+        .unwrap_or_else(|_| serde_json::Value::String(payload.clone()));
+    let event_log = TelemetryLog {
+        time: chrono::Utc::now().to_rfc3339(),
+        r#type: "function".to_string(),
+        record: serde_json::Value::String(serde_json::json!({
+            "name": "dash0_payload",
+            "type": "lambda_event",
+            "message": message,
+        }).to_string()),
+        invocation_id: Some(_aws_request_id.as_ref().clone()),
+    };
     invocation_entry::update(&_aws_request_id, |entry| {
         entry.event_payload = Some(payload);
+        entry.logs.push(event_log);
     });
 
     // Reconstruct the response with the same parts and body
