@@ -585,6 +585,25 @@ fn remove_parent_span(span: &mut Span, invocation_id: &str) {
     if !crate::config::user::is_remove_lambda_parent_span() {
         return;
     }
+
+    // If the span's trace id differs from the stored one, this span belongs
+    // to an externally-propagated trace – keep its parent.
+    if let Some(stored_ids) = invocation_entry::get_trace_span_ids(invocation_id) {
+        if let Some(stored_trace_id) = stored_ids.0.as_deref().filter(|t| !t.is_empty()) {
+            let span_trace_id_hex = hex::encode(&span.trace_id);
+            if span_trace_id_hex != stored_trace_id {
+                tracing::info!(
+                    "[{}] invocation_id={} span trace_id={} differs from stored trace_id={}, keeping parent span id",
+                    crate::log_prefix(),
+                    invocation_id,
+                    span_trace_id_hex,
+                    stored_trace_id,
+                );
+                return;
+            }
+        }
+    }
+
     let sampled = invocation_entry::get_sampled(invocation_id);
     if sampled {
         tracing::info!(
@@ -1058,6 +1077,35 @@ mod tests {
         assert!(
             span.parent_span_id.is_empty(),
             "parent_span_id should be cleared when not sampled"
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn process_trace_request_keeps_parent_span_when_trace_id_differs() {
+        let invocation_id = "inv-process-parent-diff-trace";
+        store_event_payload(invocation_id, r#"{"test":"data"}"#);
+
+        // Store a trace_id in the invocation entry that differs from the span's
+        invocation_entry::update(invocation_id, |entry| {
+            entry.trace_id = Some("aa".repeat(16));
+        });
+
+        let mut span = make_span_with_invocation(invocation_id);
+        span.trace_id = vec![0xBB; 16]; // different from stored "aa..aa"
+        span.parent_span_id = vec![0xCC; 8];
+
+        let mut request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
+        let mut invocation_ids = Vec::new();
+        let mut encoded_body = Vec::new();
+
+        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+
+        let span = &request.resource_spans[0].scope_spans[0].spans[0];
+        assert_eq!(
+            span.parent_span_id,
+            vec![0xCC; 8],
+            "parent_span_id should be preserved when span trace_id differs from stored trace_id"
         );
     }
 
