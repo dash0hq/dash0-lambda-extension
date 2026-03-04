@@ -4,7 +4,7 @@ import {expect, it} from "vitest";
 import {DASH0_ENDPOINT, DASH0_LAMBDA_TESTS_DATASET, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./config";
 import {InvokeCommand, LambdaClient} from "@aws-sdk/client-lambda";
 
-export type LogToCheck = { message: string; severity?: string };
+export type LogToCheck = { message: string; severity?: string; isJson?: boolean };
 
 export const RESOURCE_PREFIX = process.env.RESOURCE_PREFIX ?? '';
 
@@ -134,6 +134,13 @@ export const checkHttpSpan = async ({
     }
 }
 
+const deepPartialMatch = (actual: any, expected: any): boolean => {
+    if (expected === null || expected === undefined) return actual === expected;
+    if (typeof expected !== 'object') return actual === expected;
+    if (typeof actual !== 'object' || actual === null) return false;
+    return Object.keys(expected).every(key => deepPartialMatch(actual[key], expected[key]));
+};
+
 export const checkLogs = async ({
     invocationId,
     functionName,
@@ -181,7 +188,19 @@ export const checkLogs = async ({
                 }
                 let expectedSeverity = "info";
                 for (const logToCheck of logsToBeChecked) {
-                    if (logRecord.body.stringValue.includes(logToCheck.message)) {
+                    let matched = false;
+                    if (logToCheck.isJson) {
+                        try {
+                            const actual = JSON.parse(logRecord.body.stringValue);
+                            const expected = JSON.parse(logToCheck.message);
+                            matched = deepPartialMatch(actual, expected);
+                        } catch {
+                            matched = false;
+                        }
+                    } else {
+                        matched = logRecord.body.stringValue.includes(logToCheck.message);
+                    }
+                    if (matched) {
                         logsToBeCheckedCount[logToCheck.message] = true;
                         if (logToCheck.severity) {
                             expectedSeverity = logToCheck.severity;
