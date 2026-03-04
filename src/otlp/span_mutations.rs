@@ -78,15 +78,6 @@ pub fn build_synthetic_trace(
         );
     }
 
-    if let Some(ret) = return_value {
-        attributes.push(KeyValue {
-            key: "dash0.faas.return_value".to_string(),
-            value: Some(AnyValue {
-                value: Some(Value::StringValue(ret.to_string())),
-            }),
-        });
-    }
-
     let exception_result = create_exception_event(error_type, return_value, now_nanos);
     let (events, status) = match exception_result {
         Some((event, err_type)) => (
@@ -316,71 +307,6 @@ fn extract_span_links(event_payload: &str) -> Vec<Link> {
     crate::otlp::span_link_extractor::extract_span_links(event_payload)
 }
 
-pub fn add_return_payload_to_lambda_server_spans(
-    invocation_id: &str,
-    return_payload: &str,
-) -> bool {
-    let mut traces = invocation_entry::take_traces_by_id(invocation_id);
-    let mut added = false;
-
-    for trace in &mut traces {
-        match ExportTraceServiceRequest::decode(trace.body.as_slice()) {
-            Ok(mut decoded) => {
-                if annotate_return_payload(&mut decoded, invocation_id, return_payload) {
-                    trace.body = decoded.encode_to_vec();
-                    added = true;
-                }
-            }
-            Err(err) => {
-                tracing::error!(
-                    "[{}] Failed to decode trace payload while adding return value for {}: {}",
-                    crate::log_prefix(),
-                    invocation_id,
-                    err
-                );
-            }
-        }
-    }
-
-    invocation_entry::update(invocation_id, |entry| {
-        entry.traces = traces;
-        if !added {
-            entry.return_value = Some(return_payload.to_string());
-        }
-    });
-    added
-}
-
-pub fn annotate_return_payload(
-    request: &mut ExportTraceServiceRequest,
-    invocation_id: &str,
-    return_payload: &str,
-) -> bool {
-    let mut modified = false;
-    for resource_span in &mut request.resource_spans {
-        for scope_span in &mut resource_span.scope_spans {
-            if let Some(scope) = &scope_span.scope {
-                if is_lambda_instrumentation_scope(&scope.name) {
-                    for span in &mut scope_span.spans {
-                        if let Some(id) = extract_invocation_id(span) {
-                            if id == invocation_id {
-                                span.attributes.push(KeyValue {
-                                    key: "dash0.faas.return_value".to_string(),
-                                    value: Some(AnyValue {
-                                        value: Some(Value::StringValue(return_payload.to_string())),
-                                    }),
-                                });
-                                modified = true;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    modified
-}
-
 pub fn merge_telemetry_invocation_data(request: &mut ExportTraceServiceRequest) -> i32 {
     let mut modified = 0;
     for resource_span in &mut request.resource_spans {
@@ -559,22 +485,6 @@ fn add_event_payload_to_span(span: &mut Span, invocation_id: &str) {
     }
 }
 
-fn add_return_payload_to_span(span: &mut Span, invocation_id: &str) {
-    if let Some(return_payload) = invocation_entry::get_return_value(invocation_id) {
-        span.attributes.push(KeyValue {
-            key: "dash0.faas.return_value".to_string(),
-            value: Some(AnyValue {
-                value: Some(Value::StringValue(return_payload)),
-            }),
-        });
-        tracing::info!(
-            "[{}] /v1/traces added pending dash0.faas.return_value to lambda server span. invocation_id={}",
-            crate::log_prefix(),
-            invocation_id
-        );
-    }
-}
-
 fn remove_parent_span(span: &mut Span, invocation_id: &str) {
     if !crate::config::user::is_remove_lambda_parent_span() {
         return;
@@ -646,7 +556,6 @@ pub fn process_trace_request(
 
                 invocation_ids.push(invocation_id.clone());
                 add_event_payload_to_span(span, &invocation_id);
-                add_return_payload_to_span(span, &invocation_id);
                 remove_parent_span(span, &invocation_id);
                 store_span_ids(span, &invocation_id);
             }
@@ -671,10 +580,7 @@ pub fn process_trace_request(
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        add_return_payload_to_lambda_server_spans, annotate_return_payload, build_synthetic_trace,
-        StatusCode,
-    };
+    use super::{build_synthetic_trace, StatusCode};
     use crate::state::invocation_data::StoredTrace;
     use crate::state::invocation_entry;
     use hyper::{header, Method};
@@ -698,24 +604,6 @@ mod tests {
         invocation_entry::update(invocation_id, |entry| {
             entry.event_payload = Some(payload);
         });
-    }
-
-    fn store_return_payload(invocation_id: &str, payload: &str) {
-        let payload = payload.to_string();
-        invocation_entry::update(invocation_id, |entry| {
-            entry.return_value = Some(payload);
-        });
-    }
-
-    fn take_return_payload(invocation_id: &str) -> Option<String> {
-        let entry = invocation_entry::get(invocation_id)?;
-        let value = entry.return_value.clone();
-        if value.is_some() {
-            invocation_entry::update(invocation_id, |entry| {
-                entry.return_value = None;
-            });
-        }
-        value
     }
 
     fn store_trace(invocation_id: &str, trace: StoredTrace) {
@@ -848,105 +736,6 @@ mod tests {
 
     #[test]
     #[serial]
-    fn add_return_payload_adds_attribute_for_matching_server_span() {
-        take_traces();
-        let invocation_id = "inv-return-1";
-        let mut span = make_span_with_invocation(invocation_id);
-        span.kind = SpanKind::Server as i32;
-        let request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
-        let trace = StoredTrace {
-            method: Method::POST,
-            path_and_query: "/v1/traces".to_string(),
-            headers: hyper::HeaderMap::new(),
-            body: request.encode_to_vec(),
-            invocation_ids: vec![invocation_id.to_string()],
-        };
-        store_trace(invocation_id, trace);
-
-        add_return_payload_to_lambda_server_spans(invocation_id, "result");
-
-        let traces = take_traces();
-        assert_eq!(traces.len(), 1);
-        let decoded = ExportTraceServiceRequest::decode(traces[0].body.as_slice())
-            .expect("should decode updated trace");
-        let span = &decoded.resource_spans[0].scope_spans[0].spans[0];
-        let attr = find_attribute(span, "dash0.faas.return_value");
-        assert!(attr.is_some(), "dash0.faas.return_value should be added");
-    }
-
-    #[test]
-    #[serial]
-    fn add_return_payload_ignores_non_matching_invocation() {
-        take_traces();
-        let mut span = make_span_with_invocation("other-inv");
-        span.kind = SpanKind::Server as i32;
-        let request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
-        let trace = StoredTrace {
-            method: Method::POST,
-            path_and_query: "/v1/traces".to_string(),
-            headers: hyper::HeaderMap::new(),
-            body: request.encode_to_vec(),
-            invocation_ids: vec!["other-inv".to_string()],
-        };
-        store_trace("other-inv", trace);
-
-        add_return_payload_to_lambda_server_spans("inv-return-2", "result");
-
-        let traces = take_traces();
-        assert_eq!(traces.len(), 1);
-        let decoded = ExportTraceServiceRequest::decode(traces[0].body.as_slice())
-            .expect("should decode updated trace");
-        let span = &decoded.resource_spans[0].scope_spans[0].spans[0];
-        let attr = find_attribute(span, "dash0.faas.return_value");
-        assert!(
-            attr.is_none(),
-            "dash0.faas.return_value should not be added for non-matching invocation"
-        );
-    }
-
-    #[test]
-    #[serial]
-    fn add_return_payload_stores_when_trace_not_found() {
-        take_traces();
-        let invocation_id = "inv-return-store";
-
-        let added = add_return_payload_to_lambda_server_spans(invocation_id, "result");
-
-        assert!(
-            !added,
-            "should not mark as added when no trace is available to annotate"
-        );
-        let stored = take_return_payload(invocation_id);
-        assert_eq!(stored, Some("result".to_string()));
-    }
-
-    #[test]
-    #[serial]
-    fn annotate_return_payload_applies_pending_and_clears_store() {
-        let invocation_id = "inv-return-late";
-        store_return_payload(invocation_id, "late_result");
-        let payload = take_return_payload(invocation_id).expect("payload should be stored");
-        let mut span = make_span_with_invocation(invocation_id);
-        span.kind = SpanKind::Server as i32;
-        let mut request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
-
-        let added = annotate_return_payload(&mut request, invocation_id, &payload);
-
-        assert!(added, "pending return payload should be applied");
-        let span = &request.resource_spans[0].scope_spans[0].spans[0];
-        let attr = find_attribute(span, "dash0.faas.return_value");
-        assert!(
-            attr.is_some(),
-            "dash0.faas.return_value attribute should be present after applying pending payload"
-        );
-        assert!(
-            take_return_payload(invocation_id).is_none(),
-            "pending payload should be cleared after applying"
-        );
-    }
-
-    #[test]
-    #[serial]
     fn build_synthetic_trace_uses_existing_trace_and_parent_ids() {
         take_traces();
         let invocation_id = "inv-trace-copy";
@@ -993,30 +782,6 @@ mod tests {
 
         assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
         assert!(!encoded_body.is_empty(), "encoded_body should be updated");
-    }
-
-    #[test]
-    #[serial]
-    fn process_trace_request_applies_pending_return_payload() {
-        let invocation_id = "inv-process-2";
-        store_event_payload(invocation_id, r#"{"test":"data"}"#);
-        store_return_payload(invocation_id, r#"{"result":"success"}"#);
-
-        let span = make_span_with_invocation(invocation_id);
-        let mut request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
-        let mut invocation_ids = Vec::new();
-        let mut encoded_body = Vec::new();
-
-        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
-
-        assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
-
-        let span = &request.resource_spans[0].scope_spans[0].spans[0];
-        let return_attr = find_attribute(span, "dash0.faas.return_value");
-        assert!(
-            return_attr.is_some(),
-            "dash0.faas.return_value should be added"
-        );
     }
 
     #[test]
@@ -1100,54 +865,6 @@ mod tests {
 
         assert_eq!(stored.trace_id.unwrap(), expected_trace_id);
         assert_eq!(stored.span_id.unwrap(), expected_span_id);
-    }
-
-    #[test]
-    #[serial]
-    fn process_trace_request_handles_multiple_invocation_ids() {
-        let invocation_id_1 = "inv-process-4a";
-        let invocation_id_2 = "inv-process-4b";
-
-        store_event_payload(invocation_id_1, r#"{"test":"data1"}"#);
-        store_event_payload(invocation_id_2, r#"{"test":"data2"}"#);
-        store_return_payload(invocation_id_2, r#"{"result":"success2"}"#);
-
-        let span1 = make_span_with_invocation(invocation_id_1);
-        let span2 = make_span_with_invocation(invocation_id_2);
-
-        let mut request = ExportTraceServiceRequest {
-            resource_spans: vec![ResourceSpans {
-                resource: Some(Resource::default()),
-                scope_spans: vec![ScopeSpans {
-                    scope: Some(InstrumentationScope {
-                        name: "opentelemetry.instrumentation.aws_lambda".to_string(),
-                        ..Default::default()
-                    }),
-                    spans: vec![span1, span2],
-                    ..Default::default()
-                }],
-                ..Default::default()
-            }],
-        };
-
-        let mut invocation_ids = Vec::new();
-        let mut encoded_body = Vec::new();
-
-        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
-
-        assert_eq!(invocation_ids.len(), 2);
-        assert!(invocation_ids.contains(&invocation_id_1.to_string()));
-        assert!(invocation_ids.contains(&invocation_id_2.to_string()));
-
-        let spans = &request.resource_spans[0].scope_spans[0].spans;
-        assert_eq!(spans.len(), 2);
-
-        // Verify only the second span has return value
-        let span2_return = find_attribute(&spans[1], "dash0.faas.return_value");
-        assert!(
-            span2_return.is_some(),
-            "second span should have dash0.faas.return_value"
-        );
     }
 
     #[test]
@@ -1390,36 +1107,6 @@ mod tests {
         assert_eq!(escaped_attr, Some("False".to_string()));
     }
 
-    #[test]
-    #[serial]
-    fn add_return_payload_support_nodejs_scope() {
-        take_traces();
-        let invocation_id = "inv-return-node";
-        let mut span = make_span_with_invocation(invocation_id);
-        span.kind = SpanKind::Server as i32;
-        let request = make_request_with_scope("@opentelemetry/instrumentation-aws-lambda", span);
-        let trace = StoredTrace {
-            method: Method::POST,
-            path_and_query: "/v1/traces".to_string(),
-            headers: hyper::HeaderMap::new(),
-            body: request.encode_to_vec(),
-            invocation_ids: vec![invocation_id.to_string()],
-        };
-        store_trace(invocation_id, trace);
-
-        add_return_payload_to_lambda_server_spans(invocation_id, "node_result");
-
-        let traces = take_traces();
-        assert_eq!(traces.len(), 1);
-        let decoded = ExportTraceServiceRequest::decode(traces[0].body.as_slice())
-            .expect("should decode updated trace");
-        let span = &decoded.resource_spans[0].scope_spans[0].spans[0];
-        let attr = find_attribute(span, "dash0.faas.return_value");
-        assert!(
-            attr.is_some(),
-            "dash0.faas.return_value should be added for nodejs scope"
-        );
-    }
     #[test]
     #[serial]
     fn test_merge_telemetry_invocation_data_updates_span() {

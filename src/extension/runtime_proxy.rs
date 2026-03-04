@@ -8,9 +8,7 @@ use hyper::HeaderMap;
 
 use crate::config::endpoints;
 use crate::config::is_auto_instrumented_disabled;
-use crate::otlp::span_mutations::{
-    add_return_payload_to_lambda_server_spans, build_synthetic_trace,
-};
+use crate::otlp::span_mutations::build_synthetic_trace;
 use crate::state::invocation_data::{store_current_invocation_id, TelemetryLog};
 use crate::state::invocation_entry;
 use crate::util::parsers::extract_invocation_id_from_path;
@@ -238,11 +236,14 @@ pub async fn invocation_response_proxy(req: Request<Body>) -> Result<Response<Bo
         let return_value_log = TelemetryLog {
             time: chrono::Utc::now().to_rfc3339(),
             r#type: "function".to_string(),
-            record: serde_json::Value::String(serde_json::json!({
-                "name": "dash0_payload",
-                "type": "lambda_return_value",
-                "message": message,
-            }).to_string()),
+            record: serde_json::Value::String(
+                serde_json::json!({
+                    "name": "dash0_payload",
+                    "type": "lambda_return_value",
+                    "message": message,
+                })
+                .to_string(),
+            ),
             invocation_id: Some(id.clone()),
         };
         invocation_entry::update(&id, |entry| {
@@ -254,13 +255,6 @@ pub async fn invocation_response_proxy(req: Request<Body>) -> Result<Response<Bo
                 build_synthetic_trace(&id, None, Some(return_payload.as_str()), &Vec::new())
             {
                 invocation_entry::store_trace_by_id(&id, trace);
-            }
-        } else {
-            if !add_return_payload_to_lambda_server_spans(&id, &return_payload) {
-                tracing::info!(
-                    "[{}] invocation_response_proxy - no lambda server span found for return value {}", crate::log_prefix(),
-                    &id
-                );
             }
         }
     }
@@ -292,11 +286,14 @@ async fn validate_and_mangle_next_event(
     let event_log = TelemetryLog {
         time: chrono::Utc::now().to_rfc3339(),
         r#type: "function".to_string(),
-        record: serde_json::Value::String(serde_json::json!({
-            "name": "dash0_payload",
-            "type": "lambda_event",
-            "message": message,
-        }).to_string()),
+        record: serde_json::Value::String(
+            serde_json::json!({
+                "name": "dash0_payload",
+                "type": "lambda_event",
+                "message": message,
+            })
+            .to_string(),
+        ),
         invocation_id: Some(_aws_request_id.as_ref().clone()),
     };
     invocation_entry::update(&_aws_request_id, |entry| {
