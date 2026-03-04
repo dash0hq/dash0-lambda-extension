@@ -187,6 +187,8 @@ export const checkLogs = async ({
                     expect(logRecord.spanId).toEqual(parentSpanId);
                 }
                 let expectedSeverity = "info";
+                let hasJsonMatch = false;
+                let jsonSeverity: string | null = null;
                 for (const logToCheck of logsToBeChecked) {
                     let matched = false;
                     if (logToCheck.isJson) {
@@ -202,10 +204,20 @@ export const checkLogs = async ({
                     }
                     if (matched) {
                         logsToBeCheckedCount[logToCheck.message] = true;
-                        if (logToCheck.severity) {
+                        if (logToCheck.isJson) {
+                            hasJsonMatch = true;
+                            if (logToCheck.severity) {
+                                jsonSeverity = logToCheck.severity;
+                            }
+                        } else if (logToCheck.severity) {
                             expectedSeverity = logToCheck.severity;
                         }
                     }
+                }
+                // If a JSON check matched this log record, use its severity (or default "info"),
+                // ignoring severity from non-JSON includes matches that may have matched incidentally.
+                if (hasJsonMatch) {
+                    expectedSeverity = jsonSeverity ?? "info";
                 }
                 expect(logRecord.severityText.toLowerCase()).toEqual(expectedSeverity);
                 if (logRecord.body.stringValue.startsWith("REPORT RequestId: ")) {
