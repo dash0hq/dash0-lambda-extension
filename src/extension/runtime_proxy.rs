@@ -8,6 +8,7 @@ use hyper::HeaderMap;
 
 use crate::config::endpoints;
 use crate::config::is_auto_instrumented_disabled;
+use crate::otlp::masking::mask_json_string;
 use crate::otlp::span_mutations::build_synthetic_trace;
 use crate::state::invocation_data::{store_current_invocation_id, TelemetryLog};
 use crate::state::invocation_entry;
@@ -226,7 +227,7 @@ pub async fn invocation_response_proxy(req: Request<Body>) -> Result<Response<Bo
     let (parts, body) = req.into_parts();
     let body_bytes = hyper::body::to_bytes(body).await?;
 
-    let return_payload = process_payload(&String::from_utf8_lossy(&body_bytes));
+    let return_payload = mask_json_string(&String::from_utf8_lossy(&body_bytes));
     let req = Request::from_parts(parts, Body::from(body_bytes));
 
     let res = passthru_proxy(req).await;
@@ -280,7 +281,8 @@ async fn validate_and_mangle_next_event(
         hyper::body::Bytes::new()
     });
 
-    let payload = String::from_utf8_lossy(&body_bytes).to_string();
+    let payload = mask_json_string(&String::from_utf8_lossy(&body_bytes));
+
     let message = serde_json::from_str::<serde_json::Value>(&payload)
         .unwrap_or_else(|_| serde_json::Value::String(payload.clone()));
     let event_log = TelemetryLog {
