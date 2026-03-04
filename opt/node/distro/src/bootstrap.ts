@@ -28,6 +28,7 @@ import Dash0MongoDBInstrumentation from './instrumentations/mongodb/MongoDBInstr
 import Dash0PgInstrumentation from './instrumentations/pg/PgInstrumentation';
 import Dash0PrismaInstrumentation from './instrumentations/prisma/PrismaInstrumentation';
 import Dash0RedisInstrumentation from './instrumentations/redis/RedisInstrumentation';
+import Dash0UndiciInstrumentation from "./instrumentations/undici/UndiciInstrumentation";
 import { Dash0AwsSdkV3LibInstrumentation } from './instrumentations/aws-sdk';
 
 import { Dash0W3CTraceContextPropagator } from './propagator/w3cTraceContextPropagator';
@@ -109,6 +110,7 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
       new Dash0PrismaInstrumentation(),
       new Dash0RedisInstrumentation(),
       new Dash0AwsSdkV3LibInstrumentation(),
+      new Dash0UndiciInstrumentation(),
     ].filter((i) => i.isApplicable());
 
     /*
@@ -149,15 +151,8 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
       })
     );
 
-    const framework = instrumentedModules.includes('express') ? 'express' : 'node';
-
     const processEnvDetectedResource = new ProcessEnvironmentDetector().detect();
     const resource = defaultResource()
-      .merge(
-        resourceFromAttributes({
-          framework,
-        })
-      )
       .merge(infrastructureResource)
       .merge(resourceFromAttributes(processEnvDetectedResource.attributes || {}));
 

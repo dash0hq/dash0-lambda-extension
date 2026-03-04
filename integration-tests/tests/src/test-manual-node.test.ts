@@ -2,7 +2,7 @@ import fetch from 'node-fetch';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
 import { DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS } from "./config";
-import {checkLogs, compareJsonStrings, getAttributesMap, getRequestPayload, invokeFunction, RESOURCE_PREFIX} from "./utils";
+import {checkLogs, compareJsonStrings, getAttributesMap, getRequestPayload, invokeFunction, LogToCheck, RESOURCE_PREFIX} from "./utils";
 
 const verifyManualInstrumentation = async (functionName: string) => {
     const invocationId = await invokeFunction(functionName, true, false);
@@ -48,10 +48,10 @@ const verifyManualInstrumentation = async (functionName: string) => {
             }
         }
     }
-    const logsToBeChecked = [
-        'START RequestId: ',
-        '[tracing] forceFlush complete',
-        'END RequestId: ',
+    const logsToBeChecked: LogToCheck[] = [
+        { message: 'START RequestId: ' },
+        { message: '[tracing] forceFlush complete' },
+        { message: 'END RequestId: ' },
     ]
     await checkLogs({
         invocationId: invocationId!,

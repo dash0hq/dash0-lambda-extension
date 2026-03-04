@@ -7,7 +7,7 @@ import {
     checkLogs,
     checkSpanAttributesFromReport,
     getAttributesMap,
-    getRequestPayload,
+    getRequestPayload, LogToCheck,
     invokeFunction, runAllTests
 } from "./utils";
 
@@ -76,14 +76,14 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             parentSpanId: parentSpanId!,
         });
     }
-    const logsToBeChecked = [
-        'START RequestId: ',
-        'END RequestId: ',
-        "response.status_code:",
-        "[ERROR] KeyError:",
+    const logsToBeChecked: LogToCheck[] = [
+        { message: 'START RequestId: ' },
+        { message: 'END RequestId: ' },
+        { message: "response.status_code:" },
+        { message: "[ERROR] KeyError:" },
     ]
     if (!invocationEnd) {
-        logsToBeChecked.push('REPORT RequestId: ');
+        logsToBeChecked.push({ message: 'REPORT RequestId: ' });
     }
     const reportLog = await checkLogs({
         invocationId: invocationId!,

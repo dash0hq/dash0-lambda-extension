@@ -2,7 +2,7 @@ import fetch from 'node-fetch';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
 import {DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./config";
-import {checkException, checkLogs, getAttributesMap, getRequestPayload, invokeFunction, runAllTests} from "./utils";
+import {checkException, checkLogs, getAttributesMap, getRequestPayload, invokeFunction, LogToCheck, runAllTests} from "./utils";
 
 
 const verifySuccessInvocation = async (functionName: string, invocationEnd: boolean, traced: boolean) => {
@@ -45,12 +45,12 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             }
         }
     }
-    const logsToBeChecked = [
-        'START RequestId: ',
-        'END RequestId: ',
+    const logsToBeChecked: LogToCheck[] = [
+        { message: 'START RequestId: ' },
+        { message: 'END RequestId: ' },
     ];
     if (!invocationEnd) {
-        logsToBeChecked.push("Error Type: Runtime.ImportModuleError", "REPORT RequestId: ");
+        logsToBeChecked.push({ message: "Error Type: Runtime.ImportModuleError" }, { message: "REPORT RequestId: " });
     }
     await checkLogs({
         invocationId: invocationId!,

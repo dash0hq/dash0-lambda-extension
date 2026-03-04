@@ -7,7 +7,7 @@ import {
     checkLogs,
     checkResourceAttributes,
     checkSpanAttributesFromReport,
-    getAttributesMap,
+    getAttributesMap, LogToCheck,
     getRequestPayload,
     invokeFunction, runAllTests
 } from "./utils";
@@ -59,12 +59,12 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             }
         }
     }
-    const logsToBeChecked = [
-        'START RequestId: ',
-        'END RequestId: ',
+    const logsToBeChecked: LogToCheck[] = [
+        { message: 'START RequestId: ' },
+        { message: 'END RequestId: ' },
     ]
     if (!invocationEnd) {
-        logsToBeChecked.push('REPORT RequestId: ');
+        logsToBeChecked.push({ message: 'REPORT RequestId: ' });
     }
     const reportLog = await checkLogs({
         invocationId: invocationId!,

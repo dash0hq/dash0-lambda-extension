@@ -6,7 +6,7 @@ import {
     checkLogs,
     compareJsonStrings,
     getAttributesMap,
-    getRequestPayload,
+    getRequestPayload, LogToCheck,
     invokeFunction,
     RESOURCE_PREFIX,
 } from "./utils";
@@ -65,9 +65,9 @@ const verifyCjsSuccess = async (functionName: string) => {
         parentSpanId: parentSpanId!,
         success: true,
         logsToBeChecked: [
-            'START RequestId: ',
-            'Handler invoked with event:',
-            'END RequestId: ',
+            { message: 'START RequestId: ' },
+            { message: 'Handler invoked with event:' },
+            { message: 'END RequestId: ' },
         ],
     });
 };

@@ -170,6 +170,7 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
       const kinesisStream = new kinesis.Stream(this, `TracingTestKinesisStream-${runtimeName}`, {
         streamName: `${prefix}tracing-test-kinesis-stream-${runtimeName}`,
         shardCount: 1,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
       });
 
       const kinesisProducer = new lambda.Function(this, `KinesisProducerLambda-${runtimeName}`, {

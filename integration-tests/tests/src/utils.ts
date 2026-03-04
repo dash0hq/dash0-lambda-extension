@@ -4,6 +4,8 @@ import {expect, it} from "vitest";
 import {DASH0_ENDPOINT, DASH0_LAMBDA_TESTS_DATASET, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./config";
 import {InvokeCommand, LambdaClient} from "@aws-sdk/client-lambda";
 
+export type LogToCheck = { message: string; severity?: string };
+
 export const RESOURCE_PREFIX = process.env.RESOURCE_PREFIX ?? '';
 
 const lambdaClient = new LambdaClient({
@@ -145,7 +147,7 @@ export const checkLogs = async ({
     traceId: string | null,
     parentSpanId: string | null,
     success: boolean,
-    logsToBeChecked: string[],
+    logsToBeChecked: LogToCheck[],
 }): Promise<string> => {
     let reportLog = null;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -177,17 +179,22 @@ export const checkLogs = async ({
                     expect(logRecord.traceId).toEqual(traceId);
                     expect(logRecord.spanId).toEqual(parentSpanId);
                 }
-                for (const logMessage of logsToBeChecked) {
-                    if (logRecord.body.stringValue.includes(logMessage)) {
-                        logsToBeCheckedCount[logMessage] = true;
+                let expectedSeverity = "info";
+                for (const logToCheck of logsToBeChecked) {
+                    if (logRecord.body.stringValue.includes(logToCheck.message)) {
+                        logsToBeCheckedCount[logToCheck.message] = true;
+                        if (logToCheck.severity) {
+                            expectedSeverity = logToCheck.severity;
+                        }
                     }
                 }
+                expect(logRecord.severityText.toLowerCase()).toEqual(expectedSeverity);
                 if (logRecord.body.stringValue.startsWith("REPORT RequestId: ")) {
                     reportLog = logRecord.body.stringValue;
                 }
             }
-            for (const logMessage of logsToBeChecked) {
-                expect(logsToBeCheckedCount[logMessage]).toBeTruthy();
+            for (const logToCheck of logsToBeChecked) {
+                expect(logsToBeCheckedCount[logToCheck.message]).toBeTruthy();
             }
             break;
         } catch (error) {

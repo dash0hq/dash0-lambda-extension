@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./config";
 import {
     checkException, checkHttpSpan, checkLogs,
-    checkSpanAttributesFromReport, getAttributesMap, getRequestPayload, invokeFunction, runAllTests
+    checkSpanAttributesFromReport, getAttributesMap, getRequestPayload, invokeFunction, LogToCheck, runAllTests
 } from "./utils";
 
 
@@ -71,14 +71,14 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             }
         }
     }
-    const logsToBeChecked = [
-        'START RequestId: ',
-        "Input received:",
-        "java.lang.RuntimeException",
-        'END RequestId: ',
+    const logsToBeChecked: LogToCheck[] = [
+        { message: 'START RequestId: ' },
+        { message: "Input received:" },
+        { message: "java.lang.RuntimeException" },
+        { message: 'END RequestId: ' },
     ]
     if (!invocationEnd) {
-        logsToBeChecked.push('REPORT RequestId: ');
+        logsToBeChecked.push({ message: 'REPORT RequestId: ' });
     }
     const reportLog = await checkLogs({
         invocationId: invocationId!,

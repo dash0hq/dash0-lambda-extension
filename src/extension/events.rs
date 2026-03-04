@@ -41,12 +41,23 @@ fn handle_invoke_event(json: &serde_json::Value) {
             .and_then(|t| t.get("value"))
             .and_then(|v| v.as_str())
         {
+            tracing::info!(
+                "[{}] Parsing trace context from _X_AMZN_TRACE_ID: {}",
+                crate::log_prefix_with("Extension"),
+                trace_value
+            );
             if let Some((trace_id_bytes, parent_span_id_bytes, sampled)) =
                 crate::otlp::span_link_extractor::parse_amzn_trace_id(trace_value)
             {
                 let trace_id = hex::encode(&trace_id_bytes);
                 let parent_span_id = hex::encode(&parent_span_id_bytes);
                 let span_id = hex::encode(get_span_id_from_invocation_id(request_id));
+                let parent_span_id =
+                    if !sampled && crate::config::user::is_remove_lambda_parent_span() {
+                        String::new()
+                    } else {
+                        parent_span_id
+                    };
                 state::invocation_entry::update(request_id, |entry| {
                     entry.trace_id = Some(trace_id);
                     entry.span_id = Some(span_id);
