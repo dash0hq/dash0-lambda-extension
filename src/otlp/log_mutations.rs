@@ -142,14 +142,19 @@ pub fn build_payload_log(
     payload: &str,
     payload_type: &str,
     invocation_id: &str,
+    timestamp_nanos: Option<u64>,
 ) -> Option<TelemetryLog> {
     if !crate::config::user::is_create_payload_log_records() {
         return None;
     }
     let message = serde_json::from_str::<serde_json::Value>(payload)
         .unwrap_or_else(|_| serde_json::Value::String(payload.to_string()));
+    let time = match timestamp_nanos {
+        Some(nanos) => chrono::DateTime::from_timestamp_nanos(nanos as i64).to_rfc3339(),
+        None => chrono::Utc::now().to_rfc3339(),
+    };
     Some(TelemetryLog {
-        time: chrono::Utc::now().to_rfc3339(),
+        time,
         r#type: "function".to_string(),
         record: serde_json::Value::String(
             serde_json::json!({

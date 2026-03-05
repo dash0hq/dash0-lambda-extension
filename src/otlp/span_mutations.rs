@@ -389,12 +389,13 @@ fn extract_http_body_logs(span: &mut Span) {
         None => return,
     };
 
-    let body_attr_keys: &[(&str, &str)] = &[
-        ("http.request.body", "http_request_body"),
-        ("http.response.body", "http_response_body"),
+    const ONE_MS_NANOS: u64 = 1_000_000;
+    let body_attr_keys: &[(&str, &str, u64)] = &[
+        ("http.request.body", "http_request_body", span.start_time_unix_nano.saturating_add(ONE_MS_NANOS)),
+        ("http.response.body", "http_response_body", span.end_time_unix_nano.saturating_sub(ONE_MS_NANOS)),
     ];
 
-    for &(attr_key, payload_type) in body_attr_keys {
+    for &(attr_key, payload_type, timestamp_nanos) in body_attr_keys {
         if let Some(value) = span.attributes.iter().find_map(|attr| {
             if attr.key == attr_key {
                 if let Some(AnyValue {
@@ -407,7 +408,7 @@ fn extract_http_body_logs(span: &mut Span) {
             None
         }) {
             if let Some(log) =
-                crate::otlp::log_mutations::build_payload_log(&value, payload_type, &invocation_id)
+                crate::otlp::log_mutations::build_payload_log(&value, payload_type, &invocation_id, Some(timestamp_nanos))
             {
                 invocation_entry::update(&invocation_id, |entry| {
                     entry.logs.push(log);
