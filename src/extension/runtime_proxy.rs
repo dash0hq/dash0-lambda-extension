@@ -8,9 +8,10 @@ use hyper::HeaderMap;
 
 use crate::config::endpoints;
 use crate::config::is_auto_instrumented_disabled;
+use crate::otlp::log_mutations::build_payload_log;
 use crate::otlp::masking::mask_json_string;
 use crate::otlp::span_mutations::build_synthetic_trace;
-use crate::state::invocation_data::{store_current_invocation_id, TelemetryLog};
+use crate::state::invocation_data::store_current_invocation_id;
 use crate::state::invocation_entry;
 use crate::util::parsers::extract_invocation_id_from_path;
 
@@ -281,29 +282,4 @@ async fn validate_and_mangle_next_event(
     let response = Response::from_parts(parts, Body::from(body_bytes));
 
     Ok(response)
-}
-
-fn build_payload_log(
-    payload: &str,
-    payload_type: &str,
-    invocation_id: &str,
-) -> Option<TelemetryLog> {
-    if !crate::config::user::is_create_payload_log_records() {
-        return None;
-    }
-    let message = serde_json::from_str::<serde_json::Value>(payload)
-        .unwrap_or_else(|_| serde_json::Value::String(payload.to_string()));
-    Some(TelemetryLog {
-        time: chrono::Utc::now().to_rfc3339(),
-        r#type: "function".to_string(),
-        record: serde_json::Value::String(
-            serde_json::json!({
-                "name": "dash0_payload",
-                "type": payload_type,
-                "message": message,
-            })
-            .to_string(),
-        ),
-        invocation_id: Some(invocation_id.to_string()),
-    })
 }

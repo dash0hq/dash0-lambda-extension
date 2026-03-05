@@ -383,6 +383,43 @@ fn add_resource_attributes(span: &mut Span) {
     }
 }
 
+fn extract_http_body_logs(span: &mut Span) {
+    let invocation_id = match crate::state::invocation_data::get_current_invocation_id() {
+        Some(id) => id,
+        None => return,
+    };
+
+    let body_attr_keys: &[(&str, &str)] = &[
+        ("http.request.body", "http_request_body"),
+        ("http.response.body", "http_response_body"),
+    ];
+
+    for &(attr_key, payload_type) in body_attr_keys {
+        if let Some(value) = span.attributes.iter().find_map(|attr| {
+            if attr.key == attr_key {
+                if let Some(AnyValue {
+                    value: Some(Value::StringValue(val)),
+                }) = &attr.value
+                {
+                    return Some(val.clone());
+                }
+            }
+            None
+        }) {
+            if let Some(log) =
+                crate::otlp::log_mutations::build_payload_log(&value, payload_type, &invocation_id)
+            {
+                invocation_entry::update(&invocation_id, |entry| {
+                    entry.logs.push(log);
+                });
+            }
+        }
+    }
+
+    span.attributes
+        .retain(|attr| attr.key != "http.request.body" && attr.key != "http.response.body");
+}
+
 fn extract_span_attributes_from_event(event_payload: &str) -> Vec<KeyValue> {
     let mut attributes = Vec::new();
 
@@ -544,6 +581,7 @@ pub fn process_trace_request(
             if !is_lambda {
                 for span in &mut scope_span.spans {
                     add_resource_attributes(span);
+                    extract_http_body_logs(span);
                 }
                 continue;
             }

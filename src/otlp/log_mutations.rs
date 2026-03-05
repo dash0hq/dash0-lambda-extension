@@ -138,6 +138,31 @@ fn severity_text_to_number(severity: &str) -> i32 {
     }
 }
 
+pub fn build_payload_log(
+    payload: &str,
+    payload_type: &str,
+    invocation_id: &str,
+) -> Option<TelemetryLog> {
+    if !crate::config::user::is_create_payload_log_records() {
+        return None;
+    }
+    let message = serde_json::from_str::<serde_json::Value>(payload)
+        .unwrap_or_else(|_| serde_json::Value::String(payload.to_string()));
+    Some(TelemetryLog {
+        time: chrono::Utc::now().to_rfc3339(),
+        r#type: "function".to_string(),
+        record: serde_json::Value::String(
+            serde_json::json!({
+                "name": "dash0_payload",
+                "type": payload_type,
+                "message": message,
+            })
+            .to_string(),
+        ),
+        invocation_id: Some(invocation_id.to_string()),
+    })
+}
+
 pub fn map_logs_to_otlp(logs: &[TelemetryLog]) -> Vec<LogRecord> {
     let mut log_records = Vec::new();
     for log in logs {
