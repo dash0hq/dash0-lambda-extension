@@ -57,7 +57,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
         }
     }
     if (traced) {
-        await checkHttpSpan({
+        const httpSpanId = await checkHttpSpan({
             invocationId: invocationId!,
             functionName,
             traceId: traceId!,

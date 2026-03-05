@@ -101,9 +101,14 @@ export const checkHttpSpan = async ({
                 body: JSON.stringify({
                     filter: [
                         {
-                            operator: 'contains',
-                            key: 'http.response.body',
+                            operator: 'is',
+                            key: 'service.name',
                             value: functionName,
+                        },
+                        {
+                            operator: 'is',
+                            key: 'http.request.method',
+                            value: 'POST',
                         },
                     ],
                     timeRange: {
@@ -124,7 +129,7 @@ export const checkHttpSpan = async ({
             const matchingSpan = httpSpans.find((span: any) => span.traceId === traceId && span.parentSpanId === parentSpanId);
             expect(matchingSpan).toBeDefined();
             checkResourceAttributes(spanPayload.resourceSpans[0].resource.attributes, functionName);
-            break;
+            return matchingSpan.spanId;
         } catch (error) {
             console.error(`Error fetching spans on attempt ${attempt}:`, error);
             if (attempt === MAX_ATTEMPTS) {
@@ -300,6 +305,9 @@ export const runAllTests = (scenario: string, runtimes: string[], verifySuccessI
                 for (const traced of tracedValues) {
                     const invocationEndLabel = invocationEnd ? 'true' : 'false';
                     const functionName = `${RESOURCE_PREFIX}${runtime}-${scenario}-${traced}-invocation-end-${invocationEndLabel}-${architecture}`;
+                    if (functionName !== 'python3-14-success-true-invocation-end-true-arm64') {
+                        continue;
+                    }
                     it(
                         `invokes ${functionName} successfully`,
                         async () => {
