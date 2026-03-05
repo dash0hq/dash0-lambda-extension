@@ -1492,6 +1492,317 @@ mod tests {
         assert!(find_extracted_attr(&attrs, "faas.trigger").is_none());
         assert!(find_extracted_attr(&attrs, "dash0.faas.event_bridge_source").is_none());
     }
+
+    // --- extract_http_body_logs tests ---
+
+    use crate::state::invocation_data::TelemetryLog;
+
+    fn enable_payload_log_records() {
+        std::env::set_var("DASH0_CREATE_PAYLOAD_LOG_RECORDS", "true");
+    }
+
+    fn disable_payload_log_records() {
+        std::env::set_var("DASH0_CREATE_PAYLOAD_LOG_RECORDS", "false");
+    }
+
+    fn set_current_invocation(id: &str) {
+        crate::state::invocation_data::store_current_invocation_id(id);
+    }
+
+    fn take_logs_for(invocation_id: &str) -> Vec<TelemetryLog> {
+        invocation_entry::remove(invocation_id)
+            .map(|e| e.logs)
+            .unwrap_or_default()
+    }
+
+    fn make_http_span(
+        request_body: Option<&str>,
+        response_body: Option<&str>,
+        start_nanos: u64,
+        end_nanos: u64,
+    ) -> Span {
+        let mut attributes = Vec::new();
+        if let Some(body) = request_body {
+            attributes.push(KeyValue {
+                key: "http.request.body".to_string(),
+                value: Some(AnyValue {
+                    value: Some(Value::StringValue(body.to_string())),
+                }),
+            });
+        }
+        if let Some(body) = response_body {
+            attributes.push(KeyValue {
+                key: "http.response.body".to_string(),
+                value: Some(AnyValue {
+                    value: Some(Value::StringValue(body.to_string())),
+                }),
+            });
+        }
+        Span {
+            trace_id: hex::decode("5b8eff129842a1b9c9283745a23f54b1").unwrap(),
+            span_id: hex::decode("023f54b19283745a").unwrap(),
+            start_time_unix_nano: start_nanos,
+            end_time_unix_nano: end_nanos,
+            attributes,
+            ..Default::default()
+        }
+    }
+
+    fn parse_payload_log(log: &TelemetryLog) -> serde_json::Value {
+        match &log.record {
+            serde_json::Value::String(s) => serde_json::from_str(s).unwrap(),
+            other => other.clone(),
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn extract_http_body_logs_creates_request_and_response_logs() {
+        enable_payload_log_records();
+        let inv_id = "inv-http-body-1";
+        set_current_invocation(inv_id);
+
+        let start = 1_700_000_000_000_000_000u64; // some timestamp in nanos
+        let end = 1_700_000_001_000_000_000u64; // 1 second later
+        let mut span = make_http_span(
+            Some(r#"{"key":"value"}"#),
+            Some(r#"{"status":"ok"}"#),
+            start,
+            end,
+        );
+
+        super::extract_http_body_logs(&mut span);
+
+        // Both body attributes should be removed from span
+        assert!(
+            span.attributes.is_empty(),
+            "http body attributes should be removed from span"
+        );
+
+        let logs = take_logs_for(inv_id);
+        assert_eq!(logs.len(), 2, "should create 2 logs (request + response)");
+
+        // Request log
+        let req_log = &logs[0];
+        let req_parsed = parse_payload_log(req_log);
+        assert_eq!(req_parsed["name"], "dash0_payload");
+        assert_eq!(req_parsed["type"], "http_request_body");
+        assert_eq!(req_parsed["message"], serde_json::json!({"key":"value"}));
+        assert_eq!(req_log.trace_id.as_deref(), Some("5b8eff129842a1b9c9283745a23f54b1"));
+        assert_eq!(req_log.span_id.as_deref(), Some("023f54b19283745a"));
+
+        // Response log
+        let resp_log = &logs[1];
+        let resp_parsed = parse_payload_log(resp_log);
+        assert_eq!(resp_parsed["name"], "dash0_payload");
+        assert_eq!(resp_parsed["type"], "http_response_body");
+        assert_eq!(resp_parsed["message"], serde_json::json!({"status":"ok"}));
+        assert_eq!(resp_log.trace_id.as_deref(), Some("5b8eff129842a1b9c9283745a23f54b1"));
+        assert_eq!(resp_log.span_id.as_deref(), Some("023f54b19283745a"));
+
+        disable_payload_log_records();
+    }
+
+    #[test]
+    #[serial]
+    fn extract_http_body_logs_uses_correct_timestamps() {
+        enable_payload_log_records();
+        let inv_id = "inv-http-body-ts";
+        set_current_invocation(inv_id);
+
+        let start = 1_700_000_000_000_000_000u64;
+        let end = 1_700_000_001_000_000_000u64;
+        let mut span = make_http_span(
+            Some("req"),
+            Some("resp"),
+            start,
+            end,
+        );
+
+        super::extract_http_body_logs(&mut span);
+
+        let logs = take_logs_for(inv_id);
+        assert_eq!(logs.len(), 2);
+
+        // Request timestamp should be start + 1ms
+        let req_time = chrono::DateTime::parse_from_rfc3339(&logs[0].time).unwrap();
+        let expected_req_nanos = start + 1_000_000;
+        assert_eq!(
+            req_time.timestamp_nanos_opt().unwrap() as u64,
+            expected_req_nanos,
+            "request log timestamp should be span start + 1ms"
+        );
+
+        // Response timestamp should be end - 1ms
+        let resp_time = chrono::DateTime::parse_from_rfc3339(&logs[1].time).unwrap();
+        let expected_resp_nanos = end - 1_000_000;
+        assert_eq!(
+            resp_time.timestamp_nanos_opt().unwrap() as u64,
+            expected_resp_nanos,
+            "response log timestamp should be span end - 1ms"
+        );
+
+        disable_payload_log_records();
+    }
+
+    #[test]
+    #[serial]
+    fn extract_http_body_logs_only_request_body() {
+        enable_payload_log_records();
+        let inv_id = "inv-http-body-req-only";
+        set_current_invocation(inv_id);
+
+        let mut span = make_http_span(Some("request data"), None, 100, 200);
+
+        super::extract_http_body_logs(&mut span);
+
+        assert!(span.attributes.is_empty());
+
+        let logs = take_logs_for(inv_id);
+        assert_eq!(logs.len(), 1);
+        let parsed = parse_payload_log(&logs[0]);
+        assert_eq!(parsed["type"], "http_request_body");
+
+        disable_payload_log_records();
+    }
+
+    #[test]
+    #[serial]
+    fn extract_http_body_logs_only_response_body() {
+        enable_payload_log_records();
+        let inv_id = "inv-http-body-resp-only";
+        set_current_invocation(inv_id);
+
+        let mut span = make_http_span(None, Some("response data"), 100, 200);
+
+        super::extract_http_body_logs(&mut span);
+
+        assert!(span.attributes.is_empty());
+
+        let logs = take_logs_for(inv_id);
+        assert_eq!(logs.len(), 1);
+        let parsed = parse_payload_log(&logs[0]);
+        assert_eq!(parsed["type"], "http_response_body");
+
+        disable_payload_log_records();
+    }
+
+    #[test]
+    #[serial]
+    fn extract_http_body_logs_no_body_attributes() {
+        enable_payload_log_records();
+        let inv_id = "inv-http-body-none";
+        set_current_invocation(inv_id);
+
+        let mut span = make_http_span(None, None, 100, 200);
+        // Add some other attribute to verify it's preserved
+        span.attributes.push(KeyValue {
+            key: "http.method".to_string(),
+            value: Some(AnyValue {
+                value: Some(Value::StringValue("GET".to_string())),
+            }),
+        });
+
+        super::extract_http_body_logs(&mut span);
+
+        assert_eq!(span.attributes.len(), 1, "non-body attributes should be preserved");
+        assert_eq!(span.attributes[0].key, "http.method");
+
+        let logs = take_logs_for(inv_id);
+        assert!(logs.is_empty(), "no logs should be created when no body attributes");
+
+        disable_payload_log_records();
+    }
+
+    #[test]
+    #[serial]
+    fn extract_http_body_logs_preserves_other_attributes() {
+        enable_payload_log_records();
+        let inv_id = "inv-http-body-preserve";
+        set_current_invocation(inv_id);
+
+        let mut span = make_http_span(Some("req"), Some("resp"), 100, 200);
+        span.attributes.push(KeyValue {
+            key: "http.status_code".to_string(),
+            value: Some(AnyValue {
+                value: Some(Value::IntValue(200)),
+            }),
+        });
+        span.attributes.push(KeyValue {
+            key: "http.url".to_string(),
+            value: Some(AnyValue {
+                value: Some(Value::StringValue("https://example.com".to_string())),
+            }),
+        });
+
+        super::extract_http_body_logs(&mut span);
+
+        assert_eq!(span.attributes.len(), 2, "only body attributes should be removed");
+        let keys: Vec<&str> = span.attributes.iter().map(|a| a.key.as_str()).collect();
+        assert!(keys.contains(&"http.status_code"));
+        assert!(keys.contains(&"http.url"));
+
+        let logs = take_logs_for(inv_id);
+        assert_eq!(logs.len(), 2);
+
+        disable_payload_log_records();
+    }
+
+    #[test]
+    #[serial]
+    fn extract_http_body_logs_disabled_creates_no_logs() {
+        disable_payload_log_records();
+        let inv_id = "inv-http-body-disabled";
+        set_current_invocation(inv_id);
+
+        let mut span = make_http_span(Some("req"), Some("resp"), 100, 200);
+
+        super::extract_http_body_logs(&mut span);
+
+        // Attributes should still be removed even when log creation is disabled
+        assert!(span.attributes.is_empty());
+
+        let logs = take_logs_for(inv_id);
+        assert!(logs.is_empty(), "no logs when DASH0_CREATE_PAYLOAD_LOG_RECORDS is not set");
+    }
+
+    #[test]
+    #[serial]
+    fn extract_http_body_logs_handles_non_json_body() {
+        enable_payload_log_records();
+        let inv_id = "inv-http-body-nonjson";
+        set_current_invocation(inv_id);
+
+        let mut span = make_http_span(Some("plain text body"), None, 100, 200);
+
+        super::extract_http_body_logs(&mut span);
+
+        let logs = take_logs_for(inv_id);
+        assert_eq!(logs.len(), 1);
+        let parsed = parse_payload_log(&logs[0]);
+        // Non-JSON should be wrapped as a JSON string
+        assert_eq!(parsed["message"], "plain text body");
+
+        disable_payload_log_records();
+    }
+
+    #[test]
+    #[serial]
+    fn extract_http_body_logs_invocation_id_set_on_log() {
+        enable_payload_log_records();
+        let inv_id = "inv-http-body-invid";
+        set_current_invocation(inv_id);
+
+        let mut span = make_http_span(Some("req"), None, 100, 200);
+
+        super::extract_http_body_logs(&mut span);
+
+        let logs = take_logs_for(inv_id);
+        assert_eq!(logs.len(), 1);
+        assert_eq!(logs[0].invocation_id.as_deref(), Some(inv_id));
+
+        disable_payload_log_records();
+    }
 }
 
 fn env_as_json_string() -> String {
