@@ -56,8 +56,9 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             }
         }
     }
+    let httpSpanId: string | undefined = undefined;
     if (traced) {
-        const httpSpanId = await checkHttpSpan({
+        httpSpanId = await checkHttpSpan({
             invocationId: invocationId!,
             functionName,
             traceId: traceId!,
@@ -71,6 +72,12 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
         { message: JSON.stringify({ name: "dash0_payload", type: "lambda_event", message: { parameter1: "right" } }), isJson: true },
         { message: JSON.stringify({ name: "dash0_payload", type: "lambda_return_value", message: { statusCode: 200,  body: '"Hello from Lambda!"' } }), isJson: true },
     ]
+    if (traced) {
+        logsToBeChecked.push(
+            { message: JSON.stringify({ name: "dash0_payload", type: "http_request_body", message: { title: "foo", userId: 1 } }), isJson: true, spanId: httpSpanId },
+            { message: JSON.stringify({ name: "dash0_payload", type: "http_response_body" }), isJson: true, spanId: httpSpanId },
+        );
+    }
     if (!invocationEnd) {
         logsToBeChecked.push({ message: 'REPORT RequestId: ' });
     }

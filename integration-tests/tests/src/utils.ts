@@ -4,7 +4,7 @@ import {expect, it} from "vitest";
 import {DASH0_ENDPOINT, DASH0_LAMBDA_TESTS_DATASET, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./config";
 import {InvokeCommand, LambdaClient} from "@aws-sdk/client-lambda";
 
-export type LogToCheck = { message: string; severity?: string; isJson?: boolean };
+export type LogToCheck = { message: string; severity?: string; isJson?: boolean; spanId?: string };
 
 export const RESOURCE_PREFIX = process.env.RESOURCE_PREFIX ?? '';
 
@@ -186,14 +186,10 @@ export const checkLogs = async ({
             expect(allLogRecords.length).toBeGreaterThanOrEqual(2);
             const logsToBeCheckedCount: {[key: string]: boolean} = {};
             for (const logRecord of allLogRecords) {
-                if (traceId && parentSpanId && (success || !logRecord.body.stringValue.startsWith("REPORT RequestId: "))) {
-                    // on error report doesn't have traceId and spanId associated because it arrives after shutdown, data erased.
-                    expect(logRecord.traceId).toEqual(traceId);
-                    expect(logRecord.spanId).toEqual(parentSpanId);
-                }
                 let expectedSeverity = "info";
                 let hasJsonMatch = false;
                 let jsonSeverity: string | null = null;
+                let matchedSpanId: string | null = null;
                 for (const logToCheck of logsToBeChecked) {
                     let matched = false;
                     if (logToCheck.isJson) {
@@ -209,6 +205,9 @@ export const checkLogs = async ({
                     }
                     if (matched) {
                         logsToBeCheckedCount[logToCheck.message] = true;
+                        if (logToCheck.spanId) {
+                            matchedSpanId = logToCheck.spanId;
+                        }
                         if (logToCheck.isJson) {
                             hasJsonMatch = true;
                             if (logToCheck.severity) {
@@ -219,6 +218,20 @@ export const checkLogs = async ({
                         }
                     }
                 }
+
+                // Verify trace/span IDs
+                if (matchedSpanId) {
+                    // Log matched a check with a specific spanId (e.g. HTTP body payload logs)
+                    if (traceId) {
+                        expect(logRecord.traceId).toEqual(traceId);
+                    }
+                    expect(logRecord.spanId).toEqual(matchedSpanId);
+                } else if (traceId && parentSpanId && (success || !logRecord.body.stringValue.startsWith("REPORT RequestId: "))) {
+                    // on error report doesn't have traceId and spanId associated because it arrives after shutdown, data erased.
+                    expect(logRecord.traceId).toEqual(traceId);
+                    expect(logRecord.spanId).toEqual(parentSpanId);
+                }
+
                 // If a JSON check matched this log record, use its severity (or default "info"),
                 // ignoring severity from non-JSON includes matches that may have matched incidentally.
                 if (hasJsonMatch) {
@@ -305,9 +318,9 @@ export const runAllTests = (scenario: string, runtimes: string[], verifySuccessI
                 for (const traced of tracedValues) {
                     const invocationEndLabel = invocationEnd ? 'true' : 'false';
                     const functionName = `${RESOURCE_PREFIX}${runtime}-${scenario}-${traced}-invocation-end-${invocationEndLabel}-${architecture}`;
-                    if (functionName !== 'python3-14-success-true-invocation-end-true-arm64') {
-                        continue;
-                    }
+                    // if (functionName !== 'python3-14-success-true-invocation-end-true-arm64') {
+                    //     continue;
+                    // }
                     it(
                         `invokes ${functionName} successfully`,
                         async () => {
