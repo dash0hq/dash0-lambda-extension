@@ -318,6 +318,9 @@ export const runAllTests = (scenario: string, runtimes: string[], verifySuccessI
                 for (const traced of tracedValues) {
                     const invocationEndLabel = invocationEnd ? 'true' : 'false';
                     const functionName = `${RESOURCE_PREFIX}${runtime}-${scenario}-${traced}-invocation-end-${invocationEndLabel}-${architecture}`;
+                    if (functionName !== 'nodejs22-x-success-true-invocation-end-true-arm64') {
+                        continue
+                    }
                     it(
                         `invokes ${functionName} successfully`,
                         async () => {

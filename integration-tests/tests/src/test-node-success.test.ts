@@ -59,6 +59,15 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             }
         }
     }
+    let httpSpanId: string | undefined = undefined;
+    if (traced) {
+        httpSpanId = await checkHttpSpan({
+            invocationId: invocationId!,
+            functionName,
+            traceId: traceId!,
+            parentSpanId: parentSpanId!,
+        });
+    }
     const logsToBeChecked: LogToCheck[] = [
         { message: 'START RequestId: ' },
         { message: "Handler invoked with event:" },
@@ -67,6 +76,12 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
         { message: JSON.stringify({ name: "dash0_payload", type: "lambda_event", message: { parameter1: "right", masked_field: "****" } }), isJson: true },
         { message: JSON.stringify({ name: "dash0_payload", type: "lambda_return_value", message: { statusCode: 200 } }), isJson: true },
     ]
+    if (traced) {
+        logsToBeChecked.push(
+            { message: JSON.stringify({ name: "dash0_payload", type: "http_request_body", message: { title: "foo", body: "bar", userId: 1 } }), isJson: true, spanId: httpSpanId },
+            { message: JSON.stringify({ name: "dash0_payload", type: "http_response_body" }), isJson: true, spanId: httpSpanId },
+        );
+    }
     if (!invocationEnd) {
         logsToBeChecked.push({ message: 'REPORT RequestId: ' });
     }
