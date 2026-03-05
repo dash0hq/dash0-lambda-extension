@@ -84,6 +84,10 @@ pub struct TelemetryLog {
     pub record: serde_json::Value,
     #[serde(skip_deserializing)]
     pub invocation_id: Option<String>,
+    #[serde(skip_deserializing)]
+    pub trace_id: Option<String>,
+    #[serde(skip_deserializing)]
+    pub span_id: Option<String>,
 }
 
 pub fn store_runtime_done_notifier(sender: tokio::sync::oneshot::Sender<()>) {

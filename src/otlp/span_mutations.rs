@@ -390,9 +390,20 @@ fn extract_http_body_logs(span: &mut Span) {
     };
 
     const ONE_MS_NANOS: u64 = 1_000_000;
+    let trace_id_hex = hex::encode(&span.trace_id);
+    let span_id_hex = hex::encode(&span.span_id);
+
     let body_attr_keys: &[(&str, &str, u64)] = &[
-        ("http.request.body", "http_request_body", span.start_time_unix_nano.saturating_add(ONE_MS_NANOS)),
-        ("http.response.body", "http_response_body", span.end_time_unix_nano.saturating_sub(ONE_MS_NANOS)),
+        (
+            "http.request.body",
+            "http_request_body",
+            span.start_time_unix_nano.saturating_add(ONE_MS_NANOS),
+        ),
+        (
+            "http.response.body",
+            "http_response_body",
+            span.end_time_unix_nano.saturating_sub(ONE_MS_NANOS),
+        ),
     ];
 
     for &(attr_key, payload_type, timestamp_nanos) in body_attr_keys {
@@ -407,9 +418,14 @@ fn extract_http_body_logs(span: &mut Span) {
             }
             None
         }) {
-            if let Some(log) =
-                crate::otlp::log_mutations::build_payload_log(&value, payload_type, &invocation_id, Some(timestamp_nanos))
-            {
+            if let Some(log) = crate::otlp::log_mutations::build_payload_log(
+                &value,
+                payload_type,
+                &invocation_id,
+                Some(timestamp_nanos),
+                Some(trace_id_hex.clone()),
+                Some(span_id_hex.clone()),
+            ) {
                 invocation_entry::update(&invocation_id, |entry| {
                     entry.logs.push(log);
                 });
@@ -627,7 +643,7 @@ mod tests {
     use opentelemetry_proto::tonic::common::v1::any_value::Value;
     use opentelemetry_proto::tonic::common::v1::{AnyValue, InstrumentationScope, KeyValue};
     use opentelemetry_proto::tonic::resource::v1::Resource;
-    use opentelemetry_proto::tonic::trace::v1::{span::SpanKind, ResourceSpans, ScopeSpans, Span};
+    use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span};
     use prost::Message;
     use serial_test::serial;
 

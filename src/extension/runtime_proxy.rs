@@ -232,7 +232,14 @@ pub async fn invocation_response_proxy(req: Request<Body>) -> Result<Response<Bo
 
     let res = passthru_proxy(req).await;
     if let Some(id) = invocation_id {
-        if let Some(log) = build_payload_log(&return_payload, "lambda_return_value", &id, None) {
+        if let Some(log) = build_payload_log(
+            &return_payload,
+            "lambda_return_value",
+            &id,
+            None,
+            None,
+            None,
+        ) {
             invocation_entry::update(&id, |entry| {
                 entry.logs.push(log);
             });
@@ -270,7 +277,14 @@ async fn validate_and_mangle_next_event(
 
     let payload = mask_json_string(&String::from_utf8_lossy(&body_bytes));
 
-    let event_log = build_payload_log(&payload, "lambda_event", _aws_request_id.as_ref(), None);
+    let event_log = build_payload_log(
+        &payload,
+        "lambda_event",
+        _aws_request_id.as_ref(),
+        None,
+        None,
+        None,
+    );
     invocation_entry::update(&_aws_request_id, |entry| {
         entry.event_payload = Some(payload);
         if let Some(log) = event_log {
