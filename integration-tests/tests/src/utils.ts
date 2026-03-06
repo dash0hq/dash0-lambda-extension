@@ -241,7 +241,7 @@ export const checkLogs = async ({
                 if (hasJsonMatch) {
                     expectedSeverity = jsonSeverity ?? "info";
                 }
-                expect(logRecord.severityText.toLowerCase()).toEqual(expectedSeverity);
+                expect(logRecord.severityText.toLowerCase(), `Wrong severity: ${JSON.stringify(logRecord)}`).toEqual(expectedSeverity);
                 if (logRecord.body.stringValue.startsWith("REPORT RequestId: ")) {
                     reportLog = logRecord.body.stringValue;
                 }
