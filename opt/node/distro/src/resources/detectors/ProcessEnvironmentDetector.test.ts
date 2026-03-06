@@ -17,4 +17,17 @@ describe('ProcessEnvironmentDetector', () => {
      */
     process.env = {};
   });
+
+  test('detects environment variables', async () => {
+    process.env = {
+      MY_VAR: 'hello',
+      ANOTHER_VAR: 'world',
+    };
+
+    const resource = await new ProcessEnvironmentDetector().detect();
+
+    const environ = JSON.parse(resource.attributes['process.environ'] as string);
+    expect(environ.MY_VAR).toEqual('hello');
+    expect(environ.ANOTHER_VAR).toEqual('world');
+  });
 });
