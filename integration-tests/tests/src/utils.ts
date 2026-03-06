@@ -190,8 +190,8 @@ export const checkLogs = async ({
                 let hasJsonMatch = false;
                 let jsonSeverity: string | null = null;
                 let matchedSpanId: string | null = null;
+                let matched = false;
                 for (const logToCheck of logsToBeChecked) {
-                    let matched = false;
                     if (logToCheck.isJson) {
                         try {
                             const actual = JSON.parse(logRecord.body.stringValue);
@@ -216,7 +216,11 @@ export const checkLogs = async ({
                         } else if (logToCheck.severity) {
                             expectedSeverity = logToCheck.severity;
                         }
+                        break;
                     }
+                }
+                if (!matched) {
+                    continue;
                 }
 
                 // Verify trace/span IDs
@@ -318,9 +322,6 @@ export const runAllTests = (scenario: string, runtimes: string[], verifySuccessI
                 for (const traced of tracedValues) {
                     const invocationEndLabel = invocationEnd ? 'true' : 'false';
                     const functionName = `${RESOURCE_PREFIX}${runtime}-${scenario}-${traced}-invocation-end-${invocationEndLabel}-${architecture}`;
-                    if (functionName !== 'nodejs22-x-success-true-invocation-end-true-arm64') {
-                        continue
-                    }
                     it(
                         `invokes ${functionName} successfully`,
                         async () => {
