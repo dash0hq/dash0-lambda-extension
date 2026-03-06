@@ -162,6 +162,17 @@ pub fn get_span_id_from_invocation_id(invocation_id: &str) -> Vec<u8> {
     hash[..8].to_vec()
 }
 
+pub fn get_root_span_id_from_invocation_id(invocation_id: &str) -> Vec<u8> {
+    use sha2::{Digest, Sha256};
+
+    let mut hasher = Sha256::new();
+    hasher.update(b"root_span:");
+    hasher.update(invocation_id.as_bytes());
+    let hash = hasher.finalize();
+    // Take first 8 bytes of the hash for the root span ID
+    hash[..8].to_vec()
+}
+
 /// Get the name of the instrumentation scope.
 pub fn get_span_scope_name(
     request: &opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest,

@@ -2,7 +2,7 @@ use hyper::Body;
 use std::time::{Duration, Instant};
 
 use crate::state;
-use crate::util::parsers::get_span_id_from_invocation_id;
+use crate::util::parsers::{get_root_span_id_from_invocation_id, get_span_id_from_invocation_id};
 
 const EXTENSION_API_VERSION: &str = "2020-01-01";
 
@@ -52,6 +52,8 @@ fn handle_invoke_event(json: &serde_json::Value) {
                 let trace_id = hex::encode(&trace_id_bytes);
                 let parent_span_id = hex::encode(&parent_span_id_bytes);
                 let span_id = hex::encode(get_span_id_from_invocation_id(request_id));
+                let root_span_id =
+                    hex::encode(get_root_span_id_from_invocation_id(request_id));
                 let parent_span_id =
                     if !sampled && crate::config::user::is_remove_lambda_parent_span() {
                         String::new()
@@ -61,6 +63,7 @@ fn handle_invoke_event(json: &serde_json::Value) {
                 state::invocation_entry::update(request_id, |entry| {
                     entry.trace_id = Some(trace_id);
                     entry.span_id = Some(span_id);
+                    entry.root_span_id = Some(root_span_id);
                     entry.parent_span_id = Some(parent_span_id);
                     entry.sampled = sampled;
                 });
