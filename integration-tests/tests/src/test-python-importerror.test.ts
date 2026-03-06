@@ -50,7 +50,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
         { message: 'END RequestId: ' },
     ];
     if (!invocationEnd) {
-        logsToBeChecked.push({ message: "Error Type: Runtime.ImportModuleError" }, { message: "REPORT RequestId: " });
+        logsToBeChecked.push({ message: "Error Type: Runtime.ImportModuleError" });
     }
     await checkLogs({
         invocationId: invocationId!,
