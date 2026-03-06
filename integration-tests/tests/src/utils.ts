@@ -247,7 +247,7 @@ export const checkLogs = async ({
                 }
             }
             for (const logToCheck of logsToBeChecked) {
-                expect(logsToBeCheckedCount[logToCheck.message]).toBeTruthy();
+                expect(logsToBeCheckedCount[logToCheck.message], `Log not found: ${logToCheck.message}`).toBeTruthy();
             }
             break;
         } catch (error) {

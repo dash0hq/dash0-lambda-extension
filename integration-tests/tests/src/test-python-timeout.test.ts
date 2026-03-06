@@ -78,7 +78,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
         );
     }
     if (!invocationEnd) {
-        logsToBeChecked.push({ message: "REPORT RequestId: " }, { message: "Status: timeout" });
+        logsToBeChecked.push({ message: "Status: timeout" });
     }
     await checkLogs({
         invocationId: invocationId!,

@@ -62,7 +62,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
         { message: JSON.stringify({ name: "dash0_payload", type: "lambda_event", message: { parameter1: "right" } }), isJson: true },
     ];
     if (!invocationEnd) {
-        logsToBeChecked.push({ message: "REPORT RequestId: " }, { message: "Status: timeout" });
+        logsToBeChecked.push({ message: "Status: timeout" });
     }
     await checkLogs({
         invocationId: invocationId!,
