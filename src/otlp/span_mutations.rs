@@ -1588,7 +1588,10 @@ mod tests {
         assert_eq!(req_parsed["name"], "dash0_payload");
         assert_eq!(req_parsed["type"], "http_request_body");
         assert_eq!(req_parsed["message"], serde_json::json!({"key":"value"}));
-        assert_eq!(req_log.trace_id.as_deref(), Some("5b8eff129842a1b9c9283745a23f54b1"));
+        assert_eq!(
+            req_log.trace_id.as_deref(),
+            Some("5b8eff129842a1b9c9283745a23f54b1")
+        );
         assert_eq!(req_log.span_id.as_deref(), Some("023f54b19283745a"));
 
         // Response log
@@ -1597,7 +1600,10 @@ mod tests {
         assert_eq!(resp_parsed["name"], "dash0_payload");
         assert_eq!(resp_parsed["type"], "http_response_body");
         assert_eq!(resp_parsed["message"], serde_json::json!({"status":"ok"}));
-        assert_eq!(resp_log.trace_id.as_deref(), Some("5b8eff129842a1b9c9283745a23f54b1"));
+        assert_eq!(
+            resp_log.trace_id.as_deref(),
+            Some("5b8eff129842a1b9c9283745a23f54b1")
+        );
         assert_eq!(resp_log.span_id.as_deref(), Some("023f54b19283745a"));
 
         disable_payload_log_records();
@@ -1612,12 +1618,7 @@ mod tests {
 
         let start = 1_700_000_000_000_000_000u64;
         let end = 1_700_000_001_000_000_000u64;
-        let mut span = make_http_span(
-            Some("req"),
-            Some("resp"),
-            start,
-            end,
-        );
+        let mut span = make_http_span(Some("req"), Some("resp"), start, end);
 
         super::extract_http_body_logs(&mut span);
 
@@ -1705,11 +1706,18 @@ mod tests {
 
         super::extract_http_body_logs(&mut span);
 
-        assert_eq!(span.attributes.len(), 1, "non-body attributes should be preserved");
+        assert_eq!(
+            span.attributes.len(),
+            1,
+            "non-body attributes should be preserved"
+        );
         assert_eq!(span.attributes[0].key, "http.method");
 
         let logs = take_logs_for(inv_id);
-        assert!(logs.is_empty(), "no logs should be created when no body attributes");
+        assert!(
+            logs.is_empty(),
+            "no logs should be created when no body attributes"
+        );
 
         disable_payload_log_records();
     }
@@ -1737,7 +1745,11 @@ mod tests {
 
         super::extract_http_body_logs(&mut span);
 
-        assert_eq!(span.attributes.len(), 2, "only body attributes should be removed");
+        assert_eq!(
+            span.attributes.len(),
+            2,
+            "only body attributes should be removed"
+        );
         let keys: Vec<&str> = span.attributes.iter().map(|a| a.key.as_str()).collect();
         assert!(keys.contains(&"http.status_code"));
         assert!(keys.contains(&"http.url"));
@@ -1763,7 +1775,10 @@ mod tests {
         assert!(span.attributes.is_empty());
 
         let logs = take_logs_for(inv_id);
-        assert!(logs.is_empty(), "no logs when DASH0_CREATE_PAYLOAD_LOG_RECORDS is not set");
+        assert!(
+            logs.is_empty(),
+            "no logs when DASH0_CREATE_PAYLOAD_LOG_RECORDS is not set"
+        );
     }
 
     #[test]
