@@ -539,19 +539,11 @@ fn add_event_payload_to_span(span: &mut Span, invocation_id: &str) {
     }
 }
 
-fn remove_parent_span(span: &mut Span, invocation_id: &str) {
-    if !crate::config::user::is_remove_lambda_parent_span() {
-        return;
-    }
-    let sampled = invocation_entry::get_sampled(invocation_id);
-    if sampled {
-        tracing::info!(
-            "[{}] invocation_id={} is sampled, keeping parent span id",
-            crate::log_prefix(),
-            invocation_id
-        );
-    } else {
-        span.parent_span_id = Vec::new();
+fn reparent_to_root_span(span: &mut Span, invocation_id: &str) {
+    if let Some(root_span_id) = invocation_entry::get_root_span_id(invocation_id) {
+        if let Ok(bytes) = hex::decode(&root_span_id) {
+            span.parent_span_id = bytes;
+        }
     }
 }
 
@@ -611,7 +603,7 @@ pub fn process_trace_request(
 
                 invocation_ids.push(invocation_id.clone());
                 add_event_payload_to_span(span, &invocation_id);
-                remove_parent_span(span, &invocation_id);
+                reparent_to_root_span(span, &invocation_id);
                 store_span_ids(span, &invocation_id);
             }
         }
