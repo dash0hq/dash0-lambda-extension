@@ -10,6 +10,35 @@ use opentelemetry_proto::tonic::trace::v1::span::SpanKind;
 use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span};
 use prost::Message;
 
+pub fn get_span_attributes(invocation_id: &str) -> Vec<KeyValue> {
+    vec![
+        KeyValue {
+            key: "faas.invocation_id".to_string(),
+            value: Some(AnyValue {
+                value: Some(Value::StringValue(invocation_id.to_string())),
+            }),
+        },
+        KeyValue {
+            key: "cloud.resource_id".to_string(),
+            value: Some(AnyValue {
+                value: Some(Value::StringValue(
+                    crate::state::global::get_function_arn()
+                        .unwrap_or_else(|| "unknown".to_string()),
+                )),
+            }),
+        },
+        KeyValue {
+            key: "cloud.account.id".to_string(),
+            value: Some(AnyValue {
+                value: Some(Value::StringValue(
+                    crate::state::global::get_account_id()
+                        .unwrap_or_else(|| "unknown".to_string()),
+                )),
+            }),
+        },
+    ]
+}
+
 pub fn create_supplementary_spans(invocation_id: &str) {
     let data = match invocation_entry::get_supplementary_span_data(invocation_id) {
         Some(d) => d,
@@ -59,31 +88,7 @@ pub fn create_supplementary_spans(invocation_id: &str) {
         kind: SpanKind::Server as i32,
         start_time_unix_nano: start_nanos,
         end_time_unix_nano: end_nanos,
-        attributes: vec![
-            KeyValue {
-                key: "faas.invocation_id".to_string(),
-                value: Some(AnyValue {
-                    value: Some(Value::StringValue(invocation_id.to_string())),
-                }),
-            },
-            KeyValue {
-                key: "cloud.resource_id".to_string(),
-                value: Some(AnyValue {
-                    value: Some(Value::StringValue(
-                        crate::state::global::get_function_arn()
-                            .unwrap_or_else(|| "unknown".to_string()),
-                    )),
-                }),
-            },
-            KeyValue {
-                key: "cloud.account.id".to_string(),
-                value: Some(AnyValue {
-                    value: Some(Value::StringValue(
-                        crate::state::global::get_account_id().unwrap_or_else(|| "unknown".to_string()),
-                    )),
-                }),
-            },
-        ],
+        attributes: get_span_attributes(invocation_id),
         ..Default::default()
     };
 

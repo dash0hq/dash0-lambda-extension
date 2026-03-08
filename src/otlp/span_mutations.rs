@@ -38,31 +38,7 @@ pub fn build_synthetic_trace(
         .map(|t| (t * 1_000_000.0) as u64)
         .unwrap_or(now_nanos);
 
-    let mut attributes = vec![
-        KeyValue {
-            key: "faas.invocation_id".to_string(),
-            value: Some(AnyValue {
-                value: Some(Value::StringValue(invocation_id.to_string())),
-            }),
-        },
-        KeyValue {
-            key: "cloud.resource_id".to_string(),
-            value: Some(AnyValue {
-                value: Some(Value::StringValue(
-                    crate::state::global::get_function_arn()
-                        .unwrap_or_else(|| "unknown".to_string()),
-                )),
-            }),
-        },
-        KeyValue {
-            key: "cloud.account.id".to_string(),
-            value: Some(AnyValue {
-                value: Some(Value::StringValue(
-                    crate::state::global::get_account_id().unwrap_or_else(|| "unknown".to_string()),
-                )),
-            }),
-        },
-    ];
+    let mut attributes = crate::otlp::span_creation::get_span_attributes(invocation_id);
 
     let mut sqs_links = Vec::new();
     if let Some(event_payload) = invocation_entry::get_event_payload(invocation_id) {
