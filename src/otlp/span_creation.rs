@@ -59,12 +59,31 @@ pub fn create_supplementary_spans(invocation_id: &str) {
         kind: SpanKind::Server as i32,
         start_time_unix_nano: start_nanos,
         end_time_unix_nano: end_nanos,
-        attributes: vec![KeyValue {
-            key: "faas.invocation_id".to_string(),
-            value: Some(AnyValue {
-                value: Some(Value::StringValue(invocation_id.to_string())),
-            }),
-        }],
+        attributes: vec![
+            KeyValue {
+                key: "faas.invocation_id".to_string(),
+                value: Some(AnyValue {
+                    value: Some(Value::StringValue(invocation_id.to_string())),
+                }),
+            },
+            KeyValue {
+                key: "cloud.resource_id".to_string(),
+                value: Some(AnyValue {
+                    value: Some(Value::StringValue(
+                        crate::state::global::get_function_arn()
+                            .unwrap_or_else(|| "unknown".to_string()),
+                    )),
+                }),
+            },
+            KeyValue {
+                key: "cloud.account.id".to_string(),
+                value: Some(AnyValue {
+                    value: Some(Value::StringValue(
+                        crate::state::global::get_account_id().unwrap_or_else(|| "unknown".to_string()),
+                    )),
+                }),
+            },
+        ],
         ..Default::default()
     };
 
