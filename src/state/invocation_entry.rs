@@ -138,6 +138,30 @@ pub struct TelemetryData {
     pub end_time: f64,
 }
 
+/// Data needed to build supplementary spans (root span).
+pub struct SupplementarySpanData {
+    pub root_span_id: Option<String>,
+    pub trace_id: Option<String>,
+    pub parent_span_id: Option<String>,
+    pub sampled: bool,
+    pub start_time: f64,
+    pub billed_duration: f64,
+}
+
+pub fn get_supplementary_span_data(invocation_id: &str) -> Option<SupplementarySpanData> {
+    INVOCATION_STORE
+        .lock()
+        .get(invocation_id)
+        .map(|e| SupplementarySpanData {
+            root_span_id: e.root_span_id.clone(),
+            trace_id: e.trace_id.clone(),
+            parent_span_id: e.parent_span_id.clone(),
+            sampled: e.sampled,
+            start_time: e.start_time,
+            billed_duration: e.billed_duration,
+        })
+}
+
 pub fn get_telemetry_data(invocation_id: &str) -> Option<TelemetryData> {
     INVOCATION_STORE
         .lock()

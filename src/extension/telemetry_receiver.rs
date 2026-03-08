@@ -1,5 +1,6 @@
 use crate::config::user::is_logs_instrumentation_enabled;
 use crate::otlp::exporter::{flush_telemetry_logs, send_traces};
+use crate::otlp::span_creation::create_supplementary_spans;
 use crate::otlp::span_mutations::build_synthetic_trace;
 use crate::state::invocation_entry;
 use crate::util::parsers::extract_error_invocation_ids;
@@ -28,6 +29,7 @@ pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
         for log in &logs {
             if log.r#type == "platform.report" {
                 if let Some(id) = &log.invocation_id {
+                    create_supplementary_spans(id);
                     invocation_entry::update(id, |entry| {
                         entry.state = crate::state::invocation_entry::InvocationState::Done;
                     });
