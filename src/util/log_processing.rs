@@ -118,17 +118,6 @@ fn parse_platform_runtime_done(log: &TelemetryLog) {
 fn parse_platform_report(log: &TelemetryLog) {
     if let Some(record) = log.record.as_object() {
         if let Some(req_id) = record.get("requestId").and_then(|v| v.as_str()) {
-            let log_timestamp = if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&log.time) {
-                dt.timestamp_millis() as f64
-            } else {
-                tracing::info!(
-                    "[{}] Failed to parse platform.report log time: {}",
-                    crate::log_prefix(),
-                    log.time
-                );
-                0.0
-            };
-
             if let Some(metrics) = record.get("metrics").and_then(|m| m.as_object()) {
                 let duration = metrics
                     .get("durationMs")
@@ -148,12 +137,6 @@ fn parse_platform_report(log: &TelemetryLog) {
                     .unwrap_or(0.0);
 
                 crate::state::invocation_entry::update(req_id, |entry| {
-                    if entry.start_time > 0.0 {
-                        entry.end_time = entry.start_time + duration;
-                    } else if log_timestamp > 0.0 {
-                        entry.end_time = log_timestamp;
-                    }
-
                     entry.duration = duration;
                     entry.billed_duration = billed_duration;
                     entry.memory_usage = memory_usage;
