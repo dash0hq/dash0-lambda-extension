@@ -283,7 +283,7 @@ mod tests {
         let end_time = "2023-01-01T12:00:01.000Z";
 
         let mut logs = vec![
-            create_log(
+            create_log( 
                 "platform.start",
                 start_time,
                 json!({ "requestId": req_id }),

@@ -28,7 +28,10 @@ pub fn build_synthetic_trace(
     return_value: Option<&str>,
     existing_traces: &[StoredTrace],
 ) -> Option<StoredTrace> {
-    let (trace_id, span_id, parent_span_id) = get_trace_span_ids(invocation_id, existing_traces);
+    let (trace_id, span_id) = get_trace_span_ids(invocation_id, existing_traces);
+    let parent_span_id = invocation_entry::get_root_span_id(invocation_id)
+        .and_then(|id| hex::decode(&id).ok())
+        .unwrap_or_default();
 
     let now_nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -1097,7 +1100,7 @@ mod tests {
             parent_span_id.clone(),
         );
 
-        let (got_trace, got_span, _got_parent) =
+        let (got_trace, got_span) =
             super::get_trace_span_ids(invocation_id, &[stored_trace]);
 
         assert_eq!(got_trace, trace_id);
@@ -1111,19 +1114,16 @@ mod tests {
         let invocation_id = "inv-ids-from-entry";
         let trace_id_hex = "aa".repeat(16);
         let span_id_hex = "bb".repeat(8);
-        let parent_span_id_hex = "cc".repeat(8);
 
         invocation_entry::update(invocation_id, |entry| {
             entry.trace_id = Some(trace_id_hex.clone());
             entry.span_id = Some(span_id_hex.clone());
-            entry.parent_span_id = Some(parent_span_id_hex.clone());
         });
 
-        let (got_trace, got_span, _got_parent) = super::get_trace_span_ids(invocation_id, &[]);
+        let (got_trace, got_span) = super::get_trace_span_ids(invocation_id, &[]);
 
         assert_eq!(hex::encode(&got_trace), trace_id_hex);
         assert_eq!(hex::encode(&got_span), span_id_hex);
-        assert_eq!(hex::encode(_got_parent), parent_span_id_hex);
     }
 
     #[test]
@@ -1131,17 +1131,13 @@ mod tests {
     fn get_trace_span_ids_falls_back_to_hash() {
         let invocation_id = "inv-ids-hash-fallback";
         // No traces, no stored entry → should generate from hash
-        let (got_trace, got_span, got_parent) = super::get_trace_span_ids(invocation_id, &[]);
+        let (got_trace, got_span) = super::get_trace_span_ids(invocation_id, &[]);
 
         let expected_trace = crate::util::parsers::get_trace_id_from_invocation_id(invocation_id);
         let expected_span = crate::util::parsers::get_span_id_from_invocation_id(invocation_id);
 
         assert_eq!(got_trace, expected_trace);
         assert_eq!(got_span, expected_span);
-        assert!(
-            got_parent.is_empty(),
-            "parent_span_id should be empty when nothing is stored"
-        );
     }
 
     #[test]
@@ -1165,7 +1161,7 @@ mod tests {
             trace_parent_span_id.clone(),
         );
 
-        let (got_trace, got_span, _got_parent) =
+        let (got_trace, got_span) =
             super::get_trace_span_ids(invocation_id, &[stored_trace]);
 
         // trace_id and span_id should come from the existing trace, not the stored entry
@@ -1184,7 +1180,7 @@ mod tests {
             vec![0xCC; 8],
         );
 
-        let (got_trace, got_span, _) = super::get_trace_span_ids(invocation_id, &[other_trace]);
+        let (got_trace, got_span) = super::get_trace_span_ids(invocation_id, &[other_trace]);
 
         // Should fall through to hash-based generation
         let expected_trace = crate::util::parsers::get_trace_id_from_invocation_id(invocation_id);
@@ -1669,10 +1665,9 @@ fn env_as_json_string() -> String {
 fn get_trace_span_ids(
     invocation_id: &str,
     existing_traces: &[StoredTrace],
-) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+) -> (Vec<u8>, Vec<u8>) {
     let mut trace_id: Option<Vec<u8>> = None;
     let mut span_id: Option<Vec<u8>> = None;
-    let parent_span_id: Option<Vec<u8>> = None;
 
     for trace in existing_traces {
         if !trace.invocation_ids.contains(&invocation_id.to_string()) {
@@ -1723,21 +1718,10 @@ fn get_trace_span_ids(
             .unwrap_or_else(|| get_span_id_from_invocation_id(invocation_id))
     });
 
-    let parent_span_id = parent_span_id.unwrap_or_else(|| {
-        stored_ids
-            .as_ref()
-            .and_then(|(_, _, p)| p.as_deref())
-            .filter(|p| !p.is_empty())
-            .and_then(|p| hex::decode(p).ok())
-            .filter(|p| p.len() == 8)
-            .unwrap_or_default()
-    });
-
     invocation_entry::update(invocation_id, |entry| {
         entry.trace_id = Some(hex::encode(&trace_id));
         entry.span_id = Some(hex::encode(&span_id));
-        entry.parent_span_id = Some(hex::encode(&parent_span_id));
     });
 
-    (trace_id, span_id, parent_span_id)
+    (trace_id, span_id)
 }
