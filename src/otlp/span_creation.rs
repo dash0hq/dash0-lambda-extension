@@ -97,8 +97,8 @@ pub fn create_supplementary_spans(invocation_id: &str) {
 
     let scope_spans = ScopeSpans {
         scope: Some(InstrumentationScope {
-            name: "opentelemetry.instrumentation.aws_lambda".to_string(),
-            version: "unknown".to_string(),
+            name: "dash0.lambda-extension".to_string(),
+            version: "1.0".to_string(),
             ..Default::default()
         }),
         spans,
@@ -144,4 +144,80 @@ pub fn create_supplementary_spans(invocation_id: &str) {
     };
 
     invocation_entry::store_trace_by_id(invocation_id, trace);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::invocation_entry;
+    use opentelemetry_proto::tonic::common::v1::any_value::Value;
+    use prost::Message;
+    use serial_test::serial;
+
+    fn reset_store() {
+        // Remove test entries
+        invocation_entry::remove("inv-supp-1");
+    }
+
+    #[test]
+    #[serial]
+    fn create_supplementary_spans_stores_root_span() {
+        reset_store();
+        let invocation_id = "inv-supp-1";
+        let trace_id_hex = "aa".repeat(16);
+        let root_span_id_hex = "bb".repeat(8);
+        let parent_span_id_hex = "cc".repeat(8);
+
+        invocation_entry::update(invocation_id, |entry| {
+            entry.trace_id = Some(trace_id_hex.clone());
+            entry.root_span_id = Some(root_span_id_hex.clone());
+            entry.parent_span_id = Some(parent_span_id_hex.clone());
+            entry.sampled = true;
+            entry.start_time = 1_000.0; // 1 second in ms
+            entry.billed_duration = 500.0; // 500ms
+        });
+
+        std::env::set_var("AWS_LAMBDA_FUNCTION_NAME", "my-function");
+        create_supplementary_spans(invocation_id);
+        std::env::remove_var("AWS_LAMBDA_FUNCTION_NAME");
+
+        let traces = invocation_entry::take_traces_by_id(invocation_id);
+        assert_eq!(traces.len(), 1);
+
+        let trace = &traces[0];
+        assert_eq!(trace.path_and_query, "/v1/traces");
+        assert_eq!(trace.invocation_ids, vec![invocation_id.to_string()]);
+
+        let decoded = ExportTraceServiceRequest::decode(trace.body.as_slice())
+            .expect("should decode");
+        let span = &decoded.resource_spans[0].scope_spans[0].spans[0];
+
+        assert_eq!(hex::encode(&span.span_id), root_span_id_hex);
+        assert_eq!(hex::encode(&span.trace_id), trace_id_hex);
+        assert_eq!(hex::encode(&span.parent_span_id), parent_span_id_hex);
+        assert_eq!(span.name, "my-function");
+        assert_eq!(span.start_time_unix_nano, 1_000_000_000); // 1s in nanos
+        assert_eq!(span.end_time_unix_nano, 1_500_000_000); // 1s + 500ms
+
+        let inv_attr = span
+            .attributes
+            .iter()
+            .find(|kv| kv.key == "faas.invocation_id")
+            .and_then(|kv| kv.value.as_ref())
+            .and_then(|v| match &v.value {
+                Some(Value::StringValue(s)) => Some(s.as_str()),
+                _ => None,
+            });
+        assert_eq!(inv_attr, Some(invocation_id));
+    }
+
+    #[test]
+    #[serial]
+    fn create_supplementary_spans_noop_without_data() {
+        reset_store();
+        // No invocation entry exists — should not panic or store anything
+        create_supplementary_spans("inv-nonexistent");
+        let traces = invocation_entry::take_traces_by_id("inv-nonexistent");
+        assert!(traces.is_empty());
+    }
 }
