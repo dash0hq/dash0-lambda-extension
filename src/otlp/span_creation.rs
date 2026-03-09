@@ -31,8 +31,7 @@ pub fn get_span_attributes(invocation_id: &str) -> Vec<KeyValue> {
             key: "cloud.account.id".to_string(),
             value: Some(AnyValue {
                 value: Some(Value::StringValue(
-                    crate::state::global::get_account_id()
-                        .unwrap_or_else(|| "unknown".to_string()),
+                    crate::state::global::get_account_id().unwrap_or_else(|| "unknown".to_string()),
                 )),
             }),
         },
@@ -49,16 +48,15 @@ fn create_root_span(
     let span_id = hex::decode(root_span_id).ok()?;
     let trace_id = hex::decode(trace_id_hex).ok()?;
 
-    let parent_span_id =
-        if data.sampled || !crate::config::user::is_remove_lambda_parent_span() {
-            data.parent_span_id
-                .as_deref()
-                .filter(|s| !s.is_empty())
-                .and_then(|p| hex::decode(p).ok())
-                .unwrap_or_default()
-        } else {
-            Vec::new()
-        };
+    let parent_span_id = if data.sampled || !crate::config::user::is_remove_lambda_parent_span() {
+        data.parent_span_id
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .and_then(|p| hex::decode(p).ok())
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
 
     let start_nanos = (data.start_time * 1_000_000.0) as u64;
     let end_nanos = start_nanos + (data.billed_duration * 1_000_000.0) as u64;
@@ -74,7 +72,34 @@ fn create_root_span(
         kind: SpanKind::Server as i32,
         start_time_unix_nano: start_nanos,
         end_time_unix_nano: end_nanos,
-        attributes: get_span_attributes(invocation_id),
+        attributes: {
+            let mut attrs = get_span_attributes(invocation_id);
+            if data.init_duration > 0.0 {
+                attrs.push(KeyValue {
+                    key: "faas.init_duration".to_string(),
+                    value: Some(AnyValue {
+                        value: Some(Value::DoubleValue(data.init_duration)),
+                    }),
+                });
+            }
+            if data.billed_duration > 0.0 {
+                attrs.push(KeyValue {
+                    key: "dash0.faas.billed_duration".to_string(),
+                    value: Some(AnyValue {
+                        value: Some(Value::DoubleValue(data.billed_duration)),
+                    }),
+                });
+            }
+            if data.memory_usage > 0 {
+                attrs.push(KeyValue {
+                    key: "dash0.faas.memory_used".to_string(),
+                    value: Some(AnyValue {
+                        value: Some(Value::IntValue(data.memory_usage as i64)),
+                    }),
+                });
+            }
+            attrs
+        },
         ..Default::default()
     })
 }
@@ -175,6 +200,8 @@ mod tests {
             entry.sampled = true;
             entry.start_time = 1_000.0; // 1 second in ms
             entry.billed_duration = 500.0; // 500ms
+            entry.init_duration = 150.0;
+            entry.memory_usage = 256;
         });
 
         std::env::set_var("AWS_LAMBDA_FUNCTION_NAME", "my-function");
@@ -188,8 +215,8 @@ mod tests {
         assert_eq!(trace.path_and_query, "/v1/traces");
         assert_eq!(trace.invocation_ids, vec![invocation_id.to_string()]);
 
-        let decoded = ExportTraceServiceRequest::decode(trace.body.as_slice())
-            .expect("should decode");
+        let decoded =
+            ExportTraceServiceRequest::decode(trace.body.as_slice()).expect("should decode");
         let span = &decoded.resource_spans[0].scope_spans[0].spans[0];
 
         assert_eq!(hex::encode(&span.span_id), root_span_id_hex);
@@ -209,6 +236,39 @@ mod tests {
                 _ => None,
             });
         assert_eq!(inv_attr, Some(invocation_id));
+
+        let init_dur = span
+            .attributes
+            .iter()
+            .find(|kv| kv.key == "faas.init_duration")
+            .and_then(|kv| kv.value.as_ref())
+            .and_then(|v| match &v.value {
+                Some(Value::DoubleValue(d)) => Some(*d),
+                _ => None,
+            });
+        assert_eq!(init_dur, Some(150.0));
+
+        let billed_dur = span
+            .attributes
+            .iter()
+            .find(|kv| kv.key == "dash0.faas.billed_duration")
+            .and_then(|kv| kv.value.as_ref())
+            .and_then(|v| match &v.value {
+                Some(Value::DoubleValue(d)) => Some(*d),
+                _ => None,
+            });
+        assert_eq!(billed_dur, Some(500.0));
+
+        let mem_used = span
+            .attributes
+            .iter()
+            .find(|kv| kv.key == "dash0.faas.memory_used")
+            .and_then(|kv| kv.value.as_ref())
+            .and_then(|v| match &v.value {
+                Some(Value::IntValue(i)) => Some(*i),
+                _ => None,
+            });
+        assert_eq!(mem_used, Some(256));
     }
 
     #[test]

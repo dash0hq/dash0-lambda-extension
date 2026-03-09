@@ -146,6 +146,8 @@ pub struct SupplementarySpanData {
     pub sampled: bool,
     pub start_time: f64,
     pub billed_duration: f64,
+    pub init_duration: f64,
+    pub memory_usage: u64,
 }
 
 pub fn get_supplementary_span_data(invocation_id: &str) -> Option<SupplementarySpanData> {
@@ -159,6 +161,8 @@ pub fn get_supplementary_span_data(invocation_id: &str) -> Option<SupplementaryS
             sampled: e.sampled,
             start_time: e.start_time,
             billed_duration: e.billed_duration,
+            init_duration: e.init_duration,
+            memory_usage: e.memory_usage,
         })
 }
 
