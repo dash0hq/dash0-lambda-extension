@@ -40,8 +40,6 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             span = spanPayload.resourceSpans[0].scopeSpans[0].spans[0];
             const spanAttributes = getAttributesMap(span.attributes);
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
-            expect(spanAttributes['dash0.faas.event'].stringValue).toEqual('{"parameter1":"throw"}');
-            // expect(spanAttributes['dash0.faas.return_value'].stringValue).contains('ReferenceError');
 
 
             // check exception event
@@ -74,8 +72,10 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
     const logsToBeChecked: LogToCheck[] = [
         { message: 'START RequestId: ' },
         { message: "Input received:" },
-        { message: "java.lang.RuntimeException" },
         { message: 'END RequestId: ' },
+        { message: JSON.stringify({ name: "dash0_payload", type: "lambda_event", message: { parameter1: "throw" } }), isJson: true },
+        { message: JSON.stringify({ name: "dash0_payload", type: "lambda_return_value" }), isJson: true },
+        { message: "java.lang.RuntimeException" },
     ]
     if (!invocationEnd) {
         logsToBeChecked.push({ message: 'REPORT RequestId: ' });

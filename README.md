@@ -42,6 +42,8 @@ See the release page for the latest ARNs of the extension layers for each runtim
 
 * `DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER` - When set to `true`, the extension extracts span links from message attributes for SQS, SNS, Kinesis, and adds them to the Lambda server span. Default: `true`.
 
+* `DASH0_CREATE_PAYLOAD_LOG_RECORDS` - When set to `true` (the default), the extension creates log records containing the request and response payloads for the lambda invocation and each client call. Set to `false` to disable. Default: `true`.
+
 * `DASH0_LOGS_INSTRUMENTATION_ENABLED` - When set to `true`, logs won't be collected from the Telemetry API, to prevent duplicates from the OTEL instrumentation. Default: `false`.
 
 ### Secret Masking

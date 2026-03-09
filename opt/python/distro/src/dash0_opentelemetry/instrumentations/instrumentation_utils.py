@@ -4,7 +4,7 @@ from opentelemetry.trace.span import Span
 
 from dash0_opentelemetry.libs.general_utils import dash0_safe_execute
 
-PAYLOAD_MAX_SIZE = 2048
+PAYLOAD_MAX_SIZE = 2 * 1024 * 1024
 
 
 def add_body_attribute(

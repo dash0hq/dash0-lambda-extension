@@ -6,7 +6,7 @@ import {
     checkHttpSpan,
     checkLogs,
     checkResourceAttributes,
-    checkSpanAttributesFromReport, compareJsonStrings,
+    checkSpanAttributesFromReport,
     getAttributesMap,
     getRequestPayload,
     invokeFunction, LogToCheck, runAllTests
@@ -44,8 +44,6 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             span = spanPayload.resourceSpans[0].scopeSpans[0].spans[0];
             const spanAttributes = getAttributesMap(span.attributes);
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
-            compareJsonStrings(spanAttributes['dash0.faas.event'].stringValue, '{"parameter1":"right","masked_field":"****"}');
-            compareJsonStrings(spanAttributes['dash0.faas.return_value'].stringValue, '{"statusCode":200,"body":"{\\"message\\":\\"Success\\"}"}');
 
             const resourceAttributes = getAttributesMap(spanPayload.resourceSpans[0].resource.attributes);
             expect(JSON.parse(resourceAttributes['process.environ'].stringValue)['MASKED_FIELD']).toEqual('****');
@@ -61,12 +59,29 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             }
         }
     }
+    let httpSpanId: string | undefined = undefined;
+    if (traced) {
+        httpSpanId = await checkHttpSpan({
+            invocationId: invocationId!,
+            functionName,
+            traceId: traceId!,
+            parentSpanId: parentSpanId!,
+        });
+    }
     const logsToBeChecked: LogToCheck[] = [
         { message: 'START RequestId: ' },
         { message: "Handler invoked with event:" },
         { message: "let's parse this as a warning", severity: "warn" },
         { message: 'END RequestId: ' },
+        { message: JSON.stringify({ name: "dash0_payload", type: "lambda_event", message: { parameter1: "right", masked_field: "****" } }), isJson: true },
+        { message: JSON.stringify({ name: "dash0_payload", type: "lambda_return_value", message: { statusCode: 200 } }), isJson: true },
     ]
+    if (traced) {
+        logsToBeChecked.push(
+            { message: JSON.stringify({ name: "dash0_payload", type: "http_request_body", message: { title: "foo", body: "bar", userId: 1 } }), isJson: true, spanId: httpSpanId },
+            { message: JSON.stringify({ name: "dash0_payload", type: "http_response_body" }), isJson: true, spanId: httpSpanId },
+        );
+    }
     if (!invocationEnd) {
         logsToBeChecked.push({ message: 'REPORT RequestId: ' });
     }

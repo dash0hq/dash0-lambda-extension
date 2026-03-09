@@ -193,7 +193,7 @@ describe('Distro initialization', () => {
         const { init } = jest.requireActual('./distro');
         const { tracerProvider } = await init;
 
-        expect(tracerProvider._config.spanLimits['attributeValueLengthLimit']).toBe(2048);
+        expect(tracerProvider._config.spanLimits['attributeValueLengthLimit']).toBe(2097152);
       });
     });
 

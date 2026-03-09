@@ -280,6 +280,8 @@ mod tests {
             r#type: "function".to_string(),
             record: serde_json::json!({"msg": "hello"}),
             invocation_id: invocation_id.map(String::from),
+            trace_id: None,
+            span_id: None,
         }
     }
 

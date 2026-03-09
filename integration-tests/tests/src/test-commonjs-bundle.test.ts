@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest';
 import { DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS } from "./config";
 import {
     checkLogs,
-    compareJsonStrings,
     getAttributesMap,
     getRequestPayload, LogToCheck,
     invokeFunction,
@@ -42,10 +41,6 @@ const verifyCjsSuccess = async (functionName: string) => {
             const span = spanPayload.resourceSpans[0].scopeSpans[0].spans[0];
             const spanAttributes = getAttributesMap(span.attributes);
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
-            compareJsonStrings(
-                spanAttributes['dash0.faas.return_value'].stringValue,
-                '{"statusCode":200,"body":"{\\"message\\":\\"Success\\"}"}'
-            );
 
             traceId = span.traceId;
             parentSpanId = span.spanId;
@@ -68,6 +63,8 @@ const verifyCjsSuccess = async (functionName: string) => {
             { message: 'START RequestId: ' },
             { message: 'Handler invoked with event:' },
             { message: 'END RequestId: ' },
+            { message: JSON.stringify({ name: "dash0_payload", type: "lambda_event", message: { parameter1: "right" } }), isJson: true },
+            { message: JSON.stringify({ name: "dash0_payload", type: "lambda_return_value", message: { statusCode: 200 } }), isJson: true },
         ],
     });
 };

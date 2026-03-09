@@ -5,7 +5,7 @@ import * as https from 'https';
 import { logger } from './logging';
 import { sortify } from './tools/jsonSortify';
 
-export const DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT = 2048;
+export const DEFAULT_ATTRIBUTE_VALUE_LENGTH_LIMIT = 2 * 1024 * 1024;
 
 export function safeExecute<T>(
   callback: Function,

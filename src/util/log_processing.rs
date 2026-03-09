@@ -185,6 +185,8 @@ mod tests {
             r#type: log_type.to_string(),
             record,
             invocation_id,
+            trace_id: None,
+            span_id: None,
         }
     }
 

@@ -8,13 +8,12 @@ use hyper::HeaderMap;
 
 use crate::config::endpoints;
 use crate::config::is_auto_instrumented_disabled;
-use crate::otlp::span_mutations::{
-    add_return_payload_to_lambda_server_spans, build_synthetic_trace,
-};
+use crate::otlp::log_mutations::build_payload_log;
+use crate::otlp::masking::mask_json_string;
+use crate::otlp::span_mutations::build_synthetic_trace;
 use crate::state::invocation_data::store_current_invocation_id;
 use crate::state::invocation_entry;
 use crate::util::parsers::extract_invocation_id_from_path;
-use crate::util::truncate::process_payload;
 
 static HTTP_CLIENT: Lazy<hyper::Client<hyper::client::HttpConnector, Body>> =
     Lazy::new(|| hyper::Client::new());
@@ -228,23 +227,29 @@ pub async fn invocation_response_proxy(req: Request<Body>) -> Result<Response<Bo
     let (parts, body) = req.into_parts();
     let body_bytes = hyper::body::to_bytes(body).await?;
 
-    let return_payload = process_payload(&String::from_utf8_lossy(&body_bytes));
+    let return_payload = mask_json_string(&String::from_utf8_lossy(&body_bytes));
     let req = Request::from_parts(parts, Body::from(body_bytes));
 
     let res = passthru_proxy(req).await;
     if let Some(id) = invocation_id {
+        if let Some(log) = build_payload_log(
+            &return_payload,
+            "lambda_return_value",
+            &id,
+            None,
+            None,
+            None,
+        ) {
+            invocation_entry::update(&id, |entry| {
+                entry.logs.push(log);
+            });
+        }
+
         if is_auto_instrumented_disabled() {
             if let Some(trace) =
                 build_synthetic_trace(&id, None, Some(return_payload.as_str()), &Vec::new())
             {
                 invocation_entry::store_trace_by_id(&id, trace);
-            }
-        } else {
-            if !add_return_payload_to_lambda_server_spans(&id, &return_payload) {
-                tracing::info!(
-                    "[{}] invocation_response_proxy - no lambda server span found for return value {}", crate::log_prefix(),
-                    &id
-                );
             }
         }
     }
@@ -270,9 +275,21 @@ async fn validate_and_mangle_next_event(
         hyper::body::Bytes::new()
     });
 
-    let payload = String::from_utf8_lossy(&body_bytes).to_string();
+    let payload = mask_json_string(&String::from_utf8_lossy(&body_bytes));
+
+    let event_log = build_payload_log(
+        &payload,
+        "lambda_event",
+        _aws_request_id.as_ref(),
+        None,
+        None,
+        None,
+    );
     invocation_entry::update(&_aws_request_id, |entry| {
         entry.event_payload = Some(payload);
+        if let Some(log) = event_log {
+            entry.logs.push(log);
+        }
     });
 
     // Reconstruct the response with the same parts and body

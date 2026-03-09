@@ -4,7 +4,7 @@ import {expect, it} from "vitest";
 import {DASH0_ENDPOINT, DASH0_LAMBDA_TESTS_DATASET, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./config";
 import {InvokeCommand, LambdaClient} from "@aws-sdk/client-lambda";
 
-export type LogToCheck = { message: string; severity?: string };
+export type LogToCheck = { message: string; severity?: string; isJson?: boolean; spanId?: string };
 
 export const RESOURCE_PREFIX = process.env.RESOURCE_PREFIX ?? '';
 
@@ -101,9 +101,14 @@ export const checkHttpSpan = async ({
                 body: JSON.stringify({
                     filter: [
                         {
-                            operator: 'contains',
-                            key: 'http.response.body',
+                            operator: 'is',
+                            key: 'service.name',
                             value: functionName,
+                        },
+                        {
+                            operator: 'is',
+                            key: 'http.request.method',
+                            value: 'POST',
                         },
                     ],
                     timeRange: {
@@ -124,7 +129,7 @@ export const checkHttpSpan = async ({
             const matchingSpan = httpSpans.find((span: any) => span.traceId === traceId && span.parentSpanId === parentSpanId);
             expect(matchingSpan).toBeDefined();
             checkResourceAttributes(spanPayload.resourceSpans[0].resource.attributes, functionName);
-            break;
+            return matchingSpan.spanId;
         } catch (error) {
             console.error(`Error fetching spans on attempt ${attempt}:`, error);
             if (attempt === MAX_ATTEMPTS) {
@@ -133,6 +138,13 @@ export const checkHttpSpan = async ({
         }
     }
 }
+
+const deepPartialMatch = (actual: any, expected: any): boolean => {
+    if (expected === null || expected === undefined) return actual === expected;
+    if (typeof expected !== 'object') return actual === expected;
+    if (typeof actual !== 'object' || actual === null) return false;
+    return Object.keys(expected).every(key => deepPartialMatch(actual[key], expected[key]));
+};
 
 export const checkLogs = async ({
     invocationId,
@@ -174,27 +186,68 @@ export const checkLogs = async ({
             expect(allLogRecords.length).toBeGreaterThanOrEqual(2);
             const logsToBeCheckedCount: {[key: string]: boolean} = {};
             for (const logRecord of allLogRecords) {
-                if (traceId && parentSpanId && (success || !logRecord.body.stringValue.startsWith("REPORT RequestId: "))) {
+                let expectedSeverity = "info";
+                let hasJsonMatch = false;
+                let jsonSeverity: string | null = null;
+                let matchedSpanId: string | null = null;
+                let matched = false;
+                for (const logToCheck of logsToBeChecked) {
+                    if (logToCheck.isJson) {
+                        try {
+                            const actual = JSON.parse(logRecord.body.stringValue);
+                            const expected = JSON.parse(logToCheck.message);
+                            matched = deepPartialMatch(actual, expected);
+                        } catch {
+                            matched = false;
+                        }
+                    } else {
+                        matched = logRecord.body.stringValue.includes(logToCheck.message);
+                    }
+                    if (matched) {
+                        logsToBeCheckedCount[logToCheck.message] = true;
+                        if (logToCheck.spanId) {
+                            matchedSpanId = logToCheck.spanId;
+                        }
+                        if (logToCheck.isJson) {
+                            hasJsonMatch = true;
+                            if (logToCheck.severity) {
+                                jsonSeverity = logToCheck.severity;
+                            }
+                        } else if (logToCheck.severity) {
+                            expectedSeverity = logToCheck.severity;
+                        }
+                        break;
+                    }
+                }
+                if (!matched) {
+                    continue;
+                }
+
+                // Verify trace/span IDs
+                if (matchedSpanId) {
+                    // Log matched a check with a specific spanId (e.g. HTTP body payload logs)
+                    if (traceId) {
+                        expect(logRecord.traceId).toEqual(traceId);
+                    }
+                    expect(logRecord.spanId).toEqual(matchedSpanId);
+                } else if (traceId && parentSpanId && (success || !logRecord.body.stringValue.startsWith("REPORT RequestId: "))) {
                     // on error report doesn't have traceId and spanId associated because it arrives after shutdown, data erased.
                     expect(logRecord.traceId).toEqual(traceId);
                     expect(logRecord.spanId).toEqual(parentSpanId);
                 }
-                let expectedSeverity = "info";
-                for (const logToCheck of logsToBeChecked) {
-                    if (logRecord.body.stringValue.includes(logToCheck.message)) {
-                        logsToBeCheckedCount[logToCheck.message] = true;
-                        if (logToCheck.severity) {
-                            expectedSeverity = logToCheck.severity;
-                        }
-                    }
+
+                // If a JSON check matched this log record, use its severity (or default "info"),
+                // ignoring severity from non-JSON includes matches that may have matched incidentally.
+                if (hasJsonMatch) {
+                    expectedSeverity = jsonSeverity ?? "info";
                 }
-                expect(logRecord.severityText.toLowerCase()).toEqual(expectedSeverity);
+                expect(logRecord.severityText.toLowerCase(), `Wrong severity: ${JSON.stringify(logRecord)}`).toEqual(expectedSeverity);
                 if (logRecord.body.stringValue.startsWith("REPORT RequestId: ")) {
                     reportLog = logRecord.body.stringValue;
                 }
             }
             for (const logToCheck of logsToBeChecked) {
-                expect(logsToBeCheckedCount[logToCheck.message]).toBeTruthy();
+                expect(logsToBeCheckedCount[logToCheck.message], `Log not found: ${logToCheck.message}`).toBeTruthy();
             }
             break;
         } catch (error) {

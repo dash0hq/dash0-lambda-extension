@@ -138,6 +138,40 @@ fn severity_text_to_number(severity: &str) -> i32 {
     }
 }
 
+pub fn build_payload_log(
+    payload: &str,
+    payload_type: &str,
+    invocation_id: &str,
+    timestamp_nanos: Option<u64>,
+    trace_id: Option<String>,
+    span_id: Option<String>,
+) -> Option<TelemetryLog> {
+    if !crate::config::user::is_create_payload_log_records() {
+        return None;
+    }
+    let message = serde_json::from_str::<serde_json::Value>(payload)
+        .unwrap_or_else(|_| serde_json::Value::String(payload.to_string()));
+    let time = match timestamp_nanos {
+        Some(nanos) => chrono::DateTime::from_timestamp_nanos(nanos as i64).to_rfc3339(),
+        None => chrono::Utc::now().to_rfc3339(),
+    };
+    Some(TelemetryLog {
+        time,
+        r#type: "function".to_string(),
+        record: serde_json::Value::String(
+            serde_json::json!({
+                "name": "dash0_payload",
+                "type": payload_type,
+                "message": message,
+            })
+            .to_string(),
+        ),
+        invocation_id: Some(invocation_id.to_string()),
+        trace_id,
+        span_id,
+    })
+}
+
 pub fn map_logs_to_otlp(logs: &[TelemetryLog]) -> Vec<LogRecord> {
     let mut log_records = Vec::new();
     for log in logs {
@@ -206,20 +240,27 @@ pub fn map_logs_to_otlp(logs: &[TelemetryLog]) -> Vec<LogRecord> {
                 }),
             });
 
-            if let Some((tid_opt, sid_opt, _)) = invocation_entry::get_trace_span_ids(invocation_id)
-            {
-                if let Some(ref tid_hex) = tid_opt {
-                    if let Ok(tid) = hex::decode(tid_hex) {
-                        if tid.len() == 16 {
-                            trace_id = tid;
-                        }
+            // Use trace/span IDs from the log entry itself if present,
+            // otherwise fall back to looking them up from the invocation entry.
+            let (tid_opt, sid_opt) = if log.trace_id.is_some() || log.span_id.is_some() {
+                (log.trace_id.clone(), log.span_id.clone())
+            } else {
+                invocation_entry::get_trace_span_ids(invocation_id)
+                    .map(|(t, s, _)| (t, s))
+                    .unwrap_or((None, None))
+            };
+
+            if let Some(ref tid_hex) = tid_opt {
+                if let Ok(tid) = hex::decode(tid_hex) {
+                    if tid.len() == 16 {
+                        trace_id = tid;
                     }
                 }
-                if let Some(ref sid_hex) = sid_opt {
-                    if let Ok(sid) = hex::decode(sid_hex) {
-                        if sid.len() == 8 {
-                            span_id = sid;
-                        }
+            }
+            if let Some(ref sid_hex) = sid_opt {
+                if let Ok(sid) = hex::decode(sid_hex) {
+                    if sid.len() == 8 {
+                        span_id = sid;
                     }
                 }
             }
@@ -357,6 +398,8 @@ mod tests {
             r#type: "function".to_string(),
             record: json!("Hello World"),
             invocation_id: Some("inv-123".to_string()),
+            trace_id: None,
+            span_id: None,
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -386,6 +429,8 @@ mod tests {
             r#type: "platform.start".to_string(),
             record: json!("Start"),
             invocation_id: Some("inv-123".to_string()),
+            trace_id: None,
+            span_id: None,
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -399,6 +444,8 @@ mod tests {
             r#type: "function".to_string(),
             record: json!({"foo": "bar"}), // Object instead of string
             invocation_id: Some("inv-123".to_string()),
+            trace_id: None,
+            span_id: None,
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -412,6 +459,8 @@ mod tests {
             r#type: "function".to_string(),
             record: json!("msg"),
             invocation_id: Some("inv-123".to_string()),
+            trace_id: None,
+            span_id: None,
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -426,6 +475,8 @@ mod tests {
             r#type: "function".to_string(),
             record: json!("msg"),
             invocation_id: None,
+            trace_id: None,
+            span_id: None,
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -441,18 +492,24 @@ mod tests {
                 r#type: "function".to_string(),
                 record: json!("Valid 1"),
                 invocation_id: Some("1".to_string()),
+                trace_id: None,
+                span_id: None,
             },
             TelemetryLog {
                 time: "2023-10-26T12:00:01.000Z".to_string(),
                 r#type: "platform.end".to_string(),
                 record: json!("Ignored"),
                 invocation_id: Some("2".to_string()),
+                trace_id: None,
+                span_id: None,
             },
             TelemetryLog {
                 time: "2023-10-26T12:00:02.000Z".to_string(),
                 r#type: "function".to_string(),
                 record: json!("Valid 2"),
                 invocation_id: Some("3".to_string()),
+                trace_id: None,
+                span_id: None,
             },
         ];
 
@@ -561,6 +618,8 @@ mod tests {
             r#type: "function".to_string(),
             record: json!("Log with trace"),
             invocation_id: Some(invocation_id.to_string()),
+            trace_id: None,
+            span_id: None,
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -593,6 +652,8 @@ mod tests {
                 }
             }),
             invocation_id: Some("inv-report-1".to_string()),
+            trace_id: None,
+            span_id: None,
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -632,6 +693,8 @@ mod tests {
                 }
             }),
             invocation_id: Some("inv-report-2".to_string()),
+            trace_id: None,
+            span_id: None,
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -668,6 +731,8 @@ mod tests {
                 "status": "timeout"
             }),
             invocation_id: Some("inv-timeout-1".to_string()),
+            trace_id: None,
+            span_id: None,
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -714,6 +779,8 @@ mod tests {
                 "status": "success"
             }),
             invocation_id: Some("inv-success-1".to_string()),
+            trace_id: None,
+            span_id: None,
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -752,6 +819,8 @@ mod tests {
                 "errorType": "Runtime.OutOfMemory"
             }),
             invocation_id: Some("inv-error-1".to_string()),
+            trace_id: None,
+            span_id: None,
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -777,6 +846,8 @@ mod tests {
                 r#type: "function".to_string(),
                 record: json!("User log message"),
                 invocation_id: Some("inv-123".to_string()),
+                trace_id: None,
+                span_id: None,
             },
             TelemetryLog {
                 time: "2025-12-07T12:09:10.254Z".to_string(),
@@ -792,6 +863,8 @@ mod tests {
                     }
                 }),
                 invocation_id: Some("inv-123".to_string()),
+                trace_id: None,
+                span_id: None,
             },
         ];
 
@@ -821,6 +894,8 @@ mod tests {
                 "version": "$LATEST"
             }),
             invocation_id: Some("inv-start-1".to_string()),
+            trace_id: None,
+            span_id: None,
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -862,6 +937,8 @@ mod tests {
                 }
             }),
             invocation_id: Some("inv-end-1".to_string()),
+            trace_id: None,
+            span_id: None,
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -892,12 +969,16 @@ mod tests {
                     "version": "$LATEST"
                 }),
                 invocation_id: Some("test-lifecycle".to_string()),
+                trace_id: None,
+                span_id: None,
             },
             TelemetryLog {
                 time: "2025-12-07T12:09:07.000Z".to_string(),
                 r#type: "function".to_string(),
                 record: json!("Processing request..."),
                 invocation_id: Some("test-lifecycle".to_string()),
+                trace_id: None,
+                span_id: None,
             },
             TelemetryLog {
                 time: "2025-12-07T12:09:10.252Z".to_string(),
@@ -907,6 +988,8 @@ mod tests {
                     "status": "success"
                 }),
                 invocation_id: Some("test-lifecycle".to_string()),
+                trace_id: None,
+                span_id: None,
             },
             TelemetryLog {
                 time: "2025-12-07T12:09:10.254Z".to_string(),
@@ -921,6 +1004,8 @@ mod tests {
                     }
                 }),
                 invocation_id: Some("test-lifecycle".to_string()),
+                trace_id: None,
+                span_id: None,
             },
         ];
 
@@ -958,12 +1043,16 @@ mod tests {
                     "version": "$LATEST"
                 }),
                 invocation_id: Some("test-severity".to_string()),
+                trace_id: None,
+                span_id: None,
             },
             TelemetryLog {
                 time: "2025-12-07T12:09:07.000Z".to_string(),
                 r#type: "function".to_string(),
                 record: json!("User log"),
                 invocation_id: Some("test-severity".to_string()),
+                trace_id: None,
+                span_id: None,
             },
             TelemetryLog {
                 time: "2025-12-07T12:09:10.252Z".to_string(),
@@ -973,6 +1062,8 @@ mod tests {
                     "status": "success"
                 }),
                 invocation_id: Some("test-severity".to_string()),
+                trace_id: None,
+                span_id: None,
             },
             TelemetryLog {
                 time: "2025-12-07T12:09:10.254Z".to_string(),
@@ -987,6 +1078,8 @@ mod tests {
                     }
                 }),
                 invocation_id: Some("test-severity".to_string()),
+                trace_id: None,
+                span_id: None,
             },
         ];
 
@@ -1083,6 +1176,8 @@ mod tests {
             r#type: "function".to_string(),
             record: json!("2026-03-02T11:53:38.040Z\tf0ae1bc7-ae4b-4317-abf9-3a562e3127ef\tERROR\tsomething failed"),
             invocation_id: Some("inv-sev-1".to_string()),
+            trace_id: None,
+            span_id: None,
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -1098,6 +1193,8 @@ mod tests {
             r#type: "function".to_string(),
             record: json!("just a plain log message"),
             invocation_id: Some("inv-sev-2".to_string()),
+            trace_id: None,
+            span_id: None,
         }];
 
         let result = map_logs_to_otlp(&logs);

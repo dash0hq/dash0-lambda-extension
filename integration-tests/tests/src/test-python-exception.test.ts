@@ -41,8 +41,6 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             span = spanPayload.resourceSpans[0].scopeSpans[0].spans[0];
             const spanAttributes = getAttributesMap(span.attributes);
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
-            expect(spanAttributes['dash0.faas.event'].stringValue).toEqual('{"parameter1":"right"}');
-            expect(spanAttributes['dash0.faas.return_value'].stringValue).contains('KeyError');
 
             // check exception event
             const events = span.events;
@@ -68,8 +66,9 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             }
         }
     }
+    let httpSpanId: string | undefined = undefined;
     if (traced) {
-        await checkHttpSpan({
+        httpSpanId = await checkHttpSpan({
             invocationId: invocationId!,
             functionName,
             traceId: traceId!,
@@ -81,7 +80,15 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
         { message: 'END RequestId: ' },
         { message: "response.status_code:" },
         { message: "[ERROR] KeyError:" },
+        { message: JSON.stringify({ name: "dash0_payload", type: "lambda_event", message: { parameter1: "right" } }), isJson: true },
+        { message: JSON.stringify({ name: "dash0_payload", type: "lambda_return_value" }), isJson: true },
     ]
+    if (traced) {
+        logsToBeChecked.push(
+            { message: JSON.stringify({ name: "dash0_payload", type: "http_request_body", message: { title: "foo", body: "bar", userId: 1 } }), isJson: true, spanId: httpSpanId },
+            { message: JSON.stringify({ name: "dash0_payload", type: "http_response_body" }), isJson: true, spanId: httpSpanId },
+        );
+    }
     if (!invocationEnd) {
         logsToBeChecked.push({ message: 'REPORT RequestId: ' });
     }

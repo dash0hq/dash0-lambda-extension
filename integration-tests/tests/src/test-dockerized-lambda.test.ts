@@ -5,7 +5,6 @@ import { DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS } from "./con
 import {
     checkLogs,
     checkSpanAttributesFromReport,
-    compareJsonStrings,
     getAttributesMap,
     getRequestPayload, LogToCheck,
     invokeFunction,
@@ -47,9 +46,6 @@ const verifyDockerizedInvocation = async (functionName: string, runtime: string)
             span = spanPayload.resourceSpans[0].scopeSpans[0].spans[0];
             const spanAttributes = getAttributesMap(span.attributes);
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
-            expect(spanAttributes['dash0.faas.event'].stringValue).toEqual('{"parameter1":"right"}');
-            const returnValue = runtime === 'java' ? '"Hello World from Java Lambda!"' : '{"statusCode":200,"body":"{\\"message\\":\\"Success\\"}"}';
-            compareJsonStrings(spanAttributes['dash0.faas.return_value'].stringValue, returnValue);
             expect(spanAttributes['faas.init_duration'].doubleValue).toBeGreaterThan(0);
 
             const resourceAttributes = getAttributesMap(spanPayload?.resourceSpans[0].resource.attributes);
@@ -69,6 +65,8 @@ const verifyDockerizedInvocation = async (functionName: string, runtime: string)
     const logsToBeChecked: LogToCheck[] = [
         { message: 'START RequestId: ' },
         { message: 'END RequestId: ' },
+        { message: JSON.stringify({ name: "dash0_payload", type: "lambda_event", message: { parameter1: "right" } }), isJson: true },
+        { message: JSON.stringify({ name: "dash0_payload", type: "lambda_return_value" }), isJson: true },
     ]
     await checkLogs({
         invocationId: invocationId!,
