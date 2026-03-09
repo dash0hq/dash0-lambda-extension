@@ -58,7 +58,7 @@ fn create_root_span(
         Vec::new()
     };
 
-    let start_nanos = (data.start_time * 1_000_000.0) as u64;
+    let start_nanos = ((data.start_time - data.init_duration) * 1_000_000.0) as u64;
     let end_nanos = start_nanos + (data.billed_duration * 1_000_000.0) as u64;
 
     let function_name =
@@ -223,8 +223,8 @@ mod tests {
         assert_eq!(hex::encode(&span.trace_id), trace_id_hex);
         assert_eq!(hex::encode(&span.parent_span_id), parent_span_id_hex);
         assert_eq!(span.name, "my-function");
-        assert_eq!(span.start_time_unix_nano, 1_000_000_000); // 1s in nanos
-        assert_eq!(span.end_time_unix_nano, 1_500_000_000); // 1s + 500ms
+        assert_eq!(span.start_time_unix_nano, 850_000_000); // (1000 - 150) ms in nanos
+        assert_eq!(span.end_time_unix_nano, 1_350_000_000); // 850ms + 500ms
 
         let inv_attr = span
             .attributes
