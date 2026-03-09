@@ -104,6 +104,38 @@ fn create_root_span(
     })
 }
 
+fn create_init_span(
+    invocation_id: &str,
+    data: &invocation_entry::SupplementarySpanData,
+) -> Option<Span> {
+    if data.init_duration <= 0.0 {
+        return None;
+    }
+
+    let root_span_id = data.root_span_id.as_deref()?;
+    let trace_id_hex = data.trace_id.as_deref().filter(|s| !s.is_empty())?;
+
+    let parent_span_id = hex::decode(root_span_id).ok()?;
+    let trace_id = hex::decode(trace_id_hex).ok()?;
+
+    let span_id = crate::util::parsers::generate_random_span_id();
+
+    let start_nanos = ((data.start_time - data.init_duration) * 1_000_000.0) as u64;
+    let end_nanos = ((data.start_time - 1.0) * 1_000_000.0) as u64;
+
+    Some(Span {
+        trace_id,
+        span_id,
+        parent_span_id,
+        name: "aws.lambda.initialization".to_string(),
+        kind: SpanKind::Internal as i32,
+        start_time_unix_nano: start_nanos,
+        end_time_unix_nano: end_nanos,
+        attributes: get_span_attributes(invocation_id),
+        ..Default::default()
+    })
+}
+
 pub fn create_supplementary_spans(invocation_id: &str) {
     let data = match invocation_entry::get_supplementary_span_data(invocation_id) {
         Some(d) => d,
@@ -114,6 +146,10 @@ pub fn create_supplementary_spans(invocation_id: &str) {
 
     if let Some(root_span) = create_root_span(invocation_id, &data) {
         spans.push(root_span);
+    }
+
+    if let Some(init_span) = create_init_span(invocation_id, &data) {
+        spans.push(init_span);
     }
 
     if spans.is_empty() {

@@ -162,15 +162,17 @@ pub fn get_span_id_from_invocation_id(invocation_id: &str) -> Vec<u8> {
     hash[..8].to_vec()
 }
 
-pub fn get_root_span_id_from_invocation_id(invocation_id: &str) -> Vec<u8> {
-    use sha2::{Digest, Sha256};
-
-    let mut hasher = Sha256::new();
-    hasher.update(b"root_span:");
-    hasher.update(invocation_id.as_bytes());
-    let hash = hasher.finalize();
-    // Take first 8 bytes of the hash for the root span ID
-    hash[..8].to_vec()
+pub fn generate_random_span_id() -> Vec<u8> {
+    use std::collections::hash_map::RandomState;
+    use std::hash::{BuildHasher, Hasher};
+    let mut hasher = RandomState::new().build_hasher();
+    hasher.write_u128(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0),
+    );
+    hasher.finish().to_be_bytes().to_vec()
 }
 
 /// Get the name of the instrumentation scope.
