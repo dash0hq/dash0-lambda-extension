@@ -39,29 +39,15 @@ pub fn get_span_attributes(invocation_id: &str) -> Vec<KeyValue> {
     ]
 }
 
-pub fn create_supplementary_spans(invocation_id: &str) {
-    let data = match invocation_entry::get_supplementary_span_data(invocation_id) {
-        Some(d) => d,
-        None => return,
-    };
+fn create_root_span(
+    invocation_id: &str,
+    data: &invocation_entry::SupplementarySpanData,
+) -> Option<Span> {
+    let root_span_id = data.root_span_id.as_deref()?;
+    let trace_id_hex = data.trace_id.as_deref().filter(|s| !s.is_empty())?;
 
-    let root_span_id = match data.root_span_id.as_deref() {
-        Some(id) => id,
-        None => return,
-    };
-    let trace_id_hex = match data.trace_id.as_deref().filter(|s| !s.is_empty()) {
-        Some(id) => id,
-        None => return,
-    };
-
-    let span_id = match hex::decode(root_span_id) {
-        Ok(b) => b,
-        Err(_) => return,
-    };
-    let trace_id = match hex::decode(trace_id_hex) {
-        Ok(b) => b,
-        Err(_) => return,
-    };
+    let span_id = hex::decode(root_span_id).ok()?;
+    let trace_id = hex::decode(trace_id_hex).ok()?;
 
     let parent_span_id =
         if data.sampled || !crate::config::user::is_remove_lambda_parent_span() {
@@ -77,10 +63,10 @@ pub fn create_supplementary_spans(invocation_id: &str) {
     let start_nanos = (data.start_time * 1_000_000.0) as u64;
     let end_nanos = start_nanos + (data.billed_duration * 1_000_000.0) as u64;
 
-    let function_name = std::env::var("AWS_LAMBDA_FUNCTION_NAME")
-        .unwrap_or_else(|_| "unknown".to_string());
+    let function_name =
+        std::env::var("AWS_LAMBDA_FUNCTION_NAME").unwrap_or_else(|_| "unknown".to_string());
 
-    let span = Span {
+    Some(Span {
         trace_id,
         span_id,
         parent_span_id,
@@ -90,7 +76,24 @@ pub fn create_supplementary_spans(invocation_id: &str) {
         end_time_unix_nano: end_nanos,
         attributes: get_span_attributes(invocation_id),
         ..Default::default()
+    })
+}
+
+pub fn create_supplementary_spans(invocation_id: &str) {
+    let data = match invocation_entry::get_supplementary_span_data(invocation_id) {
+        Some(d) => d,
+        None => return,
     };
+
+    let mut spans = Vec::new();
+
+    if let Some(root_span) = create_root_span(invocation_id, &data) {
+        spans.push(root_span);
+    }
+
+    if spans.is_empty() {
+        return;
+    }
 
     let scope_spans = ScopeSpans {
         scope: Some(InstrumentationScope {
@@ -98,7 +101,7 @@ pub fn create_supplementary_spans(invocation_id: &str) {
             version: "unknown".to_string(),
             ..Default::default()
         }),
-        spans: vec![span],
+        spans,
         schema_url: "https://opentelemetry.io/schemas/1.11.0".to_string(),
     };
 
