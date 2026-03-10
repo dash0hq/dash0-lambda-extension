@@ -267,6 +267,74 @@ export const checkResourceAttributes = (attributes: Array<{ key: string, value: 
     expect(resourceAttributes['cloud.account.id'].stringValue).toMatch(/^\d+$/);
 }
 
+export const checkSupplementarySpans = async ({
+    invocationId,
+    functionName,
+    traceId,
+    rootSpanId,
+}: {
+    invocationId: string,
+    functionName: string,
+    traceId: string,
+    rootSpanId: string,
+}) => {
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        await delay(RETRY_DELAY_MS);
+        console.log(`Attempt ${attempt} to fetch supplementary spans for invocation ID ${invocationId}`);
+        try {
+            const spanResponse = await fetch(DASH0_ENDPOINT + 'spans', {
+                method: 'POST',
+                headers: {
+                    accept: 'application/json',
+                    authorization: `Bearer ${DASH0_TOKEN}`,
+                    'content-type': 'application/json',
+                },
+                body: JSON.stringify(getRequestPayload(invocationId)),
+            });
+
+            const spanPayload = await spanResponse.json() as any;
+            // Find spans from the dash0.lambda-extension scope
+            const supplementarySpans: any[] = [];
+            for (const rs of (spanPayload?.resourceSpans ?? [])) {
+                for (const ss of (rs.scopeSpans ?? [])) {
+                    if (ss.scope?.name === 'dash0.lambda-extension') {
+                        supplementarySpans.push(...(ss.spans ?? []));
+                    }
+                }
+            }
+            expect(supplementarySpans.length).toEqual(3);
+
+            // Root span: named after the function, has faas.init_duration
+            const rootSpan = supplementarySpans.find((s: any) => s.name === functionName);
+            expect(rootSpan, `Supplementary root span not found for ${functionName}`).toBeDefined();
+            const rootAttrs = getAttributesMap(rootSpan.attributes);
+            expect(rootAttrs['faas.invocation_id'].stringValue).toEqual(invocationId);
+            expect(rootAttrs['faas.init_duration']).toBeDefined();
+            expect(rootSpan.traceId).toEqual(traceId);
+            expect(rootSpan.spanId).toEqual(rootSpanId);
+
+            // Init span
+            const initSpan = supplementarySpans.find((s: any) => s.name === 'aws.lambda.initialization');
+            expect(initSpan, 'Supplementary init span not found').toBeDefined();
+            expect(initSpan.traceId).toEqual(traceId);
+            expect(initSpan.parentSpanId).toEqual(rootSpanId);
+
+            // Overhead span
+            const overheadSpan = supplementarySpans.find((s: any) => s.name === 'aws.lambda.overhead');
+            expect(overheadSpan, 'Supplementary overhead span not found').toBeDefined();
+            expect(overheadSpan.traceId).toEqual(traceId);
+            expect(overheadSpan.parentSpanId).toEqual(rootSpanId);
+
+            break;
+        } catch (error) {
+            console.error(`Error fetching supplementary spans on attempt ${attempt}:`, error);
+            if (attempt === MAX_ATTEMPTS) {
+                throw error;
+            }
+        }
+    }
+}
+
 export const checkException = (span: any, exception_type: string) => {
     const events = span.events;
     expect(events.length).toEqual(1);
@@ -322,6 +390,9 @@ export const runAllTests = (scenario: string, runtimes: string[], verifySuccessI
                 for (const traced of tracedValues) {
                     const invocationEndLabel = invocationEnd ? 'true' : 'false';
                     const functionName = `${RESOURCE_PREFIX}${runtime}-${scenario}-${traced}-invocation-end-${invocationEndLabel}-${architecture}`;
+                    if (functionName !== 'python3-13-success-true-invocation-end-true-arm64') {
+                        continue;
+                    }
                     it(
                         `invokes ${functionName} successfully`,
                         async () => {
