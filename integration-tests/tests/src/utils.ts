@@ -295,14 +295,17 @@ export const checkSupplementarySpans = async ({
             const spanPayload = await spanResponse.json() as any;
             // Find spans from the dash0.lambda-extension scope
             const supplementarySpans: any[] = [];
+            let supplementaryResource: any = null;
             for (const rs of (spanPayload?.resourceSpans ?? [])) {
                 for (const ss of (rs.scopeSpans ?? [])) {
                     if (ss.scope?.name === 'dash0.lambda-extension') {
                         supplementarySpans.push(...(ss.spans ?? []));
+                        supplementaryResource = rs.resource;
                     }
                 }
             }
             expect(supplementarySpans.length).toEqual(3);
+            checkResourceAttributes(supplementaryResource.attributes, functionName);
 
             // Root span: named after the function, has faas.init_duration
             const rootSpan = supplementarySpans.find((s: any) => s.name === functionName);
@@ -390,9 +393,6 @@ export const runAllTests = (scenario: string, runtimes: string[], verifySuccessI
                 for (const traced of tracedValues) {
                     const invocationEndLabel = invocationEnd ? 'true' : 'false';
                     const functionName = `${RESOURCE_PREFIX}${runtime}-${scenario}-${traced}-invocation-end-${invocationEndLabel}-${architecture}`;
-                    if (functionName !== 'python3-13-success-true-invocation-end-true-arm64') {
-                        continue;
-                    }
                     it(
                         `invokes ${functionName} successfully`,
                         async () => {
