@@ -155,9 +155,7 @@ fn create_overhead_span(
     let end_nanos =
         ((data.start_time - data.init_duration + data.billed_duration) * 1_000_000.0) as u64;
 
-    if end_nanos <= start_nanos {
-        return None;
-    }
+    let end_nanos = end_nanos.max(start_nanos);
 
     Some(Span {
         trace_id,
