@@ -267,11 +267,13 @@ export const checkSupplementarySpans = async ({
     functionName,
     traceId,
     rootSpanId,
+    runtimeError = false,
 }: {
     invocationId: string,
     functionName: string,
     traceId: string,
     rootSpanId: string,
+    runtimeError?: boolean,
 }) => {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         await delay(RETRY_DELAY_MS);
@@ -299,7 +301,8 @@ export const checkSupplementarySpans = async ({
                     }
                 }
             }
-            expect(supplementarySpans.length).toEqual(3);
+            const expectedCount = runtimeError ? 2 : 3;
+            expect(supplementarySpans.length).toEqual(expectedCount);
             checkResourceAttributes(supplementaryResource.attributes, functionName);
 
             // Root span: named after the function, has faas.init_duration
@@ -308,8 +311,10 @@ export const checkSupplementarySpans = async ({
             const rootAttrs = getAttributesMap(rootSpan.attributes);
             expect(rootAttrs['faas.invocation_id'].stringValue).toEqual(invocationId);
             expect(rootAttrs['faas.init_duration']).toBeDefined();
-            expect(rootAttrs['dash0.faas.billed_duration']).toBeDefined();
-            expect(rootAttrs['dash0.faas.memory_used']).toBeDefined();
+            if (!runtimeError) {
+                expect(rootAttrs['dash0.faas.billed_duration']).toBeDefined();
+                expect(rootAttrs['dash0.faas.memory_used']).toBeDefined();
+            }
             expect(rootSpan.traceId).toEqual(traceId);
             expect(rootSpan.spanId).toEqual(rootSpanId);
 
@@ -320,10 +325,12 @@ export const checkSupplementarySpans = async ({
             expect(initSpan.parentSpanId).toEqual(rootSpanId);
 
             // Overhead span
-            const overheadSpan = supplementarySpans.find((s: any) => s.name === 'aws.lambda.overhead');
-            expect(overheadSpan, 'Supplementary overhead span not found').toBeDefined();
-            expect(overheadSpan.traceId).toEqual(traceId);
-            expect(overheadSpan.parentSpanId).toEqual(rootSpanId);
+            if (!runtimeError) {
+                const overheadSpan = supplementarySpans.find((s: any) => s.name === 'aws.lambda.overhead');
+                expect(overheadSpan, 'Supplementary overhead span not found').toBeDefined();
+                expect(overheadSpan.traceId).toEqual(traceId);
+                expect(overheadSpan.parentSpanId).toEqual(rootSpanId);
+            }
 
             break;
         } catch (error) {
