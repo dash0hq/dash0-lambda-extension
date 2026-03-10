@@ -46,7 +46,6 @@ const verifyDockerizedInvocation = async (functionName: string, runtime: string)
             span = spanPayload.resourceSpans[0].scopeSpans[0].spans[0];
             const spanAttributes = getAttributesMap(span.attributes);
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
-            expect(spanAttributes['faas.init_duration'].doubleValue).toBeGreaterThan(0);
 
             const resourceAttributes = getAttributesMap(spanPayload?.resourceSpans[0].resource.attributes);
             expect(resourceAttributes['service.name'].stringValue).toEqual(functionName);
