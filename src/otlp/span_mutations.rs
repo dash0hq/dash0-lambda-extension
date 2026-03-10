@@ -1086,8 +1086,7 @@ mod tests {
             parent_span_id.clone(),
         );
 
-        let (got_trace, got_span) =
-            super::get_trace_span_ids(invocation_id, &[stored_trace]);
+        let (got_trace, got_span) = super::get_trace_span_ids(invocation_id, &[stored_trace]);
 
         assert_eq!(got_trace, trace_id);
         // span_id is taken from the existing span's parent_span_id
@@ -1147,8 +1146,7 @@ mod tests {
             trace_parent_span_id.clone(),
         );
 
-        let (got_trace, got_span) =
-            super::get_trace_span_ids(invocation_id, &[stored_trace]);
+        let (got_trace, got_span) = super::get_trace_span_ids(invocation_id, &[stored_trace]);
 
         // trace_id and span_id should come from the existing trace, not the stored entry
         assert_eq!(got_trace, trace_trace_id);
@@ -1648,10 +1646,7 @@ fn env_as_json_string() -> String {
     crate::otlp::masking::mask_env_vars(map)
 }
 
-fn get_trace_span_ids(
-    invocation_id: &str,
-    existing_traces: &[StoredTrace],
-) -> (Vec<u8>, Vec<u8>) {
+fn get_trace_span_ids(invocation_id: &str, existing_traces: &[StoredTrace]) -> (Vec<u8>, Vec<u8>) {
     let mut trace_id: Option<Vec<u8>> = None;
     let mut span_id: Option<Vec<u8>> = None;
 
