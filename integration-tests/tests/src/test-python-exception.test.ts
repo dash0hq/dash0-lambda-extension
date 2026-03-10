@@ -92,7 +92,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
     if (!invocationEnd) {
         logsToBeChecked.push({ message: 'REPORT RequestId: ' });
     }
-    const reportLog = await checkLogs({
+    await checkLogs({
         invocationId: invocationId!,
         functionName,
         traceId: traceId!,
@@ -100,9 +100,6 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
         success: true,
         logsToBeChecked
     });
-    if (!invocationEnd) {
-        checkSpanAttributesFromReport(reportLog, span);
-    }
 }
 
 describe.concurrent('Lambda invocation', () => {

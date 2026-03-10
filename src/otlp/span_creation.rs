@@ -190,6 +190,12 @@ pub fn create_spans(invocation_id: &str) -> Option<StoredTrace> {
     }
 
     if spans.is_empty() {
+        tracing::info!(
+            "[{}] No spans created for invocation {}, skipping trace creation. data: {:?}",
+            crate::log_prefix(),
+            invocation_id,
+            data
+        );
         return None;
     }
 

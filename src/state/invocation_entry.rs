@@ -139,6 +139,7 @@ pub struct TelemetryData {
 }
 
 /// Data needed to build supplementary spans (root span).
+#[derive(Debug)]
 pub struct SupplementarySpanData {
     pub root_span_id: Option<String>,
     pub trace_id: Option<String>,
