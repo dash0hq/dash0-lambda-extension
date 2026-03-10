@@ -160,8 +160,7 @@ export const checkLogs = async ({
     parentSpanId: string | null,
     success: boolean,
     logsToBeChecked: LogToCheck[],
-}): Promise<string> => {
-    let reportLog = null;
+}): Promise<void> => {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         await delay(RETRY_DELAY_MS);
         console.log(`Attempt ${attempt} to fetch logs for invocation ID ${invocationId}`);
@@ -242,9 +241,6 @@ export const checkLogs = async ({
                     expectedSeverity = jsonSeverity ?? "info";
                 }
                 expect(logRecord.severityText.toLowerCase(), `Wrong severity: ${JSON.stringify(logRecord)}`).toEqual(expectedSeverity);
-                if (logRecord.body.stringValue.startsWith("REPORT RequestId: ")) {
-                    reportLog = logRecord.body.stringValue;
-                }
             }
             for (const logToCheck of logsToBeChecked) {
                 expect(logsToBeCheckedCount[logToCheck.message], `Log not found: ${logToCheck.message}`).toBeTruthy();
@@ -257,7 +253,6 @@ export const checkLogs = async ({
             }
         }
     }
-    return reportLog;
 }
 
 export const checkResourceAttributes = (attributes: Array<{ key: string, value: any }>, functionName: string) => {
@@ -313,6 +308,8 @@ export const checkSupplementarySpans = async ({
             const rootAttrs = getAttributesMap(rootSpan.attributes);
             expect(rootAttrs['faas.invocation_id'].stringValue).toEqual(invocationId);
             expect(rootAttrs['faas.init_duration']).toBeDefined();
+            expect(rootAttrs['dash0.faas.billed_duration']).toBeDefined();
+            expect(rootAttrs['dash0.faas.memory_used']).toBeDefined();
             expect(rootSpan.traceId).toEqual(traceId);
             expect(rootSpan.spanId).toEqual(rootSpanId);
 
