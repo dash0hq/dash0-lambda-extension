@@ -480,15 +480,9 @@ fn store_span_ids(span: &Span, invocation_id: &str) {
         .iter()
         .map(|b| format!("{:02x}", b))
         .collect::<String>();
-    let parent_span_id_hex = span
-        .parent_span_id
-        .iter()
-        .map(|b| format!("{:02x}", b))
-        .collect::<String>();
     invocation_entry::update(invocation_id, |entry| {
         entry.trace_id = Some(trace_id_hex);
         entry.span_id = Some(span_id_hex);
-        entry.parent_span_id = Some(parent_span_id_hex);
     });
     tracing::debug!(
         "[{}] stored trace/span id for invocation_id={}",
