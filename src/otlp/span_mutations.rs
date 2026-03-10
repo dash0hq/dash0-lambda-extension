@@ -530,20 +530,6 @@ pub fn process_trace_request(
             }
         }
     }
-
-    match serde_json::to_string(&decoded) {
-        Ok(json) => tracing::trace!(
-            "[{}] /v1/traces forward payload (json): {}",
-            crate::log_prefix(),
-            json
-        ),
-        Err(err) => tracing::error!(
-            "[{}] /v1/traces failed to render json: {}",
-            crate::log_prefix(),
-            err
-        ),
-    }
-
     *encoded_body = decoded.encode_to_vec();
 }
 

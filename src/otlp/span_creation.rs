@@ -59,7 +59,11 @@ fn create_root_span(
     };
 
     let start_nanos = ((data.start_time - data.init_duration) * 1_000_000.0) as u64;
-    let end_nanos = start_nanos + (data.billed_duration * 1_000_000.0) as u64;
+    let end_nanos = if data.billed_duration > 0.0 {
+        start_nanos + (data.billed_duration * 1_000_000.0) as u64
+    } else {
+        (data.end_time * 1_000_000.0) as u64
+    };
 
     let function_name =
         std::env::var("AWS_LAMBDA_FUNCTION_NAME").unwrap_or_else(|_| "unknown".to_string());
@@ -168,11 +172,8 @@ fn create_overhead_span(
     })
 }
 
-pub fn create_supplementary_spans(invocation_id: &str) {
-    let data = match invocation_entry::get_supplementary_span_data(invocation_id) {
-        Some(d) => d,
-        None => return,
-    };
+pub fn create_spans(invocation_id: &str) -> Option<StoredTrace> {
+    let data = invocation_entry::get_supplementary_span_data(invocation_id)?;
 
     let mut spans = Vec::new();
 
@@ -189,7 +190,7 @@ pub fn create_supplementary_spans(invocation_id: &str) {
     }
 
     if spans.is_empty() {
-        return;
+        return None;
     }
 
     let scope_spans = ScopeSpans {
@@ -232,15 +233,19 @@ pub fn create_supplementary_spans(invocation_id: &str) {
         header::HeaderValue::from_static("application/x-protobuf"),
     );
 
-    let trace = StoredTrace {
+    Some(StoredTrace {
         method: hyper::Method::POST,
         path_and_query: "/v1/traces".to_string(),
         headers,
         body: export.encode_to_vec(),
         invocation_ids: vec![invocation_id.to_string()],
-    };
+    })
+}
 
-    invocation_entry::store_trace_by_id(invocation_id, trace);
+pub fn create_supplementary_spans(invocation_id: &str) {
+    if let Some(trace) = create_spans(invocation_id) {
+        invocation_entry::store_trace_by_id(invocation_id, trace);
+    }
 }
 
 #[cfg(test)]
