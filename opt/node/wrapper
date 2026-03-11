@@ -36,7 +36,8 @@ if [[ -z "$OTEL_TRACES_SAMPLER" ]]; then
 fi
 
 # Write env vars to a file for the extension to read
-echo "{\"OTEL_SERVICE_NAME\": \"$OTEL_SERVICE_NAME\", \"OTEL_RESOURCE_ATTRIBUTES\": \"$OTEL_RESOURCE_ATTRIBUTES\"}" > /tmp/lumigo_env_vars || true
+node -e "require('fs').writeFileSync('/tmp/dash0_env_vars', JSON.stringify(process.env))" 2>/dev/null || \
+  echo "{\"OTEL_SERVICE_NAME\": \"$OTEL_SERVICE_NAME\", \"OTEL_RESOURCE_ATTRIBUTES\": \"$OTEL_RESOURCE_ATTRIBUTES\"}" > /tmp/dash0_env_vars || true
 
 # enable auto instrumentation unless DASH0_DISABLE_AUTO_INSTRUMENTATION is set
 if [ -z "$DASH0_DISABLE_AUTO_INSTRUMENTATION" ] || [ "${DASH0_DISABLE_AUTO_INSTRUMENTATION,,}" = "false" ]; then

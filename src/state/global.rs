@@ -1,8 +1,11 @@
 use once_cell::sync::Lazy;
+use opentelemetry_proto::tonic::common::v1::any_value::Value;
+use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue};
 use parking_lot::Mutex;
 
 static FUNCTION_ARN: Lazy<Mutex<Option<String>>> = Lazy::new(|| Mutex::new(None));
 static ACCOUNT_ID: Lazy<Mutex<Option<String>>> = Lazy::new(|| Mutex::new(None));
+static ENV_VAR_ATTRS: Lazy<Mutex<Vec<KeyValue>>> = Lazy::new(|| Mutex::new(Vec::new()));
 
 pub fn store_function_arn(arn: &str) {
     let mut guard = FUNCTION_ARN.lock();
@@ -45,6 +48,42 @@ pub fn get_function_arn() -> Option<String> {
 
 pub fn get_account_id() -> Option<String> {
     ACCOUNT_ID.lock().clone()
+}
+
+pub fn init_env_var_attrs() {
+    let content = match std::fs::read_to_string("/tmp/dash0_env_vars") {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::warn!("[{}] Failed to read /tmp/dash0_env_vars: {}", crate::log_prefix(), e);
+            return;
+        }
+    };
+    let json: serde_json::Map<String, serde_json::Value> =
+        match serde_json::from_str(&content) {
+            Ok(m) => m,
+            Err(e) => {
+                tracing::warn!("[{}] Failed to parse /tmp/dash0_env_vars: {}", crate::log_prefix(), e);
+                return;
+            }
+        };
+
+    let attrs: Vec<KeyValue> = json
+        .into_iter()
+        .filter_map(|(key, value)| {
+            value.as_str().map(|v| KeyValue {
+                key: format!("process.environment_variable.{}", key),
+                value: Some(AnyValue {
+                    value: Some(Value::StringValue(v.to_string())),
+                }),
+            })
+        })
+        .collect();
+
+    *ENV_VAR_ATTRS.lock() = attrs;
+}
+
+pub fn get_env_var_attrs() -> Vec<KeyValue> {
+    ENV_VAR_ATTRS.lock().clone()
 }
 
 #[cfg(test)]
