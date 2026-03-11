@@ -255,12 +255,12 @@ const verifyTracingScenario = async (
     scenarioName: string,
 ) => {
     // invocationEnd=false triggers a second invocation to flush supplementary spans (including root span)
-    const producerInvocationId = await invokeFunction(producerFunctionName, false, false);
+    const producerInvocationId = await invokeFunction(producerFunctionName, true, false);
     console.log(`Producer invocation ID: ${producerInvocationId}`);
 
-    // Invoke consumer to flush its supplementary spans (root span arrives on next invocation)
-    await delay(2000);
-    await invokeFunction(consumerFunctionName, true, false);
+    // Invoke producer to flush its supplementary spans (root span arrives on next invocation)
+    await delay(8000);
+    await invokeFunction(producerFunctionName, true, false);
 
     const expectedProducerScopeName = getLambdaScopeName(producerFunctionName);
     const expectedConsumerScopeName = getLambdaScopeName(consumerFunctionName);

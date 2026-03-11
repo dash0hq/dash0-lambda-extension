@@ -53,7 +53,7 @@ export const invokeFunction = async (
     );
 
     if (!invocationEnd) {
-        await delay(4000);
+        await delay(2000);
         await lambdaClient.send(
             new InvokeCommand({
                 FunctionName: functionName,
