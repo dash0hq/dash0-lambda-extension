@@ -59,11 +59,7 @@ fn create_root_span(
     };
 
     let start_nanos = ((data.start_time - data.init_duration) * 1_000_000.0) as u64;
-    let end_nanos = if data.billed_duration > 0.0 {
-        start_nanos + (data.billed_duration * 1_000_000.0) as u64
-    } else {
-        (data.end_time * 1_000_000.0) as u64
-    };
+    let end_nanos = (data.end_time * 1_000_000.0) as u64;
 
     let function_name =
         std::env::var("AWS_LAMBDA_FUNCTION_NAME").unwrap_or_else(|_| "unknown".to_string());
