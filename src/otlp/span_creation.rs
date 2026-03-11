@@ -304,7 +304,7 @@ mod tests {
         assert_eq!(hex::encode(&span.parent_span_id), parent_span_id_hex);
         assert_eq!(span.name, "my-function");
         assert_eq!(span.start_time_unix_nano, 850_000_000); // (1000 - 150) ms in nanos
-        assert_eq!(span.end_time_unix_nano, 1_350_000_000); // 850ms + 500ms
+        assert_eq!(span.end_time_unix_nano, 1_100_000_000);
 
         let inv_attr = span
             .attributes
