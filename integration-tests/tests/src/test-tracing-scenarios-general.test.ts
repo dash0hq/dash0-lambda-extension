@@ -208,7 +208,7 @@ const fetchAndVerifyConsumerSpans = async (
                 }
                 if (consumerRootSpan) break;
             }
-            expect(consumerRootSpan, 'Consumer root span not found').not.toBeNull();
+            expect(consumerRootSpan, `Consumer root span not found: ${producerTraceId}`).not.toBeNull();
             console.log(`Consumer root span found: spanId=${consumerRootSpan!.spanId}, parentSpanId=${consumerRootSpan!.parentSpanId}`);
 
             // Find consumer handler span (from lambda scope, child of consumer root span)
@@ -259,6 +259,7 @@ const verifyTracingScenario = async (
     console.log(`Producer invocation ID: ${producerInvocationId}`);
 
     // Invoke consumer to flush its supplementary spans (root span arrives on next invocation)
+    await delay(2000);
     await invokeFunction(consumerFunctionName, true, false);
 
     const expectedProducerScopeName = getLambdaScopeName(producerFunctionName);
