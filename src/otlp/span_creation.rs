@@ -170,7 +170,7 @@ fn create_overhead_span(
     })
 }
 
-pub fn create_spans(invocation_id: &str) -> Option<StoredTrace> {
+pub fn create_spans(invocation_id: &str, create_overhead: bool) -> Option<StoredTrace> {
     let data = invocation_entry::get_supplementary_span_data(invocation_id)?;
 
     let mut spans = Vec::new();
@@ -183,8 +183,10 @@ pub fn create_spans(invocation_id: &str) -> Option<StoredTrace> {
         spans.push(init_span);
     }
 
-    if let Some(overhead_span) = create_overhead_span(invocation_id, &data) {
-        spans.push(overhead_span);
+    if create_overhead {
+        if let Some(overhead_span) = create_overhead_span(invocation_id, &data) {
+            spans.push(overhead_span);
+        }
     }
 
     if spans.is_empty() {
@@ -247,7 +249,7 @@ pub fn create_spans(invocation_id: &str) -> Option<StoredTrace> {
 }
 
 pub fn create_supplementary_spans(invocation_id: &str) {
-    if let Some(trace) = create_spans(invocation_id) {
+    if let Some(trace) = create_spans(invocation_id, true) {
         invocation_entry::store_trace_by_id(invocation_id, trace);
     }
 }

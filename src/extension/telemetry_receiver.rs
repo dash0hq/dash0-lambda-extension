@@ -71,7 +71,7 @@ pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
         }
 
         for (invocation_id, _) in &error_invocation_ids {
-            if let Some(trace) = create_spans(invocation_id) {
+            if let Some(trace) = create_spans(invocation_id, false) {
                 traces_to_send.push(trace);
             }
         }
