@@ -54,18 +54,25 @@ pub fn init_env_var_attrs() {
     let content = match std::fs::read_to_string("/tmp/dash0_env_vars") {
         Ok(c) => c,
         Err(e) => {
-            tracing::warn!("[{}] Failed to read /tmp/dash0_env_vars {}", crate::log_prefix(), e);
+            tracing::warn!(
+                "[{}] Failed to read /tmp/dash0_env_vars {}",
+                crate::log_prefix(),
+                e
+            );
             return;
         }
     };
-    let json: serde_json::Map<String, serde_json::Value> =
-        match serde_json::from_str(&content) {
-            Ok(m) => m,
-            Err(e) => {
-                tracing::warn!("[{}] Failed to parse /tmp/dash0_env_vars: {}", crate::log_prefix(), e);
-                return;
-            }
-        };
+    let json: serde_json::Map<String, serde_json::Value> = match serde_json::from_str(&content) {
+        Ok(m) => m,
+        Err(e) => {
+            tracing::warn!(
+                "[{}] Failed to parse /tmp/dash0_env_vars: {}",
+                crate::log_prefix(),
+                e
+            );
+            return;
+        }
+    };
 
     let masked = crate::otlp::masking::mask_env_vars(json);
 

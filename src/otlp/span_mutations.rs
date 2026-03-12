@@ -14,7 +14,6 @@ use opentelemetry_proto::tonic::trace::v1::span::{Event, Link, SpanKind};
 use opentelemetry_proto::tonic::trace::v1::status::StatusCode;
 use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span, Status};
 use prost::Message;
-use serde_json::Map as JsonMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub fn drop_duplicate_java_instrumenations(decoded: &ExportTraceServiceRequest) -> bool {
@@ -109,12 +108,6 @@ pub fn build_synthetic_trace(
                                 .unwrap_or_else(|| "unknown_service".to_string()),
                         ),
                     ),
-                }),
-            },
-            KeyValue {
-                key: "process.environ".to_string(),
-                value: Some(AnyValue {
-                    value: Some(Value::StringValue(env_as_json_string())),
                 }),
             },
         ],
@@ -1631,14 +1624,6 @@ mod tests {
 
         disable_payload_log_records();
     }
-}
-
-fn env_as_json_string() -> String {
-    let map: JsonMap<String, serde_json::Value> = std::env::vars()
-        .map(|(k, v)| (k, serde_json::Value::String(v)))
-        .collect();
-    let masked = crate::otlp::masking::mask_env_vars(map);
-    serde_json::Value::Object(masked).to_string()
 }
 
 fn get_trace_span_ids(invocation_id: &str, existing_traces: &[StoredTrace]) -> (Vec<u8>, Vec<u8>) {

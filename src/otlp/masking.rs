@@ -16,6 +16,7 @@ static DEFAULT_MASKING_PATTERNS: &[&str] = &[
     ".*secret.*",
     ".*credential.*",
     ".*passphrase.*",
+    ".*token.*",
 ];
 
 static MASKING_RULES: OnceCell<MaskingRules> = OnceCell::new();
@@ -116,7 +117,9 @@ fn get_env_var_masking_rules() -> &'static MaskingRules {
     ENV_VAR_MASKING_RULES.get_or_init(|| MaskingRules { global: vec![] })
 }
 
-pub fn mask_env_vars(env_map: serde_json::Map<String, serde_json::Value>) -> serde_json::Map<String, serde_json::Value> {
+pub fn mask_env_vars(
+    env_map: serde_json::Map<String, serde_json::Value>,
+) -> serde_json::Map<String, serde_json::Value> {
     let env_rules = get_env_var_masking_rules();
     let rules = if env_rules.global.is_empty() {
         get_masking_rules()
@@ -143,7 +146,7 @@ mod tests {
     #[test]
     fn test_default_masking_rules_has_five_patterns() {
         let rules = default_masking_rules();
-        assert_eq!(rules.global.len(), 5);
+        assert_eq!(rules.global.len(), 6);
     }
 
     #[test]
