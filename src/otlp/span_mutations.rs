@@ -1180,6 +1180,65 @@ mod tests {
         assert_eq!(entry.span_id.unwrap(), hex::encode(&parent_span_id));
     }
 
+    fn build_stored_trace_with_multiple_spans(
+        invocation_id: &str,
+        spans: Vec<Span>,
+    ) -> StoredTrace {
+        let request = ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans {
+                scope_spans: vec![ScopeSpans {
+                    spans,
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        StoredTrace {
+            method: Method::POST,
+            path_and_query: "/v1/traces".to_string(),
+            headers: hyper::HeaderMap::new(),
+            body: request.encode_to_vec(),
+            invocation_ids: vec![invocation_id.to_string()],
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn get_trace_span_ids_finds_root_span_with_two_levels() {
+        let invocation_id = "inv-ids-two-levels";
+        let trace_id = vec![0xAA; 16];
+        let root_parent_span_id = vec![0x11; 8]; // the missing span we want to find
+        let root_span_id = vec![0x22; 8];
+        let child_span_id = vec![0x33; 8];
+
+        // Root span: parent is the missing synthetic span
+        let root_span = Span {
+            trace_id: trace_id.clone(),
+            span_id: root_span_id.clone(),
+            parent_span_id: root_parent_span_id.clone(),
+            ..Default::default()
+        };
+        // Child span: parent is the root span
+        let child_span = Span {
+            trace_id: trace_id.clone(),
+            span_id: child_span_id.clone(),
+            parent_span_id: root_span_id.clone(),
+            ..Default::default()
+        };
+
+        // Put child first to ensure we don't just pick the first span
+        let stored_trace =
+            build_stored_trace_with_multiple_spans(invocation_id, vec![child_span, root_span]);
+
+        let (got_trace, got_span) = super::get_trace_span_ids(invocation_id, &[stored_trace]);
+
+        assert_eq!(got_trace, trace_id);
+        assert_eq!(
+            got_span, root_parent_span_id,
+            "should return the parent_span_id of the root span (the missing one)"
+        );
+    }
+
     // --- extract_span_attributes_from_event tests ---
 
     fn find_extracted_attr<'a>(attrs: &'a [KeyValue], key: &str) -> Option<&'a AnyValue> {
@@ -1638,18 +1697,29 @@ fn get_trace_span_ids(invocation_id: &str, existing_traces: &[StoredTrace]) -> (
                 crate::log_prefix(),
                 invocation_id,
             );
-            if let Some(span) = decoded
+            let spans: Vec<_> = decoded
                 .resource_spans
                 .into_iter()
                 .flat_map(|rs| rs.scope_spans)
                 .flat_map(|ss| ss.spans)
-                .next()
-            {
+                .collect();
+
+            // Build a set of all span IDs in this trace
+            let span_id_set: std::collections::HashSet<Vec<u8>> =
+                spans.iter().map(|s| s.span_id.clone()).collect();
+
+            // Find the root span: the one whose parent_span_id is not in our span set
+            let root_span = spans
+                .iter()
+                .find(|s| !s.parent_span_id.is_empty() && !span_id_set.contains(&s.parent_span_id))
+                .or_else(|| spans.first());
+
+            if let Some(span) = root_span {
                 if span.trace_id.len() == 16 {
-                    trace_id = Some(span.trace_id);
+                    trace_id = Some(span.trace_id.clone());
                 }
                 if !span.parent_span_id.is_empty() {
-                    span_id = Some(span.parent_span_id);
+                    span_id = Some(span.parent_span_id.clone());
                 }
             }
         }
