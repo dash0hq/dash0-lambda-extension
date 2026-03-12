@@ -20,23 +20,8 @@ if [ -z "${OTEL_SERVICE_NAME}" ]; then
 fi
 
 # Write env vars to a file for the extension to read
-env -0 | {
-  echo -n "{"
-  first=true
-  while IFS= read -r -d '' entry; do
-    [ -z "$entry" ] && continue
-    key="${entry%%=*}"
-    value="${entry#*=}"
-    value="${value//\\/\\\\}"
-    value="${value//\"/\\\"}"
-    value="${value//$'\n'/\\n}"
-    value="${value//$'\t'/\\t}"
-    value="${value//$'\r'/\\r}"
-    if [ "$first" = true ]; then first=false; else echo -n ","; fi
-    echo -n "\"$key\":\"$value\""
-  done
-  echo -n "}"
-} > /tmp/dash0_env_vars || true
+source /opt/shared.sh
+write_env_vars
 
 
 exec "${args[@]}"

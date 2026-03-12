@@ -1,14 +1,6 @@
 #!/bin/bash
 args=("$@")
 
-# Copy DASH0_* masking env vars to LUMIGO_* equivalents
-[ -n "$DASH0_MASK_RULES" ] && export LUMIGO_SECRET_MASKING_REGEX="$DASH0_MASK_RULES"
-[ -n "$DASH0_MASK_REQUEST_BODY" ] && export LUMIGO_SECRET_MASKING_REGEX_HTTP_REQUEST_BODIES="$DASH0_MASK_REQUEST_BODY"
-[ -n "$DASH0_MASK_REQUEST_HEADERS" ] && export LUMIGO_SECRET_MASKING_REGEX_HTTP_REQUEST_HEADERS="$DASH0_MASK_REQUEST_HEADERS"
-[ -n "$DASH0_MASK_RESPONSE_BODY" ] && export LUMIGO_SECRET_MASKING_REGEX_HTTP_RESPONSE_BODIES="$DASH0_MASK_RESPONSE_BODY"
-[ -n "$DASH0_MASK_RESPONSE_HEADERS" ] && export LUMIGO_SECRET_MASKING_REGEX_HTTP_RESPONSE_HEADERS="$DASH0_MASK_RESPONSE_HEADERS"
-[ -n "$DASH0_MASK_QUERY_PARAMS" ] && export LUMIGO_SECRET_MASKING_REGEX_HTTP_QUERY_PARAMS="$DASH0_MASK_QUERY_PARAMS"
-
 export AWS_LAMBDA_RUNTIME_API="127.0.0.1:9009"
 
 LAMBDA_RESOURCE_ATTRIBUTES="cloud.region=$AWS_REGION,cloud.provider=aws,cloud_platform=aws_lambda,faas.name=$AWS_LAMBDA_FUNCTION_NAME,faas.version=$AWS_LAMBDA_FUNCTION_VERSION,faas.instance=$AWS_LAMBDA_LOG_STREAM_NAME";
@@ -32,23 +24,8 @@ if [[ -z "$OTEL_TRACES_SAMPLER" ]]; then
 fi
 
 # Write env vars to a file for the extension to read
-env -0 | {
-  echo -n "{"
-  first=true
-  while IFS= read -r -d '' entry; do
-    [ -z "$entry" ] && continue
-    key="${entry%%=*}"
-    value="${entry#*=}"
-    value="${value//\\/\\\\}"
-    value="${value//\"/\\\"}"
-    value="${value//$'\n'/\\n}"
-    value="${value//$'\t'/\\t}"
-    value="${value//$'\r'/\\r}"
-    if [ "$first" = true ]; then first=false; else echo -n ","; fi
-    echo -n "\"$key\":\"$value\""
-  done
-  echo -n "}"
-} > /tmp/dash0_env_vars || echo "Failed to write env vars to /tmp/dash0_env_vars"
+source /opt/shared.sh
+write_env_vars
 
 
 # enable auto instrumentation unless DASH0_DISABLE_AUTO_INSTRUMENTATION is set
