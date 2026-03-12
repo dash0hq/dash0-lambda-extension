@@ -111,20 +111,10 @@ def init() -> Dict[str, Any]:
     # Activate instrumentations
     from dash0_opentelemetry.instrumentations import instrumentations  # noqa
     from dash0_opentelemetry.libs.general_utils import get_max_size
-    from dash0_opentelemetry.resources.detectors import (
-        get_process_resource,
-        get_resource,
-    )
     from opentelemetry.instrumentation.aws_lambda import AwsLambdaInstrumentor
 
-    process_resource = get_process_resource()
-
-    resource = get_resource(
-        process_resource, {}
-    )
 
     tracer_provider = TracerProvider(
-        resource=resource,
         span_limits=(SpanLimits(max_span_attribute_length=(get_max_size()))),
     )
 
