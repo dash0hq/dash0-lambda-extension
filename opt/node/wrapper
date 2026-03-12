@@ -36,8 +36,20 @@ if [[ -z "$OTEL_TRACES_SAMPLER" ]]; then
 fi
 
 # Write env vars to a file for the extension to read
-node -e "require('fs').writeFileSync('/tmp/dash0_env_vars', JSON.stringify(process.env))" 2>/dev/null || \
-  echo "{\"OTEL_SERVICE_NAME\": \"$OTEL_SERVICE_NAME\", \"OTEL_RESOURCE_ATTRIBUTES\": \"$OTEL_RESOURCE_ATTRIBUTES\"}" > /tmp/dash0_env_vars || true
+{
+  echo -n "{"
+  first=true
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    key="${line%%=*}"
+    value="${line#*=}"
+    value="${value//\\/\\\\}"
+    value="${value//\"/\\\"}"
+    if [ "$first" = true ]; then first=false; else echo -n ","; fi
+    echo -n "\"$key\":\"$value\""
+  done < <(env)
+  echo -n "}"
+} > /tmp/dash0_env_vars || true
 
 # enable auto instrumentation unless DASH0_DISABLE_AUTO_INSTRUMENTATION is set
 if [ -z "$DASH0_DISABLE_AUTO_INSTRUMENTATION" ] || [ "${DASH0_DISABLE_AUTO_INSTRUMENTATION,,}" = "false" ]; then

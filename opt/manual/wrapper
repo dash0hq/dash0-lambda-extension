@@ -20,8 +20,20 @@ if [ -z "${OTEL_SERVICE_NAME}" ]; then
 fi
 
 # Write env vars to a file for the extension to read
-python3 -c "import os,json; json.dump(dict(os.environ), open('/tmp/dash0_env_vars','w'))" 2>/dev/null || \
-  echo "{\"OTEL_SERVICE_NAME\": \"$OTEL_SERVICE_NAME\", \"OTEL_RESOURCE_ATTRIBUTES\": \"$OTEL_RESOURCE_ATTRIBUTES\"}" > /tmp/dash0_env_vars || true
+{
+  echo -n "{"
+  first=true
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    key="${line%%=*}"
+    value="${line#*=}"
+    value="${value//\\/\\\\}"
+    value="${value//\"/\\\"}"
+    if [ "$first" = true ]; then first=false; else echo -n ","; fi
+    echo -n "\"$key\":\"$value\""
+  done < <(env)
+  echo -n "}"
+} > /tmp/dash0_env_vars || true
 
 
 exec "${args[@]}"
