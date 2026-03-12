@@ -4,10 +4,9 @@ import { describe, expect, it } from 'vitest';
 import { DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS } from "./config";
 import {
     checkException,
-    checkHttpSpan,
     checkLogs,
     checkResourceAttributes,
-    checkSpanAttributesFromReport, LogToCheck,
+    checkSupplementarySpans, LogToCheck,
     getAttributesMap,
     getRequestPayload,
     invokeFunction, runAllTests
@@ -19,6 +18,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
 
     let traceId: string | undefined = undefined;
     let parentSpanId: string | undefined = undefined;
+    let rootSpanId: string | undefined = undefined;
     let span = undefined
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         await delay(RETRY_DELAY_MS);
@@ -35,20 +35,29 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             });
 
             const spanPayload = await spanResponse.json() as any;
-            expect(spanPayload?.resourceSpans.length).toEqual(1);
-            expect(spanPayload?.resourceSpans[0].scopeSpans.length).toEqual(1);
-            expect(spanPayload?.resourceSpans[0].scopeSpans[0].scope.name).toEqual("opentelemetry.instrumentation.aws_lambda");
-            expect(spanPayload?.resourceSpans[0].scopeSpans[0].spans.length).toEqual(1);
-            const resourceAttributes = getAttributesMap(spanPayload?.resourceSpans[0].resource.attributes);
+            // Find the Lambda instrumentation scope (supplementary spans may also be present)
+            let lambdaScopeSpan = null;
+            let lambdaResource = null;
+            for (const rs of (spanPayload?.resourceSpans ?? [])) {
+                for (const ss of (rs.scopeSpans ?? [])) {
+                    if (ss.scope?.name === 'opentelemetry.instrumentation.aws_lambda') {
+                        lambdaScopeSpan = ss;
+                        lambdaResource = rs.resource;
+                    }
+                }
+            }
+            expect(lambdaScopeSpan).toBeDefined();
+            expect(lambdaScopeSpan!.spans.length).toEqual(1);
+            const resourceAttributes = getAttributesMap(lambdaResource!.attributes);
             expect(resourceAttributes['service.name'].stringValue).toEqual(functionName);
-            checkResourceAttributes(spanPayload.resourceSpans[0].resource.attributes, functionName);
+            checkResourceAttributes(lambdaResource!.attributes, functionName);
             // check span attributes
-            span = spanPayload.resourceSpans[0].scopeSpans[0].spans[0];
+            span = lambdaScopeSpan!.spans[0];
             const spanAttributes = getAttributesMap(span.attributes);
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
-            expect(spanAttributes['faas.init_duration'].doubleValue).toBeGreaterThan(0);
             traceId = span.traceId;
             parentSpanId = span.spanId;
+            rootSpanId = span.parentSpanId;
             checkException(span, 'timeout');
             break;
         } catch (error) {
@@ -66,13 +75,25 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
     if (!invocationEnd) {
         logsToBeChecked.push({ message: "Status: timeout" });
     }
-    const reportLog = await checkLogs({
+    await checkLogs({
         invocationId: invocationId!,
         functionName,
         traceId: traceId!,
         parentSpanId: parentSpanId!,
         success: false,
         logsToBeChecked
+    });
+
+    // Supplementary spans are sent on the next invocation; trigger one if needed
+    if (invocationEnd) {
+        await invokeFunction(functionName, true, true);
+    }
+    await checkSupplementarySpans({
+        invocationId: invocationId!,
+        functionName,
+        traceId: traceId!,
+        rootSpanId: rootSpanId!,
+        runtimeError: true,
     });
 }
 

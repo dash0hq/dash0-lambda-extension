@@ -19,13 +19,13 @@ const getLambdaScopeName = (functionName: string) =>
         'opentelemetry.instrumentation.aws_lambda' :
         '@opentelemetry/instrumentation-aws-lambda';
 
-const fetchProducerSpan = async (
+const fetchProducerSpans = async (
     producerInvocationId: string,
     expectedScopeName: string,
-): Promise<{ traceId: string; spanId: string }> => {
+): Promise<{ traceId: string; handlerSpanId: string; rootSpanId: string }> => {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         await delay(RETRY_DELAY_MS);
-        console.log(`Attempt ${attempt} to fetch producer span for invocation ID ${producerInvocationId}`);
+        console.log(`Attempt ${attempt} to fetch producer spans for invocation ID ${producerInvocationId}`);
         try {
             const spanResponse = await fetch(DASH0_ENDPOINT + 'spans', {
                 method: 'POST',
@@ -38,26 +38,46 @@ const fetchProducerSpan = async (
             });
 
             const spanPayload = await spanResponse.json() as any;
-            expect(spanPayload?.resourceSpans.length).toEqual(1);
-            expect(spanPayload?.resourceSpans[0].scopeSpans.length).toBeGreaterThanOrEqual(1);
+            expect(spanPayload?.resourceSpans.length).toBeGreaterThanOrEqual(1);
 
-            const lambdaScopeSpan = spanPayload.resourceSpans[0].scopeSpans.find(
-                (ss: any) => ss.scope.name === expectedScopeName
-            );
-            expect(lambdaScopeSpan).toBeDefined();
-            expect(lambdaScopeSpan.spans.length).toEqual(1);
+            // Find handler span from lambda instrumentation scope
+            let handlerSpan: any = null;
+            for (const rs of spanPayload.resourceSpans) {
+                for (const ss of rs.scopeSpans) {
+                    if (ss.scope.name === expectedScopeName) {
+                        expect(ss.spans.length).toEqual(1);
+                        handlerSpan = ss.spans[0];
+                    }
+                }
+            }
+            expect(handlerSpan, `Producer handler span not found in scope ${expectedScopeName}`).not.toBeNull();
 
-            const producerSpan = lambdaScopeSpan.spans[0];
-            console.log(`Producer traceId: ${producerSpan.traceId}, spanId: ${producerSpan.spanId}`);
-            return { traceId: producerSpan.traceId, spanId: producerSpan.spanId };
+            // Find root span from dash0.lambda-extension scope (its spanId should match handler's parentSpanId)
+            let rootSpan: any = null;
+            for (const rs of spanPayload.resourceSpans) {
+                for (const ss of rs.scopeSpans) {
+                    if (ss.scope?.name === 'dash0.lambda-extension') {
+                        for (const span of ss.spans) {
+                            if (span.spanId === handlerSpan.parentSpanId) {
+                                rootSpan = span;
+                            }
+                        }
+                    }
+                }
+            }
+            expect(rootSpan, 'Producer root span not found in dash0.lambda-extension scope').not.toBeNull();
+            expect(rootSpan.traceId).toEqual(handlerSpan.traceId);
+
+            console.log(`Producer traceId: ${handlerSpan.traceId}, handlerSpanId: ${handlerSpan.spanId}, rootSpanId: ${rootSpan.spanId}`);
+            return { traceId: handlerSpan.traceId, handlerSpanId: handlerSpan.spanId, rootSpanId: rootSpan.spanId };
         } catch (error) {
-            console.error(`Error fetching producer span on attempt ${attempt}:`, error);
+            console.error(`Error fetching producer spans on attempt ${attempt}:`, error);
             if (attempt === MAX_ATTEMPTS) {
                 throw error;
             }
         }
     }
-    throw new Error('Failed to fetch producer span');
+    throw new Error('Failed to fetch producer spans');
 };
 
 const fetchLeafClientSpanId = async (
@@ -133,17 +153,16 @@ const fetchLeafClientSpanId = async (
     throw new Error('Failed to fetch leaf client span');
 };
 
-const fetchAndVerifyConsumerSpan = async (
+const fetchAndVerifyConsumerSpans = async (
     consumerFunctionName: string,
     expectedScopeName: string,
     producerTraceId: string,
-    producerSpanId: string,
     leafSpanId: string,
     scenarioName: string,
 ) => {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         await delay(RETRY_DELAY_MS);
-        console.log(`Attempt ${attempt} to fetch consumer span for ${consumerFunctionName}`);
+        console.log(`Attempt ${attempt} to fetch consumer spans for ${consumerFunctionName}`);
         try {
             const now = Date.now();
             const spanResponse = await fetch(DASH0_ENDPOINT + 'spans', {
@@ -173,29 +192,47 @@ const fetchAndVerifyConsumerSpan = async (
             const spanPayload = await spanResponse.json() as any;
             expect(spanPayload?.resourceSpans.length).toBeGreaterThanOrEqual(1);
 
-            // Find the consumer span that is a child of the leaf client span
-            let consumerSpan: any = null;
+            // Find consumer root span (from dash0.lambda-extension scope, child of the leaf client span)
+            let consumerRootSpan: any = null;
             for (const resourceSpan of spanPayload.resourceSpans) {
                 for (const scopeSpan of resourceSpan.scopeSpans) {
-                    if (scopeSpan.scope.name === expectedScopeName) {
+                    if (scopeSpan.scope?.name === 'dash0.lambda-extension') {
                         for (const span of scopeSpan.spans) {
                             if (span.traceId === producerTraceId && span.parentSpanId === leafSpanId) {
-                                consumerSpan = span;
+                                consumerRootSpan = span;
                                 break;
                             }
                         }
                     }
-                    if (consumerSpan) break;
+                    if (consumerRootSpan) break;
                 }
-                if (consumerSpan) break;
+                if (consumerRootSpan) break;
             }
+            expect(consumerRootSpan, `Consumer root span not found: ${producerTraceId}`).not.toBeNull();
+            console.log(`Consumer root span found: spanId=${consumerRootSpan!.spanId}, parentSpanId=${consumerRootSpan!.parentSpanId}`);
 
-            expect(consumerSpan).not.toBeNull();
-            console.log(`Consumer span found: traceId=${consumerSpan!.traceId}, spanId=${consumerSpan!.spanId}, parentSpanId=${consumerSpan!.parentSpanId}`);
-            console.log(`Trace chain verified: producer(${producerSpanId}) -> leaf(${leafSpanId}) -> consumer(${consumerSpan!.spanId})`);
+            // Find consumer handler span (from lambda scope, child of consumer root span)
+            let consumerHandlerSpan: any = null;
+            for (const resourceSpan of spanPayload.resourceSpans) {
+                for (const scopeSpan of resourceSpan.scopeSpans) {
+                    if (scopeSpan.scope.name === expectedScopeName) {
+                        for (const span of scopeSpan.spans) {
+                            if (span.traceId === producerTraceId && span.parentSpanId === consumerRootSpan!.spanId) {
+                                consumerHandlerSpan = span;
+                                break;
+                            }
+                        }
+                    }
+                    if (consumerHandlerSpan) break;
+                }
+                if (consumerHandlerSpan) break;
+            }
+            expect(consumerHandlerSpan, 'Consumer handler span not found').not.toBeNull();
+            console.log(`Consumer handler span found: spanId=${consumerHandlerSpan!.spanId}, parentSpanId=${consumerHandlerSpan!.parentSpanId}`);
+            console.log(`Trace chain verified: leaf(${leafSpanId}) -> consumer root(${consumerRootSpan!.spanId}) -> consumer handler(${consumerHandlerSpan!.spanId})`);
 
             if (scenarioName === 'eventbridge') {
-                const consumerAttrs = getAttributesMap(consumerSpan!.attributes);
+                const consumerAttrs = getAttributesMap(consumerHandlerSpan!.attributes);
                 expect(consumerAttrs['faas.trigger']).toBeDefined();
                 expect(consumerAttrs['dash0.faas.event_bridge_source']).toBeDefined();
                 expect(consumerAttrs['dash0.faas.event_bridge_detail_type']).toBeDefined();
@@ -204,7 +241,7 @@ const fetchAndVerifyConsumerSpan = async (
 
             return;
         } catch (error) {
-            console.error(`Error fetching consumer span on attempt ${attempt}:`, error);
+            console.error(`Error fetching consumer spans on attempt ${attempt}:`, error);
             if (attempt === MAX_ATTEMPTS) {
                 throw error;
             }
@@ -217,19 +254,28 @@ const verifyTracingScenario = async (
     consumerFunctionName: string,
     scenarioName: string,
 ) => {
+    // invocationEnd=false triggers a second invocation to flush supplementary spans (including root span)
     const producerInvocationId = await invokeFunction(producerFunctionName, true, false);
     console.log(`Producer invocation ID: ${producerInvocationId}`);
 
-    const expectedScopeName = getLambdaScopeName(producerFunctionName);
+    // Invoke producer to flush its supplementary spans (root span arrives on next invocation)
+    await delay(8000);
+    await invokeFunction(producerFunctionName, true, false);
 
-    const { traceId: producerTraceId, spanId: producerSpanId } =
-        await fetchProducerSpan(producerInvocationId, expectedScopeName);
+    const expectedProducerScopeName = getLambdaScopeName(producerFunctionName);
+    const expectedConsumerScopeName = getLambdaScopeName(consumerFunctionName);
 
+    // Fetch producer handler span and root span, verify root -> handler link
+    const { traceId: producerTraceId, handlerSpanId: producerHandlerSpanId } =
+        await fetchProducerSpans(producerInvocationId, expectedProducerScopeName);
+
+    // Fetch leaf client span (deepest descendant of producer handler)
     const leafSpanId =
-        await fetchLeafClientSpanId(producerFunctionName, producerTraceId, producerSpanId);
+        await fetchLeafClientSpanId(producerFunctionName, producerTraceId, producerHandlerSpanId);
 
-    await fetchAndVerifyConsumerSpan(
-        consumerFunctionName, expectedScopeName, producerTraceId, producerSpanId, leafSpanId, scenarioName,
+    // Verify consumer: root span (child of leaf) -> handler (child of consumer root)
+    await fetchAndVerifyConsumerSpans(
+        consumerFunctionName, expectedConsumerScopeName, producerTraceId, leafSpanId, scenarioName,
     );
 };
 

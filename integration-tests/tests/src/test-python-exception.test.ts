@@ -33,12 +33,19 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             });
 
             const spanPayload = await spanResponse.json() as any;
-            expect(spanPayload?.resourceSpans.length).toEqual(1);
-            expect(spanPayload?.resourceSpans[0].scopeSpans.length).toEqual(1);
-            expect(spanPayload?.resourceSpans[0].scopeSpans[0].scope.name).toEqual("opentelemetry.instrumentation.aws_lambda");
-            expect(spanPayload?.resourceSpans[0].scopeSpans[0].spans.length).toEqual(1);
+            // Find the Lambda instrumentation scope (supplementary spans may also be present)
+            let lambdaScopeSpan = null;
+            for (const rs of (spanPayload?.resourceSpans ?? [])) {
+                for (const ss of (rs.scopeSpans ?? [])) {
+                    if (ss.scope?.name === 'opentelemetry.instrumentation.aws_lambda') {
+                        lambdaScopeSpan = ss;
+                    }
+                }
+            }
+            expect(lambdaScopeSpan).toBeDefined();
+            expect(lambdaScopeSpan!.spans.length).toEqual(1);
             // check span attributes
-            span = spanPayload.resourceSpans[0].scopeSpans[0].spans[0];
+            span = lambdaScopeSpan!.spans[0];
             const spanAttributes = getAttributesMap(span.attributes);
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
 
@@ -92,7 +99,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
     if (!invocationEnd) {
         logsToBeChecked.push({ message: 'REPORT RequestId: ' });
     }
-    const reportLog = await checkLogs({
+    await checkLogs({
         invocationId: invocationId!,
         functionName,
         traceId: traceId!,
@@ -100,9 +107,6 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
         success: true,
         logsToBeChecked
     });
-    if (!invocationEnd) {
-        checkSpanAttributesFromReport(reportLog, span);
-    }
 }
 
 describe.concurrent('Lambda invocation', () => {

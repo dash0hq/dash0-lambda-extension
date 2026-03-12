@@ -118,17 +118,6 @@ fn parse_platform_runtime_done(log: &TelemetryLog) {
 fn parse_platform_report(log: &TelemetryLog) {
     if let Some(record) = log.record.as_object() {
         if let Some(req_id) = record.get("requestId").and_then(|v| v.as_str()) {
-            let log_timestamp = if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&log.time) {
-                dt.timestamp_millis() as f64
-            } else {
-                tracing::info!(
-                    "[{}] Failed to parse platform.report log time: {}",
-                    crate::log_prefix(),
-                    log.time
-                );
-                0.0
-            };
-
             if let Some(metrics) = record.get("metrics").and_then(|m| m.as_object()) {
                 let duration = metrics
                     .get("durationMs")
@@ -148,12 +137,6 @@ fn parse_platform_report(log: &TelemetryLog) {
                     .unwrap_or(0.0);
 
                 crate::state::invocation_entry::update(req_id, |entry| {
-                    if entry.start_time > 0.0 {
-                        entry.end_time = entry.start_time + duration;
-                    } else if log_timestamp > 0.0 {
-                        entry.end_time = log_timestamp;
-                    }
-
                     entry.duration = duration;
                     entry.billed_duration = billed_duration;
                     entry.memory_usage = memory_usage;
@@ -285,10 +268,7 @@ mod tests {
         process_telemetry_logs(&mut logs);
 
         let data = invocation_entry::get(req_id).expect("Should have data");
-        let expected_end = chrono::DateTime::parse_from_rfc3339(time_str)
-            .unwrap()
-            .timestamp_millis() as f64;
-        assert_eq!(data.end_time, expected_end);
+        assert_eq!(data.end_time, 0.0); // report does not set end_time
         assert_eq!(data.duration, 600.0);
         assert_eq!(data.billed_duration, 700.0);
         assert_eq!(data.memory_usage, 128);
@@ -342,9 +322,12 @@ mod tests {
             .unwrap()
             .timestamp_millis() as f64;
 
+        let expected_end = chrono::DateTime::parse_from_rfc3339(end_time)
+            .unwrap()
+            .timestamp_millis() as f64;
         assert_eq!(data.start_time, expected_start);
-        assert_eq!(data.end_time, expected_start + 1000.1);
-        // Report duration should overwrite runtimeDone duration
+        assert_eq!(data.end_time, expected_end); // set by runtimeDone, not overwritten by report
+                                                 // Report duration should overwrite runtimeDone duration
         assert_eq!(data.duration, 1000.1);
         assert_eq!(data.billed_duration, 1001.0);
         assert_eq!(data.memory_usage, 256);

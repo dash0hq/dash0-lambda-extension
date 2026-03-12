@@ -28,7 +28,10 @@ pub fn build_synthetic_trace(
     return_value: Option<&str>,
     existing_traces: &[StoredTrace],
 ) -> Option<StoredTrace> {
-    let (trace_id, span_id, parent_span_id) = get_trace_span_ids(invocation_id, existing_traces);
+    let (trace_id, span_id) = get_trace_span_ids(invocation_id, existing_traces);
+    let parent_span_id = invocation_entry::get_root_span_id(invocation_id)
+        .and_then(|id| hex::decode(&id).ok())
+        .unwrap_or_default();
 
     let now_nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -38,31 +41,7 @@ pub fn build_synthetic_trace(
         .map(|t| (t * 1_000_000.0) as u64)
         .unwrap_or(now_nanos);
 
-    let mut attributes = vec![
-        KeyValue {
-            key: "faas.invocation_id".to_string(),
-            value: Some(AnyValue {
-                value: Some(Value::StringValue(invocation_id.to_string())),
-            }),
-        },
-        KeyValue {
-            key: "cloud.resource_id".to_string(),
-            value: Some(AnyValue {
-                value: Some(Value::StringValue(
-                    crate::state::global::get_function_arn()
-                        .unwrap_or_else(|| "unknown".to_string()),
-                )),
-            }),
-        },
-        KeyValue {
-            key: "cloud.account.id".to_string(),
-            value: Some(AnyValue {
-                value: Some(Value::StringValue(
-                    crate::state::global::get_account_id().unwrap_or_else(|| "unknown".to_string()),
-                )),
-            }),
-        },
-    ];
+    let mut attributes = crate::otlp::span_creation::get_span_attributes(invocation_id);
 
     let mut sqs_links = Vec::new();
     if let Some(event_payload) = invocation_entry::get_event_payload(invocation_id) {
@@ -95,7 +74,7 @@ pub fn build_synthetic_trace(
         trace_id,
         span_id,
         parent_span_id,
-        name: "unknown".to_string(),
+        name: "handler".to_string(),
         kind: SpanKind::Server as i32,
         start_time_unix_nano: start_nanos,
         end_time_unix_nano: now_nanos,
@@ -307,63 +286,6 @@ fn extract_span_links(event_payload: &str) -> Vec<Link> {
     crate::otlp::span_link_extractor::extract_span_links(event_payload)
 }
 
-pub fn merge_telemetry_invocation_data(request: &mut ExportTraceServiceRequest) -> i32 {
-    let mut modified = 0;
-    for resource_span in &mut request.resource_spans {
-        for scope_span in &mut resource_span.scope_spans {
-            if let Some(scope) = &scope_span.scope {
-                if is_lambda_instrumentation_scope(&scope.name) {
-                    for span in &mut scope_span.spans {
-                        if let Some(invocation_id) = extract_invocation_id(span) {
-                            if let Some(data) = invocation_entry::get_telemetry_data(&invocation_id)
-                            {
-                                if data.init_duration > 0.0 {
-                                    span.attributes.push(KeyValue {
-                                        key: "faas.init_duration".to_string(),
-                                        value: Some(AnyValue {
-                                            value: Some(Value::DoubleValue(data.init_duration)),
-                                        }),
-                                    });
-                                    modified += 1;
-                                }
-                                if data.billed_duration > 0.0 {
-                                    span.attributes.push(KeyValue {
-                                        key: "dash0.faas.billed_duration".to_string(),
-                                        value: Some(AnyValue {
-                                            value: Some(Value::DoubleValue(data.billed_duration)),
-                                        }),
-                                    });
-                                    modified += 1;
-                                }
-                                if data.memory_usage > 0 {
-                                    span.attributes.push(KeyValue {
-                                        key: "dash0.faas.memory_used".to_string(),
-                                        value: Some(AnyValue {
-                                            value: Some(Value::IntValue(data.memory_usage as i64)),
-                                        }),
-                                    });
-                                    modified += 1;
-                                }
-
-                                if data.start_time > 0.0 {
-                                    span.start_time_unix_nano =
-                                        (data.start_time * 1_000_000.0) as u64;
-                                    modified += 1;
-                                }
-                                if data.end_time > 0.0 {
-                                    span.end_time_unix_nano = (data.end_time * 1_000_000.0) as u64;
-                                    modified += 1;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    modified
-}
-
 fn add_resource_attributes(span: &mut Span) {
     if let Some(account_id) = crate::state::global::get_account_id() {
         span.attributes.push(KeyValue {
@@ -539,19 +461,11 @@ fn add_event_payload_to_span(span: &mut Span, invocation_id: &str) {
     }
 }
 
-fn remove_parent_span(span: &mut Span, invocation_id: &str) {
-    if !crate::config::user::is_remove_lambda_parent_span() {
-        return;
-    }
-    let sampled = invocation_entry::get_sampled(invocation_id);
-    if sampled {
-        tracing::info!(
-            "[{}] invocation_id={} is sampled, keeping parent span id",
-            crate::log_prefix(),
-            invocation_id
-        );
-    } else {
-        span.parent_span_id = Vec::new();
+fn reparent_to_root_span(span: &mut Span, invocation_id: &str) {
+    if let Some(root_span_id) = invocation_entry::get_root_span_id(invocation_id) {
+        if let Ok(bytes) = hex::decode(&root_span_id) {
+            span.parent_span_id = bytes;
+        }
     }
 }
 
@@ -566,15 +480,9 @@ fn store_span_ids(span: &Span, invocation_id: &str) {
         .iter()
         .map(|b| format!("{:02x}", b))
         .collect::<String>();
-    let parent_span_id_hex = span
-        .parent_span_id
-        .iter()
-        .map(|b| format!("{:02x}", b))
-        .collect::<String>();
     invocation_entry::update(invocation_id, |entry| {
         entry.trace_id = Some(trace_id_hex);
         entry.span_id = Some(span_id_hex);
-        entry.parent_span_id = Some(parent_span_id_hex);
     });
     tracing::debug!(
         "[{}] stored trace/span id for invocation_id={}",
@@ -611,25 +519,11 @@ pub fn process_trace_request(
 
                 invocation_ids.push(invocation_id.clone());
                 add_event_payload_to_span(span, &invocation_id);
-                remove_parent_span(span, &invocation_id);
+                reparent_to_root_span(span, &invocation_id);
                 store_span_ids(span, &invocation_id);
             }
         }
     }
-
-    match serde_json::to_string(&decoded) {
-        Ok(json) => tracing::trace!(
-            "[{}] /v1/traces forward payload (json): {}",
-            crate::log_prefix(),
-            json
-        ),
-        Err(err) => tracing::error!(
-            "[{}] /v1/traces failed to render json: {}",
-            crate::log_prefix(),
-            err
-        ),
-    }
-
     *encoded_body = decoded.encode_to_vec();
 }
 
@@ -837,29 +731,6 @@ mod tests {
 
         assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
         assert!(!encoded_body.is_empty(), "encoded_body should be updated");
-    }
-
-    #[test]
-    #[serial]
-    fn process_trace_request_removes_parent_span_when_not_sampled() {
-        let invocation_id = "inv-process-parent";
-        store_event_payload(invocation_id, r#"{"test":"data"}"#);
-
-        let mut span = make_span_with_invocation(invocation_id);
-        span.parent_span_id = vec![0xAA; 8];
-
-        let mut request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
-        let mut invocation_ids = Vec::new();
-        let mut encoded_body = Vec::new();
-
-        // sampled defaults to false, so parent_span_id should be cleared
-        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
-
-        let span = &request.resource_spans[0].scope_spans[0].spans[0];
-        assert!(
-            span.parent_span_id.is_empty(),
-            "parent_span_id should be cleared when not sampled"
-        );
     }
 
     #[test]
@@ -1162,55 +1033,6 @@ mod tests {
         assert_eq!(escaped_attr, Some("False".to_string()));
     }
 
-    #[test]
-    #[serial]
-    fn test_merge_telemetry_invocation_data_updates_span() {
-        let invocation_id = "inv-merge-data";
-
-        // Setup InvocationEntry data
-        invocation_entry::update(invocation_id, |entry| {
-            entry.init_duration = 100.0;
-            entry.billed_duration = 200.0;
-            entry.memory_usage = 128;
-            entry.start_time = 1_000.0; // 1 second
-            entry.end_time = 2_000.0; // 2 seconds
-        });
-
-        let span = make_span_with_invocation(invocation_id);
-        let mut request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
-
-        let modified = super::merge_telemetry_invocation_data(&mut request);
-
-        assert!(modified > 0, "request should be modified");
-
-        let span = &request.resource_spans[0].scope_spans[0].spans[0];
-
-        // attributes
-        let init_attr = find_attribute(span, "faas.init_duration").and_then(|v| match &v.value {
-            Some(Value::DoubleValue(d)) => Some(*d),
-            _ => None,
-        });
-        assert_eq!(init_attr, Some(100.0));
-
-        let billed_attr =
-            find_attribute(span, "dash0.faas.billed_duration").and_then(|v| match &v.value {
-                Some(Value::DoubleValue(d)) => Some(*d),
-                _ => None,
-            });
-        assert_eq!(billed_attr, Some(200.0));
-
-        let mem_attr =
-            find_attribute(span, "dash0.faas.memory_used").and_then(|v| match &v.value {
-                Some(Value::IntValue(i)) => Some(*i),
-                _ => None,
-            });
-        assert_eq!(mem_attr, Some(128));
-
-        // timestamps (ms -> ns)
-        assert_eq!(span.start_time_unix_nano, 1_000_000_000);
-        assert_eq!(span.end_time_unix_nano, 2_000_000_000);
-    }
-
     // --- get_trace_span_ids tests ---
 
     fn build_stored_trace_with_ids(
@@ -1258,8 +1080,7 @@ mod tests {
             parent_span_id.clone(),
         );
 
-        let (got_trace, got_span, _got_parent) =
-            super::get_trace_span_ids(invocation_id, &[stored_trace]);
+        let (got_trace, got_span) = super::get_trace_span_ids(invocation_id, &[stored_trace]);
 
         assert_eq!(got_trace, trace_id);
         // span_id is taken from the existing span's parent_span_id
@@ -1272,19 +1093,16 @@ mod tests {
         let invocation_id = "inv-ids-from-entry";
         let trace_id_hex = "aa".repeat(16);
         let span_id_hex = "bb".repeat(8);
-        let parent_span_id_hex = "cc".repeat(8);
 
         invocation_entry::update(invocation_id, |entry| {
             entry.trace_id = Some(trace_id_hex.clone());
             entry.span_id = Some(span_id_hex.clone());
-            entry.parent_span_id = Some(parent_span_id_hex.clone());
         });
 
-        let (got_trace, got_span, _got_parent) = super::get_trace_span_ids(invocation_id, &[]);
+        let (got_trace, got_span) = super::get_trace_span_ids(invocation_id, &[]);
 
         assert_eq!(hex::encode(&got_trace), trace_id_hex);
         assert_eq!(hex::encode(&got_span), span_id_hex);
-        assert_eq!(hex::encode(_got_parent), parent_span_id_hex);
     }
 
     #[test]
@@ -1292,17 +1110,13 @@ mod tests {
     fn get_trace_span_ids_falls_back_to_hash() {
         let invocation_id = "inv-ids-hash-fallback";
         // No traces, no stored entry → should generate from hash
-        let (got_trace, got_span, got_parent) = super::get_trace_span_ids(invocation_id, &[]);
+        let (got_trace, got_span) = super::get_trace_span_ids(invocation_id, &[]);
 
         let expected_trace = crate::util::parsers::get_trace_id_from_invocation_id(invocation_id);
         let expected_span = crate::util::parsers::get_span_id_from_invocation_id(invocation_id);
 
         assert_eq!(got_trace, expected_trace);
         assert_eq!(got_span, expected_span);
-        assert!(
-            got_parent.is_empty(),
-            "parent_span_id should be empty when nothing is stored"
-        );
     }
 
     #[test]
@@ -1326,8 +1140,7 @@ mod tests {
             trace_parent_span_id.clone(),
         );
 
-        let (got_trace, got_span, _got_parent) =
-            super::get_trace_span_ids(invocation_id, &[stored_trace]);
+        let (got_trace, got_span) = super::get_trace_span_ids(invocation_id, &[stored_trace]);
 
         // trace_id and span_id should come from the existing trace, not the stored entry
         assert_eq!(got_trace, trace_trace_id);
@@ -1345,7 +1158,7 @@ mod tests {
             vec![0xCC; 8],
         );
 
-        let (got_trace, got_span, _) = super::get_trace_span_ids(invocation_id, &[other_trace]);
+        let (got_trace, got_span) = super::get_trace_span_ids(invocation_id, &[other_trace]);
 
         // Should fall through to hash-based generation
         let expected_trace = crate::util::parsers::get_trace_id_from_invocation_id(invocation_id);
@@ -1827,13 +1640,9 @@ fn env_as_json_string() -> String {
     crate::otlp::masking::mask_env_vars(map)
 }
 
-fn get_trace_span_ids(
-    invocation_id: &str,
-    existing_traces: &[StoredTrace],
-) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+fn get_trace_span_ids(invocation_id: &str, existing_traces: &[StoredTrace]) -> (Vec<u8>, Vec<u8>) {
     let mut trace_id: Option<Vec<u8>> = None;
     let mut span_id: Option<Vec<u8>> = None;
-    let parent_span_id: Option<Vec<u8>> = None;
 
     for trace in existing_traces {
         if !trace.invocation_ids.contains(&invocation_id.to_string()) {
@@ -1884,21 +1693,10 @@ fn get_trace_span_ids(
             .unwrap_or_else(|| get_span_id_from_invocation_id(invocation_id))
     });
 
-    let parent_span_id = parent_span_id.unwrap_or_else(|| {
-        stored_ids
-            .as_ref()
-            .and_then(|(_, _, p)| p.as_deref())
-            .filter(|p| !p.is_empty())
-            .and_then(|p| hex::decode(p).ok())
-            .filter(|p| p.len() == 8)
-            .unwrap_or_default()
-    });
-
     invocation_entry::update(invocation_id, |entry| {
         entry.trace_id = Some(hex::encode(&trace_id));
         entry.span_id = Some(hex::encode(&span_id));
-        entry.parent_span_id = Some(hex::encode(&parent_span_id));
     });
 
-    (trace_id, span_id, parent_span_id)
+    (trace_id, span_id)
 }

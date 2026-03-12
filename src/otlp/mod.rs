@@ -4,5 +4,6 @@ pub mod logs_receiver;
 pub mod masking;
 pub mod metrics_receiver;
 pub mod receiver;
+pub mod span_creation;
 pub mod span_link_extractor;
 pub mod span_mutations;

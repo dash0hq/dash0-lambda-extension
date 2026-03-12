@@ -160,8 +160,7 @@ export const checkLogs = async ({
     parentSpanId: string | null,
     success: boolean,
     logsToBeChecked: LogToCheck[],
-}): Promise<string> => {
-    let reportLog = null;
+}): Promise<void> => {
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         await delay(RETRY_DELAY_MS);
         console.log(`Attempt ${attempt} to fetch logs for invocation ID ${invocationId}`);
@@ -242,9 +241,6 @@ export const checkLogs = async ({
                     expectedSeverity = jsonSeverity ?? "info";
                 }
                 expect(logRecord.severityText.toLowerCase(), `Wrong severity: ${JSON.stringify(logRecord)}`).toEqual(expectedSeverity);
-                if (logRecord.body.stringValue.startsWith("REPORT RequestId: ")) {
-                    reportLog = logRecord.body.stringValue;
-                }
             }
             for (const logToCheck of logsToBeChecked) {
                 expect(logsToBeCheckedCount[logToCheck.message], `Log not found: ${logToCheck.message}`).toBeTruthy();
@@ -257,7 +253,6 @@ export const checkLogs = async ({
             }
         }
     }
-    return reportLog;
 }
 
 export const checkResourceAttributes = (attributes: Array<{ key: string, value: any }>, functionName: string) => {
@@ -265,6 +260,86 @@ export const checkResourceAttributes = (attributes: Array<{ key: string, value: 
     expect(resourceAttributes['cloud.platform'].stringValue).toEqual('aws_lambda');
     expect(resourceAttributes['cloud.resource_id'].stringValue).toContain(functionName);
     expect(resourceAttributes['cloud.account.id'].stringValue).toMatch(/^\d+$/);
+}
+
+export const checkSupplementarySpans = async ({
+    invocationId,
+    functionName,
+    traceId,
+    rootSpanId,
+    runtimeError = false,
+}: {
+    invocationId: string,
+    functionName: string,
+    traceId: string,
+    rootSpanId: string,
+    runtimeError?: boolean,
+}) => {
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        await delay(RETRY_DELAY_MS);
+        console.log(`Attempt ${attempt} to fetch supplementary spans for invocation ID ${invocationId}`);
+        try {
+            const spanResponse = await fetch(DASH0_ENDPOINT + 'spans', {
+                method: 'POST',
+                headers: {
+                    accept: 'application/json',
+                    authorization: `Bearer ${DASH0_TOKEN}`,
+                    'content-type': 'application/json',
+                },
+                body: JSON.stringify(getRequestPayload(invocationId)),
+            });
+
+            const spanPayload = await spanResponse.json() as any;
+            // Find spans from the dash0.lambda-extension scope
+            const supplementarySpans: any[] = [];
+            let supplementaryResource: any = null;
+            for (const rs of (spanPayload?.resourceSpans ?? [])) {
+                for (const ss of (rs.scopeSpans ?? [])) {
+                    if (ss.scope?.name === 'dash0.lambda-extension') {
+                        supplementarySpans.push(...(ss.spans ?? []));
+                        supplementaryResource = rs.resource;
+                    }
+                }
+            }
+            const expectedCount = runtimeError ? 2 : 3;
+            expect(supplementarySpans.length).toEqual(expectedCount);
+            checkResourceAttributes(supplementaryResource.attributes, functionName);
+
+            // Root span: named after the function, has faas.init_duration
+            const rootSpan = supplementarySpans.find((s: any) => s.name === functionName);
+            expect(rootSpan, `Supplementary root span not found for ${functionName}`).toBeDefined();
+            const rootAttrs = getAttributesMap(rootSpan.attributes);
+            expect(rootAttrs['faas.invocation_id'].stringValue).toEqual(invocationId);
+            expect(rootAttrs['faas.init_duration']).toBeDefined();
+            if (!runtimeError) {
+                expect(rootAttrs['dash0.faas.billed_duration']).toBeDefined();
+                expect(rootAttrs['dash0.faas.memory_used']).toBeDefined();
+            }
+            expect(rootSpan.traceId).toEqual(traceId);
+            expect(rootSpan.spanId).toEqual(rootSpanId);
+
+            // Init span
+            const initSpan = supplementarySpans.find((s: any) => s.name === 'aws.lambda.initialization');
+            expect(initSpan, 'Supplementary init span not found').toBeDefined();
+            expect(initSpan.traceId).toEqual(traceId);
+            expect(initSpan.parentSpanId).toEqual(rootSpanId);
+
+            // Overhead span
+            if (!runtimeError) {
+                const overheadSpan = supplementarySpans.find((s: any) => s.name === 'aws.lambda.overhead');
+                expect(overheadSpan, 'Supplementary overhead span not found').toBeDefined();
+                expect(overheadSpan.traceId).toEqual(traceId);
+                expect(overheadSpan.parentSpanId).toEqual(rootSpanId);
+            }
+
+            break;
+        } catch (error) {
+            console.error(`Error fetching supplementary spans on attempt ${attempt}:`, error);
+            if (attempt === MAX_ATTEMPTS) {
+                throw error;
+            }
+        }
+    }
 }
 
 export const checkException = (span: any, exception_type: string) => {

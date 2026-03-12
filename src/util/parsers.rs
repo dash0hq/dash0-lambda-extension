@@ -162,6 +162,19 @@ pub fn get_span_id_from_invocation_id(invocation_id: &str) -> Vec<u8> {
     hash[..8].to_vec()
 }
 
+pub fn generate_random_span_id() -> Vec<u8> {
+    use std::collections::hash_map::RandomState;
+    use std::hash::{BuildHasher, Hasher};
+    let mut hasher = RandomState::new().build_hasher();
+    hasher.write_u128(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0),
+    );
+    hasher.finish().to_be_bytes().to_vec()
+}
+
 /// Get the name of the instrumentation scope.
 pub fn get_span_scope_name(
     request: &opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest,

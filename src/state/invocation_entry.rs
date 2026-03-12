@@ -17,6 +17,7 @@ pub struct InvocationEntry {
     pub event_payload: Option<String>,
     pub return_value: Option<String>,
     pub span_id: Option<String>,
+    pub root_span_id: Option<String>,
     pub trace_id: Option<String>,
     pub parent_span_id: Option<String>,
     pub sampled: bool,
@@ -37,6 +38,7 @@ impl Default for InvocationEntry {
             event_payload: None,
             return_value: None,
             span_id: None,
+            root_span_id: None,
             trace_id: None,
             parent_span_id: None,
             sampled: false,
@@ -90,6 +92,14 @@ pub fn get_start_time(invocation_id: &str) -> Option<f64> {
         .filter(|&t| t > 0.0)
 }
 
+/// Lightweight getter: returns only the root_span_id.
+pub fn get_root_span_id(invocation_id: &str) -> Option<String> {
+    INVOCATION_STORE
+        .lock()
+        .get(invocation_id)
+        .and_then(|e| e.root_span_id.clone())
+}
+
 /// Lightweight getter: returns only the sampled flag.
 pub fn get_sampled(invocation_id: &str) -> bool {
     INVOCATION_STORE
@@ -126,6 +136,37 @@ pub struct TelemetryData {
     pub memory_usage: u64,
     pub start_time: f64,
     pub end_time: f64,
+}
+
+/// Data needed to build supplementary spans (root span).
+#[derive(Debug)]
+pub struct SupplementarySpanData {
+    pub root_span_id: Option<String>,
+    pub trace_id: Option<String>,
+    pub parent_span_id: Option<String>,
+    pub sampled: bool,
+    pub start_time: f64,
+    pub billed_duration: f64,
+    pub init_duration: f64,
+    pub memory_usage: u64,
+    pub end_time: f64,
+}
+
+pub fn get_supplementary_span_data(invocation_id: &str) -> Option<SupplementarySpanData> {
+    INVOCATION_STORE
+        .lock()
+        .get(invocation_id)
+        .map(|e| SupplementarySpanData {
+            root_span_id: e.root_span_id.clone(),
+            trace_id: e.trace_id.clone(),
+            parent_span_id: e.parent_span_id.clone(),
+            sampled: e.sampled,
+            start_time: e.start_time,
+            billed_duration: e.billed_duration,
+            init_duration: e.init_duration,
+            memory_usage: e.memory_usage,
+            end_time: e.end_time,
+        })
 }
 
 pub fn get_telemetry_data(invocation_id: &str) -> Option<TelemetryData> {
