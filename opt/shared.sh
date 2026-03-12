@@ -25,13 +25,15 @@ setup_otel_env() {
 }
 
 write_env_vars() {
-  env -0 | {
+  env -0 2>/dev/null | {
     echo -n "{"
     first=true
     while IFS= read -r -d '' entry; do
       [ -z "$entry" ] && continue
       key="${entry%%=*}"
       value="${entry#*=}"
+      key="${key//\\/\\\\}"
+      key="${key//\"/\\\"}"
       value="${value//\\/\\\\}"
       value="${value//\"/\\\"}"
       value="${value//$'\n'/\\n}"
@@ -41,5 +43,5 @@ write_env_vars() {
       echo -n "\"$key\":\"$value\""
     done
     echo -n "}"
-  } > /tmp/dash0_env_vars
+  } > /tmp/dash0_env_vars 2>/dev/null || true
 }
