@@ -54,7 +54,7 @@ pub fn init_env_var_attrs() {
     let content = match std::fs::read_to_string("/tmp/dash0_env_vars") {
         Ok(c) => c,
         Err(e) => {
-            tracing::warn!("[{}] Failed to read /tmp/dash0_env_vars: {}", crate::log_prefix(), e);
+            tracing::warn!("[{}] Failed to read /tmp/dash0_env_vars {}", crate::log_prefix(), e);
             return;
         }
     };
@@ -67,7 +67,9 @@ pub fn init_env_var_attrs() {
             }
         };
 
-    let attrs: Vec<KeyValue> = json
+    let masked = crate::otlp::masking::mask_env_vars(json);
+
+    let attrs: Vec<KeyValue> = masked
         .into_iter()
         .filter_map(|(key, value)| {
             value.as_str().map(|v| KeyValue {
@@ -88,13 +90,14 @@ pub fn get_env_var_attrs() -> Vec<KeyValue> {
 
 #[cfg(test)]
 mod tests {
-    use super::{get_function_arn, store_function_arn, ACCOUNT_ID, FUNCTION_ARN};
+    use super::*;
     use serial_test::serial;
     use std::env;
 
     fn reset_state() {
         FUNCTION_ARN.lock().take();
         ACCOUNT_ID.lock().take();
+        ENV_VAR_ATTRS.lock().clear();
         env::remove_var("AWS_REGION");
         env::remove_var("AWS_LAMBDA_FUNCTION_NAME");
     }
@@ -147,5 +150,52 @@ mod tests {
         *ACCOUNT_ID.lock() = Some("444455556666".to_string());
         env::remove_var("AWS_LAMBDA_FUNCTION_NAME");
         assert_eq!(get_function_arn(), None);
+    }
+
+    #[test]
+    #[serial]
+    fn init_env_var_attrs_masks_sensitive_values() {
+        reset_state();
+        crate::otlp::masking::init_masking_rules();
+
+        let env_json = serde_json::json!({
+            "PATH": "/usr/bin",
+            "AWS_SECRET_ACCESS_KEY": "super-secret",
+            "API_KEY": "my-api-key",
+            "HOME": "/home/user"
+        });
+        std::fs::write("/tmp/dash0_env_vars", env_json.to_string()).unwrap();
+
+        init_env_var_attrs();
+
+        let attrs = get_env_var_attrs();
+        let find_attr = |name: &str| -> Option<String> {
+            attrs.iter().find(|kv| kv.key == name).and_then(|kv| {
+                kv.value.as_ref().and_then(|v| match &v.value {
+                    Some(Value::StringValue(s)) => Some(s.clone()),
+                    _ => None,
+                })
+            })
+        };
+
+        assert_eq!(
+            find_attr("process.environment_variable.PATH"),
+            Some("/usr/bin".to_string())
+        );
+        assert_eq!(
+            find_attr("process.environment_variable.HOME"),
+            Some("/home/user".to_string())
+        );
+        assert_eq!(
+            find_attr("process.environment_variable.AWS_SECRET_ACCESS_KEY"),
+            Some("****".to_string())
+        );
+        assert_eq!(
+            find_attr("process.environment_variable.API_KEY"),
+            Some("****".to_string())
+        );
+
+        // cleanup
+        let _ = std::fs::remove_file("/tmp/dash0_env_vars");
     }
 }

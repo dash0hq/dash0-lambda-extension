@@ -1637,7 +1637,8 @@ fn env_as_json_string() -> String {
     let map: JsonMap<String, serde_json::Value> = std::env::vars()
         .map(|(k, v)| (k, serde_json::Value::String(v)))
         .collect();
-    crate::otlp::masking::mask_env_vars(map)
+    let masked = crate::otlp::masking::mask_env_vars(map);
+    serde_json::Value::Object(masked).to_string()
 }
 
 fn get_trace_span_ids(invocation_id: &str, existing_traces: &[StoredTrace]) -> (Vec<u8>, Vec<u8>) {
