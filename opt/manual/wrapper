@@ -1,9 +1,6 @@
 #!/bin/bash
 args=("$@")
 
-if [ "$X_LUMIGO_KILLSWITCH" = "true" ]; then
-    exec "${args[@]}"
-fi
 export AWS_LAMBDA_RUNTIME_API="127.0.0.1:9009"
 export LUMIGO_ENDPOINT="http://127.0.0.1:9009/v1/traces"
 
