@@ -27,7 +27,8 @@ COPY build/lrap_aarch64 /opt/lrap_aarch64
 # Copy entrypoint script (Lambda extension entry point)
 COPY opt/entrypoint /opt/extensions/lrap
 
-# Copy wrapper script
+# Copy shared script and wrapper script
+COPY opt/shared.sh /opt/shared.sh
 COPY opt/java/wrapper /opt/wrapper
 
 # Copy Java agent JAR (built locally from opt/java/opentelemetry-java-distro)
