@@ -47,16 +47,20 @@ const verifyTracingScenario = async (
 
             const spanPayload = await spanResponse.json() as any;
             expect(spanPayload?.resourceSpans.length).toBeGreaterThanOrEqual(1);
-            expect(spanPayload?.resourceSpans[0].scopeSpans.length).toBeGreaterThanOrEqual(1);
 
-            // Find the lambda instrumentation scope
-            const lambdaScopeSpan = spanPayload.resourceSpans[0].scopeSpans.find(
-                (ss: any) => ss.scope.name === expectedScopeName
-            );
-            expect(lambdaScopeSpan).toBeDefined();
-            expect(lambdaScopeSpan.spans.length).toEqual(1);
-
-            const producerSpan = lambdaScopeSpan.spans[0];
+            // Find the lambda instrumentation scope across all resource spans
+            let producerSpan: any = null;
+            for (const rs of spanPayload.resourceSpans) {
+                for (const ss of rs.scopeSpans) {
+                    if (ss.scope.name === expectedScopeName) {
+                        expect(ss.spans.length).toEqual(1);
+                        producerSpan = ss.spans[0];
+                        break;
+                    }
+                }
+                if (producerSpan) break;
+            }
+            expect(producerSpan, `Producer span not found in scope ${expectedScopeName}`).not.toBeNull();
 
             producerTraceId = producerSpan.traceId;
             producerSpanId = producerSpan.spanId;
