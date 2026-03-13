@@ -1,42 +1,9 @@
 #!/bin/bash
 args=("$@")
 
-if [ "$X_LUMIGO_KILLSWITCH" = "true" ]; then
-    exec "${args[@]}"
-fi
-
-# Copy DASH0_* masking env vars to LUMIGO_* equivalents
-[ -n "$DASH0_MASK_RULES" ] && export LUMIGO_SECRET_MASKING_REGEX="$DASH0_MASK_RULES"
-[ -n "$DASH0_MASK_REQUEST_BODY" ] && export LUMIGO_SECRET_MASKING_REGEX_HTTP_REQUEST_BODIES="$DASH0_MASK_REQUEST_BODY"
-[ -n "$DASH0_MASK_REQUEST_HEADERS" ] && export LUMIGO_SECRET_MASKING_REGEX_HTTP_REQUEST_HEADERS="$DASH0_MASK_REQUEST_HEADERS"
-[ -n "$DASH0_MASK_RESPONSE_BODY" ] && export LUMIGO_SECRET_MASKING_REGEX_HTTP_RESPONSE_BODIES="$DASH0_MASK_RESPONSE_BODY"
-[ -n "$DASH0_MASK_RESPONSE_HEADERS" ] && export LUMIGO_SECRET_MASKING_REGEX_HTTP_RESPONSE_HEADERS="$DASH0_MASK_RESPONSE_HEADERS"
-[ -n "$DASH0_MASK_QUERY_PARAMS" ] && export LUMIGO_SECRET_MASKING_REGEX_HTTP_QUERY_PARAMS="$DASH0_MASK_QUERY_PARAMS"
-
-export AWS_LAMBDA_RUNTIME_API="127.0.0.1:9009"
-
-LAMBDA_RESOURCE_ATTRIBUTES="cloud.region=$AWS_REGION,cloud.provider=aws,cloud_platform=aws_lambda,faas.name=$AWS_LAMBDA_FUNCTION_NAME,faas.version=$AWS_LAMBDA_FUNCTION_VERSION,faas.instance=$AWS_LAMBDA_LOG_STREAM_NAME";
-
-if [ -z "${OTEL_RESOURCE_ATTRIBUTES}" ]; then
-    export OTEL_RESOURCE_ATTRIBUTES=$LAMBDA_RESOURCE_ATTRIBUTES;
-else
-    export OTEL_RESOURCE_ATTRIBUTES="$LAMBDA_RESOURCE_ATTRIBUTES,$OTEL_RESOURCE_ATTRIBUTES";
-fi
-
-if [ -z "${OTEL_SERVICE_NAME}" ]; then
-    export OTEL_SERVICE_NAME=$AWS_LAMBDA_FUNCTION_NAME;
-fi
-
-if [[ -z "$OTEL_PROPAGATORS" ]]; then
-  export OTEL_PROPAGATORS="tracecontext,baggage,xray-lambda"
-fi
-
-if [[ -z "$OTEL_TRACES_SAMPLER" ]]; then
-  export OTEL_TRACES_SAMPLER="always_on"
-fi
-
-# Write env vars to a file for the extension to read
-echo "{\"OTEL_SERVICE_NAME\": \"$OTEL_SERVICE_NAME\", \"OTEL_RESOURCE_ATTRIBUTES\": \"$OTEL_RESOURCE_ATTRIBUTES\"}" > /tmp/lumigo_env_vars || true
+source /opt/shared.sh
+setup_otel_env
+write_env_vars
 
 # enable auto instrumentation unless DASH0_DISABLE_AUTO_INSTRUMENTATION is set
 if [ -z "$DASH0_DISABLE_AUTO_INSTRUMENTATION" ] || [ "${DASH0_DISABLE_AUTO_INSTRUMENTATION,,}" = "false" ]; then

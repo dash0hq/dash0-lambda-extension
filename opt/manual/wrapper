@@ -1,9 +1,6 @@
 #!/bin/bash
 args=("$@")
 
-if [ "$X_LUMIGO_KILLSWITCH" = "true" ]; then
-    exec "${args[@]}"
-fi
 export AWS_LAMBDA_RUNTIME_API="127.0.0.1:9009"
 export LUMIGO_ENDPOINT="http://127.0.0.1:9009/v1/traces"
 
@@ -20,7 +17,8 @@ if [ -z "${OTEL_SERVICE_NAME}" ]; then
 fi
 
 # Write env vars to a file for the extension to read
-echo "{\"OTEL_SERVICE_NAME\": \"$OTEL_SERVICE_NAME\", \"OTEL_RESOURCE_ATTRIBUTES\": \"$OTEL_RESOURCE_ATTRIBUTES\"}" > /tmp/lumigo_env_vars || true
+source /opt/shared.sh
+write_env_vars
 
 
 exec "${args[@]}"

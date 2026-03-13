@@ -183,6 +183,7 @@ pub async fn proxy_invocation_next(req: Request<Body>) -> Result<Response<Body>,
         // how long it took to process the event and request next
         //
         crate::stats::get_next_event();
+        crate::state::global::init_env_var_attrs();
 
         let (aws_request_id, response) = match next(req.headers(), req.uri().path()).await {
             Err(e) => {

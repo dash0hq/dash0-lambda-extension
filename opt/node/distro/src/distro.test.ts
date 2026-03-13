@@ -51,56 +51,6 @@ describe('Distro initialization', () => {
     });
   });
 
-  describe('secret keys', () => {
-    test('should be redacted by LUMIGO_SECRET_MASKING_REGEX from env vars', async () => {
-      await jest.isolateModulesAsync(async () => {
-        process.env.DASH0_TOKEN = DASH0_TOKEN;
-        process.env.OTEL_SERVICE_NAME = 'service-1';
-        process.env.LUMIGO_SECRET_MASKING_REGEX = '["VAR_TO_MASK"]';
-        process.env.VAR_TO_MASK = 'some value';
-
-        const { init } = jest.requireActual('./distro');
-        const { resource } = await init;
-
-        const vars = JSON.parse(resource.attributes['process.environ']);
-        expect(vars.VAR_TO_MASK).toEqual('****');
-      });
-    });
-
-    describe.each(['LUMIGO_SECRET_MASKING_REGEX', 'LUMIGO_SECRET_MASKING_REGEX_ENVIRONMENT'])(
-      'should be redacted entirely',
-      (envVarName) => {
-        test(`with the ${envVarName} set to 'all'`, async () => {
-          await jest.isolateModulesAsync(async () => {
-            process.env.DASH0_TOKEN = DASH0_TOKEN;
-            process.env.OTEL_SERVICE_NAME = 'service-1';
-            process.env[envVarName] = 'all';
-            process.env.VAR_TO_MASK = 'some value';
-
-            const { init } = jest.requireActual('./distro');
-            const { resource } = await init;
-
-            expect(JSON.parse(resource.attributes['process.environ'])).toEqual('****');
-          });
-        });
-      }
-    );
-
-    test('should be redacted from env vars', async () => {
-      await jest.isolateModulesAsync(async () => {
-        process.env.DASH0_TOKEN = DASH0_TOKEN;
-        process.env.OTEL_SERVICE_NAME = 'service-1';
-        process.env.AUTHORIZATION = 'some value';
-
-        const { init } = jest.requireActual('./distro');
-        const { resource } = await init;
-
-        const vars = JSON.parse(resource.attributes['process.environ']);
-        expect(vars.AUTHORIZATION).toEqual('****');
-      });
-    });
-  });
-
   describe('with the DASH0_TOKEN environment variable set', () => {
     test('should initialize the OTLPTraceExporter', async () => {
       await jest.isolateModulesAsync(async () => {

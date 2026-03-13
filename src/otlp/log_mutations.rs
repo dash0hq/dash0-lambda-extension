@@ -295,7 +295,7 @@ pub fn map_logs_to_otlp(logs: &[TelemetryLog]) -> Vec<LogRecord> {
 }
 
 pub fn try_read_env_from_file(key: &str) -> Option<String> {
-    let content = std::fs::read_to_string("/tmp/lumigo_env_vars").ok()?;
+    let content = std::fs::read_to_string("/tmp/dash0_env_vars").ok()?;
     let json: serde_json::Value = serde_json::from_str(&content).ok()?;
     json.get(key)
         .and_then(|v| v.as_str())
@@ -559,7 +559,7 @@ mod tests {
         std::env::remove_var("OTEL_RESOURCE_ATTRIBUTES");
 
         // Write mock file
-        let file_path = "/tmp/lumigo_env_vars";
+        let file_path = "/tmp/dash0_env_vars";
         let expected_service_name = "service-from-file";
         let expected_resource_attrs = "key1=value1,key2=value2";
         let content = json!({

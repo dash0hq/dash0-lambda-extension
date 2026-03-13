@@ -417,6 +417,17 @@ async fn send_request(
     Err(())
 }
 
+fn add_env_vars(resource_spans: &mut [opentelemetry_proto::tonic::trace::v1::ResourceSpans]) {
+    let env_attrs = crate::state::global::get_env_var_attrs();
+    if env_attrs.is_empty() {
+        return;
+    }
+    for rs in resource_spans.iter_mut() {
+        let resource = rs.resource.get_or_insert_with(Default::default);
+        resource.attributes.extend(env_attrs.clone());
+    }
+}
+
 fn combine_traces(
     base_trace: &StoredTrace,
     traces_iter: std::vec::IntoIter<StoredTrace>,
@@ -446,6 +457,8 @@ fn combine_traces(
     for trace in traces_iter {
         process_trace(&trace, &mut combined_resource_spans);
     }
+
+    add_env_vars(&mut combined_resource_spans);
 
     combined_resource_spans
 }

@@ -57,7 +57,6 @@ export interface Dash0SdkInitialization {
 
 import { dirname, join } from 'path';
 import { logger } from './logging';
-import { ProcessEnvironmentDetector } from './resources/detectors/ProcessEnvironmentDetector';
 
 const traceEndpoint = process.env.DASH0_EXTENSION_ENDPOINT || DEFAULT_DASH0_EXTENSION_ENDPOINT;
 
@@ -151,10 +150,8 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
       })
     );
 
-    const processEnvDetectedResource = new ProcessEnvironmentDetector().detect();
     const resource = defaultResource()
       .merge(infrastructureResource)
-      .merge(resourceFromAttributes(processEnvDetectedResource.attributes || {}));
 
     // Build span processors array
     const spanProcessors = [];

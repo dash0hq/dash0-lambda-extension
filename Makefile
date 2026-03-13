@@ -77,20 +77,21 @@ build/python: opt/python/distro/requirements.txt opt/python/Dockerfile $(PYTHON_
 
 
 
-build/$(ZIP_NAME_PYTHON): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/python/wrapper opt/python/otel_wrapper.py build/python
+build/$(ZIP_NAME_PYTHON): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/shared.sh opt/python/wrapper opt/python/otel_wrapper.py build/python
 	@rm -f build/$(ZIP_NAME_PYTHON)
 	@rm -rf build/stage-python
 	@mkdir -p build/stage-python/extensions
 	@cp build/lrap_x86_64 build/stage-python/
 	@cp build/lrap_aarch64 build/stage-python/
 	@cp opt/entrypoint build/stage-python/extensions/lrap
+	@cp opt/shared.sh build/stage-python/shared.sh
 	@cp opt/python/wrapper build/stage-python/wrapper
 	@cp -r build/python build/stage-python/python
 	@cp opt/python/otel_wrapper.py build/stage-python/python/otel_wrapper.py
 	@cd build/stage-python && zip -r ../$(ZIP_NAME_PYTHON) *
 
 
-build/$(ZIP_NAME_NODE): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/node/package.json opt/node/wrapper opt/node/webpack.config.mjs opt/node/init.mjs $(NODE_DISTRO_SRC)
+build/$(ZIP_NAME_NODE): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/shared.sh opt/node/package.json opt/node/wrapper opt/node/webpack.config.mjs opt/node/init.mjs $(NODE_DISTRO_SRC)
 	@echo Building Node.js layer
 	@rm -f build/$(ZIP_NAME_NODE)
 	@rm -rf build/stage-node
@@ -98,6 +99,7 @@ build/$(ZIP_NAME_NODE): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/
 	@cp build/lrap_x86_64 build/stage-node/
 	@cp build/lrap_aarch64 build/stage-node/
 	@cp opt/entrypoint build/stage-node/extensions/lrap
+	@cp opt/shared.sh build/stage-node/shared.sh
 	@cp opt/node/wrapper build/stage-node/wrapper
 	@bash opt/node/scripts/build-aws-sdk-tarball.sh
 	@cd opt/node && npm install && npm run build
@@ -122,7 +124,7 @@ $(JAVA_DISTRO_JAR): $(JAVA_DISTRO_SRC)
 	@echo Building Java distro
 	@cd opt/java/opentelemetry-java-distro && ./gradlew clean -Pversion=1.0.0-SNAPSHOT assemble -x javadoc
 
-build/$(ZIP_NAME_JAVA): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/java/wrapper $(JAVA_DISTRO_JAR)
+build/$(ZIP_NAME_JAVA): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/shared.sh opt/java/wrapper $(JAVA_DISTRO_JAR)
 	@echo Building Java layer
 	@rm -f build/$(ZIP_NAME_JAVA)
 	@rm -rf build/stage-java
@@ -131,13 +133,14 @@ build/$(ZIP_NAME_JAVA): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/
 	@cp build/lrap_x86_64 build/stage-java/
 	@cp build/lrap_aarch64 build/stage-java/
 	@cp opt/entrypoint build/stage-java/extensions/lrap
+	@cp opt/shared.sh build/stage-java/shared.sh
 	@cp opt/java/wrapper build/stage-java/wrapper
 	@cp $(JAVA_DISTRO_JAR) build/stage-java/java/lib/dash0-opentelemetry.jar
 	@cp $(JAVA_CLASSPATH_LIBS_DIR)/*.jar build/stage-java/java/lib/
 	@cd build/stage-java && zip -r ../$(ZIP_NAME_JAVA) *
 
 
-build/$(ZIP_NAME_MANUAL): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/manual/wrapper
+build/$(ZIP_NAME_MANUAL): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/shared.sh opt/manual/wrapper
 	@echo Building Manual layer
 	@rm -f build/$(ZIP_NAME_MANUAL)
 	@rm -rf build/stage-manual
@@ -145,6 +148,7 @@ build/$(ZIP_NAME_MANUAL): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint op
 	@cp build/lrap_x86_64 build/stage-manual/
 	@cp build/lrap_aarch64 build/stage-manual/
 	@cp opt/entrypoint build/stage-manual/extensions/lrap
+	@cp opt/shared.sh build/stage-manual/shared.sh
 	@cp opt/manual/wrapper build/stage-manual/wrapper
 	@cd build/stage-manual && zip -r ../$(ZIP_NAME_MANUAL) *
 

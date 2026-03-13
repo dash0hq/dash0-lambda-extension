@@ -54,6 +54,8 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
 
             checkResourceAttributes(lambdaResource!.attributes, functionName);
+            const resourceAttributes = getAttributesMap(lambdaResource!.attributes);
+            expect(resourceAttributes['process.environment_variable.DASH0_TOKEN'].stringValue).toEqual('****');
 
             traceId = span.traceId;
             parentSpanId = span.spanId;
