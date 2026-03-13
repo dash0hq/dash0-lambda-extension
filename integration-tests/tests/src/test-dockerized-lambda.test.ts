@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest';
 import { DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS } from "./config";
 import {
     checkLogs,
-    checkSpanAttributesFromReport,
     getAttributesMap,
     getRequestPayload, LogToCheck,
     invokeFunction,

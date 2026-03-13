@@ -43,6 +43,7 @@ pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
                     create_overhead_supplementary_span(id);
                     invocation_entry::update(id, |entry| {
                         entry.state = crate::state::invocation_entry::InvocationState::Done;
+                        entry.init_duration = 0.0;
                     });
                 }
             }

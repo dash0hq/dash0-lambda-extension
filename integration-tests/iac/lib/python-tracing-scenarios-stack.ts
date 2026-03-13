@@ -218,46 +218,51 @@ export class PythonTracingScenariosStack extends cdk.NestedStack {
       }));
 
       // Scenario 5: Lambda > EventBridge > Lambda
-      const eventBus = new events.EventBus(this, `TracingTestEventBus-${runtimeName}`, {
-        eventBusName: `${prefix}tracing-test-event-bus-${runtimeName}`,
-      });
+      for (const withError of [false, true]) {
+        const errorSuffix = withError ? '-error' : '';
+        const errorIdSuffix = withError ? 'Error' : '';
 
-      const eventBridgeConsumer = new lambda.Function(this, `EventBridgeConsumerLambda-${runtimeName}`, {
-        functionName: `${prefix}tracing-eventbridge-consumer-${runtimeName}`,
-        runtime,
-        handler: 'consumer.handler',
-        code: pythonCode,
-        layers: [props.layer],
-        role,
-        timeout: cdk.Duration.seconds(10),
-        logGroup: props.logGroup,
-        environment: baseEnvironment,
-      });
+        const eventBus = new events.EventBus(this, `TracingTestEventBus${errorIdSuffix}-${runtimeName}`, {
+          eventBusName: `${prefix}tracing-test-event-bus${errorSuffix}-${runtimeName}`,
+        });
 
-      new events.Rule(this, `TracingTestEventBridgeRule-${runtimeName}`, {
-        ruleName: `${prefix}tracing-test-eventbridge-rule-${runtimeName}`,
-        eventBus,
-        eventPattern: {
-          source: ['tracing-tests.producer'],
-          detailType: ['TestMessage'],
-        },
-        targets: [new events_targets.LambdaFunction(eventBridgeConsumer)],
-      });
+        const eventBridgeConsumer = new lambda.Function(this, `EventBridgeConsumerLambda${errorIdSuffix}-${runtimeName}`, {
+          functionName: `${prefix}tracing-eventbridge-consumer${errorSuffix}-${runtimeName}`,
+          runtime,
+          handler: withError ? 'consumer_error.handler' : 'consumer.handler',
+          code: pythonCode,
+          layers: [props.layer],
+          role,
+          timeout: cdk.Duration.seconds(10),
+          logGroup: props.logGroup,
+          environment: baseEnvironment,
+        });
 
-      const eventBridgeProducer = new lambda.Function(this, `EventBridgeProducerLambda-${runtimeName}`, {
-        functionName: `${prefix}tracing-eventbridge-producer-${runtimeName}`,
-        runtime,
-        handler: 'eventbridge_producer.handler',
-        code: pythonCode,
-        layers: [props.layer],
-        role,
-        timeout: cdk.Duration.seconds(10),
-        logGroup: props.logGroup,
-        environment: {
-          ...baseEnvironment,
-          EVENT_BUS_NAME: eventBus.eventBusName,
-        },
-      });
+        new events.Rule(this, `TracingTestEventBridgeRule${errorIdSuffix}-${runtimeName}`, {
+          ruleName: `${prefix}tracing-test-eventbridge-rule${errorSuffix}-${runtimeName}`,
+          eventBus,
+          eventPattern: {
+            source: ['tracing-tests.producer'],
+            detailType: ['TestMessage'],
+          },
+          targets: [new events_targets.LambdaFunction(eventBridgeConsumer)],
+        });
+
+        const eventBridgeProducer = new lambda.Function(this, `EventBridgeProducerLambda${errorIdSuffix}-${runtimeName}`, {
+          functionName: `${prefix}tracing-eventbridge-producer${errorSuffix}-${runtimeName}`,
+          runtime,
+          handler: 'eventbridge_producer.handler',
+          code: pythonCode,
+          layers: [props.layer],
+          role,
+          timeout: cdk.Duration.seconds(10),
+          logGroup: props.logGroup,
+          environment: {
+            ...baseEnvironment,
+            EVENT_BUS_NAME: eventBus.eventBusName,
+          },
+        });
+      }
 
       // Scenario 6: Lambda > API Gateway > Lambda
       const apiGatewayConsumer = new lambda.Function(this, `ApiGatewayConsumerLambda-${runtimeName}`, {

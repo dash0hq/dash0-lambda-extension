@@ -82,22 +82,6 @@ fn create_root_span(
                     }),
                 });
             }
-            if data.billed_duration > 0.0 {
-                attrs.push(KeyValue {
-                    key: "dash0.faas.billed_duration".to_string(),
-                    value: Some(AnyValue {
-                        value: Some(Value::DoubleValue(data.billed_duration)),
-                    }),
-                });
-            }
-            if data.memory_usage > 0 {
-                attrs.push(KeyValue {
-                    key: "dash0.faas.memory_used".to_string(),
-                    value: Some(AnyValue {
-                        value: Some(Value::IntValue(data.memory_usage as i64)),
-                    }),
-                });
-            }
             attrs
         },
         ..Default::default()
@@ -340,28 +324,6 @@ mod tests {
             });
         assert_eq!(init_dur, Some(150.0));
 
-        let billed_dur = span
-            .attributes
-            .iter()
-            .find(|kv| kv.key == "dash0.faas.billed_duration")
-            .and_then(|kv| kv.value.as_ref())
-            .and_then(|v| match &v.value {
-                Some(Value::DoubleValue(d)) => Some(*d),
-                _ => None,
-            });
-        assert_eq!(billed_dur, Some(500.0));
-
-        let mem_used = span
-            .attributes
-            .iter()
-            .find(|kv| kv.key == "dash0.faas.memory_used")
-            .and_then(|kv| kv.value.as_ref())
-            .and_then(|v| match &v.value {
-                Some(Value::IntValue(i)) => Some(*i),
-                _ => None,
-            });
-        assert_eq!(mem_used, Some(256));
-
         // --- Init span ---
         let spans = &decoded.resource_spans[0].scope_spans[0].spans;
         assert_eq!(spans.len(), 2);
@@ -392,16 +354,6 @@ mod tests {
             .attributes
             .iter()
             .find(|kv| kv.key == "faas.init_duration")
-            .is_none());
-        assert!(init_span
-            .attributes
-            .iter()
-            .find(|kv| kv.key == "dash0.faas.billed_duration")
-            .is_none());
-        assert!(init_span
-            .attributes
-            .iter()
-            .find(|kv| kv.key == "dash0.faas.memory_used")
             .is_none());
     }
 

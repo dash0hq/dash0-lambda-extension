@@ -5,7 +5,6 @@ import {DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./confi
 import {
     checkHttpSpan,
     checkLogs,
-    checkSpanAttributesFromReport,
     getAttributesMap,
     getRequestPayload, LogToCheck,
     invokeFunction, runAllTests
