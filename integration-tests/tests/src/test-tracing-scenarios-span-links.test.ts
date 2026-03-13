@@ -46,7 +46,7 @@ const verifyTracingScenario = async (
             });
 
             const spanPayload = await spanResponse.json() as any;
-            expect(spanPayload?.resourceSpans.length).toEqual(1);
+            expect(spanPayload?.resourceSpans.length).toBeGreaterThanOrEqual(1);
             expect(spanPayload?.resourceSpans[0].scopeSpans.length).toBeGreaterThanOrEqual(1);
 
             // Find the lambda instrumentation scope

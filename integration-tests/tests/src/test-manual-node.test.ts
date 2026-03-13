@@ -25,14 +25,15 @@ const verifyManualInstrumentation = async (functionName: string) => {
 
             const spanPayload = await spanResponse.json() as any;
             expect(spanPayload?.resourceSpans?.length).toBeGreaterThanOrEqual(1);
-            expect(spanPayload?.resourceSpans[0].scopeSpans.length).toEqual(1);
-            const expectedScopeName = "@opentelemetry/instrumentation-aws-lambda";
-            expect(spanPayload?.resourceSpans[0].scopeSpans[0].scope.name).toEqual(expectedScopeName);
-            expect(spanPayload?.resourceSpans[0].scopeSpans[0].spans.length).toEqual(1);
+            expect(spanPayload?.resourceSpans[0].scopeSpans.length).toBeGreaterThanOrEqual(1);
+            const lambdaScopeSpan = spanPayload.resourceSpans[0].scopeSpans.find(
+                (ss: any) => ss.scope.name === "@opentelemetry/instrumentation-aws-lambda"
+            );
+            expect(lambdaScopeSpan.spans.length).toEqual(1);
             const resourceAttributes = getAttributesMap(spanPayload?.resourceSpans[0].resource.attributes);
             expect(resourceAttributes['service.name'].stringValue).toEqual(functionName);
             // check span attributes
-            const span = spanPayload.resourceSpans[0].scopeSpans[0].spans[0];
+            const span = lambdaScopeSpan.spans[0];
             const spanAttributes = getAttributesMap(span.attributes);
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
 

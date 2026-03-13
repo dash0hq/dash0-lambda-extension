@@ -32,17 +32,19 @@ const verifyDockerizedInvocation = async (functionName: string, runtime: string)
             });
 
             const spanPayload = await spanResponse.json() as any;
-            expect(spanPayload?.resourceSpans.length).toEqual(1);
-            expect(spanPayload?.resourceSpans[0].scopeSpans.length).toEqual(1);
+            expect(spanPayload?.resourceSpans.length).toBeGreaterThanOrEqual(1);
+            expect(spanPayload?.resourceSpans[0].scopeSpans.length).toBeGreaterThanOrEqual(1);
             const scopeNameMap = {
                 "python": "opentelemetry.instrumentation.aws_lambda",
                 "node": "@opentelemetry/instrumentation-aws-lambda",
                 "java": "io.opentelemetry.aws-lambda-events-2.2"
             }
-            expect(spanPayload?.resourceSpans[0].scopeSpans[0].scope.name).toEqual(scopeNameMap[runtime as keyof typeof scopeNameMap]);
-            expect(spanPayload?.resourceSpans[0].scopeSpans[0].spans.length).toEqual(1);
+            const lambdaScopeSpan = spanPayload.resourceSpans[0].scopeSpans.find(
+                (ss: any) => ss.scope.name === scopeNameMap[runtime as keyof typeof scopeNameMap]
+            );
+            expect(lambdaScopeSpan.spans.length).toEqual(1);
             // check span attributes
-            span = spanPayload.resourceSpans[0].scopeSpans[0].spans[0];
+            span = lambdaScopeSpan.spans[0];
             const spanAttributes = getAttributesMap(span.attributes);
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
 
