@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS } from "./config";
 import {
     checkLogs,
+    findHandlerSpan,
     getAttributesMap,
     getRequestPayload, LogToCheck,
     invokeFunction,
@@ -32,14 +33,8 @@ const verifyCjsSuccess = async (functionName: string) => {
 
             const spanPayload = await spanResponse.json() as any;
             expect(spanPayload?.resourceSpans?.length).toBeGreaterThanOrEqual(1);
-            expect(spanPayload?.resourceSpans[0].scopeSpans.length).toBeGreaterThanOrEqual(1);
 
-            const lambdaScopeSpan = spanPayload.resourceSpans[0].scopeSpans.find(
-                (ss: any) => ss.scope.name === "@opentelemetry/instrumentation-aws-lambda"
-            );
-            expect(lambdaScopeSpan.spans.length).toEqual(1);
-
-            const span = lambdaScopeSpan.spans[0];
+            const { span } = findHandlerSpan(spanPayload, "@opentelemetry/instrumentation-aws-lambda");
             const spanAttributes = getAttributesMap(span.attributes);
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
 

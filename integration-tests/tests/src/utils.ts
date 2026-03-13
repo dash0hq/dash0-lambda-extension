@@ -20,6 +20,18 @@ export const getAttributesMap = (attributes: Array<{ key: string, value: any }>)
     return attrMap;
 }
 
+export const findHandlerSpan = (spanPayload: any, scopeName: string): { span: any; resource: any } => {
+    for (const rs of spanPayload.resourceSpans) {
+        for (const ss of rs.scopeSpans) {
+            if (ss.scope.name === scopeName) {
+                expect(ss.spans.length).toEqual(1);
+                return { span: ss.spans[0], resource: rs.resource };
+            }
+        }
+    }
+    throw new Error(`Handler span not found in scope ${scopeName}`);
+}
+
 export const getRequestPayload = (invocationId: string) => {
     const now = Date.now();
     return {

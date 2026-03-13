@@ -2,7 +2,7 @@ import fetch from 'node-fetch';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
 import { DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS } from "./config";
-import {checkLogs, getAttributesMap, getRequestPayload, invokeFunction, LogToCheck, RESOURCE_PREFIX} from "./utils";
+import {checkLogs, findHandlerSpan, getAttributesMap, getRequestPayload, invokeFunction, LogToCheck, RESOURCE_PREFIX} from "./utils";
 
 const verifyManualInstrumentation = async (functionName: string) => {
     const invocationId = await invokeFunction(functionName, true, false);
@@ -25,15 +25,10 @@ const verifyManualInstrumentation = async (functionName: string) => {
 
             const spanPayload = await spanResponse.json() as any;
             expect(spanPayload?.resourceSpans?.length).toBeGreaterThanOrEqual(1);
-            expect(spanPayload?.resourceSpans[0].scopeSpans.length).toBeGreaterThanOrEqual(1);
-            const lambdaScopeSpan = spanPayload.resourceSpans[0].scopeSpans.find(
-                (ss: any) => ss.scope.name === "@opentelemetry/instrumentation-aws-lambda"
-            );
-            expect(lambdaScopeSpan.spans.length).toEqual(1);
-            const resourceAttributes = getAttributesMap(spanPayload?.resourceSpans[0].resource.attributes);
+
+            const { span, resource } = findHandlerSpan(spanPayload, "@opentelemetry/instrumentation-aws-lambda");
+            const resourceAttributes = getAttributesMap(resource.attributes);
             expect(resourceAttributes['service.name'].stringValue).toEqual(functionName);
-            // check span attributes
-            const span = lambdaScopeSpan.spans[0];
             const spanAttributes = getAttributesMap(span.attributes);
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
 

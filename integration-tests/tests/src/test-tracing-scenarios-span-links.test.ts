@@ -2,7 +2,7 @@ import fetch from 'node-fetch';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
 import {DASH0_ENDPOINT, DASH0_LAMBDA_TESTS_DATASET, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from './config';
-import { getAttributesMap, getRequestPayload, invokeFunction, RESOURCE_PREFIX } from './utils';
+import { findHandlerSpan, getAttributesMap, getRequestPayload, invokeFunction, RESOURCE_PREFIX } from './utils';
 
 const pythonRuntimes = ['python3-11', 'python3-12', 'python3-13', 'python3-14'];
 const nodeRuntimes = ['nodejs20-x', 'nodejs22-x', 'nodejs24-x'];
@@ -48,19 +48,7 @@ const verifyTracingScenario = async (
             const spanPayload = await spanResponse.json() as any;
             expect(spanPayload?.resourceSpans.length).toBeGreaterThanOrEqual(1);
 
-            // Find the lambda instrumentation scope across all resource spans
-            let producerSpan: any = null;
-            for (const rs of spanPayload.resourceSpans) {
-                for (const ss of rs.scopeSpans) {
-                    if (ss.scope.name === expectedScopeName) {
-                        expect(ss.spans.length).toEqual(1);
-                        producerSpan = ss.spans[0];
-                        break;
-                    }
-                }
-                if (producerSpan) break;
-            }
-            expect(producerSpan, `Producer span not found in scope ${expectedScopeName}`).not.toBeNull();
+            const { span: producerSpan } = findHandlerSpan(spanPayload, expectedScopeName);
 
             producerTraceId = producerSpan.traceId;
             producerSpanId = producerSpan.spanId;
