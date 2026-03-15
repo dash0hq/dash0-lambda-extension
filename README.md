@@ -46,6 +46,8 @@ See the release page for the latest ARNs of the extension layers for each runtim
 
 * `DASH0_LOGS_INSTRUMENTATION_ENABLED` - When set to `true`, logs won't be collected from the Telemetry API, to prevent duplicates from the OTEL instrumentation. Default: `false`.
 
+* `DASH0_DATASET` - When set, the extension adds a `Dash0-Dataset` header to all OTLP export requests, routing telemetry to the specified dataset in the Dash0 backend.
+
 ### Secret Masking
 
 The extension automatically masks sensitive data in traces payloads. By default, any JSON key matching these patterns (case-insensitive) will have its value replaced with `****`:
