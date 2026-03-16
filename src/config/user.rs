@@ -75,6 +75,13 @@ pub fn is_create_payload_log_records() -> bool {
     }
 }
 
+pub fn get_dash0_dataset() -> Option<String> {
+    match std::env::var("DASH0_DATASET") {
+        Ok(val) if !val.is_empty() => Some(val),
+        _ => None,
+    }
+}
+
 pub fn is_logs_instrumentation_enabled() -> bool {
     match std::env::var("DASH0_LOGS_INSTRUMENTATION_ENABLED") {
         Ok(val) => matches!(
