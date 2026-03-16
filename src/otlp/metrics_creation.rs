@@ -1,5 +1,4 @@
 use crate::otlp::log_mutations::try_read_env_from_file;
-use crate::otlp::span_creation::get_span_attributes;
 use crate::state::invocation_data::{store_metric, StoredMetric};
 use crate::state::invocation_entry;
 use hyper::header;
@@ -57,6 +56,28 @@ fn create_histogram_metric(
     }
 }
 
+fn get_metric_attributes() -> Vec<KeyValue> {
+    vec![
+        KeyValue {
+            key: "cloud.resource_id".to_string(),
+            value: Some(AnyValue {
+                value: Some(Value::StringValue(
+                    crate::state::global::get_function_arn()
+                        .unwrap_or_else(|| "unknown".to_string()),
+                )),
+            }),
+        },
+        KeyValue {
+            key: "cloud.account.id".to_string(),
+            value: Some(AnyValue {
+                value: Some(Value::StringValue(
+                    crate::state::global::get_account_id().unwrap_or_else(|| "unknown".to_string()),
+                )),
+            }),
+        },
+    ]
+}
+
 pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
     let data = invocation_entry::get_metrics_data(invocation_id)?;
 
@@ -75,7 +96,7 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
             "Duration of the invocation",
             "ms",
             data.duration,
-            get_span_attributes(invocation_id),
+            get_metric_attributes(),
             start_time_unix_nano,
             time_unix_nano,
         ));
@@ -87,7 +108,7 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
             "Duration of the cold start initialization",
             "ms",
             data.init_duration,
-            get_span_attributes(invocation_id),
+            get_metric_attributes(),
             start_time_unix_nano,
             time_unix_nano,
         ));
@@ -99,7 +120,7 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
             "Billed duration of the invocation",
             "ms",
             data.billed_duration,
-            get_span_attributes(invocation_id),
+            get_metric_attributes(),
             start_time_unix_nano,
             time_unix_nano,
         ));
@@ -111,7 +132,7 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
             "Memory used by the invocation",
             "MB",
             data.memory_usage as f64,
-            get_span_attributes(invocation_id),
+            get_metric_attributes(),
             start_time_unix_nano,
             time_unix_nano,
         ));
@@ -171,6 +192,13 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
 
 pub fn create_supplementary_metrics(invocation_id: &str) {
     if let Some(metric) = create_metrics(invocation_id) {
+        tracing::info!(
+            "[{}] Created supplementary metrics for invocation {}: path={} body_len={}",
+            crate::log_prefix(),
+            invocation_id,
+            metric.path_and_query,
+            metric.body.len()
+        );
         store_metric(metric);
     }
 }
@@ -199,10 +227,7 @@ mod tests {
         });
     }
 
-    fn find_metric_by_name<'a>(
-        metrics: &'a [Metric],
-        name: &str,
-    ) -> Option<&'a Metric> {
+    fn find_metric_by_name<'a>(metrics: &'a [Metric], name: &str) -> Option<&'a Metric> {
         metrics.iter().find(|m| m.name == name)
     }
 
@@ -225,7 +250,10 @@ mod tests {
         let duration_metric = find_metric_by_name(metrics, "faas.duration").unwrap();
         assert_eq!(duration_metric.unit, "ms");
         if let Some(Data::Histogram(h)) = &duration_metric.data {
-            assert_eq!(h.aggregation_temporality, AggregationTemporality::Delta as i32);
+            assert_eq!(
+                h.aggregation_temporality,
+                AggregationTemporality::Delta as i32
+            );
             let dp = &h.data_points[0];
             assert_eq!(dp.count, 1);
             assert_eq!(dp.sum, Some(200.0));
@@ -236,18 +264,11 @@ mod tests {
             assert_eq!(dp.start_time_unix_nano, 850_000_000); // (1000 - 150) * 1_000_000
             assert_eq!(dp.time_unix_nano, 1_200_000_000); // 1200 * 1_000_000
 
-            // Check attributes
-            let inv_attr = dp
+            // Check attributes — no high-cardinality invocation_id on metrics
+            assert!(!dp
                 .attributes
                 .iter()
-                .find(|kv| kv.key == "faas.invocation_id")
-                .and_then(|kv| kv.value.as_ref())
-                .and_then(|v| match &v.value {
-                    Some(Value::StringValue(s)) => Some(s.as_str()),
-                    _ => None,
-                });
-            assert_eq!(inv_attr, Some(invocation_id));
-
+                .any(|kv| kv.key == "faas.invocation_id"));
             assert!(dp.attributes.iter().any(|kv| kv.key == "cloud.resource_id"));
             assert!(dp.attributes.iter().any(|kv| kv.key == "cloud.account.id"));
         } else {
@@ -330,7 +351,9 @@ mod tests {
         assert!(find_metric_by_name(metrics, "dash0.faas.memory_used").is_some());
 
         // Timestamps should use start_time directly (no init_duration subtraction)
-        if let Some(Data::Histogram(h)) = &find_metric_by_name(metrics, "faas.duration").unwrap().data {
+        if let Some(Data::Histogram(h)) =
+            &find_metric_by_name(metrics, "faas.duration").unwrap().data
+        {
             assert_eq!(h.data_points[0].start_time_unix_nano, 1_000_000_000); // 1000 * 1_000_000
         }
     }
