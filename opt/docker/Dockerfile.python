@@ -38,11 +38,11 @@ COPY opt/python/distro/requirements.txt /asset-output/python/dash0_opentelemetry
 FROM scratch
 
 # Copy extension binaries (both architectures - entrypoint selects at runtime)
-COPY build/lrap_x86_64 /opt/lrap_x86_64
-COPY build/lrap_aarch64 /opt/lrap_aarch64
+COPY build/dash0_x86_64 /opt/dash0_x86_64
+COPY build/dash0_aarch64 /opt/dash0_aarch64
 
 # Copy entrypoint script (Lambda extension entry point)
-COPY opt/entrypoint /opt/extensions/lrap
+COPY opt/entrypoint /opt/extensions/dash0
 
 # Copy shared script and wrapper script
 COPY opt/shared.sh /opt/shared.sh

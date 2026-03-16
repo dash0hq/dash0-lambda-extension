@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS } from "./config";
 import {
     checkLogs,
-    checkSpanAttributesFromReport,
+    findHandlerSpan,
     getAttributesMap,
     getRequestPayload, LogToCheck,
     invokeFunction,
@@ -33,21 +33,18 @@ const verifyDockerizedInvocation = async (functionName: string, runtime: string)
             });
 
             const spanPayload = await spanResponse.json() as any;
-            expect(spanPayload?.resourceSpans.length).toEqual(1);
-            expect(spanPayload?.resourceSpans[0].scopeSpans.length).toEqual(1);
+            expect(spanPayload?.resourceSpans.length).toBeGreaterThanOrEqual(1);
             const scopeNameMap = {
                 "python": "opentelemetry.instrumentation.aws_lambda",
                 "node": "@opentelemetry/instrumentation-aws-lambda",
                 "java": "io.opentelemetry.aws-lambda-events-2.2"
             }
-            expect(spanPayload?.resourceSpans[0].scopeSpans[0].scope.name).toEqual(scopeNameMap[runtime as keyof typeof scopeNameMap]);
-            expect(spanPayload?.resourceSpans[0].scopeSpans[0].spans.length).toEqual(1);
-            // check span attributes
-            span = spanPayload.resourceSpans[0].scopeSpans[0].spans[0];
+            const { span: foundSpan, resource } = findHandlerSpan(spanPayload, scopeNameMap[runtime as keyof typeof scopeNameMap]);
+            span = foundSpan;
             const spanAttributes = getAttributesMap(span.attributes);
             expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
 
-            const resourceAttributes = getAttributesMap(spanPayload?.resourceSpans[0].resource.attributes);
+            const resourceAttributes = getAttributesMap(resource.attributes);
             expect(resourceAttributes['service.name'].stringValue).toEqual(functionName);
 
             traceId = span.traceId;

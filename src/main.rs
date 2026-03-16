@@ -27,8 +27,8 @@ pub(crate) mod stats;
 /// Name to register with the Lambda Extension API.
 ///
 /// NOTE: this must be the same as the
-/// entrypoint script destination in the Lambda layer (eg, **extensions/lrap**)
-pub const EXTENSION_NAME: &str = "lrap";
+/// entrypoint script destination in the Lambda layer (eg, **extensions/dash0**)
+pub const EXTENSION_NAME: &str = "dash0";
 
 /// Default port to listen on, overriden by DASH0_LISTENER_PORT environment variable
 pub const DEFAULT_PROXY_PORT: u16 = 9009;
@@ -56,7 +56,7 @@ pub fn log_prefix_with(suffix: &str) -> String {
 ///
 #[tokio::main]
 async fn main() {
-    let filter = EnvFilter::try_from_env("DASH0_EXTENSION_LOG_LEVEL")
+    let filter = EnvFilter::try_new(&config::extension_log_level())
         .unwrap_or_else(|_| EnvFilter::new("warn"));
     tracing_subscriber::fmt()
         .json()
@@ -72,7 +72,7 @@ async fn main() {
 
     init_masking_rules();
 
-    let addr: SocketAddr = match config::endpoints::lrap_api().parse() {
+    let addr: SocketAddr = match config::endpoints::dash0_api().parse() {
         Ok(addr) => addr,
         Err(e) => {
             tracing::error!(

@@ -14,10 +14,10 @@
 args=("$@")
 case $(uname -m) in
     x86_64)
-        /opt/lrap_x86_64 "${args[@]}"
+        /opt/dash0_x86_64 "${args[@]}"
         ;;
     aarch64)
-        /opt/lrap_aarch64 "${args[@]}"
+        /opt/dash0_aarch64 "${args[@]}"
         ;;
     *)
         echo "Unsupported architecture"

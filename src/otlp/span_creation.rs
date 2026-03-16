@@ -82,22 +82,6 @@ fn create_root_span(
                     }),
                 });
             }
-            if data.billed_duration > 0.0 {
-                attrs.push(KeyValue {
-                    key: "dash0.faas.billed_duration".to_string(),
-                    value: Some(AnyValue {
-                        value: Some(Value::DoubleValue(data.billed_duration)),
-                    }),
-                });
-            }
-            if data.memory_usage > 0 {
-                attrs.push(KeyValue {
-                    key: "dash0.faas.memory_used".to_string(),
-                    value: Some(AnyValue {
-                        value: Some(Value::IntValue(data.memory_usage as i64)),
-                    }),
-                });
-            }
             attrs
         },
         ..Default::default()
@@ -166,17 +150,23 @@ fn create_overhead_span(
     })
 }
 
-pub fn create_spans(invocation_id: &str, create_overhead: bool) -> Option<StoredTrace> {
+pub fn create_spans(
+    invocation_id: &str,
+    create_root_and_init: bool,
+    create_overhead: bool,
+) -> Option<StoredTrace> {
     let data = invocation_entry::get_supplementary_span_data(invocation_id)?;
 
     let mut spans = Vec::new();
 
-    if let Some(root_span) = create_root_span(invocation_id, &data) {
-        spans.push(root_span);
-    }
+    if create_root_and_init {
+        if let Some(root_span) = create_root_span(invocation_id, &data) {
+            spans.push(root_span);
+        }
 
-    if let Some(init_span) = create_init_span(invocation_id, &data) {
-        spans.push(init_span);
+        if let Some(init_span) = create_init_span(invocation_id, &data) {
+            spans.push(init_span);
+        }
     }
 
     if create_overhead {
@@ -245,7 +235,13 @@ pub fn create_spans(invocation_id: &str, create_overhead: bool) -> Option<Stored
 }
 
 pub fn create_supplementary_spans(invocation_id: &str) {
-    if let Some(trace) = create_spans(invocation_id, true) {
+    if let Some(trace) = create_spans(invocation_id, true, false) {
+        invocation_entry::store_trace_by_id(invocation_id, trace);
+    }
+}
+
+pub fn create_overhead_supplementary_span(invocation_id: &str) {
+    if let Some(trace) = create_spans(invocation_id, false, true) {
         invocation_entry::store_trace_by_id(invocation_id, trace);
     }
 }
@@ -328,31 +324,9 @@ mod tests {
             });
         assert_eq!(init_dur, Some(150.0));
 
-        let billed_dur = span
-            .attributes
-            .iter()
-            .find(|kv| kv.key == "dash0.faas.billed_duration")
-            .and_then(|kv| kv.value.as_ref())
-            .and_then(|v| match &v.value {
-                Some(Value::DoubleValue(d)) => Some(*d),
-                _ => None,
-            });
-        assert_eq!(billed_dur, Some(500.0));
-
-        let mem_used = span
-            .attributes
-            .iter()
-            .find(|kv| kv.key == "dash0.faas.memory_used")
-            .and_then(|kv| kv.value.as_ref())
-            .and_then(|v| match &v.value {
-                Some(Value::IntValue(i)) => Some(*i),
-                _ => None,
-            });
-        assert_eq!(mem_used, Some(256));
-
         // --- Init span ---
         let spans = &decoded.resource_spans[0].scope_spans[0].spans;
-        assert_eq!(spans.len(), 3);
+        assert_eq!(spans.len(), 2);
 
         let init_span = &spans[1];
         assert_eq!(init_span.name, "aws.lambda.initialization");
@@ -381,56 +355,44 @@ mod tests {
             .iter()
             .find(|kv| kv.key == "faas.init_duration")
             .is_none());
-        assert!(init_span
-            .attributes
-            .iter()
-            .find(|kv| kv.key == "dash0.faas.billed_duration")
-            .is_none());
-        assert!(init_span
-            .attributes
-            .iter()
-            .find(|kv| kv.key == "dash0.faas.memory_used")
-            .is_none());
+    }
 
-        // --- Overhead span ---
-        let overhead_span = &spans[2];
+    #[test]
+    #[serial]
+    fn create_overhead_supplementary_span_stores_overhead_span() {
+        reset_store();
+        let invocation_id = "inv-supp-1";
+        let trace_id_hex = "aa".repeat(16);
+        let root_span_id_hex = "bb".repeat(8);
+
+        invocation_entry::update(invocation_id, |entry| {
+            entry.trace_id = Some(trace_id_hex.clone());
+            entry.root_span_id = Some(root_span_id_hex.clone());
+            entry.sampled = true;
+            entry.start_time = 1_000.0;
+            entry.billed_duration = 500.0;
+            entry.init_duration = 150.0;
+            entry.end_time = 1_100.0;
+        });
+
+        create_overhead_supplementary_span(invocation_id);
+
+        let traces = invocation_entry::take_traces_by_id(invocation_id);
+        assert_eq!(traces.len(), 1);
+
+        let decoded =
+            ExportTraceServiceRequest::decode(traces[0].body.as_slice()).expect("should decode");
+        let spans = &decoded.resource_spans[0].scope_spans[0].spans;
+        assert_eq!(spans.len(), 1);
+
+        let overhead_span = &spans[0];
         assert_eq!(overhead_span.name, "aws.lambda.overhead");
         assert_eq!(overhead_span.kind, SpanKind::Internal as i32);
         assert_eq!(hex::encode(&overhead_span.trace_id), trace_id_hex);
         assert_eq!(hex::encode(&overhead_span.parent_span_id), root_span_id_hex);
-        assert_eq!(overhead_span.start_time_unix_nano, 1_100_000_000); // end_time 1100ms in nanos
-        assert_eq!(overhead_span.end_time_unix_nano, 1_350_000_000); // same as root span end
+        assert_eq!(overhead_span.start_time_unix_nano, 1_100_000_000);
+        assert_eq!(overhead_span.end_time_unix_nano, 1_350_000_000);
         assert!(!overhead_span.span_id.is_empty());
-        assert_ne!(overhead_span.span_id, span.span_id); // different from root span
-        assert_ne!(overhead_span.span_id, init_span.span_id); // different from init span
-
-        let overhead_inv_attr = overhead_span
-            .attributes
-            .iter()
-            .find(|kv| kv.key == "faas.invocation_id")
-            .and_then(|kv| kv.value.as_ref())
-            .and_then(|v| match &v.value {
-                Some(Value::StringValue(s)) => Some(s.as_str()),
-                _ => None,
-            });
-        assert_eq!(overhead_inv_attr, Some(invocation_id));
-
-        // Overhead span should NOT have telemetry attributes
-        assert!(overhead_span
-            .attributes
-            .iter()
-            .find(|kv| kv.key == "faas.init_duration")
-            .is_none());
-        assert!(overhead_span
-            .attributes
-            .iter()
-            .find(|kv| kv.key == "dash0.faas.billed_duration")
-            .is_none());
-        assert!(overhead_span
-            .attributes
-            .iter()
-            .find(|kv| kv.key == "dash0.faas.memory_used")
-            .is_none());
     }
 
     #[test]

@@ -453,10 +453,9 @@ fn add_event_payload_to_span(span: &mut Span, invocation_id: &str) {
 }
 
 fn reparent_to_root_span(span: &mut Span, invocation_id: &str) {
-    if let Some(root_span_id) = invocation_entry::get_root_span_id(invocation_id) {
-        if let Ok(bytes) = hex::decode(&root_span_id) {
-            span.parent_span_id = bytes;
-        }
+    let root_span_id = invocation_entry::get_or_create_root_span_id(invocation_id);
+    if let Ok(bytes) = hex::decode(&root_span_id) {
+        span.parent_span_id = bytes;
     }
 }
 
@@ -726,8 +725,7 @@ mod tests {
 
     #[test]
     #[serial]
-    fn process_trace_request_keeps_parent_span_when_env_var_false() {
-        std::env::set_var("DASH0_REMOVE_LAMBDA_PARENT_SPAN", "false");
+    fn process_trace_request_reparents_even_without_preexisting_root_span_id() {
         let invocation_id = "inv-process-parent-env";
         store_event_payload(invocation_id, r#"{"test":"data"}"#);
 
@@ -741,12 +739,17 @@ mod tests {
         super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
 
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
-        assert_eq!(
+        assert_ne!(
             span.parent_span_id,
             vec![0xBB; 8],
-            "parent_span_id should be preserved when DASH0_REMOVE_LAMBDA_PARENT_SPAN is false"
+            "parent_span_id should be reparented to root_span_id"
         );
-        std::env::remove_var("DASH0_REMOVE_LAMBDA_PARENT_SPAN");
+
+        // root_span_id should have been lazily created and stored
+        let root_span_id = invocation_entry::get_root_span_id(invocation_id)
+            .expect("root_span_id should be set after reparenting");
+        let expected_parent = hex::decode(&root_span_id).unwrap();
+        assert_eq!(span.parent_span_id, expected_parent);
     }
 
     #[test]

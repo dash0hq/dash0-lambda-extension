@@ -20,6 +20,18 @@ export const getAttributesMap = (attributes: Array<{ key: string, value: any }>)
     return attrMap;
 }
 
+export const findHandlerSpan = (spanPayload: any, scopeName: string): { span: any; resource: any } => {
+    for (const rs of spanPayload.resourceSpans) {
+        for (const ss of rs.scopeSpans) {
+            if (ss.scope.name === scopeName) {
+                expect(ss.spans.length).toEqual(1);
+                return { span: ss.spans[0], resource: rs.resource };
+            }
+        }
+    }
+    throw new Error(`Handler span not found in scope ${scopeName}`);
+}
+
 export const getRequestPayload = (invocationId: string) => {
     const now = Date.now();
     return {
@@ -311,10 +323,6 @@ export const checkSupplementarySpans = async ({
             const rootAttrs = getAttributesMap(rootSpan.attributes);
             expect(rootAttrs['faas.invocation_id'].stringValue).toEqual(invocationId);
             expect(rootAttrs['faas.init_duration']).toBeDefined();
-            if (!runtimeError) {
-                expect(rootAttrs['dash0.faas.billed_duration']).toBeDefined();
-                expect(rootAttrs['dash0.faas.memory_used']).toBeDefined();
-            }
             expect(rootSpan.traceId).toEqual(traceId);
             expect(rootSpan.spanId).toEqual(rootSpanId);
 
@@ -355,35 +363,6 @@ export const checkException = (span: any, exception_type: string) => {
     expect(eventAttrMap['exception.type'].stringValue).toEqual(exception_type);
     expect(span.status.code).toEqual(2); // 2 = ERROR
     expect(span.status.message).toEqual(exception_type);
-}
-
-export const checkSpanAttributesFromReport = (reportLog: string, span: any) => {
-    const spanAttributes = getAttributesMap(span.attributes);
-    const reportRegex = /REPORT RequestId: (?<requestId>[a-f0-9\-]+)\s+Duration: (?<duration>[\d\.]+) ms\s+Billed Duration: (?<billedDuration>[\d\.]+) ms\s+Memory Size: (?<memorySize>\d+) MB\s+Max Memory Used: (?<maxMemoryUsed>\d+) MB\s+Init Duration: (?<initDuration>[\d\.]+) ms/;
-    const match = reportLog.match(reportRegex);
-    if (match?.groups) {
-        const initDuration = parseFloat(match.groups.initDuration);
-        const billedDuration = parseFloat(match.groups.billedDuration);
-        const maxMemoryUsed = parseInt(match.groups.maxMemoryUsed);
-        const duration = parseFloat(match.groups.duration);
-
-        expect(initDuration).toBeCloseTo(spanAttributes['faas.init_duration'].doubleValue, 0);
-        expect(billedDuration).toEqual(spanAttributes['dash0.faas.billed_duration'].doubleValue);
-        expect(maxMemoryUsed).toEqual(Number(spanAttributes['dash0.faas.memory_used'].intValue));
-
-        const spanDurationNano = Number(BigInt(span.endTimeUnixNano) - BigInt(span.startTimeUnixNano));
-        const spanDurationMs = spanDurationNano / 1e6;
-        expect(spanDurationMs).toBeGreaterThanOrEqual(duration - 2);
-        expect(spanDurationMs).toBeLessThanOrEqual(duration + 2);
-    } else {
-        throw new Error("Failed to parse REPORT log: " + reportLog);
-    }
-}
-
-export const compareJsonStrings = (json1: string, json2: string) => {
-    const obj1 = JSON.parse(json1);
-    const obj2 = JSON.parse(json2);
-    expect(obj1).toEqual(obj2);
 }
 
 export const runAllTests = (scenario: string, runtimes: string[], verifySuccessInvocation: Function) => {

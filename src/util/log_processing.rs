@@ -109,10 +109,6 @@ fn parse_platform_runtime_done(log: &TelemetryLog) {
             }
         }
     }
-    if let Some(notifier) = crate::state::invocation_data::take_runtime_done_notifier() {
-        tracing::info!("[{}] Signaled platform.runtimeDone", crate::log_prefix());
-        let _ = notifier.send(());
-    }
 }
 
 fn parse_platform_report(log: &TelemetryLog) {

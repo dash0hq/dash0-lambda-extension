@@ -75,6 +75,19 @@ pub fn is_create_payload_log_records() -> bool {
     }
 }
 
+pub fn get_dash0_dataset() -> Option<String> {
+    match std::env::var("DASH0_DATASET") {
+        Ok(val) if !val.is_empty() => Some(val),
+        _ => None,
+    }
+}
+
+const DEFAULT_LOG_LEVEL: &str = "warn";
+
+pub fn extension_log_level() -> String {
+    std::env::var("DASH0_EXTENSION_LOG_LEVEL").unwrap_or_else(|_| DEFAULT_LOG_LEVEL.to_string())
+}
+
 pub fn is_logs_instrumentation_enabled() -> bool {
     match std::env::var("DASH0_LOGS_INSTRUMENTATION_ENABLED") {
         Ok(val) => matches!(

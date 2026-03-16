@@ -1,7 +1,7 @@
-ZIP_NAME_PYTHON = layer-lrap-python.zip
-ZIP_NAME_NODE = layer-lrap-node.zip
-ZIP_NAME_JAVA = layer-lrap-java.zip
-ZIP_NAME_MANUAL = layer-lrap-manual.zip
+ZIP_NAME_PYTHON = layer-dash0-python.zip
+ZIP_NAME_NODE = layer-dash0-node.zip
+ZIP_NAME_JAVA = layer-dash0-java.zip
+ZIP_NAME_MANUAL = layer-dash0-manual.zip
 LAYER_NAME_PREFIX ?=
 LAYER_NAME_PYTHON = $(LAYER_NAME_PREFIX)dash0-extension-python
 LAYER_NAME_NODE = $(LAYER_NAME_PREFIX)dash0-extension-node
@@ -12,7 +12,7 @@ LAMBDA_LAYER_MARKER_NODE := .lambda-layer-node
 LAMBDA_LAYER_MARKER_JAVA := .lambda-layer-java
 LAMBDA_LAYER_MARKER_MANUAL := .lambda-layer-manual
 CARGO_FEATURES :=
-PYTHON_DEPS_IMAGE := lrap-python-deps
+PYTHON_DEPS_IMAGE := dash0-python-deps
 
 # Docker/ECR image settings
 AWS_ACCOUNT_ID := $(shell aws sts get-caller-identity --query Account --output text)
@@ -51,17 +51,17 @@ clean-build:
 clean-cargo:
 	@cargo clean
 
-build/lrap_x86_64: $(RS_FILES) Cargo.toml
+build/dash0_x86_64: $(RS_FILES) Cargo.toml
 	@echo Building Rust application for x86_64
 	@mkdir -p build
 	@cross build --release --target x86_64-unknown-linux-musl ${CARGO_FEATURES}
-	@cp target/x86_64-unknown-linux-musl/release/aws-lambda-runtime-api-proxy-rs build/lrap_x86_64
+	@cp target/x86_64-unknown-linux-musl/release/aws-lambda-runtime-api-proxy-rs build/dash0_x86_64
 
-build/lrap_aarch64: $(RS_FILES) Cargo.toml
+build/dash0_aarch64: $(RS_FILES) Cargo.toml
 	@echo Building Rust application for aarch64
 	@mkdir -p build
 	@cross build --release --target aarch64-unknown-linux-musl ${CARGO_FEATURES}
-	@cp target/aarch64-unknown-linux-musl/release/aws-lambda-runtime-api-proxy-rs build/lrap_aarch64
+	@cp target/aarch64-unknown-linux-musl/release/aws-lambda-runtime-api-proxy-rs build/dash0_aarch64
 
 PYTHON_DISTRO_SRC := $(shell find opt/python/distro/src -type f)
 NODE_DISTRO_SRC := $(shell find opt/node/distro/src -type f)
@@ -77,13 +77,13 @@ build/python: opt/python/distro/requirements.txt opt/python/Dockerfile $(PYTHON_
 
 
 
-build/$(ZIP_NAME_PYTHON): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/shared.sh opt/python/wrapper opt/python/otel_wrapper.py build/python
+build/$(ZIP_NAME_PYTHON): build/dash0_x86_64 build/dash0_aarch64 opt/entrypoint opt/shared.sh opt/python/wrapper opt/python/otel_wrapper.py build/python
 	@rm -f build/$(ZIP_NAME_PYTHON)
 	@rm -rf build/stage-python
 	@mkdir -p build/stage-python/extensions
-	@cp build/lrap_x86_64 build/stage-python/
-	@cp build/lrap_aarch64 build/stage-python/
-	@cp opt/entrypoint build/stage-python/extensions/lrap
+	@cp build/dash0_x86_64 build/stage-python/
+	@cp build/dash0_aarch64 build/stage-python/
+	@cp opt/entrypoint build/stage-python/extensions/dash0
 	@cp opt/shared.sh build/stage-python/shared.sh
 	@cp opt/python/wrapper build/stage-python/wrapper
 	@cp -r build/python build/stage-python/python
@@ -91,14 +91,14 @@ build/$(ZIP_NAME_PYTHON): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint op
 	@cd build/stage-python && zip -r ../$(ZIP_NAME_PYTHON) *
 
 
-build/$(ZIP_NAME_NODE): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/shared.sh opt/node/package.json opt/node/wrapper opt/node/webpack.config.mjs opt/node/init.mjs $(NODE_DISTRO_SRC)
+build/$(ZIP_NAME_NODE): build/dash0_x86_64 build/dash0_aarch64 opt/entrypoint opt/shared.sh opt/node/package.json opt/node/wrapper opt/node/webpack.config.mjs opt/node/init.mjs $(NODE_DISTRO_SRC)
 	@echo Building Node.js layer
 	@rm -f build/$(ZIP_NAME_NODE)
 	@rm -rf build/stage-node
 	@mkdir -p build/stage-node/extensions
-	@cp build/lrap_x86_64 build/stage-node/
-	@cp build/lrap_aarch64 build/stage-node/
-	@cp opt/entrypoint build/stage-node/extensions/lrap
+	@cp build/dash0_x86_64 build/stage-node/
+	@cp build/dash0_aarch64 build/stage-node/
+	@cp opt/entrypoint build/stage-node/extensions/dash0
 	@cp opt/shared.sh build/stage-node/shared.sh
 	@cp opt/node/wrapper build/stage-node/wrapper
 	@bash opt/node/scripts/build-aws-sdk-tarball.sh
@@ -124,15 +124,15 @@ $(JAVA_DISTRO_JAR): $(JAVA_DISTRO_SRC)
 	@echo Building Java distro
 	@cd opt/java/opentelemetry-java-distro && ./gradlew clean -Pversion=1.0.0-SNAPSHOT assemble -x javadoc
 
-build/$(ZIP_NAME_JAVA): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/shared.sh opt/java/wrapper $(JAVA_DISTRO_JAR)
+build/$(ZIP_NAME_JAVA): build/dash0_x86_64 build/dash0_aarch64 opt/entrypoint opt/shared.sh opt/java/wrapper $(JAVA_DISTRO_JAR)
 	@echo Building Java layer
 	@rm -f build/$(ZIP_NAME_JAVA)
 	@rm -rf build/stage-java
 	@mkdir -p build/stage-java/extensions
 	@mkdir -p build/stage-java/java/lib
-	@cp build/lrap_x86_64 build/stage-java/
-	@cp build/lrap_aarch64 build/stage-java/
-	@cp opt/entrypoint build/stage-java/extensions/lrap
+	@cp build/dash0_x86_64 build/stage-java/
+	@cp build/dash0_aarch64 build/stage-java/
+	@cp opt/entrypoint build/stage-java/extensions/dash0
 	@cp opt/shared.sh build/stage-java/shared.sh
 	@cp opt/java/wrapper build/stage-java/wrapper
 	@cp $(JAVA_DISTRO_JAR) build/stage-java/java/lib/dash0-opentelemetry.jar
@@ -140,14 +140,14 @@ build/$(ZIP_NAME_JAVA): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/
 	@cd build/stage-java && zip -r ../$(ZIP_NAME_JAVA) *
 
 
-build/$(ZIP_NAME_MANUAL): build/lrap_x86_64 build/lrap_aarch64 opt/entrypoint opt/shared.sh opt/manual/wrapper
+build/$(ZIP_NAME_MANUAL): build/dash0_x86_64 build/dash0_aarch64 opt/entrypoint opt/shared.sh opt/manual/wrapper
 	@echo Building Manual layer
 	@rm -f build/$(ZIP_NAME_MANUAL)
 	@rm -rf build/stage-manual
 	@mkdir -p build/stage-manual/extensions
-	@cp build/lrap_x86_64 build/stage-manual/
-	@cp build/lrap_aarch64 build/stage-manual/
-	@cp opt/entrypoint build/stage-manual/extensions/lrap
+	@cp build/dash0_x86_64 build/stage-manual/
+	@cp build/dash0_aarch64 build/stage-manual/
+	@cp opt/entrypoint build/stage-manual/extensions/dash0
 	@cp opt/shared.sh build/stage-manual/shared.sh
 	@cp opt/manual/wrapper build/stage-manual/wrapper
 	@cd build/stage-manual && zip -r ../$(ZIP_NAME_MANUAL) *
@@ -225,7 +225,7 @@ ensure-buildx:
 
 # Build and push Docker image for Python extension to ECR
 # Usage: make docker-python VERSION=1.0.0
-docker-python: build/lrap_x86_64 build/lrap_aarch64 build/python ensure-buildx
+docker-python: build/dash0_x86_64 build/dash0_aarch64 build/python ensure-buildx
 	@echo "Creating ECR repository $(ECR_REPO_PYTHON) if it doesn't exist..."
 	@aws ecr describe-repositories --repository-names $(ECR_REPO_PYTHON) 2>/dev/null || \
 		aws ecr create-repository --repository-name $(ECR_REPO_PYTHON) --no-cli-pager
@@ -241,7 +241,7 @@ docker-python: build/lrap_x86_64 build/lrap_aarch64 build/python ensure-buildx
 
 # Build and push Docker image for Node.js extension to ECR
 # Usage: make docker-node VERSION=1.0.0
-docker-node: build/lrap_x86_64 build/lrap_aarch64 ensure-buildx
+docker-node: build/dash0_x86_64 build/dash0_aarch64 ensure-buildx
 	@echo "Building Node.js SDK..."
 	@bash opt/node/scripts/build-aws-sdk-tarball.sh
 	@cd opt/node && npm install && npm run build
@@ -260,7 +260,7 @@ docker-node: build/lrap_x86_64 build/lrap_aarch64 ensure-buildx
 
 # Build and push Docker image for Java extension to ECR
 # Usage: make docker-java VERSION=1.0.0
-docker-java: build/lrap_x86_64 build/lrap_aarch64 $(JAVA_DISTRO_JAR) ensure-buildx
+docker-java: build/dash0_x86_64 build/dash0_aarch64 $(JAVA_DISTRO_JAR) ensure-buildx
 	@echo "Creating ECR repository $(ECR_REPO_JAVA) if it doesn't exist..."
 	@aws ecr describe-repositories --repository-names $(ECR_REPO_JAVA) 2>/dev/null || \
 		aws ecr create-repository --repository-name $(ECR_REPO_JAVA) --no-cli-pager

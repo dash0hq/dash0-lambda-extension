@@ -13,7 +13,7 @@
 #
 # Or manually:
 #   # First build the binaries and Java distro
-#   make build/lrap_x86_64 build/lrap_aarch64
+#   make build/dash0_x86_64 build/dash0_aarch64
 #   cd opt/java/opentelemetry-java-distro && ./gradlew -Pversion=1.0.0-SNAPSHOT assemble -x javadoc
 #   # Then build the Docker image
 #   docker build -f opt/docker/Dockerfile.java -t dash0/extension-java:latest .
@@ -21,11 +21,11 @@
 FROM scratch
 
 # Copy extension binaries (both architectures - entrypoint selects at runtime)
-COPY build/lrap_x86_64 /opt/lrap_x86_64
-COPY build/lrap_aarch64 /opt/lrap_aarch64
+COPY build/dash0_x86_64 /opt/dash0_x86_64
+COPY build/dash0_aarch64 /opt/dash0_aarch64
 
 # Copy entrypoint script (Lambda extension entry point)
-COPY opt/entrypoint /opt/extensions/lrap
+COPY opt/entrypoint /opt/extensions/dash0
 
 # Copy shared script and wrapper script
 COPY opt/shared.sh /opt/shared.sh

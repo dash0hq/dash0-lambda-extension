@@ -31,7 +31,7 @@ jobs:
           name: rust-binaries
           path: build
       - name: Ensure binaries are executable and fresh
-        run: chmod +x build/lrap_x86_64 build/lrap_aarch64 && touch build/lrap_x86_64 build/lrap_aarch64
+        run: chmod +x build/dash0_x86_64 build/dash0_aarch64 && touch build/dash0_x86_64 build/dash0_aarch64
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
@@ -57,7 +57,7 @@ jobs:
           name: rust-binaries
           path: build
       - name: Ensure binaries are executable and fresh
-        run: chmod +x build/lrap_x86_64 build/lrap_aarch64 && touch build/lrap_x86_64 build/lrap_aarch64
+        run: chmod +x build/dash0_x86_64 build/dash0_aarch64 && touch build/dash0_x86_64 build/dash0_aarch64
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
@@ -80,7 +80,7 @@ jobs:
           name: rust-binaries
           path: build
       - name: Ensure binaries are executable and fresh
-        run: chmod +x build/lrap_x86_64 build/lrap_aarch64 && touch build/lrap_x86_64 build/lrap_aarch64
+        run: chmod +x build/dash0_x86_64 build/dash0_aarch64 && touch build/dash0_x86_64 build/dash0_aarch64
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
@@ -103,7 +103,7 @@ jobs:
           name: rust-binaries
           path: build
       - name: Ensure binaries are executable and fresh
-        run: chmod +x build/lrap_x86_64 build/lrap_aarch64 && touch build/lrap_x86_64 build/lrap_aarch64
+        run: chmod +x build/dash0_x86_64 build/dash0_aarch64 && touch build/dash0_x86_64 build/dash0_aarch64
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
