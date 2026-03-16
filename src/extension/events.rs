@@ -41,11 +41,6 @@ fn handle_invoke_event(json: &serde_json::Value) {
             .and_then(|t| t.get("value"))
             .and_then(|v| v.as_str())
         {
-            tracing::info!(
-                "[{}] Parsing trace context from _X_AMZN_TRACE_ID: {}",
-                crate::log_prefix_with("Extension"),
-                trace_value
-            );
             if let Some((trace_id_bytes, parent_span_id_bytes, sampled)) =
                 crate::otlp::span_link_extractor::parse_amzn_trace_id(trace_value)
             {
@@ -67,6 +62,11 @@ fn handle_invoke_event(json: &serde_json::Value) {
                     entry.sampled = sampled;
                 });
             }
+            tracing::info!(
+                "[{}] Parsed trace context from _X_AMZN_TRACE_ID: {}",
+                crate::log_prefix_with("Extension"),
+                trace_value
+            );
         }
     }
 }

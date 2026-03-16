@@ -457,6 +457,12 @@ fn reparent_to_root_span(span: &mut Span, invocation_id: &str) {
         if let Ok(bytes) = hex::decode(&root_span_id) {
             span.parent_span_id = bytes;
         }
+    } else {
+        tracing::warn!(
+            "[{}] No root span ID found for invocation_id={}, not reparenting",
+            crate::log_prefix(),
+            invocation_id
+        );
     }
 }
 
