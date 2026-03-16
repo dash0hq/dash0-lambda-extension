@@ -56,7 +56,7 @@ pub fn log_prefix_with(suffix: &str) -> String {
 ///
 #[tokio::main]
 async fn main() {
-    let filter = EnvFilter::try_from_env("DASH0_EXTENSION_LOG_LEVEL")
+    let filter = EnvFilter::try_new(&config::extension_log_level())
         .unwrap_or_else(|_| EnvFilter::new("warn"));
     tracing_subscriber::fmt()
         .json()
