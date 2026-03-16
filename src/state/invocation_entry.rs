@@ -108,9 +108,7 @@ pub fn get_or_create_root_span_id(invocation_id: &str) -> String {
     let entry = store.entry(invocation_id.to_string()).or_default();
     entry
         .root_span_id
-        .get_or_insert_with(|| {
-            hex::encode(crate::util::parsers::generate_random_span_id())
-        })
+        .get_or_insert_with(|| hex::encode(crate::util::parsers::generate_random_span_id()))
         .clone()
 }
 

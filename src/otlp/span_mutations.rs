@@ -732,8 +732,7 @@ mod tests {
         let mut span = make_span_with_invocation(invocation_id);
         span.parent_span_id = vec![0xBB; 8];
 
-        let mut request =
-            make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
+        let mut request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
         let mut invocation_ids = Vec::new();
         let mut encoded_body = Vec::new();
 

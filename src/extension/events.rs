@@ -56,7 +56,7 @@ fn handle_invoke_event(json: &serde_json::Value) {
                     };
                 state::invocation_entry::update(request_id, |entry| {
                     entry.trace_id = Some(trace_id);
-                    entry.span_id = Some(span_id);
+                    entry.span_id.get_or_insert(span_id);
                     entry.root_span_id.get_or_insert(root_span_id);
                     entry.parent_span_id = Some(parent_span_id);
                     entry.sampled = sampled;
