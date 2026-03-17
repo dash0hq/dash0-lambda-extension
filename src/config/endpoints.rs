@@ -3,8 +3,8 @@ use once_cell::sync::OnceCell;
 /// Sandbox's Runtime API endpoint
 static LAMBDA_RUNTIME_API: OnceCell<String> = OnceCell::new();
 
-/// Lambda Runtime API Proxy (LRAP), this endpoint
-static LRAP_API: OnceCell<String> = OnceCell::new();
+/// Dash0 extension listener endpoint
+static DASH0_API: OnceCell<String> = OnceCell::new();
 
 /// Get the extension port from environment variable or use default
 pub fn extension_port() -> u16 {
@@ -36,11 +36,11 @@ pub fn latch_runtime_env() {
         );
     }
 
-    let lrap_api = format!("0.0.0.0:{}", extension_port());
+    let dash0_api = format!("0.0.0.0:{}", extension_port());
 
-    if let Err(_) = LRAP_API.set(lrap_api.clone()) {
+    if let Err(_) = DASH0_API.set(dash0_api.clone()) {
         tracing::warn!(
-            "[{}] LRAP_API was already set, skipping",
+            "[{}] DASH0_API was already set, skipping",
             crate::log_prefix()
         );
     }
@@ -68,16 +68,16 @@ pub fn sandbox_runtime_api() -> &'static str {
     }
 }
 
-/// Gets the new LRAP_API.
+/// Gets the Dash0 extension listener API endpoint.
 ///
-pub fn lrap_api() -> &'static str {
-    match LRAP_API.get() {
+pub fn dash0_api() -> &'static str {
+    match DASH0_API.get() {
         Some(val) => val,
         None => {
             latch_runtime_env();
-            LRAP_API.get().unwrap_or_else(|| {
+            DASH0_API.get().unwrap_or_else(|| {
                 tracing::error!(
-                    "[{}] Failed to initialize LRAP_API host:port",
+                    "[{}] Failed to initialize DASH0_API host:port",
                     crate::log_prefix()
                 );
                 panic!(

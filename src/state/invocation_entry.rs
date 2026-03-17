@@ -100,6 +100,18 @@ pub fn get_root_span_id(invocation_id: &str) -> Option<String> {
         .and_then(|e| e.root_span_id.clone())
 }
 
+/// Atomically returns the root_span_id, generating and storing a new random one if not yet set.
+/// This avoids the race where the OTLP receiver processes trace data before the extension
+/// events loop has set root_span_id via handle_invoke_event.
+pub fn get_or_create_root_span_id(invocation_id: &str) -> String {
+    let mut store = INVOCATION_STORE.lock();
+    let entry = store.entry(invocation_id.to_string()).or_default();
+    entry
+        .root_span_id
+        .get_or_insert_with(|| hex::encode(crate::util::parsers::generate_random_span_id()))
+        .clone()
+}
+
 /// Lightweight getter: returns only the sampled flag.
 pub fn get_sampled(invocation_id: &str) -> bool {
     INVOCATION_STORE

@@ -20,4 +20,4 @@ This package uses  *Make* to build binary executables for *aarch64* and *x86_64*
 ### Building and Deploying the Extension Layer
 
 With the dependencies installed, run `make` in the base directory 
-to compile the binaries.  The executables and  are copied into `build/`. The extension entrypoint script (`opt/entrypoint`) is copied to `build/extensions/lrap`
+to compile the binaries.  The executables and  are copied into `build/`. The extension entrypoint script (`opt/entrypoint`) is copied to `build/extensions/dash0`

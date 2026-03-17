@@ -183,9 +183,17 @@ pub async fn register_telemetry() {
         "http://sandbox.localdomain:{}/v1/telemetry",
         endpoints::extension_port()
     );
+    let types = {
+        let log_level = crate::config::extension_log_level().to_lowercase();
+        if matches!(log_level.as_str(), "warn" | "error") {
+            r#""platform","function","extension""#
+        } else {
+            r#""platform","function""#
+        }
+    };
     let payload = format!(
-        r#"{{"schemaVersion":"2022-07-01","destination":{{"protocol":"HTTP","URI":"{}"}},"types":["platform","function"],"buffering":{{"timeoutMs":50}}}}"#,
-        destination
+        r#"{{"schemaVersion":"2022-07-01","destination":{{"protocol":"HTTP","URI":"{}"}},"types":[{}],"buffering":{{"timeoutMs":50}}}}"#,
+        destination, types
     );
     // print the payload
     tracing::trace!(

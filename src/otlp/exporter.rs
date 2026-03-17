@@ -4,7 +4,7 @@ use hyper::{header, Body, Request, Uri};
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 
-use crate::config::{request_retries, request_timeout_ms};
+use crate::config::{get_dash0_dataset, request_retries, request_timeout_ms};
 use crate::otlp::log_mutations::{get_resources_attributes, map_logs_to_otlp};
 use crate::route::HTTPS_CLIENT;
 use crate::state::invocation_data::{
@@ -322,6 +322,15 @@ fn _build_otlp_request(
                 {
                     headers.insert(header::AUTHORIZATION, auth_val);
                 }
+            }
+        }
+
+        if let Some(dataset) = get_dash0_dataset() {
+            if let Ok(dataset_val) = header::HeaderValue::from_str(&dataset) {
+                headers.insert(
+                    header::HeaderName::from_static("dash0-dataset"),
+                    dataset_val,
+                );
             }
         }
     } else {
