@@ -141,6 +141,16 @@ pub fn get_trace_span_ids(
     })
 }
 
+/// Lightweight getter: returns (trace_id, root_span_id) for log correlation.
+pub fn get_trace_span_ids_for_logs(
+    invocation_id: &str,
+) -> Option<(Option<String>, Option<String>)> {
+    INVOCATION_STORE
+        .lock()
+        .get(invocation_id)
+        .map(|e| (e.trace_id.clone(), e.root_span_id.clone()))
+}
+
 /// Lightweight getter: returns the telemetry data fields needed for span annotation.
 pub struct TelemetryData {
     pub init_duration: f64,

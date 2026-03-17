@@ -245,8 +245,7 @@ pub fn map_logs_to_otlp(logs: &[TelemetryLog]) -> Vec<LogRecord> {
             let (tid_opt, sid_opt) = if log.trace_id.is_some() || log.span_id.is_some() {
                 (log.trace_id.clone(), log.span_id.clone())
             } else {
-                invocation_entry::get_trace_span_ids(invocation_id)
-                    .map(|(t, s, _)| (t, s))
+                invocation_entry::get_trace_span_ids_for_logs(invocation_id)
                     .unwrap_or((None, None))
             };
 

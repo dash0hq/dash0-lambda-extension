@@ -508,6 +508,8 @@ pub fn process_trace_request(
                 };
 
                 invocation_ids.push(invocation_id.clone());
+                span.name = "handler".to_string();
+                span.kind = SpanKind::Internal as i32;
                 add_event_payload_to_span(span, &invocation_id);
                 reparent_to_root_span(span, &invocation_id);
                 store_span_ids(span, &invocation_id);
