@@ -44,7 +44,7 @@ See the release page for the latest ARNs of the extension layers for each runtim
 
 * `DASH0_CREATE_PAYLOAD_LOG_RECORDS` - When set to `true` (the default), the extension creates log records containing the request and response payloads for the lambda invocation and each client call. Set to `false` to disable. Default: `true`.
 
-* `DASH0_LOGS_INSTRUMENTATION_ENABLED` - When set to `true`, logs won't be collected from the Telemetry API, to prevent duplicates from the OTEL instrumentation. Default: `false`.
+* `DASH0_DISABLE_TELEMETRY_LOG_COLLECTION` - When set to `true`, disables collecting logs from the [Lambda Telemetry API](https://docs.aws.amazon.com/lambda/latest/dg/telemetry-api.html). Default: `false`.
 
 * `DASH0_DATASET` - When set, the extension adds a `Dash0-Dataset` header to all OTLP export requests, routing telemetry to the specified dataset in the Dash0 backend.
 
