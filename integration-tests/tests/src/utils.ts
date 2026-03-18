@@ -274,6 +274,165 @@ export const checkResourceAttributes = (attributes: Array<{ key: string, value: 
     expect(resourceAttributes['cloud.account.id'].stringValue).toMatch(/^\d+$/);
 }
 
+export type MainSpansResult = {
+    traceId: string;
+    rootSpanId: string;
+    handlerSpanId: string;
+    handlerSpan: any;
+    resource: any;
+};
+
+export const checkMainSpans = async ({
+    invocationId,
+    functionName,
+    handlerScopeName,
+}: {
+    invocationId: string;
+    functionName: string;
+    handlerScopeName: string;
+}): Promise<MainSpansResult> => {
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        await delay(RETRY_DELAY_MS);
+        console.log(`Attempt ${attempt} to fetch main spans for invocation ID ${invocationId}`);
+        try {
+            const spanResponse = await fetch(DASH0_ENDPOINT + 'spans', {
+                method: 'POST',
+                headers: {
+                    accept: 'application/json',
+                    authorization: `Bearer ${DASH0_TOKEN}`,
+                    'content-type': 'application/json',
+                },
+                body: JSON.stringify(getRequestPayload(invocationId)),
+            });
+
+            const spanPayload = await spanResponse.json() as any;
+
+            // Find handler span in the handler scope
+            let handlerSpan: any = null;
+            let handlerResource: any = null;
+            // Find extension spans in the dash0.lambda-extension scope
+            const extensionSpans: any[] = [];
+            let extensionResource: any = null;
+
+            for (const rs of (spanPayload?.resourceSpans ?? [])) {
+                for (const ss of (rs.scopeSpans ?? [])) {
+                    if (ss.scope?.name === handlerScopeName) {
+                        expect(ss.spans.length).toEqual(1);
+                        handlerSpan = ss.spans[0];
+                        handlerResource = rs.resource;
+                    }
+                    if (ss.scope?.name === 'dash0.lambda-extension') {
+                        extensionSpans.push(...(ss.spans ?? []));
+                        extensionResource = rs.resource;
+                    }
+                }
+            }
+
+            expect(handlerSpan, `Handler span not found in scope ${handlerScopeName}`).toBeDefined();
+
+            // Root span: named after the function
+            const rootSpan = extensionSpans.find((s: any) => s.name === functionName);
+            expect(rootSpan, `Root span not found for ${functionName}`).toBeDefined();
+
+            // Init span
+            const initSpan = extensionSpans.find((s: any) => s.name === 'aws.lambda.initialization');
+            expect(initSpan, 'Init span not found').toBeDefined();
+
+            // Verify parent-child relationships
+            expect(handlerSpan.parentSpanId).toEqual(rootSpan.spanId);
+            expect(initSpan.parentSpanId).toEqual(rootSpan.spanId);
+
+            // Verify all share same traceId
+            const traceId = rootSpan.traceId;
+            expect(handlerSpan.traceId).toEqual(traceId);
+            expect(initSpan.traceId).toEqual(traceId);
+
+            // Verify faas.invocation_id on handler and root spans
+            const handlerAttrs = getAttributesMap(handlerSpan.attributes);
+            expect(handlerAttrs['faas.invocation_id'].stringValue).toEqual(invocationId);
+            const rootAttrs = getAttributesMap(rootSpan.attributes);
+            expect(rootAttrs['faas.invocation_id'].stringValue).toEqual(invocationId);
+
+            // Verify faas.init_duration on root span
+            expect(rootAttrs['faas.init_duration']).toBeDefined();
+
+            // Check resource attributes on both
+            checkResourceAttributes(handlerResource.attributes, functionName);
+            checkResourceAttributes(extensionResource.attributes, functionName);
+
+            return {
+                traceId,
+                rootSpanId: rootSpan.spanId,
+                handlerSpanId: handlerSpan.spanId,
+                handlerSpan,
+                resource: handlerResource,
+            };
+        } catch (error) {
+            console.error(`Error fetching main spans on attempt ${attempt}:`, error);
+            if (attempt === MAX_ATTEMPTS) {
+                throw error;
+            }
+        }
+    }
+    throw new Error('checkMainSpans: exhausted all attempts');
+}
+
+export const checkOverheadSpan = async ({
+    invocationId,
+    functionName,
+    traceId,
+    rootSpanId,
+}: {
+    invocationId: string;
+    functionName: string;
+    traceId: string;
+    rootSpanId: string;
+}): Promise<void> => {
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        await delay(RETRY_DELAY_MS);
+        console.log(`Attempt ${attempt} to fetch overhead span for invocation ID ${invocationId}`);
+        try {
+            const spanResponse = await fetch(DASH0_ENDPOINT + 'spans', {
+                method: 'POST',
+                headers: {
+                    accept: 'application/json',
+                    authorization: `Bearer ${DASH0_TOKEN}`,
+                    'content-type': 'application/json',
+                },
+                body: JSON.stringify(getRequestPayload(invocationId)),
+            });
+
+            const spanPayload = await spanResponse.json() as any;
+
+            // Find overhead span in dash0.lambda-extension scope
+            let overheadSpan: any = null;
+            let overheadResource: any = null;
+            for (const rs of (spanPayload?.resourceSpans ?? [])) {
+                for (const ss of (rs.scopeSpans ?? [])) {
+                    if (ss.scope?.name === 'dash0.lambda-extension') {
+                        const found = (ss.spans ?? []).find((s: any) => s.name === 'aws.lambda.overhead');
+                        if (found) {
+                            overheadSpan = found;
+                            overheadResource = rs.resource;
+                        }
+                    }
+                }
+            }
+
+            expect(overheadSpan, 'Overhead span not found').toBeDefined();
+            expect(overheadSpan.traceId).toEqual(traceId);
+            expect(overheadSpan.parentSpanId).toEqual(rootSpanId);
+            checkResourceAttributes(overheadResource.attributes, functionName);
+            break;
+        } catch (error) {
+            console.error(`Error fetching overhead span on attempt ${attempt}:`, error);
+            if (attempt === MAX_ATTEMPTS) {
+                throw error;
+            }
+        }
+    }
+}
+
 export const checkSupplementarySpans = async ({
     invocationId,
     functionName,
