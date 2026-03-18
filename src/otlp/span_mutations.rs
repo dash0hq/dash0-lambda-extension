@@ -74,7 +74,7 @@ pub fn build_synthetic_trace(
         span_id,
         parent_span_id,
         name: "handler".to_string(),
-        kind: SpanKind::Server as i32,
+        kind: SpanKind::Internal as i32,
         start_time_unix_nano: start_nanos,
         end_time_unix_nano: now_nanos,
         attributes,

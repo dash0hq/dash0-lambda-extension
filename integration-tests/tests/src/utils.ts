@@ -338,6 +338,11 @@ export const checkMainSpans = async ({
             const initSpan = extensionSpans.find((s: any) => s.name === 'aws.lambda.initialization');
             expect(initSpan, 'Init span not found').toBeDefined();
 
+            // Verify span kinds: root is SERVER (2), handler and init are INTERNAL (1)
+            expect(rootSpan.kind).toEqual(2);
+            expect(handlerSpan.kind).toEqual(1);
+            expect(initSpan.kind).toEqual(1);
+
             // Verify parent-child relationships
             expect(handlerSpan.parentSpanId).toEqual(rootSpan.spanId);
             expect(initSpan.parentSpanId).toEqual(rootSpan.spanId);
