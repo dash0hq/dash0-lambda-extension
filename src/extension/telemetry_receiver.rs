@@ -29,7 +29,10 @@ pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
         for log in &logs {
             if log.r#type == "platform.runtimeDone" {
                 if let Some(id) = &log.invocation_id {
-                    create_supplementary_spans(id);
+                    let is_error = error_invocation_ids.iter().any(|(eid, _)| eid == id);
+                    if !is_error {
+                        create_supplementary_spans(id, true);
+                    }
                 }
                 if let Some(notifier) = crate::state::invocation_data::take_runtime_done_notifier()
                 {
@@ -71,7 +74,12 @@ pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
 
         for (invocation_id, error_type) in &error_invocation_ids {
             match build_synthetic_trace(invocation_id, Some(error_type), None, &traces_to_send) {
-                Some(trace) => traces_to_send.push(trace),
+                Some(trace) => {
+                    traces_to_send.push(trace);
+                    if let Some(supp) = create_supplementary_spans(invocation_id, false) {
+                        traces_to_send.push(supp);
+                    }
+                }
                 None => {
                     tracing::error!(
                         "[{}] Failed to build runtimeDone trace for invocation {}",

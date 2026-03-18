@@ -608,7 +608,7 @@ mod tests {
         // Store the mapping
         invocation_entry::update(invocation_id, |entry| {
             entry.trace_id = Some(trace_id_hex.to_string());
-            entry.span_id = Some(span_id_hex.to_string());
+            entry.root_span_id = Some(span_id_hex.to_string());
         });
 
         let logs = vec![TelemetryLog {

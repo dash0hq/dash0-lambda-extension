@@ -235,10 +235,14 @@ pub fn create_spans(
     })
 }
 
-pub fn create_supplementary_spans(invocation_id: &str) {
-    if let Some(trace) = create_spans(invocation_id, true, false) {
-        invocation_entry::store_trace_by_id(invocation_id, trace);
+pub fn create_supplementary_spans(invocation_id: &str, store: bool) -> Option<StoredTrace> {
+    let trace = create_spans(invocation_id, true, false);
+    if store {
+        if let Some(ref t) = trace {
+            invocation_entry::store_trace_by_id(invocation_id, t.clone());
+        }
     }
+    trace
 }
 
 pub fn create_overhead_supplementary_span(invocation_id: &str) {
@@ -282,7 +286,7 @@ mod tests {
         });
 
         std::env::set_var("AWS_LAMBDA_FUNCTION_NAME", "my-function");
-        create_supplementary_spans(invocation_id);
+        create_supplementary_spans(invocation_id, true);
         std::env::remove_var("AWS_LAMBDA_FUNCTION_NAME");
 
         let traces = invocation_entry::take_traces_by_id(invocation_id);
@@ -401,7 +405,8 @@ mod tests {
     fn create_supplementary_spans_noop_without_data() {
         reset_store();
         // No invocation entry exists — should not panic or store anything
-        create_supplementary_spans("inv-nonexistent");
+        let result = create_supplementary_spans("inv-nonexistent", true);
+        assert!(result.is_none());
         let traces = invocation_entry::take_traces_by_id("inv-nonexistent");
         assert!(traces.is_empty());
     }

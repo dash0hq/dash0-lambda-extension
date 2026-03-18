@@ -84,6 +84,8 @@ pub fn build_synthetic_trace(
         ..Default::default()
     };
 
+    store_handler_span_data(&span, invocation_id);
+
     let scope_spans = ScopeSpans {
         scope: Some(InstrumentationScope {
             name: "opentelemetry.instrumentation.aws_lambda".to_string(),
