@@ -10,7 +10,7 @@
     "test": "jest",
     "cdk": "cdk",
     "setup-ecr": "bash scripts/setup-ecr.sh",
-    "deploy": "npm run setup-ecr && cdk deploy --require-approval never"
+    "deploy": "npm run setup-ecr && cdk deploy --require-approval never --concurrency 10"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
