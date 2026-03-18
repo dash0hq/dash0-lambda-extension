@@ -1,4 +1,4 @@
-use crate::config::user::is_logs_instrumentation_enabled;
+use crate::config::user::is_telemetry_log_collection_disabled;
 use crate::otlp::exporter::{flush_telemetry_logs, send_traces};
 use crate::otlp::span_creation::{create_overhead_supplementary_span, create_supplementary_spans};
 use crate::otlp::span_mutations::build_synthetic_trace;
@@ -52,7 +52,7 @@ pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
             }
         }
 
-        if !is_logs_instrumentation_enabled() {
+        if !is_telemetry_log_collection_disabled() {
             crate::state::invocation_entry::store_telemetry_logs(logs);
         }
     } else {
