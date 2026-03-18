@@ -365,6 +365,12 @@ export const checkMainSpans = async ({
             checkResourceAttributes(handlerResource.attributes, functionName);
             checkResourceAttributes(extensionResource.attributes, functionName);
 
+            // Verify service.name on both resources
+            const handlerResAttrs = getAttributesMap(handlerResource.attributes);
+            expect(handlerResAttrs['service.name'].stringValue).toEqual(functionName);
+            const extensionResAttrs = getAttributesMap(extensionResource.attributes);
+            expect(extensionResAttrs['service.name'].stringValue).toEqual(functionName);
+
             return {
                 traceId,
                 rootSpanId: rootSpan.spanId,
