@@ -17,6 +17,13 @@ env:
   RESOURCE_PREFIX: pr-${{ github.event.pull_request.number }}-
 
 jobs:
+  audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/audit@v1
+
   fmt:
     name: Format
     runs-on: ubuntu-latest
