@@ -64,6 +64,17 @@ fn create_root_span(
     let function_name =
         std::env::var("AWS_LAMBDA_FUNCTION_NAME").unwrap_or_else(|_| "unknown".to_string());
 
+    let mut attrs = get_span_attributes(invocation_id);
+    if data.init_duration > 0.0 {
+        attrs.push(KeyValue {
+            key: "faas.init_duration".to_string(),
+            value: Some(AnyValue {
+                value: Some(Value::DoubleValue(data.init_duration)),
+            }),
+        });
+    }
+    attrs.extend(data.handler_attributes.clone());
+
     Some(Span {
         trace_id,
         span_id,
@@ -72,18 +83,8 @@ fn create_root_span(
         kind: SpanKind::Server as i32,
         start_time_unix_nano: start_nanos,
         end_time_unix_nano: end_nanos,
-        attributes: {
-            let mut attrs = get_span_attributes(invocation_id);
-            if data.init_duration > 0.0 {
-                attrs.push(KeyValue {
-                    key: "faas.init_duration".to_string(),
-                    value: Some(AnyValue {
-                        value: Some(Value::DoubleValue(data.init_duration)),
-                    }),
-                });
-            }
-            attrs
-        },
+        attributes: attrs,
+        status: data.handler_status.clone(),
         ..Default::default()
     })
 }

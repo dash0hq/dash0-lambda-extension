@@ -97,7 +97,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
         invocationId: invocationId!,
         functionName,
         traceId: traceId!,
-        parentSpanId: parentSpanId!,
+        parentSpanId: rootSpanId!,
         success: true,
         logsToBeChecked
     });

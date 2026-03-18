@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
 use once_cell::sync::Lazy;
+use opentelemetry_proto::tonic::common::v1::KeyValue;
+use opentelemetry_proto::tonic::trace::v1::Status;
 use parking_lot::Mutex;
 
 use super::invocation_data::{StoredTrace, TelemetryLog};
@@ -27,6 +29,8 @@ pub struct InvocationEntry {
     pub start_time: f64,
     pub end_time: f64,
     pub memory_usage: u64,
+    pub handler_attributes: Vec<KeyValue>,
+    pub handler_status: Option<Status>,
     pub traces: Vec<StoredTrace>,
     pub logs: Vec<TelemetryLog>,
 }
@@ -48,6 +52,8 @@ impl Default for InvocationEntry {
             start_time: 0.0,
             end_time: 0.0,
             memory_usage: 0,
+            handler_attributes: Vec::new(),
+            handler_status: None,
             traces: Vec::new(),
             logs: Vec::new(),
         }
@@ -172,6 +178,8 @@ pub struct SupplementarySpanData {
     pub init_duration: f64,
     pub memory_usage: u64,
     pub end_time: f64,
+    pub handler_attributes: Vec<KeyValue>,
+    pub handler_status: Option<Status>,
 }
 
 pub fn get_supplementary_span_data(invocation_id: &str) -> Option<SupplementarySpanData> {
@@ -188,6 +196,8 @@ pub fn get_supplementary_span_data(invocation_id: &str) -> Option<SupplementaryS
             init_duration: e.init_duration,
             memory_usage: e.memory_usage,
             end_time: e.end_time,
+            handler_attributes: e.handler_attributes.clone(),
+            handler_status: e.handler_status.clone(),
         })
 }
 
