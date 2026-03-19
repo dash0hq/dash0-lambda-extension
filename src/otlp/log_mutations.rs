@@ -169,6 +169,9 @@ pub fn build_payload_log(
         invocation_id: Some(invocation_id.to_string()),
         trace_id,
         span_id,
+        custom_attributes: vec![
+            ("dash0.faas.payload_type".to_string(), payload_type.to_string()),
+        ],
     })
 }
 
@@ -262,6 +265,19 @@ pub fn map_logs_to_otlp(logs: &[TelemetryLog]) -> Vec<LogRecord> {
                     }
                 }
             }
+        }
+
+        for (key, value) in &log.custom_attributes {
+            attributes.push(opentelemetry_proto::tonic::common::v1::KeyValue {
+                key: key.clone(),
+                value: Some(AnyValue {
+                    value: Some(
+                        opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(
+                            value.clone(),
+                        ),
+                    ),
+                }),
+            });
         }
 
         let severity = if is_platform_log {
@@ -398,6 +414,7 @@ mod tests {
             invocation_id: Some("inv-123".to_string()),
             trace_id: None,
             span_id: None,
+            custom_attributes: vec![],
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -429,6 +446,7 @@ mod tests {
             invocation_id: Some("inv-123".to_string()),
             trace_id: None,
             span_id: None,
+            custom_attributes: vec![],
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -444,6 +462,7 @@ mod tests {
             invocation_id: Some("inv-123".to_string()),
             trace_id: None,
             span_id: None,
+            custom_attributes: vec![],
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -459,6 +478,7 @@ mod tests {
             invocation_id: Some("inv-123".to_string()),
             trace_id: None,
             span_id: None,
+            custom_attributes: vec![],
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -475,6 +495,7 @@ mod tests {
             invocation_id: None,
             trace_id: None,
             span_id: None,
+            custom_attributes: vec![],
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -492,6 +513,7 @@ mod tests {
                 invocation_id: Some("1".to_string()),
                 trace_id: None,
                 span_id: None,
+                custom_attributes: vec![],
             },
             TelemetryLog {
                 time: "2023-10-26T12:00:01.000Z".to_string(),
@@ -500,6 +522,7 @@ mod tests {
                 invocation_id: Some("2".to_string()),
                 trace_id: None,
                 span_id: None,
+                custom_attributes: vec![],
             },
             TelemetryLog {
                 time: "2023-10-26T12:00:02.000Z".to_string(),
@@ -508,6 +531,7 @@ mod tests {
                 invocation_id: Some("3".to_string()),
                 trace_id: None,
                 span_id: None,
+                custom_attributes: vec![],
             },
         ];
 
@@ -618,6 +642,7 @@ mod tests {
             invocation_id: Some(invocation_id.to_string()),
             trace_id: None,
             span_id: None,
+            custom_attributes: vec![],
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -652,6 +677,7 @@ mod tests {
             invocation_id: Some("inv-report-1".to_string()),
             trace_id: None,
             span_id: None,
+            custom_attributes: vec![],
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -693,6 +719,7 @@ mod tests {
             invocation_id: Some("inv-report-2".to_string()),
             trace_id: None,
             span_id: None,
+            custom_attributes: vec![],
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -731,6 +758,7 @@ mod tests {
             invocation_id: Some("inv-timeout-1".to_string()),
             trace_id: None,
             span_id: None,
+            custom_attributes: vec![],
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -779,6 +807,7 @@ mod tests {
             invocation_id: Some("inv-success-1".to_string()),
             trace_id: None,
             span_id: None,
+            custom_attributes: vec![],
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -819,6 +848,7 @@ mod tests {
             invocation_id: Some("inv-error-1".to_string()),
             trace_id: None,
             span_id: None,
+            custom_attributes: vec![],
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -846,6 +876,7 @@ mod tests {
                 invocation_id: Some("inv-123".to_string()),
                 trace_id: None,
                 span_id: None,
+                custom_attributes: vec![],
             },
             TelemetryLog {
                 time: "2025-12-07T12:09:10.254Z".to_string(),
@@ -863,6 +894,7 @@ mod tests {
                 invocation_id: Some("inv-123".to_string()),
                 trace_id: None,
                 span_id: None,
+                custom_attributes: vec![],
             },
         ];
 
@@ -894,6 +926,7 @@ mod tests {
             invocation_id: Some("inv-start-1".to_string()),
             trace_id: None,
             span_id: None,
+            custom_attributes: vec![],
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -937,6 +970,7 @@ mod tests {
             invocation_id: Some("inv-end-1".to_string()),
             trace_id: None,
             span_id: None,
+            custom_attributes: vec![],
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -969,6 +1003,7 @@ mod tests {
                 invocation_id: Some("test-lifecycle".to_string()),
                 trace_id: None,
                 span_id: None,
+                custom_attributes: vec![],
             },
             TelemetryLog {
                 time: "2025-12-07T12:09:07.000Z".to_string(),
@@ -977,6 +1012,7 @@ mod tests {
                 invocation_id: Some("test-lifecycle".to_string()),
                 trace_id: None,
                 span_id: None,
+                custom_attributes: vec![],
             },
             TelemetryLog {
                 time: "2025-12-07T12:09:10.252Z".to_string(),
@@ -988,6 +1024,7 @@ mod tests {
                 invocation_id: Some("test-lifecycle".to_string()),
                 trace_id: None,
                 span_id: None,
+                custom_attributes: vec![],
             },
             TelemetryLog {
                 time: "2025-12-07T12:09:10.254Z".to_string(),
@@ -1004,6 +1041,7 @@ mod tests {
                 invocation_id: Some("test-lifecycle".to_string()),
                 trace_id: None,
                 span_id: None,
+                custom_attributes: vec![],
             },
         ];
 
@@ -1043,6 +1081,7 @@ mod tests {
                 invocation_id: Some("test-severity".to_string()),
                 trace_id: None,
                 span_id: None,
+                custom_attributes: vec![],
             },
             TelemetryLog {
                 time: "2025-12-07T12:09:07.000Z".to_string(),
@@ -1051,6 +1090,7 @@ mod tests {
                 invocation_id: Some("test-severity".to_string()),
                 trace_id: None,
                 span_id: None,
+                custom_attributes: vec![],
             },
             TelemetryLog {
                 time: "2025-12-07T12:09:10.252Z".to_string(),
@@ -1062,6 +1102,7 @@ mod tests {
                 invocation_id: Some("test-severity".to_string()),
                 trace_id: None,
                 span_id: None,
+                custom_attributes: vec![],
             },
             TelemetryLog {
                 time: "2025-12-07T12:09:10.254Z".to_string(),
@@ -1078,6 +1119,7 @@ mod tests {
                 invocation_id: Some("test-severity".to_string()),
                 trace_id: None,
                 span_id: None,
+                custom_attributes: vec![],
             },
         ];
 
@@ -1176,6 +1218,7 @@ mod tests {
             invocation_id: Some("inv-sev-1".to_string()),
             trace_id: None,
             span_id: None,
+            custom_attributes: vec![],
         }];
 
         let result = map_logs_to_otlp(&logs);
@@ -1193,6 +1236,7 @@ mod tests {
             invocation_id: Some("inv-sev-2".to_string()),
             trace_id: None,
             span_id: None,
+            custom_attributes: vec![],
         }];
 
         let result = map_logs_to_otlp(&logs);
