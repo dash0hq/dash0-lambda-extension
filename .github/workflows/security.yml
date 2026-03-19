@@ -47,6 +47,12 @@ jobs:
         with:
           sarif_file: ${{ steps.scan.outputs.sarif }}
           category: rust
+      - name: Annotate findings
+        if: always()
+        run: |
+          grype --output json --file grype.json \
+            target/x86_64-unknown-linux-musl/release/aws-lambda-runtime-api-proxy-rs || true
+          .github/scripts/grype-annotate.sh grype.json "Rust (extension binary)"
 
   scan-python:
     name: Scan Python distro (installed packages)
@@ -76,6 +82,11 @@ jobs:
         with:
           sarif_file: ${{ steps.scan.outputs.sarif }}
           category: python
+      - name: Annotate findings
+        if: always()
+        run: |
+          grype --output json --file grype.json build/python || true
+          .github/scripts/grype-annotate.sh grype.json "Python distro"
 
   scan-node:
     name: Scan Node.js distro (shipped modules)
@@ -123,6 +134,11 @@ jobs:
         with:
           sarif_file: ${{ steps.scan.outputs.sarif }}
           category: node
+      - name: Annotate findings
+        if: always()
+        run: |
+          grype --output json --file grype.json build/stage-node || true
+          .github/scripts/grype-annotate.sh grype.json "Node.js distro"
 
   scan-java:
     name: Scan Java distro (assembled JAR)
@@ -153,3 +169,9 @@ jobs:
         with:
           sarif_file: ${{ steps.scan.outputs.sarif }}
           category: java
+      - name: Annotate findings
+        if: always()
+        run: |
+          grype --output json --file grype.json \
+            opt/java/opentelemetry-java-distro/agent/build/libs || true
+          .github/scripts/grype-annotate.sh grype.json "Java distro"
