@@ -1,0 +1,55 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly on Monday at 06:00 UTC
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  scan:
+    name: Rust Dependency Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write  # for uploading SARIF results
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-auditable
+        run: cargo install cargo-auditable
+
+      - name: Build with auditable metadata
+        run: cargo auditable build --release
+
+      - name: Install Grype
+        uses: anchore/scan-action/download-grype@v6
+
+      - name: Scan binary for vulnerabilities
+        id: scan
+        uses: anchore/scan-action@v6
+        with:
+          path: target/release/aws-lambda-runtime-api-proxy-rs
+          fail-build: true
+          severity-cutoff: high
+          output-format: sarif
+
+      - name: Upload SARIF report
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ steps.scan.outputs.sarif }}
