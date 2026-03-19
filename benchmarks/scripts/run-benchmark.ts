@@ -240,31 +240,49 @@ function generateMarkdown(summaries: Record<string, FunctionSummary>): string {
   ];
 
   // Overview table
-  lines.push("## Overview");
+  lines.push("## Init Duration Overview (avg, ms)");
   lines.push("");
-  lines.push("| Runtime | Baseline Init (avg) | Instrumented Init (avg) | Init Overhead | Baseline Memory (avg) | Instrumented Memory (avg) | Memory Overhead |");
-  lines.push("| :------ | ------------------: | ----------------------: | ------------: | --------------------: | ------------------------: | --------------: |");
+  lines.push("| Runtime | Baseline | Dash0 | Dash0 Overhead | OSS OTel | OSS OTel Overhead |");
+  lines.push("| :------ | -------: | ----: | -------------: | -------: | ----------------: |");
 
   for (const rt of ALL_RUNTIMES) {
     const b = summaries[`${PREFIX}bench-baseline-${rt}`];
-    const i = summaries[`${PREFIX}bench-instrumented-${rt}`];
+    const d = summaries[`${PREFIX}bench-instrumented-${rt}`];
+    const o = summaries[`${PREFIX}bench-oss-otel-${rt}`];
 
     const bInit = b?.initDurationMs?.avg;
-    const iInit = i?.initDurationMs?.avg;
-    const initOverhead =
-      bInit != null && iInit != null
-        ? `+${Math.round((iInit - bInit) * 10) / 10} ms`
-        : "N/A";
+    const dInit = d?.initDurationMs?.avg;
+    const oInit = o?.initDurationMs?.avg;
 
-    const bMem = b?.maxMemoryUsedMb?.avg;
-    const iMem = i?.maxMemoryUsedMb?.avg;
-    const memOverhead =
-      bMem != null && iMem != null
-        ? `+${Math.round((iMem - bMem) * 10) / 10} MB`
-        : "N/A";
+    const dOverhead = bInit != null && dInit != null ? `+${Math.round((dInit - bInit) * 10) / 10} ms` : "N/A";
+    const oOverhead = bInit != null && oInit != null ? `+${Math.round((oInit - bInit) * 10) / 10} ms` : "N/A";
 
     lines.push(
-      `| ${runtimeDisplayName(rt)} | ${fmt(bInit, " ms")} | ${fmt(iInit, " ms")} | ${initOverhead} | ${fmt(bMem, " MB")} | ${fmt(iMem, " MB")} | ${memOverhead} |`
+      `| ${runtimeDisplayName(rt)} | ${fmt(bInit, " ms")} | ${fmt(dInit, " ms")} | ${dOverhead} | ${fmt(oInit, " ms")} | ${oOverhead} |`
+    );
+  }
+
+  lines.push("");
+
+  lines.push("## Memory Overview (avg, MB)");
+  lines.push("");
+  lines.push("| Runtime | Baseline | Dash0 | Dash0 Overhead | OSS OTel | OSS OTel Overhead |");
+  lines.push("| :------ | -------: | ----: | -------------: | -------: | ----------------: |");
+
+  for (const rt of ALL_RUNTIMES) {
+    const b = summaries[`${PREFIX}bench-baseline-${rt}`];
+    const d = summaries[`${PREFIX}bench-instrumented-${rt}`];
+    const o = summaries[`${PREFIX}bench-oss-otel-${rt}`];
+
+    const bMem = b?.maxMemoryUsedMb?.avg;
+    const dMem = d?.maxMemoryUsedMb?.avg;
+    const oMem = o?.maxMemoryUsedMb?.avg;
+
+    const dOverhead = bMem != null && dMem != null ? `+${Math.round((dMem - bMem) * 10) / 10} MB` : "N/A";
+    const oOverhead = bMem != null && oMem != null ? `+${Math.round((oMem - bMem) * 10) / 10} MB` : "N/A";
+
+    lines.push(
+      `| ${runtimeDisplayName(rt)} | ${fmt(bMem, " MB")} | ${fmt(dMem, " MB")} | ${dOverhead} | ${fmt(oMem, " MB")} | ${oOverhead} |`
     );
   }
 
@@ -313,19 +331,17 @@ function generateMarkdown(summaries: Record<string, FunctionSummary>): string {
       const displayName = runtimeDisplayName(rt);
 
       const b = summaries[`${PREFIX}bench-baseline-${rt}`];
-      const i = summaries[`${PREFIX}bench-instrumented-${rt}`];
+      const d = summaries[`${PREFIX}bench-instrumented-${rt}`];
+      const o = summaries[`${PREFIX}bench-oss-otel-${rt}`];
 
-      if (b?.initDurationMs) {
-        const d = b.initDurationMs;
-        lines.push(
-          `| ${displayName} | Baseline | ${d.min} | ${d.avg} | ${d.median} | ${d.p95} | ${d.max} | ${d.values.length} |`
-        );
-      }
-      if (i?.initDurationMs) {
-        const d = i.initDurationMs;
-        lines.push(
-          `| ${displayName} | Instrumented | ${d.min} | ${d.avg} | ${d.median} | ${d.p95} | ${d.max} | ${d.values.length} |`
-        );
+      const variants: [string, FunctionSummary | undefined][] = [["Baseline", b], ["Dash0", d], ["OSS OTel", o]];
+      for (const [label, s] of variants) {
+        if (s?.initDurationMs) {
+          const v = s.initDurationMs;
+          lines.push(
+            `| ${displayName} | ${label} | ${v.min} | ${v.avg} | ${v.median} | ${v.p95} | ${v.max} | ${v.values.length} |`
+          );
+        }
       }
     }
 
@@ -339,19 +355,17 @@ function generateMarkdown(summaries: Record<string, FunctionSummary>): string {
       const displayName = runtimeDisplayName(rt);
 
       const b = summaries[`${PREFIX}bench-baseline-${rt}`];
-      const i = summaries[`${PREFIX}bench-instrumented-${rt}`];
+      const d = summaries[`${PREFIX}bench-instrumented-${rt}`];
+      const o = summaries[`${PREFIX}bench-oss-otel-${rt}`];
 
-      if (b?.maxMemoryUsedMb) {
-        const m = b.maxMemoryUsedMb;
-        lines.push(
-          `| ${displayName} | Baseline | ${m.min} | ${m.avg} | ${m.max} | ${m.values.length} |`
-        );
-      }
-      if (i?.maxMemoryUsedMb) {
-        const m = i.maxMemoryUsedMb;
-        lines.push(
-          `| ${displayName} | Instrumented | ${m.min} | ${m.avg} | ${m.max} | ${m.values.length} |`
-        );
+      const memVariants: [string, FunctionSummary | undefined][] = [["Baseline", b], ["Dash0", d], ["OSS OTel", o]];
+      for (const [label, s] of memVariants) {
+        if (s?.maxMemoryUsedMb) {
+          const m = s.maxMemoryUsedMb;
+          lines.push(
+            `| ${displayName} | ${label} | ${m.min} | ${m.avg} | ${m.max} | ${m.values.length} |`
+          );
+        }
       }
     }
 
@@ -391,6 +405,7 @@ async function main() {
     ...ALL_RUNTIMES.flatMap((rt) => [
       `${PREFIX}bench-baseline-${rt}`,
       `${PREFIX}bench-instrumented-${rt}`,
+      `${PREFIX}bench-oss-otel-${rt}`,
     ]),
     `${PREFIX}bench-extension-only-${EXTENSION_ONLY_FUNCTION}`,
   ];

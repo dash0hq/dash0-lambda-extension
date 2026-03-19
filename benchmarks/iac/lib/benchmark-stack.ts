@@ -38,6 +38,16 @@ interface RuntimeConfig {
   memorySize: number;
 }
 
+// OSS OpenTelemetry Lambda layer versions (from account 184161586896)
+// https://github.com/open-telemetry/opentelemetry-lambda/releases
+const OSS_OTEL_LAYERS: Record<string, { layerName: string; version: number }> = {
+  python: { layerName: 'opentelemetry-python-0_18_0', version: 2 },
+  node: { layerName: 'opentelemetry-nodejs-0_20_0', version: 1 },
+  java: { layerName: 'opentelemetry-javaagent-0_18_0', version: 1 },
+};
+const OSS_OTEL_COLLECTOR = { layerName: 'opentelemetry-collector-amd64-0_20_0', version: 1 };
+const OSS_OTEL_ACCOUNT = '184161586896';
+
 export class BenchmarkStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -133,8 +143,17 @@ export class BenchmarkStack extends cdk.Stack {
       loggingFormat: lambda.LoggingFormat.TEXT,
     });
 
+    // OSS OTel collector layer (shared across all runtimes)
+    const ossCollectorArn = `arn:aws:lambda:${this.region}:${OSS_OTEL_ACCOUNT}:layer:${OSS_OTEL_COLLECTOR.layerName}:${OSS_OTEL_COLLECTOR.version}`;
+    const ossCollectorLayer = lambda.LayerVersion.fromLayerVersionArn(this, 'oss-otel-collector', ossCollectorArn);
+
     for (const config of runtimeConfigs) {
       const layer = getLatestLayerVersion(this, `${config.name}Layer`, config.layerName);
+
+      // OSS OTel language layer for this runtime
+      const ossConfig = OSS_OTEL_LAYERS[config.name];
+      const ossLayerArn = `arn:aws:lambda:${this.region}:${OSS_OTEL_ACCOUNT}:layer:${ossConfig.layerName}:${ossConfig.version}`;
+      const ossLayer = lambda.LayerVersion.fromLayerVersionArn(this, `oss-otel-${config.name}`, ossLayerArn);
 
       for (const runtime of config.runtimes) {
         const runtimeName = runtime.name.replace(/\./g, '-');
@@ -153,7 +172,7 @@ export class BenchmarkStack extends cdk.Stack {
           loggingFormat: lambda.LoggingFormat.TEXT,
         });
 
-        // Instrumented: with layer and wrapper
+        // Instrumented: with Dash0 layer and wrapper
         new lambda.Function(this, `instrumented-${runtimeName}`, {
           functionName: `${prefix}bench-instrumented-${runtimeName}`,
           runtime,
@@ -169,6 +188,25 @@ export class BenchmarkStack extends cdk.Stack {
             DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN ?? 'benchmark-dummy-token',
             DASH0_ENDPOINT: process.env.DASH0_ENDPOINT ?? 'https://ingress.eu-west-1.aws.dash0-dev.com:4318',
             DASH0_EXTENSION_LOG_LEVEL: 'warn',
+          },
+          logGroup,
+          loggingFormat: lambda.LoggingFormat.TEXT,
+        });
+
+        // OSS OTel: open-source OpenTelemetry language layer + collector layer
+        new lambda.Function(this, `oss-otel-${runtimeName}`, {
+          functionName: `${prefix}bench-oss-otel-${runtimeName}`,
+          runtime,
+          memorySize: config.memorySize,
+          handler: config.handler,
+          architecture: lambda.Architecture.X86_64,
+          timeout: cdk.Duration.seconds(30),
+          code: config.code,
+          layers: [ossLayer, ossCollectorLayer],
+          role,
+          environment: {
+            AWS_LAMBDA_EXEC_WRAPPER: '/opt/otel-handler',
+            OTEL_SERVICE_NAME: `bench-oss-otel-${runtimeName}`,
           },
           logGroup,
           loggingFormat: lambda.LoggingFormat.TEXT,
