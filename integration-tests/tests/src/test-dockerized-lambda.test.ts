@@ -1,12 +1,9 @@
-import fetch from 'node-fetch';
-import { setTimeout as delay } from 'node:timers/promises';
-import { describe, expect, it } from 'vitest';
-import { DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS } from "./config";
+import { describe, it } from 'vitest';
 import {
     checkLogs,
-    findHandlerSpan,
-    getAttributesMap,
-    getRequestPayload, LogToCheck,
+    checkMainSpans,
+    checkOverheadSpan,
+    LogToCheck,
     invokeFunction,
     RESOURCE_PREFIX,
 } from "./utils";
@@ -15,48 +12,17 @@ import {
 const verifyDockerizedInvocation = async (functionName: string, runtime: string) => {
     const invocationId = await invokeFunction(functionName, true, false);
 
-    let traceId: string | undefined = undefined;
-    let parentSpanId: string | undefined = undefined;
-    let span = undefined
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        await delay(RETRY_DELAY_MS);
-        console.log(`Attempt ${attempt} to fetch spans for invocation ID ${invocationId}`);
-        try {
-            const spanResponse = await fetch(DASH0_ENDPOINT + 'spans', {
-                method: 'POST',
-                headers: {
-                    accept: 'application/json',
-                    authorization: `Bearer ${DASH0_TOKEN}`,
-                    'content-type': 'application/json',
-                },
-                body: JSON.stringify(getRequestPayload(invocationId)),
-            });
+    const scopeNameMap = {
+        "python": "opentelemetry.instrumentation.aws_lambda",
+        "node": "@opentelemetry/instrumentation-aws-lambda",
+        "java": "io.opentelemetry.aws-lambda-events-2.2",
+    };
 
-            const spanPayload = await spanResponse.json() as any;
-            expect(spanPayload?.resourceSpans.length).toBeGreaterThanOrEqual(1);
-            const scopeNameMap = {
-                "python": "opentelemetry.instrumentation.aws_lambda",
-                "node": "@opentelemetry/instrumentation-aws-lambda",
-                "java": "io.opentelemetry.aws-lambda-events-2.2"
-            }
-            const { span: foundSpan, resource } = findHandlerSpan(spanPayload, scopeNameMap[runtime as keyof typeof scopeNameMap]);
-            span = foundSpan;
-            const spanAttributes = getAttributesMap(span.attributes);
-            expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
-
-            const resourceAttributes = getAttributesMap(resource.attributes);
-            expect(resourceAttributes['service.name'].stringValue).toEqual(functionName);
-
-            traceId = span.traceId;
-            parentSpanId = span.spanId;
-            break;
-        } catch (error) {
-            console.error(`Error fetching spans on attempt ${attempt}:`, error);
-            if (attempt === MAX_ATTEMPTS) {
-                throw error;
-            }
-        }
-    }
+    const { traceId, rootSpanId } = await checkMainSpans({
+        invocationId,
+        functionName,
+        handlerScopeName: scopeNameMap[runtime as keyof typeof scopeNameMap],
+    });
 
     const logsToBeChecked: LogToCheck[] = [
         { message: 'START RequestId: ' },
@@ -65,12 +31,21 @@ const verifyDockerizedInvocation = async (functionName: string, runtime: string)
         { message: JSON.stringify({ name: "dash0_payload", type: "lambda_return_value" }), isJson: true },
     ]
     await checkLogs({
-        invocationId: invocationId!,
+        invocationId,
         functionName,
-        traceId: traceId!,
-        parentSpanId: parentSpanId!,
+        traceId,
+        parentSpanId: rootSpanId,
         success: true,
-        logsToBeChecked
+        logsToBeChecked,
+    });
+
+    // Overhead span is sent on the next invocation; trigger one
+    await invokeFunction(functionName, true, false);
+    await checkOverheadSpan({
+        invocationId,
+        functionName,
+        traceId,
+        rootSpanId,
     });
 }
 
