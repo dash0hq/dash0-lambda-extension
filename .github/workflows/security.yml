@@ -39,7 +39,7 @@ jobs:
         id: scan
         run: |
           TARGET=target/x86_64-unknown-linux-musl/release/aws-lambda-runtime-api-proxy-rs
-          grype "$TARGET" --output sarif --file results.sarif --output json --file grype.json || true
+          grype "$TARGET" --output sarif=results.sarif --output json=grype.json || true
           .github/scripts/grype-annotate.sh grype.json "Rust (extension binary)"
           grype "$TARGET" --fail-on high --quiet 2>/dev/null
       - name: Upload SARIF
@@ -69,7 +69,7 @@ jobs:
       - name: Scan and annotate
         id: scan
         run: |
-          grype build/python --output sarif --file results.sarif --output json --file grype.json || true
+          grype build/python --output sarif=results.sarif --output json=grype.json || true
           .github/scripts/grype-annotate.sh grype.json "Python distro"
           grype build/python --fail-on high --quiet 2>/dev/null
       - name: Upload SARIF
@@ -115,7 +115,7 @@ jobs:
       - name: Scan and annotate
         id: scan
         run: |
-          grype build/stage-node --output sarif --file results.sarif --output json --file grype.json || true
+          grype build/stage-node --output sarif=results.sarif --output json=grype.json || true
           .github/scripts/grype-annotate.sh grype.json "Node.js distro"
           grype build/stage-node --fail-on high --quiet 2>/dev/null
       - name: Upload SARIF
@@ -146,7 +146,7 @@ jobs:
         id: scan
         run: |
           LIBS=opt/java/opentelemetry-java-distro/agent/build/libs
-          grype "$LIBS" --output sarif --file results.sarif --output json --file grype.json || true
+          grype "$LIBS" --output sarif=results.sarif --output json=grype.json || true
           .github/scripts/grype-annotate.sh grype.json "Java distro"
           grype "$LIBS" --fail-on high --quiet 2>/dev/null
       - name: Upload SARIF
