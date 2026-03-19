@@ -74,7 +74,7 @@ pub fn build_synthetic_trace(
         span_id,
         parent_span_id,
         name: "handler".to_string(),
-        kind: SpanKind::Server as i32,
+        kind: SpanKind::Internal as i32,
         start_time_unix_nano: start_nanos,
         end_time_unix_nano: now_nanos,
         attributes,
@@ -83,6 +83,8 @@ pub fn build_synthetic_trace(
         status: Some(status),
         ..Default::default()
     };
+
+    store_handler_span_data(&span, invocation_id);
 
     let scope_spans = ScopeSpans {
         scope: Some(InstrumentationScope {
@@ -459,6 +461,15 @@ fn reparent_to_root_span(span: &mut Span, invocation_id: &str) {
     }
 }
 
+fn store_handler_span_data(span: &Span, invocation_id: &str) {
+    let attributes = span.attributes.clone();
+    let status = span.status.clone();
+    invocation_entry::update(invocation_id, |entry| {
+        entry.handler_attributes = attributes;
+        entry.handler_status = status;
+    });
+}
+
 fn store_span_ids(span: &Span, invocation_id: &str) {
     let trace_id_hex = span
         .trace_id
@@ -508,9 +519,12 @@ pub fn process_trace_request(
                 };
 
                 invocation_ids.push(invocation_id.clone());
+                span.name = "handler".to_string();
+                span.kind = SpanKind::Internal as i32;
                 add_event_payload_to_span(span, &invocation_id);
                 reparent_to_root_span(span, &invocation_id);
                 store_span_ids(span, &invocation_id);
+                store_handler_span_data(span, &invocation_id);
             }
         }
     }

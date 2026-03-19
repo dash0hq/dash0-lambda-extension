@@ -1,85 +1,36 @@
-import fetch from 'node-fetch';
-import { setTimeout as delay } from 'node:timers/promises';
-import { describe, expect, it } from 'vitest';
-import {DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./config";
+import { describe, expect } from 'vitest';
 import {
-    checkException, checkHttpSpan, checkLogs,
-    getAttributesMap, getRequestPayload, invokeFunction, LogToCheck, runAllTests
+    checkLogs,
+    checkMainSpans,
+    checkOverheadSpan,
+    getAttributesMap,
+    LogToCheck,
+    invokeFunction,
+    runAllTests,
 } from "./utils";
 
 
 const verifySuccessInvocation = async (functionName: string, invocationEnd: boolean, traced: boolean) => {
     const invocationId = await invokeFunction(functionName, invocationEnd, true, JSON.stringify({ parameter1: 'throw' }));
 
-    let traceId: string | undefined = undefined;
-    let parentSpanId: string | undefined = undefined;
-    let span = undefined
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        await delay(RETRY_DELAY_MS);
-        console.log(`Attempt ${attempt} to fetch spans for invocation ID ${invocationId}`);
-        try {
-            const spanResponse = await fetch(DASH0_ENDPOINT + 'spans', {
-                method: 'POST',
-                headers: {
-                    accept: 'application/json',
-                    authorization: `Bearer ${DASH0_TOKEN}`,
-                    'content-type': 'application/json',
-                },
-                body: JSON.stringify(getRequestPayload(invocationId)),
-            });
+    const handlerScopeName = traced ? "io.opentelemetry.aws-lambda-events-2.2" : "opentelemetry.instrumentation.aws_lambda";
+    const { traceId, rootSpanId, handlerSpan } = await checkMainSpans({
+        invocationId,
+        functionName,
+        handlerScopeName,
+    });
 
-            const spanPayload = await spanResponse.json() as any;
-            const expectedScopeName = traced ? "io.opentelemetry.aws-lambda-events-2.2" : "opentelemetry.instrumentation.aws_lambda";
+    // Check exception event (custom: status.message and exception.message differ)
+    const events = handlerSpan.events;
+    expect(events.length).toEqual(1);
+    const exceptionEvent = events[0];
+    expect(exceptionEvent.name).toEqual('exception');
+    const eventAttrMap = getAttributesMap(exceptionEvent.attributes);
+    expect(eventAttrMap['exception.type'].stringValue).toEqual('java.lang.RuntimeException');
+    expect(eventAttrMap['exception.message'].stringValue).toEqual("Intentional exception triggered by input 'throw'");
+    expect(handlerSpan.status.code).toEqual(2); // 2 = ERROR
+    expect(handlerSpan.status.message).toEqual(traced ? "" : 'java.lang.RuntimeException');
 
-            // Find the Lambda instrumentation scope (supplementary spans may also be present)
-            let lambdaScopeSpan = null;
-            let lambdaResource = null;
-            for (const rs of (spanPayload?.resourceSpans ?? [])) {
-                for (const ss of (rs.scopeSpans ?? [])) {
-                    if (ss.scope?.name === expectedScopeName) {
-                        lambdaScopeSpan = ss;
-                        lambdaResource = rs.resource;
-                    }
-                }
-            }
-            expect(lambdaScopeSpan).toBeDefined();
-            expect(lambdaScopeSpan!.spans.length).toEqual(1);
-            // check span attributes
-            span = lambdaScopeSpan!.spans[0];
-
-            const resourceAttributes = getAttributesMap(lambdaResource.attributes);
-            expect(resourceAttributes['service.name'].stringValue).toEqual(functionName);
-            const spanAttributes = getAttributesMap(span.attributes);
-            expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
-
-
-            // check exception event
-            const events = span.events;
-            console.log(events);
-            console.log(spanAttributes);
-            expect(events.length).toEqual(1);
-            const exceptionEvent = events[0];
-            expect(exceptionEvent.name).toEqual('exception');
-            const eventAttributes = exceptionEvent.attributes;
-            const eventAttrMap: Record<string, any> = {};
-            for (const attr of eventAttributes) {
-                eventAttrMap[attr.key] = attr.value;
-            }
-            expect(eventAttrMap['exception.type'].stringValue).toEqual('java.lang.RuntimeException');
-            expect(eventAttrMap['exception.message'].stringValue).toEqual("Intentional exception triggered by input 'throw'");
-            expect(span.status.code).toEqual(2); // 2 = ERROR
-            expect(span.status.message).toEqual(traced ? "" : 'java.lang.RuntimeException');
-
-            traceId = span.traceId;
-            parentSpanId = span.spanId;
-            break;
-        } catch (error) {
-            console.error(`Error fetching spans on attempt ${attempt}:`, error);
-            if (attempt === MAX_ATTEMPTS) {
-                throw error;
-            }
-        }
-    }
     const logsToBeChecked: LogToCheck[] = [
         { message: 'START RequestId: ' },
         { message: "Input received:" },
@@ -92,12 +43,23 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
         logsToBeChecked.push({ message: 'REPORT RequestId: ' });
     }
     await checkLogs({
-        invocationId: invocationId!,
+        invocationId,
         functionName,
-        traceId: traceId!,
-        parentSpanId: parentSpanId!,
+        traceId,
+        parentSpanId: rootSpanId,
         success: true,
-        logsToBeChecked
+        logsToBeChecked,
+    });
+
+    // Overhead span is sent on the next invocation; trigger one if needed
+    if (invocationEnd) {
+        await invokeFunction(functionName, true, true, JSON.stringify({ parameter1: 'throw' }));
+    }
+    await checkOverheadSpan({
+        invocationId,
+        functionName,
+        traceId,
+        rootSpanId,
     });
 }
 
