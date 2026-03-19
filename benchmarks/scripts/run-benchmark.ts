@@ -39,6 +39,9 @@ const JAVA_RUNTIMES = ["java17", "java21", "java25"];
 
 const ALL_RUNTIMES = [...PYTHON_RUNTIMES, ...NODE_RUNTIMES, ...JAVA_RUNTIMES];
 
+// Extension-only (manual layer, no auto-instrumentation)
+const EXTENSION_ONLY_FUNCTION = "nodejs24-x";
+
 // ── Types ──────────────────────────────────────────────────────────────
 
 interface InvocationResult {
@@ -267,6 +270,36 @@ function generateMarkdown(summaries: Record<string, FunctionSummary>): string {
 
   lines.push("");
 
+  // Extension-only section
+  const extOnly = summaries[`${PREFIX}bench-extension-only-${EXTENSION_ONLY_FUNCTION}`];
+  const nodeBaseline = summaries[`${PREFIX}bench-baseline-${EXTENSION_ONLY_FUNCTION}`];
+  const nodeInstr = summaries[`${PREFIX}bench-instrumented-${EXTENSION_ONLY_FUNCTION}`];
+
+  lines.push("## Extension-Only Overhead (No Auto-Instrumentation)");
+  lines.push("");
+  lines.push(`Comparison using Node.js 24.x with the manual layer (extension only, no distro instrumentation):`);
+  lines.push("");
+  lines.push("| Variant | Init (avg) | Init Overhead | Memory (avg) | Memory Overhead |");
+  lines.push("| :------ | ---------: | ------------: | -----------: | --------------: |");
+
+  const baseInit = nodeBaseline?.initDurationMs?.avg;
+  const baseMem = nodeBaseline?.maxMemoryUsedMb?.avg;
+
+  const extInit = extOnly?.initDurationMs?.avg;
+  const extMem = extOnly?.maxMemoryUsedMb?.avg;
+  const extInitOh = baseInit != null && extInit != null ? `+${Math.round((extInit - baseInit) * 10) / 10} ms` : "N/A";
+  const extMemOh = baseMem != null && extMem != null ? `+${Math.round((extMem - baseMem) * 10) / 10} MB` : "N/A";
+
+  const instrInit = nodeInstr?.initDurationMs?.avg;
+  const instrMem = nodeInstr?.maxMemoryUsedMb?.avg;
+  const instrInitOh = baseInit != null && instrInit != null ? `+${Math.round((instrInit - baseInit) * 10) / 10} ms` : "N/A";
+  const instrMemOh = baseMem != null && instrMem != null ? `+${Math.round((instrMem - baseMem) * 10) / 10} MB` : "N/A";
+
+  lines.push(`| Baseline (no layer) | ${fmt(baseInit, " ms")} | - | ${fmt(baseMem, " MB")} | - |`);
+  lines.push(`| Extension only (manual layer) | ${fmt(extInit, " ms")} | ${extInitOh} | ${fmt(extMem, " MB")} | ${extMemOh} |`);
+  lines.push(`| Full instrumentation (node layer) | ${fmt(instrInit, " ms")} | ${instrInitOh} | ${fmt(instrMem, " MB")} | ${instrMemOh} |`);
+  lines.push("");
+
   // Detailed tables per language
   for (const group of groups) {
     lines.push(`## ${group.name}`);
@@ -354,10 +387,13 @@ async function runWithConcurrency<T>(
 // ── Main ───────────────────────────────────────────────────────────────
 
 async function main() {
-  const allFunctions = ALL_RUNTIMES.flatMap((rt) => [
-    `${PREFIX}bench-baseline-${rt}`,
-    `${PREFIX}bench-instrumented-${rt}`,
-  ]);
+  const allFunctions = [
+    ...ALL_RUNTIMES.flatMap((rt) => [
+      `${PREFIX}bench-baseline-${rt}`,
+      `${PREFIX}bench-instrumented-${rt}`,
+    ]),
+    `${PREFIX}bench-extension-only-${EXTENSION_ONLY_FUNCTION}`,
+  ];
 
   console.log("=== Benchmark: Collecting cold start metrics ===");
   console.log(`Region: ${REGION}`);

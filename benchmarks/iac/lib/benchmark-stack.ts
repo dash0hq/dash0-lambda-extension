@@ -111,6 +111,28 @@ export class BenchmarkStack extends cdk.Stack {
       },
     ];
 
+    // Extension-only: manual layer with no auto-instrumentation (Node.js 24)
+    const manualLayer = getLatestLayerVersion(this, 'manualLayer', `${prefix}dash0-extension-manual`);
+    new lambda.Function(this, 'extension-only-nodejs24-x', {
+      functionName: `${prefix}bench-extension-only-nodejs24-x`,
+      runtime: lambda.Runtime.NODEJS_24_X,
+      memorySize: 128,
+      handler: 'handler.handler',
+      architecture: lambda.Architecture.X86_64,
+      timeout: cdk.Duration.seconds(30),
+      code: nodeCode,
+      layers: [manualLayer],
+      role,
+      environment: {
+        AWS_LAMBDA_EXEC_WRAPPER: '/opt/wrapper',
+        DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN ?? 'benchmark-dummy-token',
+        DASH0_ENDPOINT: process.env.DASH0_ENDPOINT ?? 'https://ingress.eu-west-1.aws.dash0-dev.com:4318',
+        DASH0_EXTENSION_LOG_LEVEL: 'warn',
+      },
+      logGroup,
+      loggingFormat: lambda.LoggingFormat.TEXT,
+    });
+
     for (const config of runtimeConfigs) {
       const layer = getLatestLayerVersion(this, `${config.name}Layer`, config.layerName);
 
