@@ -83,14 +83,14 @@ jobs:
           ## Layer ARNs
 
           **Python:**
-          arn:aws:lambda:<region>:115813213817:layer:dash0-extension-python:${{ steps.layers.outputs.python_version }}
+          `arn:aws:lambda:<region>:115813213817:layer:dash0-extension-python:${{ steps.layers.outputs.python_version }}`
 
           **Node:**
-          arn:aws:lambda:<region>:115813213817:layer:dash0-extension-node:${{ steps.layers.outputs.node_version }}
+          `arn:aws:lambda:<region>:115813213817:layer:dash0-extension-node:${{ steps.layers.outputs.node_version }}`
 
           **Java:**
-          arn:aws:lambda:<region>:115813213817:layer:dash0-extension-java:${{ steps.layers.outputs.java_version }}
+          `arn:aws:lambda:<region>:115813213817:layer:dash0-extension-java:${{ steps.layers.outputs.java_version }}`
 
           **Manual:**
-          arn:aws:lambda:<region>:115813213817:layer:dash0-extension-manual:${{ steps.layers.outputs.manual_version }}
+          `arn:aws:lambda:<region>:115813213817:layer:dash0-extension-manual:${{ steps.layers.outputs.manual_version }}`
           EOF

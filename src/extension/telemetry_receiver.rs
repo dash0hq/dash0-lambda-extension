@@ -1,4 +1,4 @@
-use crate::config::user::is_logs_instrumentation_enabled;
+use crate::config::user::is_telemetry_log_collection_disabled;
 use crate::otlp::exporter::{flush_telemetry_logs, send_traces};
 use crate::otlp::metrics_creation::create_supplementary_metrics;
 use crate::otlp::span_creation::{create_overhead_supplementary_span, create_supplementary_spans};
@@ -30,7 +30,10 @@ pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
         for log in &logs {
             if log.r#type == "platform.runtimeDone" {
                 if let Some(id) = &log.invocation_id {
-                    create_supplementary_spans(id);
+                    let is_error = error_invocation_ids.iter().any(|(eid, _)| eid == id);
+                    if !is_error {
+                        create_supplementary_spans(id, true);
+                    }
                 }
                 if let Some(notifier) = crate::state::invocation_data::take_runtime_done_notifier()
                 {
@@ -51,7 +54,7 @@ pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
             }
         }
 
-        if !is_logs_instrumentation_enabled() {
+        if !is_telemetry_log_collection_disabled() {
             crate::state::invocation_entry::store_telemetry_logs(logs);
         }
     } else {
@@ -73,7 +76,12 @@ pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
 
         for (invocation_id, error_type) in &error_invocation_ids {
             match build_synthetic_trace(invocation_id, Some(error_type), None, &traces_to_send) {
-                Some(trace) => traces_to_send.push(trace),
+                Some(trace) => {
+                    traces_to_send.push(trace);
+                    if let Some(supp) = create_supplementary_spans(invocation_id, false) {
+                        traces_to_send.push(supp);
+                    }
+                }
                 None => {
                     tracing::error!(
                         "[{}] Failed to build runtimeDone trace for invocation {}",

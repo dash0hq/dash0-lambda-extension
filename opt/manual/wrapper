@@ -1,23 +1,9 @@
 #!/bin/bash
 args=("$@")
 
-export AWS_LAMBDA_RUNTIME_API="127.0.0.1:9009"
-export LUMIGO_ENDPOINT="http://127.0.0.1:9009/v1/traces"
-
-LAMBDA_RESOURCE_ATTRIBUTES="cloud.region=$AWS_REGION,cloud.provider=aws,cloud_platform=aws_lambda,faas.name=$AWS_LAMBDA_FUNCTION_NAME,faas.version=$AWS_LAMBDA_FUNCTION_VERSION,faas.instance=$AWS_LAMBDA_LOG_STREAM_NAME";
-
-if [ -z "${OTEL_RESOURCE_ATTRIBUTES}" ]; then
-    export OTEL_RESOURCE_ATTRIBUTES=$LAMBDA_RESOURCE_ATTRIBUTES;
-else
-    export OTEL_RESOURCE_ATTRIBUTES="$LAMBDA_RESOURCE_ATTRIBUTES,$OTEL_RESOURCE_ATTRIBUTES";
-fi
-
-if [ -z "${OTEL_SERVICE_NAME}" ]; then
-    export OTEL_SERVICE_NAME=$AWS_LAMBDA_FUNCTION_NAME;
-fi
-
 # Write env vars to a file for the extension to read
 source /opt/shared.sh
+setup_otel_env
 write_env_vars
 
 
