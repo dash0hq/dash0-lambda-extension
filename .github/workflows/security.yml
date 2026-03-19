@@ -12,34 +12,24 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  CARGO_TERM_COLOR: always
-
 jobs:
-  scan:
-    name: Rust Dependency Scan
+  scan-rust:
+    name: Scan Rust (extension binary)
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      security-events: write  # for uploading SARIF results
-
+      security-events: write
+    env:
+      CARGO_TERM_COLOR: always
     steps:
       - uses: actions/checkout@v4
-
       - uses: dtolnay/rust-toolchain@stable
-
       - uses: Swatinem/rust-cache@v2
-
       - name: Install cargo-auditable
         run: cargo install cargo-auditable
-
       - name: Build with auditable metadata
         run: cargo auditable build --release
-
-      - name: Install Grype
-        uses: anchore/scan-action/download-grype@v6
-
-      - name: Scan binary for vulnerabilities
+      - name: Scan with Grype
         id: scan
         uses: anchore/scan-action@v6
         with:
@@ -47,9 +37,93 @@ jobs:
           fail-build: true
           severity-cutoff: high
           output-format: sarif
-
-      - name: Upload SARIF report
+      - name: Upload SARIF
         if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: ${{ steps.scan.outputs.sarif }}
+          category: rust
+
+  scan-python:
+    name: Scan Python distro
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan with Grype
+        id: scan
+        uses: anchore/scan-action@v6
+        with:
+          path: opt/python/distro
+          fail-build: true
+          severity-cutoff: high
+          output-format: sarif
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ steps.scan.outputs.sarif }}
+          category: python
+
+  scan-node:
+    name: Scan Node.js distro
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Build AWS SDK tarball (required by preinstall)
+        run: bash opt/node/scripts/build-aws-sdk-tarball.sh
+      - name: Install dependencies
+        working-directory: opt/node
+        run: npm install
+      - name: Scan with Grype
+        id: scan
+        uses: anchore/scan-action@v6
+        with:
+          path: opt/node
+          fail-build: true
+          severity-cutoff: high
+          output-format: sarif
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ steps.scan.outputs.sarif }}
+          category: node
+
+  scan-java:
+    name: Scan Java distro
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Build Java distro JAR
+        working-directory: opt/java/opentelemetry-java-distro
+        run: ./gradlew clean -Pversion=1.0.0-SNAPSHOT assemble -x javadoc
+      - name: Scan with Grype
+        id: scan
+        uses: anchore/scan-action@v6
+        with:
+          path: opt/java/opentelemetry-java-distro/agent/build/libs
+          fail-build: true
+          severity-cutoff: high
+          output-format: sarif
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ steps.scan.outputs.sarif }}
+          category: java
