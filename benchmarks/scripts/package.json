@@ -1,0 +1,16 @@
+{
+  "name": "benchmark-scripts",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "benchmark": "npx tsx run-benchmark.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-lambda": "^3.943.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.3"
+  }
+}
