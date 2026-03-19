@@ -20,7 +20,7 @@ const COLD_START_INVOCATIONS = parseInt(
 );
 const OUTPUT_FILE =
   process.env.OUTPUT_FILE ??
-  `results/${new Date().toISOString().slice(0, 10)}.json`;
+  `results/${new Date().toISOString().slice(0, 10)}.md`;
 
 const CONCURRENCY = parseInt(process.env.BENCHMARK_CONCURRENCY ?? "10", 10);
 
@@ -207,61 +207,125 @@ function summarize(results: FunctionResults[]): Record<string, FunctionSummary> 
   return summaries;
 }
 
-function printTable(summaries: Record<string, FunctionSummary>) {
-  const header = [
-    "Runtime".padEnd(15),
-    "Baseline Init".padStart(14),
-    "Instr. Init".padStart(14),
-    "Overhead".padStart(10),
-    "Base Mem".padStart(10),
-    "Instr Mem".padStart(10),
-    "Mem Δ".padStart(8),
-  ].join(" | ");
+function fmt(v: number | undefined, suffix: string): string {
+  return v != null ? `${v}${suffix}` : "N/A";
+}
 
-  const separator = header.replace(/[^|]/g, "-");
+function runtimeDisplayName(rt: string): string {
+  return rt
+    .replace("python3-", "Python 3.")
+    .replace("nodejs", "Node.js ")
+    .replace("-x", ".x")
+    .replace("java", "Java ");
+}
 
-  console.log();
-  console.log(header);
-  console.log(separator);
+function generateMarkdown(summaries: Record<string, FunctionSummary>): string {
+  const lines: string[] = [];
+  const date = new Date().toISOString().slice(0, 10);
+
+  lines.push(`# Benchmark Results - ${date}`);
+  lines.push("");
+  lines.push(`- **Region:** ${REGION}`);
+  lines.push(`- **Cold start invocations per function:** ${COLD_START_INVOCATIONS}`);
+  lines.push("");
+
+  // Group runtimes by language
+  const groups: { name: string; runtimes: string[] }[] = [
+    { name: "Python", runtimes: PYTHON_RUNTIMES },
+    { name: "Node.js", runtimes: NODE_RUNTIMES },
+    { name: "Java", runtimes: JAVA_RUNTIMES },
+  ];
+
+  // Overview table
+  lines.push("## Overview");
+  lines.push("");
+  lines.push("| Runtime | Baseline Init (avg) | Instrumented Init (avg) | Init Overhead | Baseline Memory (avg) | Instrumented Memory (avg) | Memory Overhead |");
+  lines.push("| :------ | ------------------: | ----------------------: | ------------: | --------------------: | ------------------------: | --------------: |");
 
   for (const rt of ALL_RUNTIMES) {
-    const baselineKey = `${PREFIX}bench-baseline-${rt}`;
-    const instrKey = `${PREFIX}bench-instrumented-${rt}`;
-
-    const b = summaries[baselineKey];
-    const i = summaries[instrKey];
+    const b = summaries[`${PREFIX}bench-baseline-${rt}`];
+    const i = summaries[`${PREFIX}bench-instrumented-${rt}`];
 
     const bInit = b?.initDurationMs?.avg;
     const iInit = i?.initDurationMs?.avg;
-    const overhead =
+    const initOverhead =
       bInit != null && iInit != null
-        ? `${Math.round((iInit - bInit) * 10) / 10}ms`
+        ? `+${Math.round((iInit - bInit) * 10) / 10} ms`
         : "N/A";
 
     const bMem = b?.maxMemoryUsedMb?.avg;
     const iMem = i?.maxMemoryUsedMb?.avg;
     const memOverhead =
       bMem != null && iMem != null
-        ? `${Math.round((iMem - bMem) * 10) / 10}MB`
+        ? `+${Math.round((iMem - bMem) * 10) / 10} MB`
         : "N/A";
 
-    const fmt = (v: number | undefined, suffix: string) =>
-      v != null ? `${v}${suffix}` : "N/A";
-
-    console.log(
-      [
-        rt.padEnd(15),
-        fmt(bInit, "ms").padStart(14),
-        fmt(iInit, "ms").padStart(14),
-        overhead.padStart(10),
-        fmt(bMem, "MB").padStart(10),
-        fmt(iMem, "MB").padStart(10),
-        memOverhead.padStart(8),
-      ].join(" | ")
+    lines.push(
+      `| ${runtimeDisplayName(rt)} | ${fmt(bInit, " ms")} | ${fmt(iInit, " ms")} | ${initOverhead} | ${fmt(bMem, " MB")} | ${fmt(iMem, " MB")} | ${memOverhead} |`
     );
   }
 
-  console.log();
+  lines.push("");
+
+  // Detailed tables per language
+  for (const group of groups) {
+    lines.push(`## ${group.name}`);
+    lines.push("");
+    lines.push("### Init Duration (ms)");
+    lines.push("");
+    lines.push("| Runtime | Type | Min | Avg | Median | P95 | Max | Samples |");
+    lines.push("| :------ | :--- | --: | --: | -----: | --: | --: | ------: |");
+
+    for (const rt of group.runtimes) {
+      const displayName = runtimeDisplayName(rt);
+
+      const b = summaries[`${PREFIX}bench-baseline-${rt}`];
+      const i = summaries[`${PREFIX}bench-instrumented-${rt}`];
+
+      if (b?.initDurationMs) {
+        const d = b.initDurationMs;
+        lines.push(
+          `| ${displayName} | Baseline | ${d.min} | ${d.avg} | ${d.median} | ${d.p95} | ${d.max} | ${d.values.length} |`
+        );
+      }
+      if (i?.initDurationMs) {
+        const d = i.initDurationMs;
+        lines.push(
+          `| ${displayName} | Instrumented | ${d.min} | ${d.avg} | ${d.median} | ${d.p95} | ${d.max} | ${d.values.length} |`
+        );
+      }
+    }
+
+    lines.push("");
+    lines.push("### Memory Usage (MB)");
+    lines.push("");
+    lines.push("| Runtime | Type | Min | Avg | Max | Samples |");
+    lines.push("| :------ | :--- | --: | --: | --: | ------: |");
+
+    for (const rt of group.runtimes) {
+      const displayName = runtimeDisplayName(rt);
+
+      const b = summaries[`${PREFIX}bench-baseline-${rt}`];
+      const i = summaries[`${PREFIX}bench-instrumented-${rt}`];
+
+      if (b?.maxMemoryUsedMb) {
+        const m = b.maxMemoryUsedMb;
+        lines.push(
+          `| ${displayName} | Baseline | ${m.min} | ${m.avg} | ${m.max} | ${m.values.length} |`
+        );
+      }
+      if (i?.maxMemoryUsedMb) {
+        const m = i.maxMemoryUsedMb;
+        lines.push(
+          `| ${displayName} | Instrumented | ${m.min} | ${m.avg} | ${m.max} | ${m.values.length} |`
+        );
+      }
+    }
+
+    lines.push("");
+  }
+
+  return lines.join("\n");
 }
 
 // Run tasks with limited concurrency
@@ -327,21 +391,16 @@ async function main() {
   const results = await runWithConcurrency(tasks, CONCURRENCY);
   const summaries = summarize(results);
 
-  // Print comparison table
-  printTable(summaries);
+  // Generate markdown report
+  const markdown = generateMarkdown(summaries);
+  console.log();
+  console.log(markdown);
 
   // Save results
   mkdirSync(resolve(__dirname, "..", dirname(OUTPUT_FILE)), { recursive: true });
   const outputPath = resolve(__dirname, "..", OUTPUT_FILE);
-
-  const output = {
-    timestamp: new Date().toISOString(),
-    region: REGION,
-    coldStartInvocations: COLD_START_INVOCATIONS,
-    functions: summaries,
-  };
-
-  writeFileSync(outputPath, JSON.stringify(output, null, 2));
+  writeFileSync(outputPath, markdown + "\n");
+  console.log();
   console.log(`Results saved to ${outputPath}`);
   console.log();
   console.log("=== Benchmark complete ===");
