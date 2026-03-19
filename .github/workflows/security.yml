@@ -24,16 +24,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
       - uses: Swatinem/rust-cache@v2
-      - name: Install cargo-auditable
-        run: cargo install cargo-auditable
-      - name: Build with auditable metadata
-        run: cargo auditable build --release
+      - name: Install musl tools and cargo-auditable
+        run: |
+          sudo apt-get install -y musl-tools
+          cargo install cargo-auditable
+      - name: Build shipped binary with auditable metadata
+        run: cargo auditable build --release --target x86_64-unknown-linux-musl
       - name: Scan with Grype
         id: scan
         uses: anchore/scan-action@v6
         with:
-          path: target/release/aws-lambda-runtime-api-proxy-rs
+          path: target/x86_64-unknown-linux-musl/release/aws-lambda-runtime-api-proxy-rs
           fail-build: true
           severity-cutoff: high
           output-format: sarif
@@ -45,18 +49,24 @@ jobs:
           category: rust
 
   scan-python:
-    name: Scan Python distro
+    name: Scan Python distro (installed packages)
     runs-on: ubuntu-latest
     permissions:
       contents: read
       security-events: write
     steps:
       - uses: actions/checkout@v4
-      - name: Scan with Grype
+      - name: Build Python deps image and extract installed packages
+        run: |
+          docker build -t dash0-python-deps -f opt/python/Dockerfile .
+          cid=$(docker create dash0-python-deps)
+          docker cp "$cid":/asset-output/python build/python
+          docker rm "$cid"
+      - name: Scan installed packages with Grype
         id: scan
         uses: anchore/scan-action@v6
         with:
-          path: opt/python/distro
+          path: build/python
           fail-build: true
           severity-cutoff: high
           output-format: sarif
@@ -68,7 +78,7 @@ jobs:
           category: python
 
   scan-node:
-    name: Scan Node.js distro
+    name: Scan Node.js distro (shipped modules)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -78,16 +88,32 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Build AWS SDK tarball (required by preinstall)
+      - name: Build AWS SDK tarball
         run: bash opt/node/scripts/build-aws-sdk-tarball.sh
-      - name: Install dependencies
+      - name: Install dependencies and build bundle
         working-directory: opt/node
-        run: npm install
-      - name: Scan with Grype
+        run: npm install && npm run build
+      - name: Assemble shipped node_modules (mirrors Makefile)
+        run: |
+          mkdir -p build/stage-node/node_modules
+          for pkg in \
+            require-in-the-middle \
+            import-in-the-middle \
+            module-details-from-path \
+            debug \
+            ms \
+            acorn \
+            cjs-module-lexer; do
+            cp -r "opt/node/node_modules/$pkg" build/stage-node/node_modules/
+          done
+          # acorn-import-attributes is optional
+          cp -r opt/node/node_modules/acorn-import-attributes build/stage-node/node_modules/ 2>/dev/null || true
+          cp opt/node/dist/init.mjs build/stage-node/
+      - name: Scan shipped modules with Grype
         id: scan
         uses: anchore/scan-action@v6
         with:
-          path: opt/node
+          path: build/stage-node
           fail-build: true
           severity-cutoff: high
           output-format: sarif
@@ -99,7 +125,7 @@ jobs:
           category: node
 
   scan-java:
-    name: Scan Java distro
+    name: Scan Java distro (assembled JAR)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -113,7 +139,7 @@ jobs:
       - name: Build Java distro JAR
         working-directory: opt/java/opentelemetry-java-distro
         run: ./gradlew clean -Pversion=1.0.0-SNAPSHOT assemble -x javadoc
-      - name: Scan with Grype
+      - name: Scan assembled JAR with Grype
         id: scan
         uses: anchore/scan-action@v6
         with:
