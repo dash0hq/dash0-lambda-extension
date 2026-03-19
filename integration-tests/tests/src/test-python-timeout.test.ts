@@ -1,81 +1,37 @@
-import fetch from 'node-fetch';
-import { setTimeout as delay } from 'node:timers/promises';
-import { describe, expect, it } from 'vitest';
-import {DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./config";
+import { describe } from 'vitest';
 import {
     checkException,
     checkHttpSpan,
     checkLogs,
-    checkResourceAttributes,
-    checkSupplementarySpans,
-    getAttributesMap, LogToCheck,
-    getRequestPayload,
+    checkMainSpans,
+    getAttributesMap,
+    LogToCheck,
     invokeFunction,
-    runAllTests
+    runAllTests,
 } from "./utils";
 
 
 const verifySuccessInvocation = async (functionName: string, invocationEnd: boolean, traced: boolean) => {
     const invocationId = await invokeFunction(functionName, invocationEnd, true);
 
-    let traceId: string | undefined = undefined;
-    let parentSpanId: string | undefined = undefined;
-    let rootSpanId: string | undefined = undefined;
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        await delay(RETRY_DELAY_MS);
-        console.log(`Attempt ${attempt} to fetch spans for invocation ID ${invocationId}`);
-        try {
-            const spanResponse = await fetch(DASH0_ENDPOINT + 'spans', {
-                method: 'POST',
-                headers: {
-                    accept: 'application/json',
-                    authorization: `Bearer ${DASH0_TOKEN}`,
-                    'content-type': 'application/json',
-                },
-                body: JSON.stringify(getRequestPayload(invocationId)),
-            });
+    const { traceId, rootSpanId, handlerSpanId, handlerSpan } = await checkMainSpans({
+        invocationId,
+        functionName,
+        handlerScopeName: 'opentelemetry.instrumentation.aws_lambda',
+    });
 
-            const spanPayload = await spanResponse.json() as any;
-            // Find the Lambda instrumentation scope (supplementary spans may also be present)
-            let lambdaScopeSpan = null;
-            let lambdaResource = null;
-            for (const rs of (spanPayload?.resourceSpans ?? [])) {
-                for (const ss of (rs.scopeSpans ?? [])) {
-                    if (ss.scope?.name === 'opentelemetry.instrumentation.aws_lambda') {
-                        lambdaScopeSpan = ss;
-                        lambdaResource = rs.resource;
-                    }
-                }
-            }
-            expect(lambdaScopeSpan).toBeDefined();
-            expect(lambdaScopeSpan!.spans.length).toEqual(1);
-            // check span attributes
-            const span = lambdaScopeSpan!.spans[0];
-            const spanAttributes = getAttributesMap(span.attributes);
-            expect(spanAttributes['faas.invocation_id'].stringValue).toEqual(invocationId);
-            checkResourceAttributes(lambdaResource!.attributes, functionName);
+    checkException(handlerSpan, 'timeout');
 
-            checkException(span, 'timeout');
-            traceId = span.traceId;
-            parentSpanId = span.spanId;
-            rootSpanId = span.parentSpanId;
-            break;
-        } catch (error) {
-            console.error(`Error fetching spans on attempt ${attempt}:`, error);
-            if (attempt === MAX_ATTEMPTS) {
-                throw error;
-            }
-        }
-    }
     let httpSpanId: string | undefined = undefined;
     if (traced) {
         httpSpanId = await checkHttpSpan({
-            invocationId: invocationId!,
+            invocationId,
             functionName,
-            traceId: traceId!,
-            parentSpanId: parentSpanId!,
+            traceId,
+            parentSpanId: handlerSpanId,
         });
     }
+
     const logsToBeChecked: LogToCheck[] = [
         { message: 'START RequestId: ' },
         { message: 'END RequestId: ' },
@@ -92,25 +48,14 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
         logsToBeChecked.push({ message: "Status: timeout" });
     }
     await checkLogs({
-        invocationId: invocationId!,
+        invocationId,
         functionName,
-        traceId: traceId!,
-        parentSpanId: parentSpanId!,
+        traceId,
+        parentSpanId: rootSpanId,
         success: false,
         logsToBeChecked,
     });
 
-    // Supplementary spans are sent on the next invocation; trigger one if needed
-    if (invocationEnd) {
-        await invokeFunction(functionName, true, true);
-    }
-    await checkSupplementarySpans({
-        invocationId: invocationId!,
-        functionName,
-        traceId: traceId!,
-        rootSpanId: rootSpanId!,
-        runtimeError: true,
-    });
 }
 
 describe.concurrent('Lambda invocations with timeout', () => {

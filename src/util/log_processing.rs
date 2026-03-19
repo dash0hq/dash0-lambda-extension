@@ -80,13 +80,27 @@ fn parse_platform_init_report(log: &TelemetryLog) {
 fn parse_platform_runtime_done(log: &TelemetryLog) {
     if let Some(record) = log.record.as_object() {
         if let Some(req_id) = record.get("requestId").and_then(|v| v.as_str()) {
-            let end_time = if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&log.time) {
+            // Try to get end_time from the responseDuration span's "start" field first,
+            // falling back to the log's "time" field.
+            let response_duration_start = record
+                .get("spans")
+                .and_then(|s| s.as_array())
+                .and_then(|spans| {
+                    spans.iter().find(|s| {
+                        s.get("name").and_then(|n| n.as_str()) == Some("responseDuration")
+                    })
+                })
+                .and_then(|s| s.get("start"))
+                .and_then(|s| s.as_str());
+
+            let time_str = response_duration_start.unwrap_or(&log.time);
+            let end_time = if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(time_str) {
                 dt.timestamp_millis() as f64
             } else {
                 tracing::info!(
-                    "[{}] Failed to parse platform.runtimeDone log time: {}",
+                    "[{}] Failed to parse platform.runtimeDone end time: {}",
                     crate::log_prefix(),
-                    log.time
+                    time_str
                 );
                 0.0
             };
@@ -234,6 +248,39 @@ mod tests {
 
         let data = invocation_entry::get(req_id).expect("Should have data");
         let expected_end = chrono::DateTime::parse_from_rfc3339(time_str)
+            .unwrap()
+            .timestamp_millis() as f64;
+        assert_eq!(data.end_time, expected_end);
+        assert_eq!(data.duration, 500.0);
+    }
+
+    #[test]
+    #[serial]
+    fn test_parse_platform_runtime_done_with_response_duration_span() {
+        let req_id = "test-req-done-span";
+        let log_time = "2023-01-01T12:00:01.000Z";
+        let response_duration_start = "2023-01-01T12:00:00.900Z";
+        let logs = vec![create_log(
+            "platform.runtimeDone",
+            log_time,
+            json!({
+                "requestId": req_id,
+                "spans": [
+                    { "name": "responseLatency", "start": "2023-01-01T12:00:00.800Z", "durationMs": 65.0 },
+                    { "name": "responseDuration", "start": response_duration_start, "durationMs": 0.077 },
+                    { "name": "runtimeOverhead", "start": "2023-01-01T12:00:00.950Z", "durationMs": 1.0 }
+                ],
+                "metrics": { "durationMs": 500.0 }
+            }),
+            None,
+        )];
+
+        let mut logs = logs;
+        process_telemetry_logs(&mut logs);
+
+        let data = invocation_entry::get(req_id).expect("Should have data");
+        // Should use responseDuration start, not the log time
+        let expected_end = chrono::DateTime::parse_from_rfc3339(response_duration_start)
             .unwrap()
             .timestamp_millis() as f64;
         assert_eq!(data.end_time, expected_end);
