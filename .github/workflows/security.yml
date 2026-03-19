@@ -33,26 +33,21 @@ jobs:
           cargo install cargo-auditable
       - name: Build shipped binary with auditable metadata
         run: cargo auditable build --release --target x86_64-unknown-linux-musl
-      - name: Scan with Grype
+      - name: Install Grype
+        run: curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+      - name: Scan and annotate
         id: scan
-        uses: anchore/scan-action@v6
-        with:
-          path: target/x86_64-unknown-linux-musl/release/aws-lambda-runtime-api-proxy-rs
-          fail-build: true
-          severity-cutoff: high
-          output-format: sarif
+        run: |
+          TARGET=target/x86_64-unknown-linux-musl/release/aws-lambda-runtime-api-proxy-rs
+          grype "$TARGET" --output sarif --file results.sarif --output json --file grype.json || true
+          .github/scripts/grype-annotate.sh grype.json "Rust (extension binary)"
+          grype "$TARGET" --fail-on high --quiet 2>/dev/null
       - name: Upload SARIF
         if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: ${{ steps.scan.outputs.sarif }}
+          sarif_file: results.sarif
           category: rust
-      - name: Annotate findings
-        if: always()
-        run: |
-          grype --output json --file grype.json \
-            target/x86_64-unknown-linux-musl/release/aws-lambda-runtime-api-proxy-rs || true
-          .github/scripts/grype-annotate.sh grype.json "Rust (extension binary)"
 
   scan-python:
     name: Scan Python distro (installed packages)
@@ -66,27 +61,23 @@ jobs:
         run: |
           docker build -t dash0-python-deps -f opt/python/Dockerfile .
           cid=$(docker create dash0-python-deps)
+          mkdir -p build
           docker cp "$cid":/asset-output/python build/python
           docker rm "$cid"
-      - name: Scan installed packages with Grype
+      - name: Install Grype
+        run: curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+      - name: Scan and annotate
         id: scan
-        uses: anchore/scan-action@v6
-        with:
-          path: build/python
-          fail-build: true
-          severity-cutoff: high
-          output-format: sarif
+        run: |
+          grype build/python --output sarif --file results.sarif --output json --file grype.json || true
+          .github/scripts/grype-annotate.sh grype.json "Python distro"
+          grype build/python --fail-on high --quiet 2>/dev/null
       - name: Upload SARIF
         if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: ${{ steps.scan.outputs.sarif }}
+          sarif_file: results.sarif
           category: python
-      - name: Annotate findings
-        if: always()
-        run: |
-          grype --output json --file grype.json build/python || true
-          .github/scripts/grype-annotate.sh grype.json "Python distro"
 
   scan-node:
     name: Scan Node.js distro (shipped modules)
@@ -117,28 +108,22 @@ jobs:
             cjs-module-lexer; do
             cp -r "opt/node/node_modules/$pkg" build/stage-node/node_modules/
           done
-          # acorn-import-attributes is optional
           cp -r opt/node/node_modules/acorn-import-attributes build/stage-node/node_modules/ 2>/dev/null || true
           cp opt/node/dist/init.mjs build/stage-node/
-      - name: Scan shipped modules with Grype
+      - name: Install Grype
+        run: curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+      - name: Scan and annotate
         id: scan
-        uses: anchore/scan-action@v6
-        with:
-          path: build/stage-node
-          fail-build: true
-          severity-cutoff: high
-          output-format: sarif
+        run: |
+          grype build/stage-node --output sarif --file results.sarif --output json --file grype.json || true
+          .github/scripts/grype-annotate.sh grype.json "Node.js distro"
+          grype build/stage-node --fail-on high --quiet 2>/dev/null
       - name: Upload SARIF
         if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: ${{ steps.scan.outputs.sarif }}
+          sarif_file: results.sarif
           category: node
-      - name: Annotate findings
-        if: always()
-        run: |
-          grype --output json --file grype.json build/stage-node || true
-          .github/scripts/grype-annotate.sh grype.json "Node.js distro"
 
   scan-java:
     name: Scan Java distro (assembled JAR)
@@ -155,23 +140,18 @@ jobs:
       - name: Build Java distro JAR
         working-directory: opt/java/opentelemetry-java-distro
         run: ./gradlew clean -Pversion=1.0.0-SNAPSHOT assemble -x javadoc
-      - name: Scan assembled JAR with Grype
+      - name: Install Grype
+        run: curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+      - name: Scan and annotate
         id: scan
-        uses: anchore/scan-action@v6
-        with:
-          path: opt/java/opentelemetry-java-distro/agent/build/libs
-          fail-build: true
-          severity-cutoff: high
-          output-format: sarif
+        run: |
+          LIBS=opt/java/opentelemetry-java-distro/agent/build/libs
+          grype "$LIBS" --output sarif --file results.sarif --output json --file grype.json || true
+          .github/scripts/grype-annotate.sh grype.json "Java distro"
+          grype "$LIBS" --fail-on high --quiet 2>/dev/null
       - name: Upload SARIF
         if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: ${{ steps.scan.outputs.sarif }}
+          sarif_file: results.sarif
           category: java
-      - name: Annotate findings
-        if: always()
-        run: |
-          grype --output json --file grype.json \
-            opt/java/opentelemetry-java-distro/agent/build/libs || true
-          .github/scripts/grype-annotate.sh grype.json "Java distro"
