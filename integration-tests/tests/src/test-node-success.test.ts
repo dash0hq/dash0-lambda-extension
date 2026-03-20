@@ -16,7 +16,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
     const invocationId = await invokeFunction(functionName, invocationEnd, false, invocationPayload);
 
     const handlerScopeName = traced ? "@opentelemetry/instrumentation-aws-lambda" : "opentelemetry.instrumentation.aws_lambda";
-    const { traceId, rootSpanId, handlerSpanId, resource } = await checkMainSpans({
+    const { traceId, rootSpanId, handlerSpanId, handlerSpan, resource } = await checkMainSpans({
         invocationId,
         functionName,
         handlerScopeName,
@@ -25,6 +25,12 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
     // Verify MASKED_FIELD is masked in resource attributes
     const resourceAttributes = getAttributesMap(resource.attributes);
     expect(resourceAttributes['process.environment_variable.MASKED_FIELD'].stringValue).toEqual('****');
+
+    // Verify custom attribute set by the handler on the invocation span
+    if (traced) {
+        const handlerAttrs = getAttributesMap(handlerSpan.attributes);
+        expect(handlerAttrs['custom.attribute'].stringValue).toEqual('hello-from-handler');
+    }
 
     let httpSpanId: string | undefined = undefined;
     if (traced) {
