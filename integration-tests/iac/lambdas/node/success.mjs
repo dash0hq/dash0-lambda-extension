@@ -1,7 +1,14 @@
 import https from 'https';
+import { trace } from '@opentelemetry/api';
 
 export async function handler(event) {
     console.log("Handler invoked with event:", event);
+
+    // Set an attribute on the Lambda invocation span
+    const currentSpan = trace.getActiveSpan();
+    if (currentSpan) {
+        currentSpan.setAttribute('custom.attribute', 'hello-from-handler');
+    }
 
     const postData = JSON.stringify({
         title: 'foo',
@@ -28,6 +35,12 @@ export async function handler(event) {
 
     console.log(`response.statusCode: ${response.statusCode}`);
     console.warn("let's parse this as a warning");
+
+    const tracer = trace.getTracer('success-handler');
+    await tracer.startActiveSpan('sleep-span', async (span) => {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        span.end();
+    });
 
     return {
         statusCode: 200,

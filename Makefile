@@ -114,6 +114,8 @@ build/$(ZIP_NAME_NODE): build/dash0_x86_64 build/dash0_aarch64 opt/entrypoint op
 	@cp -r opt/node/node_modules/acorn build/stage-node/node_modules/
 	@cp -r opt/node/node_modules/acorn-import-attributes build/stage-node/node_modules/ 2>/dev/null || true
 	@cp -r opt/node/node_modules/cjs-module-lexer build/stage-node/node_modules/
+	@mkdir -p build/stage-node/node_modules/@opentelemetry
+	@cp -r opt/node/node_modules/@opentelemetry/api build/stage-node/node_modules/@opentelemetry/api
 	@cd build/stage-node && zip -r ../$(ZIP_NAME_NODE) *
 
 
