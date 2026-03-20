@@ -169,9 +169,10 @@ pub fn build_payload_log(
         invocation_id: Some(invocation_id.to_string()),
         trace_id,
         span_id,
-        custom_attributes: vec![
-            ("dash0.faas.payload_type".to_string(), payload_type.to_string()),
-        ],
+        custom_attributes: vec![(
+            "dash0.faas.payload_type".to_string(),
+            payload_type.to_string(),
+        )],
     })
 }
 
