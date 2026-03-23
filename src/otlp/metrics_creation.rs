@@ -12,12 +12,33 @@ use opentelemetry_proto::tonic::metrics::v1::{
 use opentelemetry_proto::tonic::resource::v1::Resource;
 use prost::Message;
 
+const DURATION_BOUNDS: &[f64] = &[
+    0.0, 5.0, 10.0, 25.0, 50.0, 75.0, 100.0, 250.0, 500.0, 750.0, 1000.0, 2500.0, 5000.0, 7500.0,
+    10000.0,
+];
+
+const MEMORY_BOUNDS: &[f64] = &[
+    0.0, 64.0, 128.0, 256.0, 512.0, 1024.0, 1536.0, 2048.0, 3072.0, 4096.0, 8192.0, 10240.0,
+];
+
+fn compute_bucket_counts(value: f64, bounds: &[f64]) -> Vec<u64> {
+    let mut counts = vec![0u64; bounds.len() + 1];
+    let bucket_index = bounds
+        .iter()
+        .position(|&b| value <= b)
+        .unwrap_or(bounds.len());
+    counts[bucket_index] = 1;
+    counts
+}
+
 fn create_histogram_data_point(
     value: f64,
     attributes: Vec<KeyValue>,
     start_time_unix_nano: u64,
     time_unix_nano: u64,
+    explicit_bounds: &[f64],
 ) -> HistogramDataPoint {
+    let bucket_counts = compute_bucket_counts(value, explicit_bounds);
     HistogramDataPoint {
         attributes,
         start_time_unix_nano,
@@ -26,8 +47,8 @@ fn create_histogram_data_point(
         sum: Some(value),
         min: Some(value),
         max: Some(value),
-        explicit_bounds: vec![],
-        bucket_counts: vec![1],
+        explicit_bounds: explicit_bounds.to_vec(),
+        bucket_counts,
         ..Default::default()
     }
 }
@@ -40,9 +61,15 @@ fn create_histogram_metric(
     attributes: Vec<KeyValue>,
     start_time_unix_nano: u64,
     time_unix_nano: u64,
+    explicit_bounds: &[f64],
 ) -> Metric {
-    let data_point =
-        create_histogram_data_point(value, attributes, start_time_unix_nano, time_unix_nano);
+    let data_point = create_histogram_data_point(
+        value,
+        attributes,
+        start_time_unix_nano,
+        time_unix_nano,
+        explicit_bounds,
+    );
 
     Metric {
         name: name.to_string(),
@@ -99,6 +126,7 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
             get_metric_attributes(),
             start_time_unix_nano,
             time_unix_nano,
+            DURATION_BOUNDS,
         ));
     }
 
@@ -111,6 +139,7 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
             get_metric_attributes(),
             start_time_unix_nano,
             time_unix_nano,
+            DURATION_BOUNDS,
         ));
     }
 
@@ -123,6 +152,7 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
             get_metric_attributes(),
             start_time_unix_nano,
             time_unix_nano,
+            DURATION_BOUNDS,
         ));
     }
 
@@ -135,6 +165,7 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
             get_metric_attributes(),
             start_time_unix_nano,
             time_unix_nano,
+            MEMORY_BOUNDS,
         ));
     }
 
@@ -259,8 +290,11 @@ mod tests {
             assert_eq!(dp.sum, Some(200.0));
             assert_eq!(dp.min, Some(200.0));
             assert_eq!(dp.max, Some(200.0));
-            assert_eq!(dp.explicit_bounds, Vec::<f64>::new());
-            assert_eq!(dp.bucket_counts, vec![1]);
+            assert_eq!(dp.explicit_bounds, DURATION_BOUNDS.to_vec());
+            // 200ms <= 250.0, which is bounds[7], so bucket index 7
+            let mut expected_counts = vec![0u64; DURATION_BOUNDS.len() + 1];
+            expected_counts[7] = 1;
+            assert_eq!(dp.bucket_counts, expected_counts);
             assert_eq!(dp.start_time_unix_nano, 850_000_000); // (1000 - 150) * 1_000_000
             assert_eq!(dp.time_unix_nano, 1_200_000_000); // 1200 * 1_000_000
 
