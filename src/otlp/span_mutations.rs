@@ -488,9 +488,14 @@ fn store_span_ids(span: &Span, invocation_id: &str) {
         .map(|b| format!("{:02x}", b))
         .collect::<String>();
     invocation_entry::update(invocation_id, |entry| {
+        let is_same_trace = entry
+            .trace_id
+            .as_ref()
+            .map_or(false, |existing| existing == &trace_id_hex);
         entry.trace_id = Some(trace_id_hex);
         entry.span_id = Some(span_id_hex);
-        if !span.parent_span_id.is_empty() {
+        // we update parent span only if the lambda instrumentation extracted the context not from _X_AMZN_TRACE_ID
+        if !span.parent_span_id.is_empty() && !is_same_trace {
             entry.parent_span_id = Some(hex::encode(&span.parent_span_id));
         }
     });
