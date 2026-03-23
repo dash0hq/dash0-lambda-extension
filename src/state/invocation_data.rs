@@ -88,6 +88,8 @@ pub struct TelemetryLog {
     pub trace_id: Option<String>,
     #[serde(skip_deserializing)]
     pub span_id: Option<String>,
+    #[serde(skip_deserializing)]
+    pub custom_attributes: Vec<(String, String)>,
 }
 
 pub fn store_runtime_done_notifier(sender: tokio::sync::oneshot::Sender<()>) {
