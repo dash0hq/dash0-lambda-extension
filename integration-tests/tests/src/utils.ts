@@ -4,7 +4,7 @@ import {expect, it} from "vitest";
 import {DASH0_ENDPOINT, DASH0_LAMBDA_TESTS_DATASET, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./config";
 import {InvokeCommand, LambdaClient} from "@aws-sdk/client-lambda";
 
-export type LogToCheck = { message: string; severity?: string; isJson?: boolean; spanId?: string };
+export type LogToCheck = { message: string; severity?: string; isJson?: boolean; spanId?: string; attributes?: Record<string, string> };
 
 export const RESOURCE_PREFIX = process.env.RESOURCE_PREFIX ?? '';
 
@@ -201,6 +201,7 @@ export const checkLogs = async ({
                 let hasJsonMatch = false;
                 let jsonSeverity: string | null = null;
                 let matchedSpanId: string | null = null;
+                let matchedCheck: LogToCheck | null = null;
                 let matched = false;
                 for (const logToCheck of logsToBeChecked) {
                     if (logToCheck.isJson) {
@@ -216,6 +217,7 @@ export const checkLogs = async ({
                     }
                     if (matched) {
                         logsToBeCheckedCount[logToCheck.message] = true;
+                        matchedCheck = logToCheck;
                         if (logToCheck.spanId) {
                             matchedSpanId = logToCheck.spanId;
                         }
@@ -253,6 +255,14 @@ export const checkLogs = async ({
                     expectedSeverity = jsonSeverity ?? "info";
                 }
                 expect(logRecord.severityText.toLowerCase(), `Wrong severity: ${JSON.stringify(logRecord)}`).toEqual(expectedSeverity);
+
+                // Verify custom attributes if specified
+                if (matchedCheck?.attributes) {
+                    const logAttrs = getAttributesMap(logRecord.attributes);
+                    for (const [key, value] of Object.entries(matchedCheck.attributes)) {
+                        expect(logAttrs[key]?.stringValue, `Missing or wrong attribute '${key}' on log: ${JSON.stringify(logRecord)}`).toEqual(value);
+                    }
+                }
             }
             for (const logToCheck of logsToBeChecked) {
                 expect(logsToBeCheckedCount[logToCheck.message], `Log not found: ${logToCheck.message}`).toBeTruthy();
