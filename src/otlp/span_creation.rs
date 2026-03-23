@@ -48,15 +48,12 @@ fn create_root_span(
     let span_id = hex::decode(root_span_id).ok()?;
     let trace_id = hex::decode(trace_id_hex).ok()?;
 
-    let parent_span_id = if data.sampled || !crate::config::user::is_remove_lambda_parent_span() {
-        data.parent_span_id
-            .as_deref()
-            .filter(|s| !s.is_empty())
-            .and_then(|p| hex::decode(p).ok())
-            .unwrap_or_default()
-    } else {
-        Vec::new()
-    };
+    let parent_span_id = data
+        .parent_span_id
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .and_then(|p| hex::decode(p).ok())
+        .unwrap_or_default();
 
     let start_nanos = ((data.start_time - data.init_duration) * 1_000_000.0) as u64;
     let end_nanos = (data.end_time * 1_000_000.0) as u64;

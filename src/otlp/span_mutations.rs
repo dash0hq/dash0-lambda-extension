@@ -455,6 +455,12 @@ fn add_event_payload_to_span(span: &mut Span, invocation_id: &str) {
 }
 
 fn reparent_to_root_span(span: &mut Span, invocation_id: &str) {
+    tracing::info!(
+        "[{}] reparenting span for invocation_id={}: original parent_span_id={}",
+        crate::log_prefix(),
+        invocation_id,
+        hex::encode(&span.parent_span_id),
+    );
     let root_span_id = invocation_entry::get_or_create_root_span_id(invocation_id);
     if let Ok(bytes) = hex::decode(&root_span_id) {
         span.parent_span_id = bytes;
@@ -484,12 +490,10 @@ fn store_span_ids(span: &Span, invocation_id: &str) {
     invocation_entry::update(invocation_id, |entry| {
         entry.trace_id = Some(trace_id_hex);
         entry.span_id = Some(span_id_hex);
+        if !span.parent_span_id.is_empty() {
+            entry.parent_span_id = Some(hex::encode(&span.parent_span_id));
+        }
     });
-    tracing::debug!(
-        "[{}] stored trace/span id for invocation_id={}",
-        crate::log_prefix(),
-        invocation_id
-    );
 }
 
 /// Process a decoded trace request by adding event payloads, return payloads, and storing invocation span IDs.
@@ -522,8 +526,8 @@ pub fn process_trace_request(
                 span.name = "handler".to_string();
                 span.kind = SpanKind::Internal as i32;
                 add_event_payload_to_span(span, &invocation_id);
-                reparent_to_root_span(span, &invocation_id);
                 store_span_ids(span, &invocation_id);
+                reparent_to_root_span(span, &invocation_id);
                 store_handler_span_data(span, &invocation_id);
             }
         }
