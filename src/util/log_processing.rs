@@ -180,6 +180,7 @@ mod tests {
             invocation_id,
             trace_id: None,
             span_id: None,
+            custom_attributes: vec![],
         }
     }
 

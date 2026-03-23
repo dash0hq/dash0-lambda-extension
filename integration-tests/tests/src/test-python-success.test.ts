@@ -38,13 +38,13 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
         { message: 'START RequestId: ' },
         { message: 'END RequestId: ' },
         { message: "response.status_code:" },
-        { message: JSON.stringify({ name: "dash0_payload", type: "lambda_event", message: { parameter1: "right" } }), isJson: true },
-        { message: JSON.stringify({ name: "dash0_payload", type: "lambda_return_value", message: { statusCode: 200,  body: '"Hello from Lambda!"' } }), isJson: true },
+        { message: JSON.stringify({ name: "dash0_payload", type: "lambda_event", message: { parameter1: "right" } }), isJson: true, attributes: { "dash0.faas.payload_type": "lambda_event" } },
+        { message: JSON.stringify({ name: "dash0_payload", type: "lambda_return_value", message: { statusCode: 200,  body: '"Hello from Lambda!"' } }), isJson: true, attributes: { "dash0.faas.payload_type": "lambda_return_value" } },
     ]
     if (traced) {
         logsToBeChecked.push(
-            { message: JSON.stringify({ name: "dash0_payload", type: "http_request_body", message: { title: "foo", userId: 1 } }), isJson: true, spanId: httpSpanId },
-            { message: JSON.stringify({ name: "dash0_payload", type: "http_response_body" }), isJson: true, spanId: httpSpanId },
+            { message: JSON.stringify({ name: "dash0_payload", type: "http_request_body", message: { title: "foo", userId: 1 } }), isJson: true, spanId: httpSpanId, attributes: { "dash0.faas.payload_type": "http_request_body" } },
+            { message: JSON.stringify({ name: "dash0_payload", type: "http_response_body" }), isJson: true, spanId: httpSpanId, attributes: { "dash0.faas.payload_type": "http_response_body" } },
         );
     }
     if (!invocationEnd) {
