@@ -1,0 +1,161 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly on Monday at 06:00 UTC
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan-rust:
+    name: Scan Rust (extension binary)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+      - name: Install musl tools and cargo-auditable
+        run: |
+          sudo apt-get install -y musl-tools
+          cargo install cargo-auditable
+      - name: Build shipped binary with auditable metadata
+        run: cargo auditable build --release --target x86_64-unknown-linux-musl
+      - name: Install Grype
+        run: curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+      - name: Scan and annotate
+        id: scan
+        run: |
+          TARGET=target/x86_64-unknown-linux-musl/release/aws-lambda-runtime-api-proxy-rs
+          grype "$TARGET" --output sarif=results.sarif --output json=grype.json || true
+          .github/scripts/grype-annotate.sh grype.json "Rust (extension binary)"
+          grype "$TARGET" --fail-on high --quiet 2>/dev/null
+#      - name: Upload SARIF
+#        if: always()
+#        uses: github/codeql-action/upload-sarif@v4
+#        with:
+#          sarif_file: results.sarif
+#          category: rust
+
+  scan-python:
+    name: Scan Python distro (installed packages)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build Python deps image and extract installed packages
+        run: |
+          docker build -t dash0-python-deps -f opt/python/Dockerfile .
+          cid=$(docker create dash0-python-deps)
+          mkdir -p build
+          docker cp "$cid":/asset-output/python build/python
+          docker rm "$cid"
+      - name: Install Grype
+        run: curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+      - name: Scan and annotate
+        id: scan
+        run: |
+          grype build/python --output sarif=results.sarif --output json=grype.json || true
+          .github/scripts/grype-annotate.sh grype.json "Python distro"
+          grype build/python --fail-on high --quiet 2>/dev/null
+#      - name: Upload SARIF
+#        if: always()
+#        uses: github/codeql-action/upload-sarif@v4
+#        with:
+#          sarif_file: results.sarif
+#          category: python
+
+  scan-node:
+    name: Scan Node.js distro (shipped modules)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Build AWS SDK tarball
+        run: bash opt/node/scripts/build-aws-sdk-tarball.sh
+      - name: Install dependencies and build bundle
+        working-directory: opt/node
+        run: npm install && npm run build
+      - name: Assemble shipped node_modules (mirrors Makefile)
+        run: |
+          mkdir -p build/stage-node/node_modules
+          for pkg in \
+            require-in-the-middle \
+            import-in-the-middle \
+            module-details-from-path \
+            debug \
+            ms \
+            acorn \
+            cjs-module-lexer; do
+            cp -r "opt/node/node_modules/$pkg" build/stage-node/node_modules/
+          done
+          cp -r opt/node/node_modules/acorn-import-attributes build/stage-node/node_modules/ 2>/dev/null || true
+          cp opt/node/dist/init.mjs build/stage-node/
+      - name: Install Grype
+        run: curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+      - name: Scan and annotate
+        id: scan
+        run: |
+          grype build/stage-node --output sarif=results.sarif --output json=grype.json || true
+          .github/scripts/grype-annotate.sh grype.json "Node.js distro"
+          grype build/stage-node --fail-on high --quiet 2>/dev/null
+#      - name: Upload SARIF
+#        if: always()
+#        uses: github/codeql-action/upload-sarif@v4
+#        with:
+#          sarif_file: results.sarif
+#          category: node
+
+  scan-java:
+    name: Scan Java distro (assembled JAR)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Build Java distro JAR
+        working-directory: opt/java/opentelemetry-java-distro
+        run: ./gradlew clean -Pversion=1.0.0-SNAPSHOT assemble -x javadoc
+      - name: Install Grype
+        run: curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+      - name: Scan and annotate
+        id: scan
+        run: |
+          LIBS=opt/java/opentelemetry-java-distro/agent/build/libs
+          grype "$LIBS" --output sarif=results.sarif --output json=grype.json || true
+          .github/scripts/grype-annotate.sh grype.json "Java distro"
+          grype "$LIBS" --fail-on high --quiet 2>/dev/null
+#      - name: Upload SARIF
+#        if: always()
+#        uses: github/codeql-action/upload-sarif@v4
+#        with:
+#          sarif_file: results.sarif
+#          category: java
