@@ -355,6 +355,7 @@ mod tests {
             invocation_id: invocation_id.map(String::from),
             trace_id: None,
             span_id: None,
+            custom_attributes: vec![],
         }
     }
 
