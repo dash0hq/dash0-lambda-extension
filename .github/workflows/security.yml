@@ -43,12 +43,12 @@ jobs:
           grype "$TARGET" --output sarif=results.sarif --output json=grype.json || true
           .github/scripts/grype-annotate.sh grype.json "Rust (extension binary)"
           grype "$TARGET" --fail-on high --quiet 2>/dev/null
-      - name: Upload SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: results.sarif
-          category: rust
+#      - name: Upload SARIF
+#        if: always()
+#        uses: github/codeql-action/upload-sarif@v4
+#        with:
+#          sarif_file: results.sarif
+#          category: rust
 
   scan-python:
     name: Scan Python distro (installed packages)
@@ -74,12 +74,12 @@ jobs:
           grype build/python --output sarif=results.sarif --output json=grype.json || true
           .github/scripts/grype-annotate.sh grype.json "Python distro"
           grype build/python --fail-on high --quiet 2>/dev/null
-      - name: Upload SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: results.sarif
-          category: python
+#      - name: Upload SARIF
+#        if: always()
+#        uses: github/codeql-action/upload-sarif@v4
+#        with:
+#          sarif_file: results.sarif
+#          category: python
 
   scan-node:
     name: Scan Node.js distro (shipped modules)
@@ -121,12 +121,12 @@ jobs:
           grype build/stage-node --output sarif=results.sarif --output json=grype.json || true
           .github/scripts/grype-annotate.sh grype.json "Node.js distro"
           grype build/stage-node --fail-on high --quiet 2>/dev/null
-      - name: Upload SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: results.sarif
-          category: node
+#      - name: Upload SARIF
+#        if: always()
+#        uses: github/codeql-action/upload-sarif@v4
+#        with:
+#          sarif_file: results.sarif
+#          category: node
 
   scan-java:
     name: Scan Java distro (assembled JAR)
@@ -153,9 +153,9 @@ jobs:
           grype "$LIBS" --output sarif=results.sarif --output json=grype.json || true
           .github/scripts/grype-annotate.sh grype.json "Java distro"
           grype "$LIBS" --fail-on high --quiet 2>/dev/null
-      - name: Upload SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: results.sarif
-          category: java
+#      - name: Upload SARIF
+#        if: always()
+#        uses: github/codeql-action/upload-sarif@v4
+#        with:
+#          sarif_file: results.sarif
+#          category: java
