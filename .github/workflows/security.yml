@@ -17,6 +17,7 @@ jobs:
     name: Scan Rust (extension binary)
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
       security-events: write
     env:
@@ -53,6 +54,7 @@ jobs:
     name: Scan Python distro (installed packages)
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
       security-events: write
     steps:
@@ -83,6 +85,7 @@ jobs:
     name: Scan Node.js distro (shipped modules)
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
       security-events: write
     steps:
@@ -129,6 +132,7 @@ jobs:
     name: Scan Java distro (assembled JAR)
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
       security-events: write
     steps:
