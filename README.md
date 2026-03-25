@@ -145,6 +145,34 @@ These attributes are added to the resource of log data:
 | `cloud.account.id` | string | The AWS account ID. |
 | `service.name` | string | The service name, from `OTEL_SERVICE_NAME` or defaults to `unknown_service`. |
 
+### Metrics
+
+The extension creates the following histogram metrics for each Lambda invocation:
+
+| Metric | Unit | Description |
+|---|---|---|
+| `faas.duration` | ms | Duration of the invocation. |
+| `faas.init_duration` | ms | Duration of the cold start initialization. Only present on cold start invocations. |
+| `dash0.faas.billed_duration` | ms | Billed duration of the invocation. |
+| `dash0.faas.memory_used` | MB | Memory used by the invocation. |
+
+#### Metric Attributes
+
+The following attributes are added to each metric data point:
+
+| Attribute | Type | Description |
+|---|---|---|
+| `cloud.resource_id` | string | The full ARN of the Lambda function. |
+| `cloud.account.id` | string | The AWS account ID. |
+
+#### Resource Attributes (Metrics)
+
+These attributes are added to the resource of metric data:
+
+| Attribute | Type | Description |
+|---|---|---|
+| `service.name` | string | The service name, from `OTEL_SERVICE_NAME` or defaults to `unknown_service`. |
+
 
 ## Dockerized Lambdas
 
