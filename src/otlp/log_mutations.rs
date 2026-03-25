@@ -170,7 +170,7 @@ pub fn build_payload_log(
         trace_id,
         span_id,
         custom_attributes: vec![(
-            "dash0.faas.payload_type".to_string(),
+            crate::otlp::attributes::DASH0_FAAS_PAYLOAD_TYPE.to_string(),
             payload_type.to_string(),
         )],
     })
@@ -234,7 +234,7 @@ pub fn map_logs_to_otlp(logs: &[TelemetryLog]) -> Vec<LogRecord> {
 
         if let Some(invocation_id) = &log.invocation_id {
             attributes.push(opentelemetry_proto::tonic::common::v1::KeyValue {
-                key: "faas.invocation_id".to_string(),
+                key: crate::otlp::attributes::FAAS_INVOCATION_ID.to_string(),
                 value: Some(AnyValue {
                     value: Some(
                         opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(
@@ -318,9 +318,10 @@ pub fn try_read_env_from_file(key: &str) -> Option<String> {
 }
 
 pub fn get_resources_attributes() -> Vec<opentelemetry_proto::tonic::common::v1::KeyValue> {
+    use crate::otlp::attributes::*;
     let mut attributes = vec![
         opentelemetry_proto::tonic::common::v1::KeyValue {
-            key: "cloud.platform".to_string(),
+            key: CLOUD_PLATFORM.to_string(),
             value: Some(AnyValue {
                 value: Some(
                     opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(
@@ -330,7 +331,7 @@ pub fn get_resources_attributes() -> Vec<opentelemetry_proto::tonic::common::v1:
             }),
         },
         opentelemetry_proto::tonic::common::v1::KeyValue {
-            key: "cloud.resource.id".to_string(),
+            key: CLOUD_RESOURCE_ID_SEMCONV.to_string(),
             value: Some(AnyValue {
                 value: Some(
                     opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(
@@ -341,7 +342,7 @@ pub fn get_resources_attributes() -> Vec<opentelemetry_proto::tonic::common::v1:
             }),
         },
         opentelemetry_proto::tonic::common::v1::KeyValue {
-            key: "cloud.account.id".to_string(),
+            key: CLOUD_ACCOUNT_ID.to_string(),
             value: Some(AnyValue {
                 value: Some(
                     opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(
@@ -352,7 +353,7 @@ pub fn get_resources_attributes() -> Vec<opentelemetry_proto::tonic::common::v1:
             }),
         },
         opentelemetry_proto::tonic::common::v1::KeyValue {
-            key: "service.name".to_string(),
+            key: SERVICE_NAME.to_string(),
             value: Some(AnyValue {
                 value: Some(
                     opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(

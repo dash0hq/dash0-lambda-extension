@@ -2,6 +2,7 @@ import { describe, expect } from 'vitest';
 import {
     checkLogs,
     checkMainSpans,
+    checkMetrics,
     checkOverheadSpan,
     getAttributesMap,
     LogToCheck,
@@ -60,6 +61,11 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
         functionName,
         traceId,
         rootSpanId,
+    });
+
+    await checkMetrics({
+        functionName,
+        metricNames: ['faas.duration', 'dash0.faas.billed_duration', 'dash0.faas.memory_used', 'faas.init_duration'],
     });
 }
 

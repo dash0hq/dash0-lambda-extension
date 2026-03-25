@@ -98,6 +98,82 @@ The following environment variables allow fine-grained control over secret maski
   Example: `DASH0_MASK_QUERY_PARAMS='[".*api_key.*", ".*token.*"]'`
 
 
+## Enrichment Attributes
+
+The extension enriches telemetry data with additional attributes beyond what the auto-instrumentation provides.
+
+### Span Attributes
+
+The following attributes are added to spans by the extension (if relevant):
+
+| Attribute | Type | Description |
+|---|---|---|
+| `faas.invocation_id` | string | The AWS request ID of the current invocation. |
+| `faas.trigger` | string | The event source that triggered the Lambda (e.g., `aws:sqs`, `aws:dynamodb`, `aws:event_bridge`). Extracted from the event payload. |
+| `faas.init_duration` | double | The cold start initialization duration in milliseconds. Only present on cold start invocations. |
+| `dash0.faas.record_count` | int | The number of records in a batch event (SQS, DynamoDB Streams, Kinesis, SNS). |
+| `dash0.faas.trigger_arn` | string | The ARN of the event source (e.g., SQS queue ARN, DynamoDB stream ARN, SNS topic ARN). |
+| `dash0.faas.event_bridge_source` | string | The `source` field from an EventBridge event. |
+| `dash0.faas.event_bridge_detail_type` | string | The `detail-type` field from an EventBridge event. |
+
+#### Resource Attributes (Spans)
+
+These attributes are added to the resource of span data:
+
+| Attribute | Type | Description |
+|---|---|---|
+| `service.name` | string | The service name, from `OTEL_SERVICE_NAME` or defaults to `unknown_service`. |
+| `process.environment_variable.<KEY>` | string | Lambda environment variables (with sensitive values masked). Added to the span resource. |
+
+### Log Attributes
+
+The following attributes are added to log records by the extension (if relevant):
+
+| Attribute | Type | Description |
+|---|---|---|
+| `faas.invocation_id` | string | The AWS request ID, used to correlate logs with the invocation span. |
+| `dash0.faas.payload_type` | string | The type of payload log record. Values: `lambda_event`, `lambda_return_value`, `http_request_body`, `http_response_body`. Only present on payload log records. |
+
+#### Resource Attributes (Logs)
+
+These attributes are added to the resource of log data:
+
+| Attribute | Type | Description |
+|---|---|---|
+| `cloud.platform` | string | Always set to `aws_lambda`. |
+| `cloud.resource.id` | string | The full ARN of the Lambda function. |
+| `cloud.account.id` | string | The AWS account ID. |
+| `service.name` | string | The service name, from `OTEL_SERVICE_NAME` or defaults to `unknown_service`. |
+
+### Metrics
+
+The extension creates the following histogram metrics for each Lambda invocation:
+
+| Metric | Unit | Description |
+|---|---|---|
+| `faas.duration` | ms | Duration of the invocation. |
+| `faas.init_duration` | ms | Duration of the cold start initialization. Only present on cold start invocations. |
+| `dash0.faas.billed_duration` | ms | Billed duration of the invocation. |
+| `dash0.faas.memory_used` | MB | Memory used by the invocation. |
+
+#### Metric Attributes
+
+The following attributes are added to each metric data point:
+
+| Attribute | Type | Description |
+|---|---|---|
+| `cloud.resource_id` | string | The full ARN of the Lambda function. |
+| `cloud.account.id` | string | The AWS account ID. |
+
+#### Resource Attributes (Metrics)
+
+These attributes are added to the resource of metric data:
+
+| Attribute | Type | Description |
+|---|---|---|
+| `service.name` | string | The service name, from `OTEL_SERVICE_NAME` or defaults to `unknown_service`. |
+
+
 ## Dockerized Lambdas
 
 For containerized Lambda functions, use the provided Docker images in a multi-stage build. The extension images are available for Node.js, Python, and Java runtimes.

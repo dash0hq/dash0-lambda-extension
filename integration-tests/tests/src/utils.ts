@@ -454,6 +454,62 @@ export const checkOverheadSpan = async ({
     }
 }
 
+export const checkMetrics = async ({
+    functionName,
+    metricNames,
+}: {
+    functionName: string;
+    metricNames: string[];
+}): Promise<void> => {
+    for (const metricName of metricNames) {
+        let found = false;
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            await delay(RETRY_DELAY_MS);
+            console.log(`Attempt ${attempt} to fetch metric ${metricName} for ${functionName}`);
+            try {
+                const params = new URLSearchParams({
+                    dataset: DASH0_LAMBDA_TESTS_DATASET,
+                    start: 'now-10m',
+                    end: 'now',
+                    step: '1m',
+                    query: `{otel_metric_name = "${metricName}", otel_metric_type = "histogram", service_name = "${functionName}"}`,
+                });
+                const response = await fetch(DASH0_ENDPOINT + 'prometheus/api/v1/query_range', {
+                    method: 'POST',
+                    headers: {
+                        authorization: `Bearer ${DASH0_TOKEN}`,
+                        'content-type': 'application/x-www-form-urlencoded',
+                    },
+                    body: params.toString(),
+                });
+
+                const payload = await response.json() as any;
+                expect(payload.status).toEqual('success');
+
+                const results = payload.data?.result ?? [];
+                const hasValue = results.some((r: any) =>
+                    (r.values ?? []).some((v: any) => parseFloat(v[1]) >= 1)
+                );
+
+                if (hasValue) {
+                    found = true;
+                    break;
+                }
+
+                if (attempt === MAX_ATTEMPTS) {
+                    throw new Error(`Metric ${metricName} for ${functionName} not found with value >= 1`);
+                }
+            } catch (error) {
+                console.error(`Error fetching metric ${metricName} on attempt ${attempt}:`, error);
+                if (attempt === MAX_ATTEMPTS) {
+                    throw error;
+                }
+            }
+        }
+        expect(found, `Metric ${metricName} should have at least one value >= 1`).toBe(true);
+    }
+}
+
 export const checkException = (span: any, exception_type: string) => {
     const events = span.events;
     expect(events.length).toEqual(1);
