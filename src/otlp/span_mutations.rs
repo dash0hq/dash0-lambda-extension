@@ -98,7 +98,7 @@ pub fn build_synthetic_trace(
 
     let resource = Resource {
         attributes: vec![KeyValue {
-            key: "service.name".to_string(),
+            key: crate::otlp::attributes::SERVICE_NAME.to_string(),
             value: Some(AnyValue {
                 value: Some(
                     opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(
@@ -149,19 +149,19 @@ fn create_exception_event(
                 name: "exception".to_string(),
                 attributes: vec![
                     KeyValue {
-                        key: "exception.type".to_string(),
+                        key: crate::otlp::attributes::EXCEPTION_TYPE.to_string(),
                         value: Some(AnyValue {
                             value: Some(Value::StringValue(err.to_string())),
                         }),
                     },
                     KeyValue {
-                        key: "exception.message".to_string(),
+                        key: crate::otlp::attributes::EXCEPTION_MESSAGE.to_string(),
                         value: Some(AnyValue {
                             value: Some(Value::StringValue(err.to_string())),
                         }),
                     },
                     KeyValue {
-                        key: "exception.escaped".to_string(),
+                        key: crate::otlp::attributes::EXCEPTION_ESCAPED.to_string(),
                         value: Some(AnyValue {
                             value: Some(Value::StringValue("False".to_string())),
                         }),
@@ -181,19 +181,19 @@ fn create_exception_event(
             if let (Some(msg), Some(typ)) = (error_message, error_type) {
                 let mut attributes = vec![
                     KeyValue {
-                        key: "exception.type".to_string(),
+                        key: crate::otlp::attributes::EXCEPTION_TYPE.to_string(),
                         value: Some(AnyValue {
                             value: Some(Value::StringValue(typ.to_string())),
                         }),
                     },
                     KeyValue {
-                        key: "exception.message".to_string(),
+                        key: crate::otlp::attributes::EXCEPTION_MESSAGE.to_string(),
                         value: Some(AnyValue {
                             value: Some(Value::StringValue(msg.to_string())),
                         }),
                     },
                     KeyValue {
-                        key: "exception.escaped".to_string(),
+                        key: crate::otlp::attributes::EXCEPTION_ESCAPED.to_string(),
                         value: Some(AnyValue {
                             value: Some(Value::StringValue("False".to_string())),
                         }),
@@ -207,7 +207,7 @@ fn create_exception_event(
                         .collect::<Vec<&str>>()
                         .join("");
                     attributes.push(KeyValue {
-                        key: "exception.stacktrace".to_string(),
+                        key: crate::otlp::attributes::EXCEPTION_STACKTRACE.to_string(),
                         value: Some(AnyValue {
                             value: Some(Value::StringValue(stack_trace_str)),
                         }),
@@ -280,9 +280,10 @@ fn extract_span_links(event_payload: &str) -> Vec<Link> {
 }
 
 fn add_resource_attributes(span: &mut Span) {
+    use crate::otlp::attributes::*;
     if let Some(account_id) = crate::state::global::get_account_id() {
         span.attributes.push(KeyValue {
-            key: "cloud.account.id".to_string(),
+            key: CLOUD_ACCOUNT_ID.to_string(),
             value: Some(AnyValue {
                 value: Some(Value::StringValue(account_id)),
             }),
@@ -290,7 +291,7 @@ fn add_resource_attributes(span: &mut Span) {
     }
     if let Some(function_arn) = crate::state::global::get_function_arn() {
         span.attributes.push(KeyValue {
-            key: "cloud.resource_id".to_string(),
+            key: CLOUD_RESOURCE_ID.to_string(),
             value: Some(AnyValue {
                 value: Some(Value::StringValue(function_arn)),
             }),
@@ -308,14 +309,15 @@ fn extract_http_body_logs(span: &mut Span) {
     let trace_id_hex = hex::encode(&span.trace_id);
     let span_id_hex = hex::encode(&span.span_id);
 
+    use crate::otlp::attributes::*;
     let body_attr_keys: &[(&str, &str, u64)] = &[
         (
-            "http.request.body",
+            HTTP_REQUEST_BODY,
             "http_request_body",
             span.start_time_unix_nano.saturating_add(ONE_MS_NANOS),
         ),
         (
-            "http.response.body",
+            HTTP_RESPONSE_BODY,
             "http_response_body",
             span.end_time_unix_nano.saturating_sub(ONE_MS_NANOS),
         ),
@@ -349,16 +351,17 @@ fn extract_http_body_logs(span: &mut Span) {
     }
 
     span.attributes
-        .retain(|attr| attr.key != "http.request.body" && attr.key != "http.response.body");
+        .retain(|attr| attr.key != HTTP_REQUEST_BODY && attr.key != HTTP_RESPONSE_BODY);
 }
 
 fn extract_span_attributes_from_event(event_payload: &str) -> Vec<KeyValue> {
+    use crate::otlp::attributes::*;
     let mut attributes = Vec::new();
 
     if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(event_payload) {
         if let Some(records) = json_val.get("Records").and_then(|v| v.as_array()) {
             attributes.push(KeyValue {
-                key: "dash0.faas.record_count".to_string(),
+                key: DASH0_FAAS_RECORD_COUNT.to_string(),
                 value: Some(AnyValue {
                     value: Some(Value::IntValue(records.len() as i64)),
                 }),
@@ -371,7 +374,7 @@ fn extract_span_attributes_from_event(event_payload: &str) -> Vec<KeyValue> {
                     .and_then(|v| v.as_str())
                 {
                     attributes.push(KeyValue {
-                        key: "faas.trigger".to_string(),
+                        key: FAAS_TRIGGER.to_string(),
                         value: Some(AnyValue {
                             value: Some(Value::StringValue(trigger.to_string())),
                         }),
@@ -389,7 +392,7 @@ fn extract_span_attributes_from_event(event_payload: &str) -> Vec<KeyValue> {
                     })
                 {
                     attributes.push(KeyValue {
-                        key: "dash0.faas.trigger_arn".to_string(),
+                        key: DASH0_FAAS_TRIGGER_ARN.to_string(),
                         value: Some(AnyValue {
                             value: Some(Value::StringValue(arn.to_string())),
                         }),
@@ -403,14 +406,14 @@ fn extract_span_attributes_from_event(event_payload: &str) -> Vec<KeyValue> {
                 .is_some()
         {
             attributes.push(KeyValue {
-                key: "faas.trigger".to_string(),
+                key: FAAS_TRIGGER.to_string(),
                 value: Some(AnyValue {
                     value: Some(Value::StringValue("aws:event_bridge".to_string())),
                 }),
             });
             if let Some(source) = json_val.get("source").and_then(|v| v.as_str()) {
                 attributes.push(KeyValue {
-                    key: "dash0.faas.event_bridge_source".to_string(),
+                    key: DASH0_FAAS_EVENT_BRIDGE_SOURCE.to_string(),
                     value: Some(AnyValue {
                         value: Some(Value::StringValue(source.to_string())),
                     }),
@@ -418,7 +421,7 @@ fn extract_span_attributes_from_event(event_payload: &str) -> Vec<KeyValue> {
             }
             if let Some(detail_type) = json_val.get("detail-type").and_then(|v| v.as_str()) {
                 attributes.push(KeyValue {
-                    key: "dash0.faas.event_bridge_detail_type".to_string(),
+                    key: DASH0_FAAS_EVENT_BRIDGE_DETAIL_TYPE.to_string(),
                     value: Some(AnyValue {
                         value: Some(Value::StringValue(detail_type.to_string())),
                     }),

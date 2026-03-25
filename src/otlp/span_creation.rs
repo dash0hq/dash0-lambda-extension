@@ -11,15 +11,16 @@ use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span};
 use prost::Message;
 
 pub fn get_span_attributes(invocation_id: &str) -> Vec<KeyValue> {
+    use crate::otlp::attributes::*;
     vec![
         KeyValue {
-            key: "faas.invocation_id".to_string(),
+            key: FAAS_INVOCATION_ID.to_string(),
             value: Some(AnyValue {
                 value: Some(Value::StringValue(invocation_id.to_string())),
             }),
         },
         KeyValue {
-            key: "cloud.resource_id".to_string(),
+            key: CLOUD_RESOURCE_ID.to_string(),
             value: Some(AnyValue {
                 value: Some(Value::StringValue(
                     crate::state::global::get_function_arn()
@@ -28,7 +29,7 @@ pub fn get_span_attributes(invocation_id: &str) -> Vec<KeyValue> {
             }),
         },
         KeyValue {
-            key: "cloud.account.id".to_string(),
+            key: CLOUD_ACCOUNT_ID.to_string(),
             value: Some(AnyValue {
                 value: Some(Value::StringValue(
                     crate::state::global::get_account_id().unwrap_or_else(|| "unknown".to_string()),
@@ -64,7 +65,7 @@ fn create_root_span(
     let mut attrs = get_span_attributes(invocation_id);
     if data.init_duration > 0.0 {
         attrs.push(KeyValue {
-            key: "faas.init_duration".to_string(),
+            key: crate::otlp::attributes::FAAS_INIT_DURATION.to_string(),
             value: Some(AnyValue {
                 value: Some(Value::DoubleValue(data.init_duration)),
             }),
@@ -195,7 +196,7 @@ pub fn create_spans(
 
     let resource = Resource {
         attributes: vec![KeyValue {
-            key: "service.name".to_string(),
+            key: crate::otlp::attributes::SERVICE_NAME.to_string(),
             value: Some(AnyValue {
                 value: Some(Value::StringValue(
                     std::env::var("OTEL_SERVICE_NAME")

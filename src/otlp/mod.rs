@@ -1,5 +1,6 @@
 pub const OTEL_SCHEMA_URL: &str = "https://opentelemetry.io/schemas/1.11.0";
 
+pub mod attributes;
 pub mod exporter;
 pub mod log_mutations;
 pub mod logs_receiver;

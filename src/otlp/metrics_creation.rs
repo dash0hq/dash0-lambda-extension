@@ -84,9 +84,10 @@ fn create_histogram_metric(
 }
 
 fn get_metric_attributes() -> Vec<KeyValue> {
+    use crate::otlp::attributes::*;
     vec![
         KeyValue {
-            key: "cloud.resource_id".to_string(),
+            key: CLOUD_RESOURCE_ID.to_string(),
             value: Some(AnyValue {
                 value: Some(Value::StringValue(
                     crate::state::global::get_function_arn()
@@ -95,7 +96,7 @@ fn get_metric_attributes() -> Vec<KeyValue> {
             }),
         },
         KeyValue {
-            key: "cloud.account.id".to_string(),
+            key: CLOUD_ACCOUNT_ID.to_string(),
             value: Some(AnyValue {
                 value: Some(Value::StringValue(
                     crate::state::global::get_account_id().unwrap_or_else(|| "unknown".to_string()),
@@ -185,7 +186,7 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
 
     let resource = Resource {
         attributes: vec![KeyValue {
-            key: "service.name".to_string(),
+            key: crate::otlp::attributes::SERVICE_NAME.to_string(),
             value: Some(AnyValue {
                 value: Some(Value::StringValue(
                     std::env::var("OTEL_SERVICE_NAME")
