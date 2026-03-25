@@ -190,7 +190,7 @@ pub fn create_spans(
             ..Default::default()
         }),
         spans,
-        schema_url: "https://opentelemetry.io/schemas/1.11.0".to_string(),
+        schema_url: crate::otlp::OTEL_SCHEMA_URL.to_string(),
     };
 
     let resource = Resource {
