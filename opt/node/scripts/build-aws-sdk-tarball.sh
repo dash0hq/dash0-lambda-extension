@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO="https://github.com/mosheshaham-dash0/opentelemetry-js-contrib.git"
-BRANCH="instrument-kinesis"
+BRANCH="instrument-kinesis-inject-context-v2"
 
 # Resolve the target path relative to this script (opt/node/scripts -> ../../build)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
