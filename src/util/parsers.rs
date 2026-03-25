@@ -11,7 +11,7 @@ pub fn extract_invocation_id_from_path(path: &str) -> Option<String> {
 /// Extract invocation id from a Span's attributes (faas.invocation_id)
 pub fn extract_invocation_id(span: &opentelemetry_proto::tonic::trace::v1::Span) -> Option<String> {
     span.attributes.iter().find_map(|attr| {
-        if attr.key == "faas.invocation_id" {
+        if attr.key == crate::otlp::attributes::FAAS_INVOCATION_ID {
             if let Some(opentelemetry_proto::tonic::common::v1::AnyValue {
                 value: Some(opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(val)),
             }) = &attr.value
