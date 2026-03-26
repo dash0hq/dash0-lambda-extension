@@ -5,6 +5,11 @@ setup_otel_env() {
 
   LAMBDA_RESOURCE_ATTRIBUTES="cloud.region=$AWS_REGION,cloud.provider=aws,cloud_platform=aws_lambda,faas.name=$AWS_LAMBDA_FUNCTION_NAME,faas.version=$AWS_LAMBDA_FUNCTION_VERSION,faas.instance=$AWS_LAMBDA_LOG_STREAM_NAME";
 
+  # Add extension git hash if the file was baked in at build time
+  if [[ -f /opt/dash0_git_hash ]]; then
+    LAMBDA_RESOURCE_ATTRIBUTES="$LAMBDA_RESOURCE_ATTRIBUTES,faas.extension.git_hash=$(cat /opt/dash0_git_hash)"
+  fi
+
   if [ -z "${OTEL_RESOURCE_ATTRIBUTES}" ]; then
       export OTEL_RESOURCE_ATTRIBUTES=$LAMBDA_RESOURCE_ATTRIBUTES;
   else
