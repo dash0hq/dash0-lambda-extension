@@ -1,4 +1,3 @@
-use crate::otlp::log_mutations::try_read_env_from_file;
 use crate::state::invocation_data::StoredTrace;
 use crate::state::invocation_entry;
 use crate::util::parsers::{
@@ -97,20 +96,7 @@ pub fn build_synthetic_trace(
     };
 
     let resource = Resource {
-        attributes: vec![KeyValue {
-            key: crate::otlp::attributes::SERVICE_NAME.to_string(),
-            value: Some(AnyValue {
-                value: Some(
-                    opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(
-                        std::env::var("OTEL_SERVICE_NAME")
-                            .ok()
-                            .filter(|v| !v.is_empty())
-                            .or_else(|| try_read_env_from_file("OTEL_SERVICE_NAME"))
-                            .unwrap_or_else(|| "unknown_service".to_string()),
-                    ),
-                ),
-            }),
-        }],
+        attributes: crate::otlp::log_mutations::get_resources_attributes(),
         ..Default::default()
     };
 
