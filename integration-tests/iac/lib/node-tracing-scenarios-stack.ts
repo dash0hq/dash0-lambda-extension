@@ -10,6 +10,7 @@ import * as kinesis from 'aws-cdk-lib/aws-kinesis';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import * as apigatewayv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import * as events from 'aws-cdk-lib/aws-events';
 import * as events_targets from 'aws-cdk-lib/aws-events-targets';
 import * as lambda_event_sources from 'aws-cdk-lib/aws-lambda-event-sources';
@@ -277,6 +278,65 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         environment: {
           ...baseEnvironment,
           API_URL: api.url,
+        },
+      });
+
+      // Scenario 6b: Lambda > HTTP API Gateway > Lambda
+      const httpApiConsumer = new lambda.Function(this, `HttpApiConsumerLambda-${runtimeName}`, {
+        functionName: `${prefix}tracing-httpapi-consumer-${runtimeName}`,
+        runtime,
+        handler: 'consumer.handler',
+        code: nodeCode,
+        layers: [props.layer],
+        role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: baseEnvironment,
+      });
+
+      const httpApi = new apigatewayv2.CfnApi(this, `TracingTestHttpApi-${runtimeName}`, {
+        name: `${prefix}tracing-test-http-api-${runtimeName}`,
+        protocolType: 'HTTP',
+      });
+
+      const httpApiIntegration = new apigatewayv2.CfnIntegration(this, `TracingTestHttpApiIntegration-${runtimeName}`, {
+        apiId: httpApi.ref,
+        integrationType: 'AWS_PROXY',
+        integrationUri: httpApiConsumer.functionArn,
+        payloadFormatVersion: '2.0',
+      });
+
+      new apigatewayv2.CfnRoute(this, `TracingTestHttpApiRoute-${runtimeName}`, {
+        apiId: httpApi.ref,
+        routeKey: 'POST /',
+        target: `integrations/${httpApiIntegration.ref}`,
+      });
+
+      new apigatewayv2.CfnStage(this, `TracingTestHttpApiStage-${runtimeName}`, {
+        apiId: httpApi.ref,
+        stageName: '$default',
+        autoDeploy: true,
+      });
+
+      httpApiConsumer.addPermission(`HttpApiInvokePermission-${runtimeName}`, {
+        principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+        sourceArn: `arn:aws:execute-api:${this.region}:${this.account}:${httpApi.ref}/*/*`,
+      });
+
+      const httpApiUrl = `https://${httpApi.ref}.execute-api.${this.region}.amazonaws.com/`;
+
+      const httpApiProducer = new lambda.Function(this, `HttpApiProducerLambda-${runtimeName}`, {
+        functionName: `${prefix}tracing-httpapi-producer-${runtimeName}`,
+        runtime,
+        handler: 'apigateway_producer.handler',
+        code: nodeCode,
+        layers: [props.layer],
+        role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: {
+          ...baseEnvironment,
+          API_URL: httpApiUrl,
         },
       });
 

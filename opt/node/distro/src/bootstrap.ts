@@ -31,6 +31,7 @@ import Dash0RedisInstrumentation from './instrumentations/redis/RedisInstrumenta
 import Dash0UndiciInstrumentation from "./instrumentations/undici/UndiciInstrumentation";
 import { Dash0AwsSdkV3LibInstrumentation } from './instrumentations/aws-sdk';
 
+import { CompositePropagator, W3CBaggagePropagator } from '@opentelemetry/core';
 import { Dash0W3CTraceContextPropagator } from './propagator/w3cTraceContextPropagator';
 import { getSpanAttributeMaxLength } from './utils';
 import { safeRequire } from './requireUtils';
@@ -189,7 +190,13 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
     });
 
     tracerProvider.register({
-      propagator: new AWSXRayLambdaPropagator(),
+      propagator: new CompositePropagator({
+        propagators: [
+          new Dash0W3CTraceContextPropagator(),
+          new W3CBaggagePropagator(),
+          new AWSXRayLambdaPropagator(),
+        ],
+      }),
     });
 
     logger.info(
