@@ -75,6 +75,7 @@ jobs:
 
   deploy:
     name: Publish Layers
+    if: github.event.pull_request.head.repo.full_name == github.repository
     needs: build
     uses: ./.github/workflows/publish.yml
     with:
@@ -84,6 +85,7 @@ jobs:
 
   integration-test:
     name: Integration Test
+    if: github.event.pull_request.head.repo.full_name == github.repository
     needs: deploy
     runs-on: ubuntu-latest
     environment: staging

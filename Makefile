@@ -88,6 +88,7 @@ build/$(ZIP_NAME_PYTHON): build/dash0_x86_64 build/dash0_aarch64 opt/entrypoint 
 	@cp opt/python/wrapper build/stage-python/wrapper
 	@cp -r build/python build/stage-python/python
 	@cp opt/python/otel_wrapper.py build/stage-python/python/otel_wrapper.py
+	@git rev-parse HEAD > build/stage-python/dash0_git_hash
 	@cd build/stage-python && zip -r ../$(ZIP_NAME_PYTHON) *
 
 
@@ -114,6 +115,7 @@ build/$(ZIP_NAME_NODE): build/dash0_x86_64 build/dash0_aarch64 opt/entrypoint op
 	@cp -r opt/node/node_modules/acorn build/stage-node/node_modules/
 	@cp -r opt/node/node_modules/acorn-import-attributes build/stage-node/node_modules/ 2>/dev/null || true
 	@cp -r opt/node/node_modules/cjs-module-lexer build/stage-node/node_modules/
+	@git rev-parse HEAD > build/stage-node/dash0_git_hash
 	@cd build/stage-node && zip -r ../$(ZIP_NAME_NODE) *
 
 
@@ -137,6 +139,7 @@ build/$(ZIP_NAME_JAVA): build/dash0_x86_64 build/dash0_aarch64 opt/entrypoint op
 	@cp opt/java/wrapper build/stage-java/wrapper
 	@cp $(JAVA_DISTRO_JAR) build/stage-java/java/lib/dash0-opentelemetry.jar
 	@cp $(JAVA_CLASSPATH_LIBS_DIR)/*.jar build/stage-java/java/lib/
+	@git rev-parse HEAD > build/stage-java/dash0_git_hash
 	@cd build/stage-java && zip -r ../$(ZIP_NAME_JAVA) *
 
 
@@ -150,6 +153,7 @@ build/$(ZIP_NAME_MANUAL): build/dash0_x86_64 build/dash0_aarch64 opt/entrypoint 
 	@cp opt/entrypoint build/stage-manual/extensions/dash0
 	@cp opt/shared.sh build/stage-manual/shared.sh
 	@cp opt/manual/wrapper build/stage-manual/wrapper
+	@git rev-parse HEAD > build/stage-manual/dash0_git_hash
 	@cd build/stage-manual && zip -r ../$(ZIP_NAME_MANUAL) *
 
 

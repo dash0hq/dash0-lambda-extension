@@ -5,8 +5,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "deploy": "serverless deploy",
-    "invoke": "serverless invoke local -f hello",
-    "local": "DASH0_TOKEN=auth_oEiAAAy5hZvVsEAADPm4uDyV7OcBmU4B DASH0_ENDPOINT=https://ingress.eu-west-1.aws.dash0-dev.com:4318 node invoke-local.js"
+    "invoke": "serverless invoke local -f hello"
   },
   "keywords": [],
   "author": "",

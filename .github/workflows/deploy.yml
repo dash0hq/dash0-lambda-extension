@@ -84,7 +84,7 @@ jobs:
           JAVA="${{ steps.layers.outputs.java_version }}"
           MANUAL="${{ steps.layers.outputs.manual_version }}"
 
-          cat <<EOF | gh release create "${{ steps.tag.outputs.tag }}" --title "${{ steps.tag.outputs.tag }}" --notes-file -
+          cat <<EOF > /tmp/release-notes.md
           ## Layer ARNs
 
           **Python:**
@@ -99,3 +99,8 @@ jobs:
           **Manual:**
           \`arn:aws:lambda:<region>:115813213817:layer:dash0-extension-manual:${MANUAL}\`
           EOF
+
+          gh release create "${{ steps.tag.outputs.tag }}" \
+            --title "${{ steps.tag.outputs.tag }}" \
+            --notes-file /tmp/release-notes.md \
+            --generate-notes
