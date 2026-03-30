@@ -7,7 +7,14 @@ import {
     invokeFunction,
     RESOURCE_PREFIX,
 } from './utils';
-import { DASH0_ENDPOINT, DASH0_LAMBDA_TESTS_DATASET, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS } from './config';
+import {
+    DASH0_ENDPOINT,
+    DASH0_LAMBDA_TESTS_DATASET,
+    DASH0_TOKEN,
+    MAX_ATTEMPTS,
+    RETRY_DELAY_MS,
+    TEST_TIMEOUT_MS
+} from './config';
 
 const getRequestPayload = (filter: Array<{ operator: string; key: string; value: string }>) => {
     const now = Date.now();
@@ -78,9 +85,6 @@ const verifySingleTracedInvocation = async (functionName: string) => {
 
     const traceId = handlerSpan.traceId;
     const handlerParentSpanId = handlerSpan.parentSpanId;
-
-    // Service and execution environment spans are sent on the next invocation, so trigger one
-    await invokeFunction(functionName, true, false);
 
     // Step 2: Query by service.name to find the service span and execution environment span
     let serviceSpan: any = null;
@@ -155,7 +159,7 @@ describe.concurrent('Single-traced Lambda invocation', () => {
                 console.log(`Starting test for ${functionName}`, new Date().toISOString());
                 await verifySingleTracedInvocation(functionName);
             },
-            120_000,
+            TEST_TIMEOUT_MS,
         );
     }
 });
