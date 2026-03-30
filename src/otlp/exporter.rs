@@ -119,19 +119,12 @@ pub async fn flush_metrics() {
 }
 
 fn build_metrics_request(metrics: Vec<StoredMetric>) -> Option<Vec<u8>> {
-    let mut metrics_iter = metrics.into_iter();
-    let base_metric = match metrics_iter.next() {
-        Some(metric) => metric,
-        None => {
-            tracing::error!(
-                "[{}] build_metrics_request called with empty metrics vector",
-                crate::log_prefix()
-            );
-            return None;
-        }
-    };
-
-    let combined_resource_metrics = combine_metrics(&base_metric, metrics_iter);
+    let combined_resource_metrics = combine_items(
+        &metrics,
+        |m| &m.body,
+        |b| ExportMetricsServiceRequest::decode(b).map(|d| d.resource_metrics),
+        "metric",
+    );
 
     if combined_resource_metrics.is_empty() {
         return None;
@@ -144,53 +137,13 @@ fn build_metrics_request(metrics: Vec<StoredMetric>) -> Option<Vec<u8>> {
     Some(combined_export.encode_to_vec())
 }
 
-fn combine_metrics(
-    base_metric: &StoredMetric,
-    metrics_iter: std::vec::IntoIter<StoredMetric>,
-) -> Vec<opentelemetry_proto::tonic::metrics::v1::ResourceMetrics> {
-    let mut combined_resource_metrics = Vec::new();
-
-    let process_metric =
-        |metric: &StoredMetric,
-         combined: &mut Vec<opentelemetry_proto::tonic::metrics::v1::ResourceMetrics>| {
-            let decoded = match ExportMetricsServiceRequest::decode(metric.body.as_slice()) {
-                Ok(d) => d,
-                Err(err) => {
-                    tracing::error!(
-                        "[{}] Failed to decode metric payload: {}",
-                        crate::log_prefix(),
-                        err
-                    );
-                    return;
-                }
-            };
-
-            combined.extend(decoded.resource_metrics);
-        };
-
-    process_metric(base_metric, &mut combined_resource_metrics);
-
-    for metric in metrics_iter {
-        process_metric(&metric, &mut combined_resource_metrics);
-    }
-
-    combined_resource_metrics
-}
-
 fn build_logs_request(logs: Vec<StoredLog>) -> Option<Vec<u8>> {
-    let mut logs_iter = logs.into_iter();
-    let base_log = match logs_iter.next() {
-        Some(log) => log,
-        None => {
-            tracing::error!(
-                "[{}] build_logs_request called with empty logs vector",
-                crate::log_prefix()
-            );
-            return None;
-        }
-    };
-
-    let combined_resource_logs = combine_logs(&base_log, logs_iter);
+    let combined_resource_logs = combine_items(
+        &logs,
+        |l| &l.body,
+        |b| ExportLogsServiceRequest::decode(b).map(|d| d.resource_logs),
+        "log",
+    );
 
     if combined_resource_logs.is_empty() {
         return None;
@@ -201,39 +154,6 @@ fn build_logs_request(logs: Vec<StoredLog>) -> Option<Vec<u8>> {
     };
 
     Some(combined_export.encode_to_vec())
-}
-
-fn combine_logs(
-    base_log: &StoredLog,
-    logs_iter: std::vec::IntoIter<StoredLog>,
-) -> Vec<opentelemetry_proto::tonic::logs::v1::ResourceLogs> {
-    let mut combined_resource_logs = Vec::new();
-
-    let process_log =
-        |log: &StoredLog,
-         combined: &mut Vec<opentelemetry_proto::tonic::logs::v1::ResourceLogs>| {
-            let decoded = match ExportLogsServiceRequest::decode(log.body.as_slice()) {
-                Ok(d) => d,
-                Err(err) => {
-                    tracing::error!(
-                        "[{}] Failed to decode log payload: {}",
-                        crate::log_prefix(),
-                        err
-                    );
-                    return;
-                }
-            };
-
-            combined.extend(decoded.resource_logs);
-        };
-
-    process_log(base_log, &mut combined_resource_logs);
-
-    for log in logs_iter {
-        process_log(&log, &mut combined_resource_logs);
-    }
-
-    combined_resource_logs
 }
 
 pub async fn send_traces(traces: Vec<StoredTrace>) {
@@ -259,23 +179,18 @@ pub async fn send_traces(traces: Vec<StoredTrace>) {
 }
 
 fn _build_traces_request(traces: Vec<StoredTrace>) -> Option<Vec<u8>> {
-    let mut traces_iter = traces.into_iter();
-    let base_trace = match traces_iter.next() {
-        Some(trace) => trace,
-        None => {
-            tracing::error!(
-                "[{}] _build_traces_request called with empty traces vector",
-                crate::log_prefix()
-            );
-            return None;
-        }
-    };
-
-    let combined_resource_spans = combine_traces(&base_trace, traces_iter);
+    let mut combined_resource_spans = combine_items(
+        &traces,
+        |t| &t.body,
+        |b| ExportTraceServiceRequest::decode(b).map(|d| d.resource_spans),
+        "trace",
+    );
 
     if combined_resource_spans.is_empty() {
         return None;
     }
+
+    add_env_vars(&mut combined_resource_spans);
 
     let combined_export = ExportTraceServiceRequest {
         resource_spans: combined_resource_spans,
@@ -437,39 +352,27 @@ fn add_env_vars(resource_spans: &mut [opentelemetry_proto::tonic::trace::v1::Res
     }
 }
 
-fn combine_traces(
-    base_trace: &StoredTrace,
-    traces_iter: std::vec::IntoIter<StoredTrace>,
-) -> Vec<opentelemetry_proto::tonic::trace::v1::ResourceSpans> {
-    let mut combined_resource_spans = Vec::new();
-
-    let process_trace =
-        |trace: &StoredTrace,
-         combined: &mut Vec<opentelemetry_proto::tonic::trace::v1::ResourceSpans>| {
-            let decoded = match ExportTraceServiceRequest::decode(trace.body.as_slice()) {
-                Ok(d) => d,
-                Err(err) => {
-                    tracing::error!(
-                        "[{}] Failed to decode trace payload: {}",
-                        crate::log_prefix(),
-                        err
-                    );
-                    return;
-                }
-            };
-
-            combined.extend(decoded.resource_spans);
-        };
-
-    process_trace(base_trace, &mut combined_resource_spans);
-
-    for trace in traces_iter {
-        process_trace(&trace, &mut combined_resource_spans);
+fn combine_items<S, R>(
+    items: &[S],
+    get_body: impl Fn(&S) -> &[u8],
+    decode_and_extract: impl Fn(&[u8]) -> Result<Vec<R>, prost::DecodeError>,
+    item_type: &str,
+) -> Vec<R> {
+    let mut combined = Vec::new();
+    for item in items {
+        match decode_and_extract(get_body(item)) {
+            Ok(resources) => combined.extend(resources),
+            Err(err) => {
+                tracing::error!(
+                    "[{}] Failed to decode {} payload: {}",
+                    crate::log_prefix(),
+                    item_type,
+                    err
+                );
+            }
+        }
     }
-
-    add_env_vars(&mut combined_resource_spans);
-
-    combined_resource_spans
+    combined
 }
 
 #[cfg(test)]
@@ -504,80 +407,94 @@ mod tests {
         }
     }
 
+    fn combine_test_traces(traces: &[StoredTrace]) -> Vec<ResourceSpans> {
+        combine_items(
+            traces,
+            |t| &t.body,
+            |b| ExportTraceServiceRequest::decode(b).map(|d| d.resource_spans),
+            "trace",
+        )
+    }
+
     #[test]
     fn test_combine_traces_single_valid_trace() {
-        let base_trace = create_valid_trace(vec!["inv-1".to_string()], 2);
-        let traces_iter = vec![].into_iter();
+        let traces = vec![create_valid_trace(vec!["inv-1".to_string()], 2)];
 
-        let resource_spans = combine_traces(&base_trace, traces_iter);
+        let resource_spans = combine_test_traces(&traces);
 
         assert_eq!(resource_spans.len(), 2);
     }
 
     #[test]
     fn test_combine_traces_multiple_valid_traces() {
-        let base_trace = create_valid_trace(vec!["inv-1".to_string()], 2);
-        let trace2 = create_valid_trace(vec!["inv-2".to_string()], 3);
-        let trace3 = create_valid_trace(vec!["inv-3".to_string()], 1);
-        let traces_iter = vec![trace2, trace3].into_iter();
+        let traces = vec![
+            create_valid_trace(vec!["inv-1".to_string()], 2),
+            create_valid_trace(vec!["inv-2".to_string()], 3),
+            create_valid_trace(vec!["inv-3".to_string()], 1),
+        ];
 
-        let resource_spans = combine_traces(&base_trace, traces_iter);
+        let resource_spans = combine_test_traces(&traces);
 
         assert_eq!(resource_spans.len(), 6); // 2 + 3 + 1
     }
 
     #[test]
     fn test_combine_traces_with_invalid_base_trace() {
-        let base_trace = create_invalid_trace(vec!["inv-1".to_string()]);
-        let trace2 = create_valid_trace(vec!["inv-2".to_string()], 2);
-        let traces_iter = vec![trace2].into_iter();
+        let traces = vec![
+            create_invalid_trace(vec!["inv-1".to_string()]),
+            create_valid_trace(vec!["inv-2".to_string()], 2),
+        ];
 
-        let resource_spans = combine_traces(&base_trace, traces_iter);
+        let resource_spans = combine_test_traces(&traces);
 
         assert_eq!(resource_spans.len(), 2); // Only from trace2
     }
 
     #[test]
     fn test_combine_traces_with_invalid_subsequent_trace() {
-        let base_trace = create_valid_trace(vec!["inv-1".to_string()], 2);
-        let trace2 = create_invalid_trace(vec!["inv-2".to_string()]);
-        let trace3 = create_valid_trace(vec!["inv-3".to_string()], 1);
-        let traces_iter = vec![trace2, trace3].into_iter();
+        let traces = vec![
+            create_valid_trace(vec!["inv-1".to_string()], 2),
+            create_invalid_trace(vec!["inv-2".to_string()]),
+            create_valid_trace(vec!["inv-3".to_string()], 1),
+        ];
 
-        let resource_spans = combine_traces(&base_trace, traces_iter);
+        let resource_spans = combine_test_traces(&traces);
 
         assert_eq!(resource_spans.len(), 3); // 2 from base + 1 from trace3
     }
 
     #[test]
     fn test_combine_traces_all_invalid() {
-        let base_trace = create_invalid_trace(vec!["inv-1".to_string()]);
-        let trace2 = create_invalid_trace(vec!["inv-2".to_string()]);
-        let traces_iter = vec![trace2].into_iter();
+        let traces = vec![
+            create_invalid_trace(vec!["inv-1".to_string()]),
+            create_invalid_trace(vec!["inv-2".to_string()]),
+        ];
 
-        let resource_spans = combine_traces(&base_trace, traces_iter);
+        let resource_spans = combine_test_traces(&traces);
 
         assert!(resource_spans.is_empty());
     }
 
     #[test]
     fn test_combine_traces_with_multiple_invocation_ids() {
-        let base_trace = create_valid_trace(vec!["inv-1".to_string(), "inv-2".to_string()], 1);
-        let trace2 = create_valid_trace(vec!["inv-3".to_string(), "inv-4".to_string()], 1);
-        let traces_iter = vec![trace2].into_iter();
+        let traces = vec![
+            create_valid_trace(vec!["inv-1".to_string(), "inv-2".to_string()], 1),
+            create_valid_trace(vec!["inv-3".to_string(), "inv-4".to_string()], 1),
+        ];
 
-        let resource_spans = combine_traces(&base_trace, traces_iter);
+        let resource_spans = combine_test_traces(&traces);
 
         assert_eq!(resource_spans.len(), 2);
     }
 
     #[test]
     fn test_combine_traces_empty_resource_spans() {
-        let base_trace = create_valid_trace(vec!["inv-1".to_string()], 0);
-        let trace2 = create_valid_trace(vec!["inv-2".to_string()], 0);
-        let traces_iter = vec![trace2].into_iter();
+        let traces = vec![
+            create_valid_trace(vec!["inv-1".to_string()], 0),
+            create_valid_trace(vec!["inv-2".to_string()], 0),
+        ];
 
-        let resource_spans = combine_traces(&base_trace, traces_iter);
+        let resource_spans = combine_test_traces(&traces);
 
         assert!(resource_spans.is_empty());
     }
