@@ -7,6 +7,7 @@ import {
     invokeFunction,
     RESOURCE_PREFIX,
 } from "./utils";
+import {TEST_TIMEOUT_MS} from "./config";
 
 
 const verifyDockerizedInvocation = async (functionName: string, runtime: string) => {
@@ -58,7 +59,7 @@ describe.concurrent('Dockerized Lambda invocation', () => {
             const functionName = `${RESOURCE_PREFIX}dockerized-${runtime}-${architecture}`;
             it(functionName, async () => {
                 await verifyDockerizedInvocation(functionName, runtime);
-            }, 120_000);
+            }, TEST_TIMEOUT_MS);
         }
     }
 });

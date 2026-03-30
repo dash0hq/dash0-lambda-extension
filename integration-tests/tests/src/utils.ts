@@ -1,7 +1,14 @@
 import {setTimeout as delay} from "timers/promises";
 import fetch from "node-fetch";
 import {expect, it} from "vitest";
-import {DASH0_ENDPOINT, DASH0_LAMBDA_TESTS_DATASET, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./config";
+import {
+    DASH0_ENDPOINT,
+    DASH0_LAMBDA_TESTS_DATASET,
+    DASH0_TOKEN,
+    MAX_ATTEMPTS,
+    RETRY_DELAY_MS,
+    TEST_TIMEOUT_MS
+} from "./config";
 import {InvokeCommand, LambdaClient} from "@aws-sdk/client-lambda";
 
 export type LogToCheck = { message: string; severity?: string; isJson?: boolean; spanId?: string; attributes?: Record<string, string> };
@@ -542,7 +549,7 @@ export const runAllTests = (scenario: string, runtimes: string[], verifySuccessI
                             console.log(`Starting test for ${functionName}`, new Date().toISOString());
                             await verifySuccessInvocation(functionName, invocationEnd, traced);
                         },
-                        120_000
+                        TEST_TIMEOUT_MS
                     );
                 }
             }
