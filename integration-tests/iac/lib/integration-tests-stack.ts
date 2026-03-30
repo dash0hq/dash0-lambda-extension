@@ -193,6 +193,7 @@ class NodeStack extends cdk.NestedStack {
           DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
           DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
           DASH0_EXTENSION_LOG_LEVEL: "info",
+          DASH0_XRAY_TRACES_ENABLED: "true",
         },
         tracing: lambda.Tracing.ACTIVE,
         logGroup: props.logGroup,
