@@ -7,6 +7,7 @@ import {
     invokeFunction,
     RESOURCE_PREFIX,
 } from "./utils";
+import {TEST_TIMEOUT_MS} from "./config";
 
 const verifyManualInstrumentation = async (functionName: string) => {
     const invocationId = await invokeFunction(functionName, true, false);
@@ -53,7 +54,7 @@ describe.concurrent('Manual instrumentation Lambda', () => {
                 console.log(`Starting test for ${functionName}`, new Date().toISOString());
                 await verifyManualInstrumentation(functionName);
             },
-            120_000
+            TEST_TIMEOUT_MS
         );
     }
 });

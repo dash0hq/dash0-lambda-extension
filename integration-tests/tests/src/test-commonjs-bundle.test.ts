@@ -7,6 +7,7 @@ import {
     invokeFunction,
     RESOURCE_PREFIX,
 } from "./utils";
+import {TEST_TIMEOUT_MS} from "./config";
 
 const verifyCjsSuccess = async (functionName: string) => {
     const invocationPayload = JSON.stringify({ parameter1: 'right' });
@@ -53,7 +54,7 @@ describe.concurrent('CJS-bundled Lambda invocation', () => {
                 console.log(`Starting test for ${functionName}`, new Date().toISOString());
                 await verifyCjsSuccess(functionName);
             },
-            120_000
+            TEST_TIMEOUT_MS
         );
     }
 });

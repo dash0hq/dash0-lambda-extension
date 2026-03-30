@@ -1,7 +1,14 @@
 import fetch from 'node-fetch';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
-import {DASH0_ENDPOINT, DASH0_LAMBDA_TESTS_DATASET, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./config";
+import {
+    DASH0_ENDPOINT,
+    DASH0_LAMBDA_TESTS_DATASET,
+    DASH0_TOKEN,
+    MAX_ATTEMPTS,
+    RETRY_DELAY_MS,
+    TEST_TIMEOUT_MS
+} from "./config";
 import { invokeFunction, RESOURCE_PREFIX } from "./utils";
 
 
@@ -67,7 +74,7 @@ describe.concurrent('Python dependency conflict', { retry: 1 }, () => {
                 console.log(`Starting test for ${functionName}`, new Date().toISOString());
                 await verifyDependencyConflict(functionName);
             },
-            120_000,
+            TEST_TIMEOUT_MS,
         );
     }
 });
