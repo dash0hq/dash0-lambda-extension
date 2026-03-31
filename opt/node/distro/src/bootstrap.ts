@@ -1,3 +1,5 @@
+console.log(`[import] top file`);
+
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { registerInstrumentations } from '@opentelemetry/instrumentation';
 import type { Resource } from '@opentelemetry/resources';
@@ -10,6 +12,9 @@ import {
 } from '@opentelemetry/resources';
 import {BasicTracerProvider, BatchSpanProcessor, SimpleSpanProcessor} from '@opentelemetry/sdk-trace-base';
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
+
+console.log(`[import] after NodeTracerProvider `);
+
 
 import {
   DEFAULT_DASH0_EXTENSION_ENDPOINT,
@@ -30,6 +35,9 @@ import Dash0PrismaInstrumentation from './instrumentations/prisma/PrismaInstrume
 import Dash0RedisInstrumentation from './instrumentations/redis/RedisInstrumentation';
 import Dash0UndiciInstrumentation from "./instrumentations/undici/UndiciInstrumentation";
 import { Dash0AwsSdkV3LibInstrumentation } from './instrumentations/aws-sdk';
+
+console.log(`[import] after Dash0AwsSdkV3LibInstrumentation `);
+
 
 import { CompositePropagator, W3CBaggagePropagator } from '@opentelemetry/core';
 import { Dash0W3CTraceContextPropagator } from './propagator/w3cTraceContextPropagator';
@@ -59,6 +67,9 @@ export interface Dash0SdkInitialization {
 import { dirname, join } from 'path';
 import { logger } from './logging';
 
+const _t0 = performance.now();
+console.log(`[init] module body start: ${_t0.toFixed(1)}ms`);
+
 const traceEndpoint = process.env.DASH0_EXTENSION_ENDPOINT || DEFAULT_DASH0_EXTENSION_ENDPOINT;
 
 let isTraceInitialized = false;
@@ -82,6 +93,8 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
   isTraceInitialized = true;
 
   try {
+    logger.info(`[init] init() called: ${(performance.now() - _t0).toFixed(1)}ms`);
+
     if (process.env.DASH0_SWITCH_OFF?.toLowerCase() === 'true') {
       logger.info(
         'The Dash0 OpenTelemetry Distro is switched off (the "DASH0_SWITCH_OFF" environment variable is set): no telemetry will be sent to Dash0.'
@@ -95,6 +108,8 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
       {};
 
     const ignoredHostnames = [new URL(traceEndpoint).hostname];
+
+    logger.info(`[init] setup done: ${(performance.now() - _t0).toFixed(1)}ms`);
 
     const instrumentationsToInstall = [
       new Dash0AmqplibInstrumentation(),
@@ -113,6 +128,8 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
       new Dash0UndiciInstrumentation(),
     ].filter((i) => i.isApplicable());
 
+    logger.info(`[init] instrumentations created (${instrumentationsToInstall.length}): ${(performance.now() - _t0).toFixed(1)}ms`);
+
     /*
      * Register instrumentation globally, so that all tracer providers
      * will receive traces. This may be necessary when there is already
@@ -126,6 +143,7 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
       i.getInstrumentedModule()
     );
 
+    logger.info(`[init] instrumentations registered: ${(performance.now() - _t0).toFixed(1)}ms`);
     logger.debug(`Instrumented modules: ${instrumentedModules.join(', ')}`);
 
     const dashToken = process.env.DASH0_TOKEN;
@@ -153,6 +171,8 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
 
     const resource = defaultResource()
       .merge(infrastructureResource)
+
+    logger.info(`[init] resource detection: ${(performance.now() - _t0).toFixed(1)}ms`);
 
     // Build span processors array
     const spanProcessors = [];
@@ -189,6 +209,8 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
       spanProcessors,
     });
 
+    logger.info(`[init] tracer provider created: ${(performance.now() - _t0).toFixed(1)}ms`);
+
     tracerProvider.register({
       propagator: new CompositePropagator({
         propagators: [
@@ -199,8 +221,10 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
       }),
     });
 
+    logger.info(`[init] provider registered: ${(performance.now() - _t0).toFixed(1)}ms`);
+
     logger.info(
-      `Dash0 OpenTelemetry Distro started`
+      `Dash0 OpenTelemetry Distro started in ${(performance.now() - _t0).toFixed(1)}ms`
     );
 
     return {
