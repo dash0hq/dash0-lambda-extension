@@ -160,8 +160,8 @@ async fn fetch_secret_value(secret_arn: &str) -> Result<String, String> {
         hex_sha256(canonical_request.as_bytes())
     );
 
-    let signing_key = derive_signing_key(&secret_key, &date_stamp, &region, "secretsmanager");
-    let signature = hex::encode(hmac_sha256(&signing_key, string_to_sign.as_bytes()));
+    let signing_key = derive_signing_key(&secret_key, &date_stamp, &region, "secretsmanager")?;
+    let signature = hex::encode(hmac_sha256(&signing_key, string_to_sign.as_bytes())?);
 
     let authorization = format!(
         "AWS4-HMAC-SHA256 Credential={}/{}, SignedHeaders={}, Signature={}",
@@ -233,20 +233,26 @@ fn hex_sha256(data: &[u8]) -> String {
     hex::encode(hasher.finalize())
 }
 
-fn hmac_sha256(key: &[u8], data: &[u8]) -> Vec<u8> {
-    let mut mac = Hmac::<Sha256>::new_from_slice(key).expect("HMAC can take key of any size");
+fn hmac_sha256(key: &[u8], data: &[u8]) -> Result<Vec<u8>, String> {
+    let mut mac =
+        Hmac::<Sha256>::new_from_slice(key).map_err(|e| format!("HMAC key error: {}", e))?;
     mac.update(data);
-    mac.finalize().into_bytes().to_vec()
+    Ok(mac.finalize().into_bytes().to_vec())
 }
 
 /// Derive the SigV4 signing key.
-fn derive_signing_key(secret_key: &str, date_stamp: &str, region: &str, service: &str) -> Vec<u8> {
+fn derive_signing_key(
+    secret_key: &str,
+    date_stamp: &str,
+    region: &str,
+    service: &str,
+) -> Result<Vec<u8>, String> {
     let k_date = hmac_sha256(
         format!("AWS4{}", secret_key).as_bytes(),
         date_stamp.as_bytes(),
-    );
-    let k_region = hmac_sha256(&k_date, region.as_bytes());
-    let k_service = hmac_sha256(&k_region, service.as_bytes());
+    )?;
+    let k_region = hmac_sha256(&k_date, region.as_bytes())?;
+    let k_service = hmac_sha256(&k_region, service.as_bytes())?;
     hmac_sha256(&k_service, b"aws4_request")
 }
 
@@ -328,7 +334,8 @@ mod tests {
             "20120215",
             "us-east-1",
             "iam",
-        );
+        )
+        .unwrap();
         let expected = "f4780e2d9f65fa895f9c67b32ce1baf0b0d8a43505a000a1a9e090d414db404d";
         assert_eq!(hex::encode(&key), expected);
     }
