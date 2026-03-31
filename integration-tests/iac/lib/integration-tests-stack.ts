@@ -236,6 +236,7 @@ class JavaStack extends cdk.NestedStack {
       handler: 'org.example.HelloHandler::handleRequest',
       code: javaCode,
       memorySize: 512,
+      dash0TokenSecretArn: props.dash0TokenSecretArn,
     };
     const runtimes = [lambda.Runtime.JAVA_25, lambda.Runtime.JAVA_21, lambda.Runtime.JAVA_17];
 
@@ -381,6 +382,7 @@ export class IntegrationTestsStack extends cdk.Stack {
       layer: javaLayer,
       logGroup: sharedLogGroup,
       prefix,
+      dash0TokenSecretArn: dash0TokenSecret.secretArn,
     });
 
     new ManualStack(this, 'ManualStack', {
