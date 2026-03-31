@@ -10,6 +10,12 @@ static DASH0_TOKEN: OnceCell<Option<String>> = OnceCell::new();
 /// Must be called once at startup from an async context.
 pub async fn init_dash0_token() {
     let token = resolve_token().await;
+    if token.is_none() {
+        tracing::warn!(
+            "[{}] No Dash0 token configured, no telemetry will be collected",
+            crate::log_prefix()
+        );
+    }
     if DASH0_TOKEN.set(token).is_err() {
         tracing::warn!("[{}] Dash0 token already initialized", crate::log_prefix());
     }
@@ -113,8 +119,8 @@ async fn fetch_secret_value(secret_arn: &str) -> Result<String, String> {
     let region = parse_region_from_arn(secret_arn)?;
     let host = format!("secretsmanager.{}.amazonaws.com", region);
 
-    let access_key = std::env::var("AWS_ACCESS_KEY_ID")
-        .map_err(|_| "AWS_ACCESS_KEY_ID not set".to_string())?;
+    let access_key =
+        std::env::var("AWS_ACCESS_KEY_ID").map_err(|_| "AWS_ACCESS_KEY_ID not set".to_string())?;
     let secret_key = std::env::var("AWS_SECRET_ACCESS_KEY")
         .map_err(|_| "AWS_SECRET_ACCESS_KEY not set".to_string())?;
     let session_token = std::env::var("AWS_SESSION_TOKEN").ok();
@@ -190,7 +196,12 @@ async fn fetch_secret_value(secret_arn: &str) -> Result<String, String> {
     let timeout = std::time::Duration::from_millis(crate::config::request_timeout_ms());
     let response = tokio::time::timeout(timeout, client.request(request))
         .await
-        .map_err(|_| format!("Secrets Manager request timed out after {}ms", timeout.as_millis()))?
+        .map_err(|_| {
+            format!(
+                "Secrets Manager request timed out after {}ms",
+                timeout.as_millis()
+            )
+        })?
         .map_err(|e| format!("Secrets Manager request failed: {}", e))?;
 
     let status = response.status();
@@ -223,8 +234,7 @@ fn hex_sha256(data: &[u8]) -> String {
 }
 
 fn hmac_sha256(key: &[u8], data: &[u8]) -> Vec<u8> {
-    let mut mac =
-        Hmac::<Sha256>::new_from_slice(key).expect("HMAC can take key of any size");
+    let mut mac = Hmac::<Sha256>::new_from_slice(key).expect("HMAC can take key of any size");
     mac.update(data);
     mac.finalize().into_bytes().to_vec()
 }

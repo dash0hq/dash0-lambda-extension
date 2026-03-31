@@ -264,6 +264,10 @@ async fn send_request(
     item_count: usize,
     item_type: &str,
 ) -> Result<(), ()> {
+    if crate::config::get_dash0_token().is_none() {
+        return Ok(());
+    }
+
     let max_attempts = request_retries() + 1;
 
     for attempt in 1..=max_attempts {
