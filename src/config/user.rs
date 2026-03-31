@@ -45,26 +45,6 @@ pub fn request_retries() -> usize {
     }
 }
 
-pub fn is_extract_span_links_in_consumer() -> bool {
-    match std::env::var("DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER") {
-        Ok(val) => matches!(
-            val.as_str(),
-            "1" | "true" | "TRUE" | "True" | "yes" | "YES" | "Yes" | "y" | "Y"
-        ),
-        Err(_) => true,
-    }
-}
-
-pub fn is_remove_lambda_parent_span() -> bool {
-    match std::env::var("DASH0_REMOVE_LAMBDA_PARENT_SPAN") {
-        Ok(val) => matches!(
-            val.as_str(),
-            "1" | "true" | "TRUE" | "True" | "yes" | "YES" | "Yes" | "y" | "Y"
-        ),
-        Err(_) => true,
-    }
-}
-
 pub fn is_create_payload_log_records() -> bool {
     match std::env::var("DASH0_CREATE_PAYLOAD_LOG_RECORDS") {
         Ok(val) => matches!(
@@ -86,6 +66,16 @@ const DEFAULT_LOG_LEVEL: &str = "warn";
 
 pub fn extension_log_level() -> String {
     std::env::var("DASH0_EXTENSION_LOG_LEVEL").unwrap_or_else(|_| DEFAULT_LOG_LEVEL.to_string())
+}
+
+pub fn is_xray_traces_enabled() -> bool {
+    match std::env::var("DASH0_XRAY_TRACES_ENABLED") {
+        Ok(val) => matches!(
+            val.as_str(),
+            "1" | "true" | "TRUE" | "True" | "yes" | "YES" | "Yes" | "y" | "Y"
+        ),
+        Err(_) => false,
+    }
 }
 
 pub fn is_telemetry_log_collection_disabled() -> bool {

@@ -222,6 +222,9 @@ pub fn create_spans(
 }
 
 pub fn create_supplementary_spans(invocation_id: &str, store: bool) -> Option<StoredTrace> {
+    if crate::config::user::is_xray_traces_enabled() {
+        return None;
+    }
     let trace = create_spans(invocation_id, true, false);
     if store {
         if let Some(ref t) = trace {
@@ -232,6 +235,9 @@ pub fn create_supplementary_spans(invocation_id: &str, store: bool) -> Option<St
 }
 
 pub fn create_overhead_supplementary_span(invocation_id: &str) {
+    if crate::config::user::is_xray_traces_enabled() {
+        return;
+    }
     if let Some(trace) = create_spans(invocation_id, false, true) {
         invocation_entry::store_trace_by_id(invocation_id, trace);
     }
@@ -395,5 +401,58 @@ mod tests {
         assert!(result.is_none());
         let traces = invocation_entry::take_traces_by_id("inv-nonexistent");
         assert!(traces.is_empty());
+    }
+
+    fn setup_invocation_entry(invocation_id: &str) {
+        let trace_id_hex = "aa".repeat(16);
+        let root_span_id_hex = "bb".repeat(8);
+        let parent_span_id_hex = "cc".repeat(8);
+
+        invocation_entry::update(invocation_id, |entry| {
+            entry.trace_id = Some(trace_id_hex);
+            entry.root_span_id = Some(root_span_id_hex);
+            entry.parent_span_id = Some(parent_span_id_hex);
+            entry.sampled = true;
+            entry.start_time = 1_000.0;
+            entry.billed_duration = 500.0;
+            entry.init_duration = 150.0;
+            entry.memory_usage = 256;
+            entry.end_time = 1_100.0;
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn create_supplementary_spans_skipped_when_xray_enabled() {
+        reset_store();
+        let invocation_id = "inv-supp-1";
+        setup_invocation_entry(invocation_id);
+
+        std::env::set_var("DASH0_XRAY_TRACES_ENABLED", "true");
+        std::env::set_var("AWS_LAMBDA_FUNCTION_NAME", "my-function");
+
+        let result = create_supplementary_spans(invocation_id, true);
+        assert!(result.is_none());
+        let traces = invocation_entry::take_traces_by_id(invocation_id);
+        assert!(traces.is_empty());
+
+        std::env::remove_var("DASH0_XRAY_TRACES_ENABLED");
+        std::env::remove_var("AWS_LAMBDA_FUNCTION_NAME");
+    }
+
+    #[test]
+    #[serial]
+    fn create_overhead_supplementary_span_skipped_when_xray_enabled() {
+        reset_store();
+        let invocation_id = "inv-supp-1";
+        setup_invocation_entry(invocation_id);
+
+        std::env::set_var("DASH0_XRAY_TRACES_ENABLED", "true");
+
+        create_overhead_supplementary_span(invocation_id);
+        let traces = invocation_entry::take_traces_by_id(invocation_id);
+        assert!(traces.is_empty());
+
+        std::env::remove_var("DASH0_XRAY_TRACES_ENABLED");
     }
 }
