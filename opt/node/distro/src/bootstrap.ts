@@ -128,13 +128,7 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
 
     logger.debug(`Instrumented modules: ${instrumentedModules.join(', ')}`);
 
-    const dashToken = process.env.DASH0_TOKEN;
-
-    if (!dashToken) {
-      logger.warn(
-        'The Dash0 token is not available (the "DASH0_TOKEN" environment variable is not set): no telemetry will be sent.'
-      );
-    }
+    const dashToken = process.env.DASH0_TOKEN || '';
 
     const infrastructureDetectors = [
       envDetector,
@@ -162,23 +156,21 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
       );
     }
 
-    if (dashToken) {
-      const otlpTraceExporter = new OTLPTraceExporter({
-        url: traceEndpoint,
-        headers: {
-          Authorization: `Bearer ${dashToken.trim()}`,
-        },
-      });
+    const otlpTraceExporter = new OTLPTraceExporter({
+      url: traceEndpoint,
+      headers: {
+        Authorization: `Bearer ${dashToken.trim()}`,
+      },
+    });
 
-      spanProcessors.push(
-        new BatchSpanProcessor(otlpTraceExporter, {
-          // The maximum queue size. After the size is reached spans are dropped.
-          maxQueueSize: 1000,
-          // The maximum batch size of every export. It must be smaller or equal to maxQueueSize.
-          maxExportBatchSize: 100,
-        })
-      );
-    }
+    spanProcessors.push(
+      new BatchSpanProcessor(otlpTraceExporter, {
+        // The maximum queue size. After the size is reached spans are dropped.
+        maxQueueSize: 1000,
+        // The maximum batch size of every export. It must be smaller or equal to maxQueueSize.
+        maxExportBatchSize: 100,
+      })
+    );
 
     // Create providers with processors
     const tracerProvider = new NodeTracerProvider({

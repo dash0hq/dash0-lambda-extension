@@ -230,7 +230,7 @@ fn _build_otlp_request(
             header::HeaderValue::from_static("application/x-protobuf"),
         );
 
-        if let Ok(token) = std::env::var("DASH0_TOKEN") {
+        if let Some(token) = crate::config::get_dash0_token() {
             if !token.is_empty() {
                 if let Ok(auth_val) =
                     header::HeaderValue::from_str(format!("Bearer {}", token).as_str())
