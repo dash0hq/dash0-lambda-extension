@@ -187,9 +187,10 @@ async fn fetch_secret_value(secret_arn: &str) -> Result<String, String> {
         .build();
     let client = Client::builder().build(https);
 
-    let response = client
-        .request(request)
+    let timeout = std::time::Duration::from_millis(crate::config::request_timeout_ms());
+    let response = tokio::time::timeout(timeout, client.request(request))
         .await
+        .map_err(|_| format!("Secrets Manager request timed out after {}ms", timeout.as_millis()))?
         .map_err(|e| format!("Secrets Manager request failed: {}", e))?;
 
     let status = response.status();

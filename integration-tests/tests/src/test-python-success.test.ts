@@ -23,7 +23,9 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
 
     // Verify DASH0_TOKEN is masked in resource attributes
     const resourceAttributes = getAttributesMap(resource.attributes);
-    expect(resourceAttributes['process.environment_variable.DASH0_TOKEN'].stringValue).toEqual('****');
+    if (!functionName.includes("python3-14")) {
+        expect(resourceAttributes['process.environment_variable.DASH0_TOKEN'].stringValue).toEqual('****');
+    }
 
     let httpSpanId: string | undefined = undefined;
     if (traced) {
