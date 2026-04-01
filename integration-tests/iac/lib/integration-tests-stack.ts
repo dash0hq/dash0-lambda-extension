@@ -178,6 +178,31 @@ class NodeStack extends cdk.NestedStack {
 
     for (const runtime of runtimes) {
       const runtimeName = runtime.name.replace(/\./g, '-');
+      new lambda.Function(this, `single-traced-${runtimeName}`, {
+        functionName: `${props.prefix}single-traced-${runtimeName}`,
+        runtime,
+        memorySize: 128,
+        handler: 'success.handler',
+        architecture: lambda.Architecture.X86_64,
+        timeout: cdk.Duration.seconds(10),
+        code: lambda.Code.fromAsset(path.join(__dirname, '../lambdas/node')),
+        layers: [props.layer],
+        role: props.role,
+        environment: {
+          AWS_LAMBDA_EXEC_WRAPPER: "/opt/wrapper",
+          DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
+          DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
+          DASH0_EXTENSION_LOG_LEVEL: "info",
+          DASH0_XRAY_TRACES_ENABLED: "true",
+        },
+        tracing: lambda.Tracing.ACTIVE,
+        logGroup: props.logGroup,
+        loggingFormat: lambda.LoggingFormat.TEXT,
+      });
+    }
+
+    for (const runtime of runtimes) {
+      const runtimeName = runtime.name.replace(/\./g, '-');
       new lambdaNodejs.NodejsFunction(this, `cjs-success-${runtimeName}`, {
         functionName: `${props.prefix}cjs-success-${runtimeName}`,
         runtime,

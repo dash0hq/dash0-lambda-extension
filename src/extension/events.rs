@@ -48,12 +48,11 @@ fn handle_invoke_event(json: &serde_json::Value) {
                 let parent_span_id = hex::encode(&parent_span_id_bytes);
                 let span_id = hex::encode(get_span_id_from_invocation_id(request_id));
                 let root_span_id = hex::encode(generate_random_span_id());
-                let parent_span_id =
-                    if !sampled && crate::config::user::is_remove_lambda_parent_span() {
-                        String::new()
-                    } else {
-                        parent_span_id
-                    };
+                let parent_span_id = if !sampled && !crate::config::user::is_xray_traces_enabled() {
+                    String::new()
+                } else {
+                    parent_span_id
+                };
                 state::invocation_entry::update(request_id, |entry| {
                     entry.trace_id = Some(trace_id);
                     entry.span_id.get_or_insert(span_id);

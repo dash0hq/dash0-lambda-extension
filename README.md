@@ -38,15 +38,13 @@ See the release page for the latest ARNs of the extension layers for each runtim
 
 * `DASH0_MAX_EVENT_PAYLOAD` - Maximum size in KB for event payloads (request/response bodies) captured in traces. Payloads exceeding this limit are truncated. Default: `20`.
 
-* `DASH0_REMOVE_LAMBDA_PARENT_SPAN` - When set to `true` (the default), the extension removes the parent span ID from Lambda server spans for non-sampled invocations. Set to `false` to preserve the original parent span ID.
-
-* `DASH0_EXTRACT_SPAN_LINKS_IN_CONSUMER` - When set to `true`, the extension extracts span links from message attributes for SQS, SNS, Kinesis, and adds them to the Lambda server span. Default: `true`.
-
 * `DASH0_CREATE_PAYLOAD_LOG_RECORDS` - When set to `true` (the default), the extension creates log records containing the request and response payloads for the lambda invocation and each client call. Set to `false` to disable. Default: `true`.
 
 * `DASH0_DISABLE_TELEMETRY_LOG_COLLECTION` - When set to `true`, disables collecting logs from the [Lambda Telemetry API](https://docs.aws.amazon.com/lambda/latest/dg/telemetry-api.html). Default: `false`.
 
 * `DASH0_DATASET` - When set, the extension adds a `Dash0-Dataset` header to all OTLP export requests, routing telemetry to the specified dataset in the Dash0 backend.
+
+* `DASH0_XRAY_TRACES_ENABLED` - When set to `true`, the extension preserves the original X-Ray trace context instead of creating supplementary spans. Use this when AWS X-Ray active tracing is enabled on the Lambda function. Default: `false`.
 
 ### Secret Masking
 

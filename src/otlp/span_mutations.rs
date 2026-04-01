@@ -450,6 +450,9 @@ fn add_event_payload_to_span(span: &mut Span, invocation_id: &str) {
 }
 
 fn reparent_to_root_span(span: &mut Span, invocation_id: &str) {
+    if crate::config::user::is_xray_traces_enabled() {
+        return;
+    }
     tracing::info!(
         "[{}] reparenting span for invocation_id={}: original parent_span_id={}",
         crate::log_prefix(),
@@ -768,6 +771,33 @@ mod tests {
             .expect("root_span_id should be set after reparenting");
         let expected_parent = hex::decode(&root_span_id).unwrap();
         assert_eq!(span.parent_span_id, expected_parent);
+    }
+
+    #[test]
+    #[serial]
+    fn reparent_to_root_span_skipped_when_xray_enabled() {
+        let invocation_id = "inv-xray-reparent";
+        store_event_payload(invocation_id, r#"{"test":"data"}"#);
+
+        let original_parent = vec![0xBB; 8];
+        let mut span = make_span_with_invocation(invocation_id);
+        span.parent_span_id = original_parent.clone();
+
+        std::env::set_var("DASH0_XRAY_TRACES_ENABLED", "true");
+
+        let mut request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
+        let mut invocation_ids = Vec::new();
+        let mut encoded_body = Vec::new();
+
+        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+
+        let span = &request.resource_spans[0].scope_spans[0].spans[0];
+        assert_eq!(
+            span.parent_span_id, original_parent,
+            "parent_span_id should not be reparented when xray traces are enabled"
+        );
+
+        std::env::remove_var("DASH0_XRAY_TRACES_ENABLED");
     }
 
     #[test]
