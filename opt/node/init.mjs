@@ -1,8 +1,5 @@
 console.log('[init.mjs] file top');
 import * as dash0 from "./distro/dist/src/distro.js";
-import {AwsLambdaInstrumentation} from '@opentelemetry/instrumentation-aws-lambda';
-import {registerInstrumentations} from '@opentelemetry/instrumentation';
-import {register} from "module";
 
 try {
 
@@ -32,30 +29,18 @@ try {
         return fixed;
     }
 
-    const awsLambdaInstrumentation = new AwsLambdaInstrumentation({});
-
-// Override _onRequire on the instance to fix non-configurable exports before patching.
-// We can't override init() because it's already called during construction (via enable()).
-// _onRequire is called lazily when modules are required, so this override takes effect
-// before the Lambda runtime loads the handler.
-    const originalOnRequire = awsLambdaInstrumentation._onRequire;
-    awsLambdaInstrumentation._onRequire = function (module, exports, name, basedir) {
-        return originalOnRequire.call(this, module, makeExportsConfigurable(exports), name, basedir);
-    };
 
     const tracerProvider = (await dash0.init).tracerProvider;
 
-    registerInstrumentations({
-        instrumentations: [
-            awsLambdaInstrumentation
-        ],
-        tracerProvider
-    });
+    // registerInstrumentations({
+    //     instrumentations: [
+    //         awsLambdaInstrumentation
+    //     ],
+    //     tracerProvider
+    // });
 
     console.log('[init.mjs] after registerInstrumentations');
 
-    register('import-in-the-middle/hook.mjs', import.meta.url);
-    console.log('[init.mjs] after register');
 
 } catch (err) {
     console.error('Error initializing Dash0 tracer:', err);
