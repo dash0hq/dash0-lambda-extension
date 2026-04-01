@@ -1,7 +1,5 @@
 console.log(`[import] top file`);
 
-import { registerInstrumentations } from '@opentelemetry/instrumentation';
-import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 
 console.log(`[import] after NodeTracerProvider `);
 
@@ -91,15 +89,9 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
 
 
     // Create providers with processors
-    const tracerProvider = new NodeTracerProvider({
-      spanLimits: {
-        attributeValueLengthLimit: getSpanAttributeMaxLength(),
-      },
-    });
 
     logger.info(`[init] tracer provider created: ${(performance.now() - _t0).toFixed(1)}ms`);
 
-    tracerProvider.register();
 
     logger.info(`[init] provider registered: ${(performance.now() - _t0).toFixed(1)}ms`);
 
@@ -108,7 +100,7 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
     );
 
     return {
-      tracerProvider,
+      tracerProvider: "yes",
     };
   } catch (err) {
     reportInitError(err);
