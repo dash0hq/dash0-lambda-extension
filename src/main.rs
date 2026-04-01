@@ -25,7 +25,6 @@ pub mod otlp;
 pub(crate) mod stats;
 
 /// Name to register with the Lambda Extension API.
-///
 /// NOTE: this must be the same as the
 /// entrypoint script destination in the Lambda layer (eg, **extensions/dash0**)
 pub const EXTENSION_NAME: &str = "dash0";

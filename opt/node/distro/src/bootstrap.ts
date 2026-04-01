@@ -1,6 +1,5 @@
 console.log(`[import] top file`);
 
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { registerInstrumentations } from '@opentelemetry/instrumentation';
 import type { Resource } from '@opentelemetry/resources';
 import {
@@ -21,20 +20,8 @@ import {
 } from './constants';
 import { FileSpanExporter } from './exporters';
 
-import Dash0GrpcInstrumentation from './instrumentations/@grpc/grpc-js/GrpcInstrumentation';
-import Dash0NestInstrumentation from './instrumentations/@nestjs/core/NestInstrumentation';
-import Dash0AmqplibInstrumentation from './instrumentations/amqplib/AmqplibInstrumentation';
-import Dash0ExpressInstrumentation from './instrumentations/express/ExpressInstrumentation';
-import Dash0FastifyInstrumentation from './instrumentations/fastify/FastifyInstrumentation';
 import Dash0HttpInstrumentation from './instrumentations/https/HttpInstrumentation';
-import Dash0IORedisInstrumentation from './instrumentations/ioredis/IORedisInstrumentation';
-import Dash0KafkaJsInstrumentation from './instrumentations/kafkajs/KafkaJsInstrumentation';
-import Dash0MongoDBInstrumentation from './instrumentations/mongodb/MongoDBInstrumentation';
-import Dash0PgInstrumentation from './instrumentations/pg/PgInstrumentation';
-import Dash0PrismaInstrumentation from './instrumentations/prisma/PrismaInstrumentation';
-import Dash0RedisInstrumentation from './instrumentations/redis/RedisInstrumentation';
 import Dash0UndiciInstrumentation from "./instrumentations/undici/UndiciInstrumentation";
-import { Dash0AwsSdkV3LibInstrumentation } from './instrumentations/aws-sdk';
 
 console.log(`[import] after Dash0AwsSdkV3LibInstrumentation `);
 
@@ -112,19 +99,7 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
     logger.info(`[init] setup done: ${(performance.now() - _t0).toFixed(1)}ms`);
 
     const instrumentationsToInstall = [
-      new Dash0AmqplibInstrumentation(),
-      new Dash0ExpressInstrumentation(),
-      new Dash0GrpcInstrumentation(),
-      new Dash0NestInstrumentation(),
-      new Dash0FastifyInstrumentation(),
       new Dash0HttpInstrumentation(...ignoredHostnames),
-      new Dash0IORedisInstrumentation(),
-      new Dash0KafkaJsInstrumentation(),
-      new Dash0MongoDBInstrumentation(),
-      new Dash0PgInstrumentation(),
-      new Dash0PrismaInstrumentation(),
-      new Dash0RedisInstrumentation(),
-      new Dash0AwsSdkV3LibInstrumentation(),
       new Dash0UndiciInstrumentation(),
     ].filter((i) => i.isApplicable());
 
@@ -183,15 +158,9 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
     }
 
     if (dashToken) {
-      const otlpTraceExporter = new OTLPTraceExporter({
-        url: traceEndpoint,
-        headers: {
-          Authorization: `Bearer ${dashToken.trim()}`,
-        },
-      });
 
       spanProcessors.push(
-        new BatchSpanProcessor(otlpTraceExporter, {
+        new BatchSpanProcessor(new FileSpanExporter("/tmp/exported"), {
           // The maximum queue size. After the size is reached spans are dropped.
           maxQueueSize: 1000,
           // The maximum batch size of every export. It must be smaller or equal to maxQueueSize.
