@@ -1,3 +1,4 @@
+console.log('[init.mjs] file top');
 import * as dash0 from "./distro/dist/src/distro.js";
 import {AwsLambdaInstrumentation} from '@opentelemetry/instrumentation-aws-lambda';
 import {registerInstrumentations} from '@opentelemetry/instrumentation';
@@ -51,7 +52,10 @@ try {
         tracerProvider
     });
 
+    console.log('[init.mjs] after registerInstrumentations');
+
     register('import-in-the-middle/hook.mjs', import.meta.url);
+    console.log('[init.mjs] after register');
 
 } catch (err) {
     console.error('Error initializing Dash0 tracer:', err);

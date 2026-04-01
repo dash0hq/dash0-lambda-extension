@@ -1,6 +1,8 @@
 #!/bin/bash
 args=("$@")
 
+echo "[wrapper] start"
+
 source /opt/shared.sh
 setup_otel_env
 write_env_vars
@@ -13,5 +15,7 @@ if [ -z "$DASH0_DISABLE_AUTO_INSTRUMENTATION" ] || [ "${DASH0_DISABLE_AUTO_INSTR
   PACKAGE_PATH="/opt/init.mjs"
   export NODE_OPTIONS="${NODE_OPTIONS} --import \"${PACKAGE_PATH}\""
 fi
+
+echo "[wrapper] exec"
 
 exec "${args[@]}"
