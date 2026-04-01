@@ -622,9 +622,8 @@ mod tests {
 
     #[test]
     fn sqs_without_arn() {
-        let result = extract_trigger_chain(
-            r#"{"Records": [{"eventSource": "aws:sqs", "body": "hello"}]}"#,
-        );
+        let result =
+            extract_trigger_chain(r#"{"Records": [{"eventSource": "aws:sqs", "body": "hello"}]}"#);
         assert_eq!(result.hops.len(), 1);
         assert_eq!(result.hops[0].trigger_type, "aws:sqs");
         assert!(result.hops[0].arn.is_none());
@@ -661,8 +660,7 @@ mod tests {
 
     #[test]
     fn sns_without_sns_object() {
-        let result =
-            extract_trigger_chain(r#"{"Records": [{"EventSource": "aws:sns"}]}"#);
+        let result = extract_trigger_chain(r#"{"Records": [{"EventSource": "aws:sns"}]}"#);
         assert!(result.hops.is_empty());
     }
 
@@ -715,14 +713,16 @@ mod tests {
         let result = extract_trigger_chain(payload);
         assert_eq!(result.hops.len(), 1);
         assert_eq!(result.hops[0].trigger_type, "aws:s3");
-        assert_eq!(result.hops[0].arn.as_deref(), Some("arn:aws:s3:::my-bucket"));
+        assert_eq!(
+            result.hops[0].arn.as_deref(),
+            Some("arn:aws:s3:::my-bucket")
+        );
         assert_eq!(result.hops[0].name.as_deref(), Some("my-bucket"));
     }
 
     #[test]
     fn s3_without_s3_object() {
-        let result =
-            extract_trigger_chain(r#"{"Records": [{"eventSource": "aws:s3"}]}"#);
+        let result = extract_trigger_chain(r#"{"Records": [{"eventSource": "aws:s3"}]}"#);
         assert!(result.hops.is_empty());
     }
 
@@ -749,12 +749,12 @@ mod tests {
 
     #[test]
     fn eventbridge_requires_both_source_and_detail_type() {
-        assert!(extract_trigger_chain(r#"{"source": "my-app"}"#).hops.is_empty());
-        assert!(
-            extract_trigger_chain(r#"{"detail-type": "OrderCreated"}"#)
-                .hops
-                .is_empty()
-        );
+        assert!(extract_trigger_chain(r#"{"source": "my-app"}"#)
+            .hops
+            .is_empty());
+        assert!(extract_trigger_chain(r#"{"detail-type": "OrderCreated"}"#)
+            .hops
+            .is_empty());
     }
 
     #[test]
@@ -1104,7 +1104,10 @@ mod tests {
         }"#;
 
         let result = extract_trigger_chain(payload);
-        assert_eq!(result.hops[0].name.as_deref(), Some("my-hyphenated-topic-name"));
+        assert_eq!(
+            result.hops[0].name.as_deref(),
+            Some("my-hyphenated-topic-name")
+        );
     }
 
     #[test]
