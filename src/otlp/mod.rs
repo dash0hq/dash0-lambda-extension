@@ -11,3 +11,4 @@ pub mod receiver;
 pub mod span_creation;
 pub mod span_link_extractor;
 pub mod span_mutations;
+pub mod trigger_chain;

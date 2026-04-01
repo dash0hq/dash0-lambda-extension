@@ -416,6 +416,10 @@ fn extract_span_attributes_from_event(event_payload: &str) -> Vec<KeyValue> {
         }
     }
 
+    // Trigger chain enrichment
+    let chain_result = crate::otlp::trigger_chain::extract_trigger_chain(event_payload);
+    attributes.extend(crate::otlp::trigger_chain::trigger_chain_to_attributes(&chain_result));
+
     attributes
 }
 
