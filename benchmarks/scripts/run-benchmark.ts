@@ -242,23 +242,26 @@ function generateMarkdown(summaries: Record<string, FunctionSummary>): string {
   // Overview table
   lines.push("## Init Duration Overview (avg, ms)");
   lines.push("");
-  lines.push("| Runtime | Baseline | Dash0 | Dash0 Overhead | OSS OTel | OSS OTel Overhead |");
-  lines.push("| :------ | -------: | ----: | -------------: | -------: | ----------------: |");
+  lines.push("| Runtime | Baseline | Dash0 | Dash0 Overhead | OSS OTel | OSS OTel Overhead | Datadog | Datadog Overhead |");
+  lines.push("| :------ | -------: | ----: | -------------: | -------: | ----------------: | ------: | ---------------: |");
 
   for (const rt of ALL_RUNTIMES) {
     const b = summaries[`${PREFIX}bench-baseline-${rt}`];
     const d = summaries[`${PREFIX}bench-instrumented-${rt}`];
     const o = summaries[`${PREFIX}bench-oss-otel-${rt}`];
+    const dd = summaries[`${PREFIX}bench-datadog-${rt}`];
 
     const bInit = b?.initDurationMs?.avg;
     const dInit = d?.initDurationMs?.avg;
     const oInit = o?.initDurationMs?.avg;
+    const ddInit = dd?.initDurationMs?.avg;
 
     const dOverhead = bInit != null && dInit != null ? `+${Math.round((dInit - bInit) * 10) / 10} ms` : "N/A";
     const oOverhead = bInit != null && oInit != null ? `+${Math.round((oInit - bInit) * 10) / 10} ms` : "N/A";
+    const ddOverhead = bInit != null && ddInit != null ? `+${Math.round((ddInit - bInit) * 10) / 10} ms` : "N/A";
 
     lines.push(
-      `| ${runtimeDisplayName(rt)} | ${fmt(bInit, " ms")} | ${fmt(dInit, " ms")} | ${dOverhead} | ${fmt(oInit, " ms")} | ${oOverhead} |`
+      `| ${runtimeDisplayName(rt)} | ${fmt(bInit, " ms")} | ${fmt(dInit, " ms")} | ${dOverhead} | ${fmt(oInit, " ms")} | ${oOverhead} | ${fmt(ddInit, " ms")} | ${ddOverhead} |`
     );
   }
 
@@ -266,23 +269,26 @@ function generateMarkdown(summaries: Record<string, FunctionSummary>): string {
 
   lines.push("## Memory Overview (avg, MB)");
   lines.push("");
-  lines.push("| Runtime | Baseline | Dash0 | Dash0 Overhead | OSS OTel | OSS OTel Overhead |");
-  lines.push("| :------ | -------: | ----: | -------------: | -------: | ----------------: |");
+  lines.push("| Runtime | Baseline | Dash0 | Dash0 Overhead | OSS OTel | OSS OTel Overhead | Datadog | Datadog Overhead |");
+  lines.push("| :------ | -------: | ----: | -------------: | -------: | ----------------: | ------: | ---------------: |");
 
   for (const rt of ALL_RUNTIMES) {
     const b = summaries[`${PREFIX}bench-baseline-${rt}`];
     const d = summaries[`${PREFIX}bench-instrumented-${rt}`];
     const o = summaries[`${PREFIX}bench-oss-otel-${rt}`];
+    const dd = summaries[`${PREFIX}bench-datadog-${rt}`];
 
     const bMem = b?.maxMemoryUsedMb?.avg;
     const dMem = d?.maxMemoryUsedMb?.avg;
     const oMem = o?.maxMemoryUsedMb?.avg;
+    const ddMem = dd?.maxMemoryUsedMb?.avg;
 
     const dOverhead = bMem != null && dMem != null ? `+${Math.round((dMem - bMem) * 10) / 10} MB` : "N/A";
     const oOverhead = bMem != null && oMem != null ? `+${Math.round((oMem - bMem) * 10) / 10} MB` : "N/A";
+    const ddOverhead = bMem != null && ddMem != null ? `+${Math.round((ddMem - bMem) * 10) / 10} MB` : "N/A";
 
     lines.push(
-      `| ${runtimeDisplayName(rt)} | ${fmt(bMem, " MB")} | ${fmt(dMem, " MB")} | ${dOverhead} | ${fmt(oMem, " MB")} | ${oOverhead} |`
+      `| ${runtimeDisplayName(rt)} | ${fmt(bMem, " MB")} | ${fmt(dMem, " MB")} | ${dOverhead} | ${fmt(oMem, " MB")} | ${oOverhead} | ${fmt(ddMem, " MB")} | ${ddOverhead} |`
     );
   }
 
@@ -333,8 +339,9 @@ function generateMarkdown(summaries: Record<string, FunctionSummary>): string {
       const b = summaries[`${PREFIX}bench-baseline-${rt}`];
       const d = summaries[`${PREFIX}bench-instrumented-${rt}`];
       const o = summaries[`${PREFIX}bench-oss-otel-${rt}`];
+      const dd = summaries[`${PREFIX}bench-datadog-${rt}`];
 
-      const variants: [string, FunctionSummary | undefined][] = [["Baseline", b], ["Dash0", d], ["OSS OTel", o]];
+      const variants: [string, FunctionSummary | undefined][] = [["Baseline", b], ["Dash0", d], ["OSS OTel", o], ["Datadog", dd]];
       for (const [label, s] of variants) {
         if (s?.initDurationMs) {
           const v = s.initDurationMs;
@@ -357,8 +364,9 @@ function generateMarkdown(summaries: Record<string, FunctionSummary>): string {
       const b = summaries[`${PREFIX}bench-baseline-${rt}`];
       const d = summaries[`${PREFIX}bench-instrumented-${rt}`];
       const o = summaries[`${PREFIX}bench-oss-otel-${rt}`];
+      const dd = summaries[`${PREFIX}bench-datadog-${rt}`];
 
-      const memVariants: [string, FunctionSummary | undefined][] = [["Baseline", b], ["Dash0", d], ["OSS OTel", o]];
+      const memVariants: [string, FunctionSummary | undefined][] = [["Baseline", b], ["Dash0", d], ["OSS OTel", o], ["Datadog", dd]];
       for (const [label, s] of memVariants) {
         if (s?.maxMemoryUsedMb) {
           const m = s.maxMemoryUsedMb;
@@ -406,6 +414,7 @@ async function main() {
       `${PREFIX}bench-baseline-${rt}`,
       `${PREFIX}bench-instrumented-${rt}`,
       `${PREFIX}bench-oss-otel-${rt}`,
+      `${PREFIX}bench-datadog-${rt}`,
     ]),
     `${PREFIX}bench-extension-only-${EXTENSION_ONLY_FUNCTION}`,
   ];

@@ -36,6 +36,8 @@ interface RuntimeConfig {
   handler: string;
   code: lambda.Code;
   memorySize: number;
+  datadogHandler?: string;
+  datadogLayers: Record<string, { layerName: string; version: number }>;
 }
 
 // OSS OpenTelemetry Lambda layer versions (from account 184161586896)
@@ -47,6 +49,11 @@ const OSS_OTEL_LAYERS: Record<string, { layerName: string; version: number }> = 
 };
 const OSS_OTEL_COLLECTOR = { layerName: 'opentelemetry-collector-amd64-0_20_0', version: 1 };
 const OSS_OTEL_ACCOUNT = '184161586896';
+
+// Datadog Lambda layer versions (from account 464622532012)
+// https://docs.datadoghq.com/serverless/libraries_integrations/extension/
+const DATADOG_ACCOUNT = '464622532012';
+const DATADOG_EXTENSION = { layerName: 'Datadog-Extension', version: 94 };
 
 export class BenchmarkStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -94,6 +101,14 @@ export class BenchmarkStack extends cdk.Stack {
         handler: 'handler.handler',
         code: pythonCode,
         memorySize: 128,
+        datadogHandler: 'datadog_lambda.handler.handler',
+        datadogLayers: {
+          'python3.10': { layerName: 'Datadog-Python310', version: 120 },
+          'python3.11': { layerName: 'Datadog-Python311', version: 120 },
+          'python3.12': { layerName: 'Datadog-Python312', version: 120 },
+          'python3.13': { layerName: 'Datadog-Python313', version: 120 },
+          'python3.14': { layerName: 'Datadog-Python314', version: 120 },
+        },
       },
       {
         name: 'node',
@@ -106,6 +121,12 @@ export class BenchmarkStack extends cdk.Stack {
         handler: 'handler.handler',
         code: nodeCode,
         memorySize: 128,
+        datadogHandler: '/opt/nodejs/node_modules/datadog-lambda-js/handler.handler',
+        datadogLayers: {
+          'nodejs20.x': { layerName: 'Datadog-Node20-x', version: 136 },
+          'nodejs22.x': { layerName: 'Datadog-Node22-x', version: 136 },
+          'nodejs24.x': { layerName: 'Datadog-Node24-x', version: 136 },
+        },
       },
       {
         name: 'java',
@@ -118,6 +139,11 @@ export class BenchmarkStack extends cdk.Stack {
         handler: 'org.example.BenchmarkHandler::handleRequest',
         code: javaCode,
         memorySize: 512,
+        datadogLayers: {
+          'java17': { layerName: 'dd-trace-java', version: 21 },
+          'java21': { layerName: 'dd-trace-java', version: 21 },
+          'java25': { layerName: 'dd-trace-java', version: 21 },
+        },
       },
     ];
 
@@ -146,6 +172,10 @@ export class BenchmarkStack extends cdk.Stack {
     // OSS OTel collector layer (shared across all runtimes)
     const ossCollectorArn = `arn:aws:lambda:${this.region}:${OSS_OTEL_ACCOUNT}:layer:${OSS_OTEL_COLLECTOR.layerName}:${OSS_OTEL_COLLECTOR.version}`;
     const ossCollectorLayer = lambda.LayerVersion.fromLayerVersionArn(this, 'oss-otel-collector', ossCollectorArn);
+
+    // Datadog extension layer (shared across all runtimes)
+    const ddExtensionArn = `arn:aws:lambda:${this.region}:${DATADOG_ACCOUNT}:layer:${DATADOG_EXTENSION.layerName}:${DATADOG_EXTENSION.version}`;
+    const ddExtensionLayer = lambda.LayerVersion.fromLayerVersionArn(this, 'dd-extension', ddExtensionArn);
 
     for (const config of runtimeConfigs) {
       const layer = getLatestLayerVersion(this, `${config.name}Layer`, config.layerName);
@@ -211,6 +241,46 @@ export class BenchmarkStack extends cdk.Stack {
           logGroup,
           loggingFormat: lambda.LoggingFormat.TEXT,
         });
+
+        // Datadog: Datadog language layer + extension layer
+        const ddLayerConfig = config.datadogLayers[runtime.name];
+        if (ddLayerConfig) {
+          const ddLanguageArn = `arn:aws:lambda:${this.region}:${DATADOG_ACCOUNT}:layer:${ddLayerConfig.layerName}:${ddLayerConfig.version}`;
+          const ddLanguageLayer = lambda.LayerVersion.fromLayerVersionArn(this, `dd-${config.name}-${runtimeName}`, ddLanguageArn);
+
+          const ddEnv: Record<string, string> = {
+            DD_API_KEY: process.env.DD_API_KEY ?? 'benchmark-dummy-key',
+            DD_SITE: process.env.DD_SITE ?? 'us3.datadoghq.com',
+            DD_TRACE_ENABLED: 'true',
+            DD_SERVERLESS_LOGS_ENABLED: 'true',
+            DD_MERGE_XRAY_TRACES: 'false',
+            DD_CAPTURE_LAMBDA_PAYLOAD: 'false',
+          };
+
+          // Node and Python use handler redirection; Java uses the Java agent
+          let ddHandler = config.handler;
+          if (config.datadogHandler) {
+            ddHandler = config.datadogHandler;
+            ddEnv.DD_LAMBDA_HANDLER = config.handler;
+          } else if (config.name === 'java') {
+            ddEnv.JAVA_TOOL_OPTIONS = '-javaagent:/opt/java/lib/dd-java-agent.jar';
+          }
+
+          new lambda.Function(this, `datadog-${runtimeName}`, {
+            functionName: `${prefix}bench-datadog-${runtimeName}`,
+            runtime,
+            memorySize: config.memorySize,
+            handler: ddHandler,
+            architecture: lambda.Architecture.X86_64,
+            timeout: cdk.Duration.seconds(30),
+            code: config.code,
+            layers: [ddLanguageLayer, ddExtensionLayer],
+            role,
+            environment: ddEnv,
+            logGroup,
+            loggingFormat: lambda.LoggingFormat.TEXT,
+          });
+        }
       }
     }
   }
