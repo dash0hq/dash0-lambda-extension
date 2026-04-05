@@ -19,9 +19,8 @@ pub struct TriggerChainResult {
     pub truncated: bool,
 }
 
-/// Extracts a trigger chain from a Lambda event payload.
-/// Returns hops ordered outermost (origin) to innermost (immediate trigger),
-/// and a flag indicating if the chain was truncated due to depth limit.
+/// Extracts a trigger chain from a raw event payload string.
+/// Parses JSON internally — use `extract_trigger_chain_from_json` if you already have parsed JSON.
 pub fn extract_trigger_chain(event_payload: &str) -> TriggerChainResult {
     let json_val: serde_json::Value = match serde_json::from_str(event_payload) {
         Ok(v) => v,
@@ -33,6 +32,11 @@ pub fn extract_trigger_chain(event_payload: &str) -> TriggerChainResult {
         }
     };
 
+    extract_trigger_chain_from_json(&json_val)
+}
+
+/// Extracts a trigger chain from an already-parsed JSON value.
+pub fn extract_trigger_chain_from_json(json_val: &serde_json::Value) -> TriggerChainResult {
     if let Some(records) = json_val.get("Records").and_then(|v| v.as_array()) {
         if let Some(first) = records.first() {
             return extract_from_record(first);
