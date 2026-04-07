@@ -118,20 +118,14 @@ def init() -> Dict[str, Any]:
         span_limits=(SpanLimits(max_span_attribute_length=(get_max_size()))),
     )
 
-    if dash0_token:
-        tracer_provider.add_span_processor(
-            BatchSpanProcessor(
-                OTLPSpanExporter(
-                    endpoint=traces_endpoint,
-                    headers={"Authorization": f"Bearer {dash0_token}"},
-                ),
-            )
+    tracer_provider.add_span_processor(
+        BatchSpanProcessor(
+            OTLPSpanExporter(
+                endpoint=traces_endpoint,
+                headers={"Authorization": f"Bearer {dash0_token}"},
+            ),
         )
-    else:
-        logger.warning(
-            "Dash0 token not provided (env var 'DASH0_TOKEN' not set); "
-            "no data will be sent to Dash0"
-        )
+    )
 
     if spandump_file:
         from opentelemetry.sdk.trace.export import (

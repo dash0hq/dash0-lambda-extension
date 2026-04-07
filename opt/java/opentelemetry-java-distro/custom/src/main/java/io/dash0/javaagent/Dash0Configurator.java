@@ -80,11 +80,6 @@ public class Dash0Configurator implements AutoConfigurationCustomizerProvider {
 
   private Map<String, String> propertiesCustomizer(ConfigProperties originalCfg) {
     String accessToken = originalCfg.getString(DASH0_TOKEN);
-    if (Strings.isBlank(accessToken)) {
-      LOGGER.warning(
-          "Dash0 token not provided (env var 'DASH0_TOKEN' not set); no data will be sent.");
-      return Collections.emptyMap();
-    }
 
     Map<String, String> customizedCfg = new HashMap<>();
 

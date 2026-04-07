@@ -4,6 +4,7 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as ecr_assets from 'aws-cdk-lib/aws-ecr-assets';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as cr from 'aws-cdk-lib/custom-resources';
 import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as path from 'path';
@@ -39,6 +40,7 @@ interface SubStackProps extends cdk.NestedStackProps {
   layer: lambda.ILayerVersion;
   logGroup: logs.ILogGroup;
   prefix: string;
+  dash0TokenSecretArn?: string;
 }
 
 function createLambdas(
@@ -48,8 +50,9 @@ function createLambdas(
     role: iam.Role,
     logGroup: logs.ILogGroup,
     prefix: string,
-    overrides?: { handler?: string; code?: lambda.Code; memorySize?: number }
+    overrides?: { handler?: string; code?: lambda.Code; memorySize?: number; dash0TokenSecretArn?: string }
 ) {
+  const latestRuntime = runtimes[runtimes.length - 1];
   for (const runtime of runtimes) {
     for (const architecture of [lambda.Architecture.X86_64, lambda.Architecture.ARM_64]) {
       for (const invocationEnd of ["true", "false"]) {
@@ -64,13 +67,20 @@ function createLambdas(
               continue;
             }
             const runtimeName = runtime.name.replace(/\./g, '-');
+            const useSecretManager = overrides?.dash0TokenSecretArn
+                && runtime === latestRuntime
+                && scenario === "success";
             const environment: any = {
               AWS_LAMBDA_EXEC_WRAPPER: "/opt/wrapper",
-              DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
               DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
               DASH0_EXTENSION_LOG_LEVEL: "info",
               DASH0_SEND_ON_INVOCATION_END: invocationEnd,
             };
+            if (useSecretManager) {
+              environment["DASH0_TOKEN_SECRET_ARN"] = overrides!.dash0TokenSecretArn!;
+            } else {
+              environment["DASH0_TOKEN"] = process.env.DASH0_DEV_API_TOKEN!;
+            }
             if (traced === "false") {
               environment["DASH0_DISABLE_AUTO_INSTRUMENTATION"] = "true";
             }
@@ -122,6 +132,7 @@ class PythonStack extends cdk.NestedStack {
 
     createLambdas(this, runtimes, props.layer, props.role, props.logGroup, props.prefix, {
       code: createPythonCode(),
+      dash0TokenSecretArn: props.dash0TokenSecretArn,
     });
 
     // Dependency conflict test lambdas
@@ -174,7 +185,9 @@ class NodeStack extends cdk.NestedStack {
       lambda.Runtime.NODEJS_24_X,
     ];
 
-    createLambdas(this, runtimes, props.layer, props.role, props.logGroup, props.prefix);
+    createLambdas(this, runtimes, props.layer, props.role, props.logGroup, props.prefix, {
+      dash0TokenSecretArn: props.dash0TokenSecretArn,
+    });
 
     for (const runtime of runtimes) {
       const runtimeName = runtime.name.replace(/\./g, '-');
@@ -226,6 +239,7 @@ class NodeStack extends cdk.NestedStack {
         loggingFormat: lambda.LoggingFormat.TEXT,
       });
     }
+
   }
 }
 
@@ -247,6 +261,7 @@ class JavaStack extends cdk.NestedStack {
       handler: 'org.example.HelloHandler::handleRequest',
       code: javaCode,
       memorySize: 512,
+      dash0TokenSecretArn: props.dash0TokenSecretArn,
     };
     const runtimes = [lambda.Runtime.JAVA_25, lambda.Runtime.JAVA_21, lambda.Runtime.JAVA_17];
 
@@ -364,11 +379,19 @@ export class IntegrationTestsStack extends cdk.Stack {
       retention: logs.RetentionDays.ONE_DAY,
     });
 
+    const dash0TokenSecret = new secretsmanager.Secret(this, 'Dash0TokenSecret', {
+      secretName: `${prefix}dash0-token-secret`,
+      secretStringValue: cdk.SecretValue.unsafePlainText(process.env.DASH0_DEV_API_TOKEN!),
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+    dash0TokenSecret.grantRead(role);
+
     new PythonStack(this, 'PythonStack', {
       role,
       layer: pythonLayer,
       logGroup: sharedLogGroup,
       prefix,
+      dash0TokenSecretArn: dash0TokenSecret.secretArn,
     });
 
     new NodeStack(this, 'NodeStack', {
@@ -376,6 +399,7 @@ export class IntegrationTestsStack extends cdk.Stack {
       layer: nodeLayer,
       logGroup: sharedLogGroup,
       prefix,
+      dash0TokenSecretArn: dash0TokenSecret.secretArn,
     });
 
     new JavaStack(this, 'JavaStack', {
@@ -383,6 +407,7 @@ export class IntegrationTestsStack extends cdk.Stack {
       layer: javaLayer,
       logGroup: sharedLogGroup,
       prefix,
+      dash0TokenSecretArn: dash0TokenSecret.secretArn,
     });
 
     new ManualStack(this, 'ManualStack', {

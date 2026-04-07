@@ -74,36 +74,6 @@ describe('Distro initialization', () => {
 
   });
 
-  describe('without the DASH0_TOKEN environment variable set', () => {
-    test('should not initialize the OTLPTraceExporter', async () => {
-      await jest.isolateModulesAsync(async () => {
-        const { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-http');
-        jest.mock('@opentelemetry/exporter-trace-otlp-http');
-
-        const { init } = jest.requireActual('./distro');
-        await init;
-
-        expect(OTLPTraceExporter).not.toHaveBeenCalled();
-      });
-    });
-
-    describe('with the DASH0_DEBUG_SPANDUMP variable set', () => {
-      test('should initialize the FileSpanExporter', async () => {
-        await jest.isolateModulesAsync(async () => {
-          process.env.DASH0_DEBUG_SPANDUMP = '/dev/stdout';
-
-          jest.mock('./exporters');
-
-          const { init } = jest.requireActual('./distro');
-          await init;
-
-          const { FileSpanExporter } = require('./exporters');
-          expect(FileSpanExporter).toHaveBeenCalledWith('/dev/stdout');
-        });
-      });
-    });
-  });
-
   describe('NodeTracerProvider should be initialize with span limit according to environment variables or default', () => {
     beforeEach(() => {
       process.env = { ...ORIGINAL_PROCESS_ENV };
