@@ -1,23 +1,12 @@
 import { Client } from 'pg';
-import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
-
-const secretsManager = new SecretsManagerClient();
-
-async function getCredentials() {
-    const secretArn = process.env.DB_SECRET_ARN;
-    const response = await secretsManager.send(new GetSecretValueCommand({ SecretId: secretArn }));
-    return JSON.parse(response.SecretString);
-}
 
 export async function handler(event, context) {
-    const credentials = await getCredentials();
-
     const client = new Client({
         host: process.env.DB_HOST,
         port: parseInt(process.env.DB_PORT || '5432'),
         database: process.env.DB_NAME,
-        user: credentials.username,
-        password: credentials.password,
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD,
         ssl: { rejectUnauthorized: false },
     });
 
