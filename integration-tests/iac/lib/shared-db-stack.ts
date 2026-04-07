@@ -15,11 +15,12 @@ export class SharedDbStack extends cdk.Stack {
 
     const rdsSg = new ec2.SecurityGroup(this, 'RdsSg', {
       vpc,
-      description: 'Security group for shared RDS instance',
+      description: 'Security group for shared RDS instances',
     });
     rdsSg.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(5432), 'Allow public PostgreSQL access');
+    rdsSg.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(3306), 'Allow public MySQL access');
 
-    const dbInstance = new rds.DatabaseInstance(this, 'PostgresInstance', {
+    const postgresInstance = new rds.DatabaseInstance(this, 'PostgresInstance', {
       instanceIdentifier: 'shared-db-testing-postgres',
       engine: rds.DatabaseInstanceEngine.postgres({
         version: rds.PostgresEngineVersion.VER_16,
@@ -35,14 +36,40 @@ export class SharedDbStack extends cdk.Stack {
       deletionProtection: false,
     });
 
-    new cdk.CfnOutput(this, 'DbHost', {
-      value: dbInstance.dbInstanceEndpointAddress,
+    const mysqlInstance = new rds.DatabaseInstance(this, 'MysqlInstance', {
+      instanceIdentifier: 'shared-db-testing-mysql',
+      engine: rds.DatabaseInstanceEngine.mysql({
+        version: rds.MysqlEngineVersion.VER_8_0,
+      }),
+      instanceType: ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.MICRO),
+      vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
+      publiclyAccessible: true,
+      securityGroups: [rdsSg],
+      databaseName: 'testdb',
+      credentials: rds.Credentials.fromGeneratedSecret('admin'),
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      deletionProtection: false,
     });
-    new cdk.CfnOutput(this, 'DbPort', {
-      value: dbInstance.dbInstanceEndpointPort,
+
+    new cdk.CfnOutput(this, 'PostgresHost', {
+      value: postgresInstance.dbInstanceEndpointAddress,
     });
-    new cdk.CfnOutput(this, 'DbSecretArn', {
-      value: dbInstance.secret!.secretArn,
+    new cdk.CfnOutput(this, 'PostgresPort', {
+      value: postgresInstance.dbInstanceEndpointPort,
+    });
+    new cdk.CfnOutput(this, 'PostgresSecretArn', {
+      value: postgresInstance.secret!.secretArn,
+    });
+
+    new cdk.CfnOutput(this, 'MysqlHost', {
+      value: mysqlInstance.dbInstanceEndpointAddress,
+    });
+    new cdk.CfnOutput(this, 'MysqlPort', {
+      value: mysqlInstance.dbInstanceEndpointPort,
+    });
+    new cdk.CfnOutput(this, 'MysqlSecretArn', {
+      value: mysqlInstance.secret!.secretArn,
     });
   }
 }
