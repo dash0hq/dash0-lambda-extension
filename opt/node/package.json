@@ -57,7 +57,7 @@
     "@opentelemetry/winston-transport": "^0.19.0",
     "@prisma/instrumentation": "^6.0.0",
     "deasync": "^0.1.30",
-    "import-in-the-middle": "2.0.0",
+    "import-in-the-middle": "3.0.0",
     "opentelemetry-instrumentation-express": "0.41.0",
     "opentelemetry-instrumentation-kafkajs": "^0.41.0",
     "pg": "^8.7.3",
