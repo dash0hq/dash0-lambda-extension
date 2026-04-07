@@ -101,28 +101,19 @@ const fetchAndVerifyConsumerSpans = async (
                 expect(consumerAttrs['dash0.faas.event_bridge_source']).toBeDefined();
                 expect(consumerAttrs['dash0.faas.event_bridge_detail_type']).toBeDefined();
                 console.log(`EventBridge attributes: faas.trigger=${JSON.stringify(consumerAttrs['faas.trigger'])}, source=${JSON.stringify(consumerAttrs['dash0.faas.event_bridge_source'])}, detail_type=${JSON.stringify(consumerAttrs['dash0.faas.event_bridge_detail_type'])}`);
-
-                // Trigger chain: EventBridge direct, depth 1
-                expect(consumerAttrs['dash0.trigger.chain.depth']?.intValue).toEqual('1');
-                expect(consumerAttrs['dash0.trigger.chain.0.type']?.stringValue).toEqual('aws:event_bridge');
-                expect(consumerAttrs['dash0.trigger.chain.0.name']).toBeDefined();
-                console.log(`Trigger chain (eventbridge): depth=1, hop0=${consumerAttrs['dash0.trigger.chain.0.type']?.stringValue}, name=${consumerAttrs['dash0.trigger.chain.0.name']?.stringValue}`);
             }
 
-            if (scenarioName === 's3') {
-                // Trigger chain: S3 direct, depth 1
+            // Verify trigger chain attributes for scenarios that support them
+            const expectedTriggerType: Record<string, string> = {
+                'eventbridge': 'aws:event_bridge', 's3': 'aws:s3',
+                'apigateway': 'aws:api_gateway', 'httpapi': 'aws:api_gateway',
+            };
+            const expectedType = expectedTriggerType[scenarioName];
+            if (expectedType) {
                 expect(consumerAttrs['dash0.trigger.chain.depth']?.intValue).toEqual('1');
-                expect(consumerAttrs['dash0.trigger.chain.0.type']?.stringValue).toEqual('aws:s3');
+                expect(consumerAttrs['dash0.trigger.chain.0.type']?.stringValue).toEqual(expectedType);
                 expect(consumerAttrs['dash0.trigger.chain.0.name']).toBeDefined();
-                console.log(`Trigger chain (s3): depth=1, hop0=${consumerAttrs['dash0.trigger.chain.0.type']?.stringValue}, name=${consumerAttrs['dash0.trigger.chain.0.name']?.stringValue}`);
-            }
-
-            if (scenarioName === 'apigateway' || scenarioName === 'httpapi') {
-                // Trigger chain: API Gateway, depth 1
-                expect(consumerAttrs['dash0.trigger.chain.depth']?.intValue).toEqual('1');
-                expect(consumerAttrs['dash0.trigger.chain.0.type']?.stringValue).toEqual('aws:api_gateway');
-                expect(consumerAttrs['dash0.trigger.chain.0.name']).toBeDefined();
-                console.log(`Trigger chain (${scenarioName}): depth=1, hop0=${consumerAttrs['dash0.trigger.chain.0.type']?.stringValue}, name=${consumerAttrs['dash0.trigger.chain.0.name']?.stringValue}`);
+                console.log(`Trigger chain (${scenarioName}): depth=1, type=${expectedType}, name=${consumerAttrs['dash0.trigger.chain.0.name']?.stringValue}`);
             }
 
             return;

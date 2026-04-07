@@ -5,6 +5,36 @@ use crate::otlp::attributes::*;
 
 const MAX_CHAIN_DEPTH: usize = 5;
 
+/// Extracts a human-readable resource name from an AWS ARN.
+///
+/// Examples:
+/// - `arn:aws:sqs:us-east-1:123:my-queue` -> `my-queue`
+/// - `arn:aws:sns:us-east-1:123:my-topic` -> `my-topic`
+/// - `arn:aws:kinesis:us-east-1:123:stream/my-stream` -> `my-stream`
+/// - `arn:aws:s3:::my-bucket` -> `my-bucket`
+fn extract_name_from_arn(arn: &str) -> Option<String> {
+    // ARN format: arn:partition:service:region:account:resource
+    let parts: Vec<&str> = arn.splitn(7, ':').collect();
+    if parts.len() < 6 {
+        return None;
+    }
+
+    let resource = parts[5..].join(":");
+    if resource.is_empty() {
+        return None;
+    }
+
+    // For Kinesis: "stream/my-stream" -> "my-stream"
+    if let Some(after_slash) = resource.split('/').last() {
+        if resource.contains('/') {
+            return Some(after_slash.to_string());
+        }
+    }
+
+    // For SQS, SNS, S3: resource is the name directly
+    Some(resource.to_string())
+}
+
 /// A single hop in the trigger chain.
 pub struct TriggerHop {
     pub trigger_type: String,
@@ -83,7 +113,6 @@ fn extract_from_record(record: &serde_json::Value) -> TriggerChainResult {
         Some("aws:sqs") => extract_sqs_chain(record),
         Some("aws:sns") => extract_sns_chain(record),
         Some("aws:kinesis") => extract_kinesis_chain(record),
-        Some("aws:dynamodb") => extract_dynamodb_chain(record),
         Some("aws:s3") => extract_s3_chain(record),
         _ => TriggerChainResult {
             hops: Vec::new(),
@@ -280,26 +309,6 @@ fn extract_kinesis_chain(record: &serde_json::Value) -> TriggerChainResult {
     TriggerChainResult {
         hops: vec![TriggerHop {
             trigger_type: "aws:kinesis".to_string(),
-            arn,
-            name,
-            timestamp: None,
-        }],
-        truncated: false,
-    }
-}
-
-// ── DynamoDB ─────────────────────────────────────────────────────────
-
-fn extract_dynamodb_chain(record: &serde_json::Value) -> TriggerChainResult {
-    let arn = record
-        .get("eventSourceARN")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
-    let name = arn.as_deref().and_then(extract_name_from_arn);
-
-    TriggerChainResult {
-        hops: vec![TriggerHop {
-            trigger_type: "aws:dynamodb".to_string(),
             arn,
             name,
             timestamp: None,
@@ -682,23 +691,6 @@ mod tests {
         assert_eq!(result.hops.len(), 1);
         assert_eq!(result.hops[0].trigger_type, "aws:kinesis");
         assert_eq!(result.hops[0].name.as_deref(), Some("order-stream"));
-    }
-
-    #[test]
-    fn dynamodb_streams_trigger() {
-        let payload = r#"{
-            "Records": [{
-                "eventSource": "aws:dynamodb",
-                "eventSourceARN": "arn:aws:dynamodb:us-east-1:123456789:table/orders/stream/2025-01-01T00:00:00.000",
-                "eventName": "INSERT",
-                "dynamodb": {"Keys": {"id": {"S": "123"}}}
-            }]
-        }"#;
-
-        let result = extract_trigger_chain(payload);
-        assert_eq!(result.hops.len(), 1);
-        assert_eq!(result.hops[0].trigger_type, "aws:dynamodb");
-        assert_eq!(result.hops[0].name.as_deref(), Some("orders"));
     }
 
     #[test]
@@ -1235,5 +1227,49 @@ mod tests {
         let result = extract_trigger_chain(payload);
         assert_eq!(result.hops.len(), 1);
         assert_eq!(result.hops[0].trigger_type, "aws:sns");
+    }
+
+    // ── ARN name extraction ──────────────────────────────────────────
+
+    #[test]
+    fn extract_name_sqs() {
+        assert_eq!(
+            extract_name_from_arn("arn:aws:sqs:us-east-1:123456789:my-queue"),
+            Some("my-queue".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_name_sns() {
+        assert_eq!(
+            extract_name_from_arn("arn:aws:sns:us-east-1:123456789:my-topic"),
+            Some("my-topic".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_name_kinesis() {
+        assert_eq!(
+            extract_name_from_arn("arn:aws:kinesis:us-east-1:123456789:stream/my-stream"),
+            Some("my-stream".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_name_s3() {
+        assert_eq!(
+            extract_name_from_arn("arn:aws:s3:::my-bucket"),
+            Some("my-bucket".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_name_invalid_arn() {
+        assert_eq!(extract_name_from_arn("not-an-arn"), None);
+    }
+
+    #[test]
+    fn extract_name_empty_resource() {
+        assert_eq!(extract_name_from_arn("arn:aws:sqs:us-east-1:123:"), None);
     }
 }

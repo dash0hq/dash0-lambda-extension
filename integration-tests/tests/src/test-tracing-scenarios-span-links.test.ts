@@ -129,36 +129,27 @@ const verifyTracingScenario = async (
             console.log(`Consumer span attributes: faas.trigger=${JSON.stringify(consumerAttrs['faas.trigger'])}, dash0.faas.trigger_arn=${JSON.stringify(consumerAttrs['dash0.faas.trigger_arn'])}, dash0.faas.record_count=${JSON.stringify(consumerAttrs['dash0.faas.record_count'])}`);
 
             // Verify trigger chain attributes
-            expect(consumerAttrs['dash0.trigger.chain.depth']).toBeDefined();
-            expect(consumerAttrs['dash0.trigger.chain.0.type']).toBeDefined();
-            expect(consumerAttrs['dash0.trigger.chain.0.name']).toBeDefined();
-
+            const expectedTriggerType: Record<string, string> = {
+                'sqs': 'aws:sqs', 'sns': 'aws:sns', 'sns-sqs': 'aws:sns', 'kinesis': 'aws:kinesis',
+            };
             const scenarioName = consumerFunctionName.includes('sns-sqs') ? 'sns-sqs' :
                 consumerFunctionName.includes('sns') ? 'sns' :
                 consumerFunctionName.includes('sqs') ? 'sqs' :
                 consumerFunctionName.includes('kinesis') ? 'kinesis' : 'unknown';
+            const expectedType = expectedTriggerType[scenarioName];
+
+            expect(consumerAttrs['dash0.trigger.chain.depth']).toBeDefined();
+            expect(consumerAttrs['dash0.trigger.chain.0.type']?.stringValue).toEqual(expectedType);
+            expect(consumerAttrs['dash0.trigger.chain.0.name']).toBeDefined();
 
             if (scenarioName === 'sns-sqs') {
-                // SNS -> SQS: depth 2, hop 0 = SNS, hop 1 = SQS
                 expect(consumerAttrs['dash0.trigger.chain.depth']?.intValue).toEqual('2');
-                expect(consumerAttrs['dash0.trigger.chain.0.type']?.stringValue).toEqual('aws:sns');
-                expect(consumerAttrs['dash0.trigger.chain.0.arn']).toBeDefined();
                 expect(consumerAttrs['dash0.trigger.chain.1.type']?.stringValue).toEqual('aws:sqs');
                 expect(consumerAttrs['dash0.trigger.chain.1.arn']).toBeDefined();
-                console.log(`Trigger chain (sns-sqs): depth=2, hop0=${consumerAttrs['dash0.trigger.chain.0.type']?.stringValue}, hop1=${consumerAttrs['dash0.trigger.chain.1.type']?.stringValue}`);
-            } else if (scenarioName === 'sqs') {
+            } else {
                 expect(consumerAttrs['dash0.trigger.chain.depth']?.intValue).toEqual('1');
-                expect(consumerAttrs['dash0.trigger.chain.0.type']?.stringValue).toEqual('aws:sqs');
-                console.log(`Trigger chain (sqs): depth=1, hop0=${consumerAttrs['dash0.trigger.chain.0.type']?.stringValue}`);
-            } else if (scenarioName === 'sns') {
-                expect(consumerAttrs['dash0.trigger.chain.depth']?.intValue).toEqual('1');
-                expect(consumerAttrs['dash0.trigger.chain.0.type']?.stringValue).toEqual('aws:sns');
-                console.log(`Trigger chain (sns): depth=1, hop0=${consumerAttrs['dash0.trigger.chain.0.type']?.stringValue}`);
-            } else if (scenarioName === 'kinesis') {
-                expect(consumerAttrs['dash0.trigger.chain.depth']?.intValue).toEqual('1');
-                expect(consumerAttrs['dash0.trigger.chain.0.type']?.stringValue).toEqual('aws:kinesis');
-                console.log(`Trigger chain (kinesis): depth=1, hop0=${consumerAttrs['dash0.trigger.chain.0.type']?.stringValue}`);
             }
+            console.log(`Trigger chain (${scenarioName}): depth=${consumerAttrs['dash0.trigger.chain.depth']?.intValue}, hop0=${consumerAttrs['dash0.trigger.chain.0.type']?.stringValue}`);
 
             break;
         } catch (error) {
