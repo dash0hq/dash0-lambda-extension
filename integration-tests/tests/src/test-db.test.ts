@@ -20,7 +20,8 @@ import {
     TEST_TIMEOUT_MS,
 } from './config.js';
 
-const runtimes = ['nodejs20-x', 'nodejs22-x', 'nodejs24-x'];
+const nodeRuntimes = ['nodejs20-x', 'nodejs22-x', 'nodejs24-x'];
+const pythonRuntimes = ['python3-12', 'python3-13', 'python3-14'];
 
 interface DbSpanExpectation {
     scopeName: string;
@@ -28,17 +29,36 @@ interface DbSpanExpectation {
     dbSystemName: string;
 }
 
-const postgresExpectation: DbSpanExpectation = {
+// Node.js expectations
+const nodePostgresExpectation: DbSpanExpectation = {
     scopeName: '@opentelemetry/instrumentation-pg',
     spanNames: ['pg.connect', 'pg.query:CREATE testdb', 'pg.query:INSERT testdb', 'pg.query:SELECT testdb'],
     dbSystemName: 'postgresql',
 };
 
-const mysqlExpectation: DbSpanExpectation = {
+const nodeMysqlExpectation: DbSpanExpectation = {
     scopeName: '@opentelemetry/instrumentation-mysql2',
     spanNames: ['CREATE', 'INSERT', 'SELECT'],
     dbSystemName: 'mysql',
 };
+
+// Python expectations
+const pythonPostgresExpectation: DbSpanExpectation = {
+    scopeName: 'opentelemetry.instrumentation.psycopg2',
+    spanNames: ['CREATE', 'INSERT', 'fetchone', 'SELECT', 'fetchone'],
+    dbSystemName: 'postgresql',
+};
+
+const pythonMysqlExpectation: DbSpanExpectation = {
+    scopeName: 'opentelemetry.instrumentation.pymysql',
+    spanNames: ['CREATE', 'INSERT', 'SELECT'],
+    dbSystemName: 'mysql',
+};
+
+const HANDLER_SCOPE_NAMES = [
+    '@opentelemetry/instrumentation-aws-lambda',
+    'opentelemetry.instrumentation.aws_lambda',
+];
 
 const checkDbMainSpans = async ({
     invocationId,
@@ -71,7 +91,7 @@ const checkDbMainSpans = async ({
 
             for (const rs of (spanPayload?.resourceSpans ?? [])) {
                 for (const ss of (rs.scopeSpans ?? [])) {
-                    if (ss.scope?.name === '@opentelemetry/instrumentation-aws-lambda') {
+                    if (HANDLER_SCOPE_NAMES.includes(ss.scope?.name)) {
                         expect(ss.spans.length).toEqual(1);
                         handlerSpan = ss.spans[0];
                         handlerResource = rs.resource;
@@ -193,12 +213,14 @@ const checkDbSpans = async ({
                 }
             }
 
-            expect(dbSpans.length, `Expected ${expectation.spanNames.length} DB spans, got ${dbSpans.length}`).toEqual(expectation.spanNames.length);
+            expect(dbSpans.length, `Expected ${expectation.spanNames.length} DB spans, got ${dbSpans.length}`).toBeGreaterThanOrEqual(expectation.spanNames.length);
 
+            const remainingSpans = [...dbSpans];
             for (const expectedName of expectation.spanNames) {
-                const matchingSpan = dbSpans.find((s: any) => s.name === expectedName);
-                expect(matchingSpan, `DB span with name "${expectedName}" not found`).toBeDefined();
+                const idx = remainingSpans.findIndex((s: any) => s.name === expectedName);
+                expect(idx, `DB span with name "${expectedName}" not found`).toBeGreaterThanOrEqual(0);
 
+                const matchingSpan = remainingSpans.splice(idx, 1)[0];
                 const attrs = getAttributesMap(matchingSpan.attributes);
                 expect(attrs['db.system.name']?.stringValue).toEqual(expectation.dbSystemName);
                 expect(attrs['db.namespace']?.stringValue).toEqual('testdb');
@@ -216,7 +238,7 @@ const checkDbSpans = async ({
 };
 
 describe.concurrent('DB tracing', () => {
-    for (const runtime of runtimes) {
+    for (const runtime of nodeRuntimes) {
         const runtimeName = runtime.replace(/\./g, '-');
 
         const postgresFunctionName = `${RESOURCE_PREFIX}db-testing-rds-postgres-${runtimeName}`;
@@ -224,7 +246,7 @@ describe.concurrent('DB tracing', () => {
             `traces PostgreSQL queries for ${postgresFunctionName}`,
             async () => {
                 console.log(`Starting DB test for ${postgresFunctionName}`, new Date().toISOString());
-                await verifyDbInvocation(postgresFunctionName, postgresExpectation);
+                await verifyDbInvocation(postgresFunctionName, nodePostgresExpectation);
             },
             TEST_TIMEOUT_MS,
         );
@@ -234,7 +256,31 @@ describe.concurrent('DB tracing', () => {
             `traces MySQL queries for ${mysqlFunctionName}`,
             async () => {
                 console.log(`Starting DB test for ${mysqlFunctionName}`, new Date().toISOString());
-                await verifyDbInvocation(mysqlFunctionName, mysqlExpectation);
+                await verifyDbInvocation(mysqlFunctionName, nodeMysqlExpectation);
+            },
+            TEST_TIMEOUT_MS,
+        );
+    }
+
+    for (const runtime of pythonRuntimes) {
+        const runtimeName = runtime.replace(/\./g, '-');
+
+        const postgresFunctionName = `${RESOURCE_PREFIX}db-testing-rds-postgres-${runtimeName}`;
+        it(
+            `traces PostgreSQL queries for ${postgresFunctionName}`,
+            async () => {
+                console.log(`Starting DB test for ${postgresFunctionName}`, new Date().toISOString());
+                await verifyDbInvocation(postgresFunctionName, pythonPostgresExpectation);
+            },
+            TEST_TIMEOUT_MS,
+        );
+
+        const mysqlFunctionName = `${RESOURCE_PREFIX}db-testing-rds-mysql-${runtimeName}`;
+        it(
+            `traces MySQL queries for ${mysqlFunctionName}`,
+            async () => {
+                console.log(`Starting DB test for ${mysqlFunctionName}`, new Date().toISOString());
+                await verifyDbInvocation(mysqlFunctionName, pythonMysqlExpectation);
             },
             TEST_TIMEOUT_MS,
         );

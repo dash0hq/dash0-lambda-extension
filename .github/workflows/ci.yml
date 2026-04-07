@@ -120,6 +120,8 @@ jobs:
         run: npm run deploy
         env:
           DASH0_DEV_API_TOKEN: ${{ secrets.DASH0_DEV_API_TOKEN }}
+          TEST_POSTGRESS_PASSWORD: ${{ secrets.TEST_POSTGRESS_PASSWORD }}
+          TEST_MYSQL_PASSWORD: ${{ secrets.TEST_MYSQL_PASSWORD }}
           RESOURCE_PREFIX: ${{ env.RESOURCE_PREFIX }}
           DB_HOST: ${{ secrets.DB_HOST }}
           DB_PORT: ${{ secrets.DB_PORT }}

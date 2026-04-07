@@ -33,6 +33,8 @@ jobs:
         run: npx cdk destroy ${RESOURCE_PREFIX}IntegrationTestsStack --force || true
         env:
           DASH0_DEV_API_TOKEN: ${{ secrets.DASH0_DEV_API_TOKEN }}
+          TEST_POSTGRESS_PASSWORD: ${{ secrets.TEST_POSTGRESS_PASSWORD }}
+          TEST_MYSQL_PASSWORD: ${{ secrets.TEST_MYSQL_PASSWORD }}
       - name: Delete PR-specific Lambda layers
         run: |
           for layer in ${RESOURCE_PREFIX}dash0-extension-python ${RESOURCE_PREFIX}dash0-extension-node ${RESOURCE_PREFIX}dash0-extension-java ${RESOURCE_PREFIX}dash0-extension-manual; do
