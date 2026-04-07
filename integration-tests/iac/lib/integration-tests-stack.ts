@@ -418,7 +418,8 @@ export class IntegrationTestsStack extends cdk.Stack {
     });
 
     new DbTestingStack(this, 'DbTestingStack', {
-      layer: nodeLayer,
+      nodeLayer,
+      pythonLayer,
       logGroup: sharedLogGroup,
       prefix,
     });
