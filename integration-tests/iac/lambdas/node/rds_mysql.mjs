@@ -11,8 +11,8 @@ export async function handler(event, context) {
     });
 
     try {
-        await connection.execute(`
-            CREATE TABLE IF NOT EXISTS test_entries (
+        await connection.execute(
+            `CREATE TABLE IF NOT EXISTS test_entries (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 request_id TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
