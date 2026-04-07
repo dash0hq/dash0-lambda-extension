@@ -22,9 +22,15 @@ See the release page for the latest ARNs of the extension layers for each runtim
 
 * `DASH0_ENDPOINT` - The integration endpoint for you organization in Dash0, i.e. `https://ingress.eu-west-1.aws.dash0.com:4318`.
 
-* `DASH0_TOKEN` - The API token for your Dash0 project.
+* Either `DASH0_TOKEN` or `DASH0_TOKEN_SECRET_ARN` must be set (see below).
 
 ### Optional
+
+* `DASH0_TOKEN` - The API token for your Dash0 project. Either this or `DASH0_TOKEN_SECRET_ARN` must be set.
+
+* `DASH0_TOKEN_SECRET_ARN` - The ARN of an AWS Secrets Manager secret containing the Dash0 API token. Either this or `DASH0_TOKEN` must be set. If both are set, `DASH0_TOKEN` takes precedence.
+
+* `DASH0_TOKEN_SECRET_KEY` - The JSON key within the secret to extract the token from. Required when the secret stored in `DASH0_TOKEN_SECRET_ARN` is a JSON object. If not set, the entire secret value is used as the token.
 
 * `DASH0_DISABLE_AUTO_INSTRUMENTATION` - Auto-instrumentation can be turned off by this environment variable, which will result in creating synthetic traces by the extension for all invocations.
 
