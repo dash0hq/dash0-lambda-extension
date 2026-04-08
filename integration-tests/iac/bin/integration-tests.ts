@@ -11,10 +11,8 @@ import { SharedDbStack } from '../lib/shared-db-stack';
 const prefix = process.env.RESOURCE_PREFIX ?? '';
 const app = new cdk.App();
 
-// Manually deployed, long-lived shared resources (not managed by CI)
-new SharedResourcesStack(app, 'SharedResourcesStack');
-
 // Per-PR stacks (deployed and destroyed by CI)
+new SharedResourcesStack(app, `${prefix}SharedResourcesStack`);
 new PythonStack(app, `${prefix}PythonStack`);
 new NodeStack(app, `${prefix}NodeStack`);
 new JavaStack(app, `${prefix}JavaStack`);
@@ -25,5 +23,5 @@ new NodeTracingScenariosStack(app, `${prefix}NodeTracingScenariosStack`);
 new JavaTracingScenariosStack(app, `${prefix}JavaTracingScenariosStack`);
 new DbTestingStack(app, `${prefix}DbTestingStack`);
 
-// Manually deployed shared database infrastructure
+// Manually deployed, long-lived shared database infrastructure
 new SharedDbStack(app, 'SharedDbStack');

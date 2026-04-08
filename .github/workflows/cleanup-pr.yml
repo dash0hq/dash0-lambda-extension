@@ -30,7 +30,7 @@ jobs:
         run: npm ci
       - name: Destroy CDK stack
         working-directory: integration-tests/iac
-        run: npx cdk destroy ${RESOURCE_PREFIX}PythonStack ${RESOURCE_PREFIX}NodeStack ${RESOURCE_PREFIX}JavaStack ${RESOURCE_PREFIX}ManualStack ${RESOURCE_PREFIX}DockerizedStack ${RESOURCE_PREFIX}PythonTracingScenariosStack ${RESOURCE_PREFIX}NodeTracingScenariosStack ${RESOURCE_PREFIX}JavaTracingScenariosStack ${RESOURCE_PREFIX}DbTestingStack --force || true
+        run: npx cdk destroy ${RESOURCE_PREFIX}PythonStack ${RESOURCE_PREFIX}NodeStack ${RESOURCE_PREFIX}JavaStack ${RESOURCE_PREFIX}ManualStack ${RESOURCE_PREFIX}DockerizedStack ${RESOURCE_PREFIX}PythonTracingScenariosStack ${RESOURCE_PREFIX}NodeTracingScenariosStack ${RESOURCE_PREFIX}JavaTracingScenariosStack ${RESOURCE_PREFIX}DbTestingStack ${RESOURCE_PREFIX}SharedResourcesStack --force || true
         env:
           DASH0_DEV_API_TOKEN: ${{ secrets.DASH0_DEV_API_TOKEN }}
           TEST_POSTGRESS_PASSWORD: ${{ secrets.TEST_POSTGRESS_PASSWORD }}

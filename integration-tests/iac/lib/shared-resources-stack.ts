@@ -30,13 +30,15 @@ export function getLatestLayerVersion(scope: Construct, id: string, layerName: s
 }
 
 export function importSharedResources(scope: cdk.Stack) {
-  const roleArn = cdk.Fn.importValue('SharedResources-RoleArn');
+  const prefix = process.env.RESOURCE_PREFIX ?? '';
+
+  const roleArn = cdk.Fn.importValue(`${prefix}SharedResources-RoleArn`);
   const role = iam.Role.fromRoleArn(scope, 'SharedRole', roleArn);
 
-  const logGroupArn = cdk.Fn.importValue('SharedResources-LogGroupArn');
+  const logGroupArn = cdk.Fn.importValue(`${prefix}SharedResources-LogGroupArn`);
   const logGroup = logs.LogGroup.fromLogGroupArn(scope, 'SharedLogGroup', logGroupArn);
 
-  const secretArn = cdk.Fn.importValue('SharedResources-SecretArn');
+  const secretArn = cdk.Fn.importValue(`${prefix}SharedResources-SecretArn`);
 
   return { role, logGroup, secretArn };
 }
@@ -44,6 +46,8 @@ export function importSharedResources(scope: cdk.Stack) {
 export class SharedResourcesStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
+
+    const prefix = process.env.RESOURCE_PREFIX ?? '';
 
     const role = new iam.Role(this, 'IntegrationTestsLambdaRole', {
       assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
@@ -65,7 +69,7 @@ export class SharedResourcesStack extends cdk.Stack {
     });
 
     const secret = new secretsmanager.Secret(this, 'Dash0TokenSecret', {
-      secretName: 'dash0-token-secret',
+      secretName: `${prefix}dash0-token-secret`,
       secretStringValue: cdk.SecretValue.unsafePlainText(process.env.DASH0_DEV_API_TOKEN!),
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
@@ -73,15 +77,15 @@ export class SharedResourcesStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, 'RoleArn', {
       value: role.roleArn,
-      exportName: 'SharedResources-RoleArn',
+      exportName: `${prefix}SharedResources-RoleArn`,
     });
     new cdk.CfnOutput(this, 'LogGroupArn', {
       value: logGroup.logGroupArn,
-      exportName: 'SharedResources-LogGroupArn',
+      exportName: `${prefix}SharedResources-LogGroupArn`,
     });
     new cdk.CfnOutput(this, 'SecretArn', {
       value: secret.secretArn,
-      exportName: 'SharedResources-SecretArn',
+      exportName: `${prefix}SharedResources-SecretArn`,
     });
   }
 }
