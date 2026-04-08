@@ -101,6 +101,16 @@ The following environment variables allow fine-grained control over secret maski
   Example: `DASH0_MASK_QUERY_PARAMS='[".*api_key.*", ".*token.*"]'`
 
 
+## Manual Instrumentation
+
+If you prefer to set up OpenTelemetry instrumentation yourself instead of relying on the extension's auto-instrumentation, you can use the manual layer and point your OTLP exporters to the extension's local endpoint. The extension will receive the telemetry, enrich it, and forward it to Dash0.
+
+1. Add the manual layer to your Lambda function: `arn:aws:lambda:<region>:115813213817:layer:dash0-extension-manual:<version>`.
+2. Configure your OTLP trace exporter to send to `http://127.0.0.1:9009/v1/traces`.
+3. If exporting metrics, configure your OTLP metric exporter to send to `http://127.0.0.1:9009/v1/metrics`.
+4. Make sure to flush all telemetry before the Lambda invocation completes (e.g., in a response hook or before returning the response).
+
+
 ## Enrichment Attributes
 
 The extension enriches telemetry data with additional attributes beyond what the auto-instrumentation provides.
