@@ -119,7 +119,7 @@ export class DbTestingStack extends cdk.NestedStack {
           image: runtime.bundlingImage,
           command: [
             'bash', '-c',
-            `pip install --platform manylinux2014_x86_64 --only-binary=:all: --python-version ${pythonVersion} -r requirements.txt -t /asset-output && cp -au . /asset-output`,
+            `pip install --no-cache-dir --platform manylinux2014_x86_64 --only-binary=:all: --python-version ${pythonVersion} -r requirements.txt -t /asset-output && cp -au . /asset-output`,
           ],
         },
       });

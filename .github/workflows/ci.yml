@@ -112,6 +112,15 @@ jobs:
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghcrunner
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf /usr/share/swift
+          docker system prune -af
+          df -h
       - name: Install dependencies
         working-directory: integration-tests/iac
         run: npm ci
