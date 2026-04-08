@@ -18,9 +18,6 @@ const resource = resourceFromAttributes({
 
 const exporter = new OTLPTraceExporter({
   url: `http://127.0.0.1:9009/v1/traces`,
-  headers: {
-    Authorization: `Bearer ${process.env.DASH0_TOKEN}`,
-  },
 });
 
 const provider = new NodeTracerProvider({
