@@ -2,6 +2,20 @@
 
 An extension for capturing observability data from AWS Lambda invocations and shipping to Dash0.
 
+## Table of Contents
+
+- [Layer ARNs](#layer-arns)
+- [Configuration](#configuration)
+  - [Required](#required)
+  - [Optional](#optional)
+  - [Secret Masking](#secret-masking)
+- [Manual Instrumentation](#manual-instrumentation)
+- [Enrichment Attributes](#enrichment-attributes)
+  - [Span Attributes](#span-attributes)
+  - [Log Attributes](#log-attributes)
+  - [Metrics](#metrics)
+- [Dockerized Lambdas](#dockerized-lambdas)
+
 This extension has five main functionalities:
 1. Enable auto-instrumentation for supported runtimes, which currently include Python, Node, Java.
 2. Receive traces from auto/manual instrumentations, enrich with data acquired in the extension, and send to Dash0.
