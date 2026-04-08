@@ -2,11 +2,12 @@
 
 An extension for capturing observability data from AWS Lambda invocations and shipping to Dash0.
 
-This extension has four main functionalities:
+This extension has five main functionalities:
 1. Enable auto-instrumentation for supported runtimes, which currently include Python, Node, Java.
 2. Receive traces from auto/manual instrumentations, enrich with data acquired in the extension, and send to Dash0.
 3. Detect runtime errors such as timeout or out of memory and create synthetic traces for them
 4. Collect all logs and send to Dash0, correlated with the trace id of the invocation.
+5. Create metrics for invocation duration, cold start duration, billed duration, and memory used.
 
 
 ## Layer ARNs
@@ -41,8 +42,6 @@ See the release page for the latest ARNs of the extension layers for each runtim
 * `DASH0_DISTRO_DEBUG` - When set to true, additional logs related to tracing and auto-instrumentation will be emitted. Default: `false`.
 
 * `DASH0_REQUEST_TIMEOUT` - Timeout in milliseconds for HTTP requests to the backend. Default: `2000`.
-
-* `DASH0_MAX_EVENT_PAYLOAD` - Maximum size in KB for event payloads (request/response bodies) captured in traces. Payloads exceeding this limit are truncated. Default: `20`.
 
 * `DASH0_CREATE_PAYLOAD_LOG_RECORDS` - When set to `true` (the default), the extension creates log records containing the request and response payloads for the lambda invocation and each client call. Set to `false` to disable. Default: `true`.
 
