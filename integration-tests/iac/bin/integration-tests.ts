@@ -12,16 +12,23 @@ const prefix = process.env.RESOURCE_PREFIX ?? '';
 const app = new cdk.App();
 
 // Per-PR stacks (deployed and destroyed by CI)
-new SharedResourcesStack(app, `${prefix}SharedResourcesStack`);
-new PythonStack(app, `${prefix}PythonStack`);
-new NodeStack(app, `${prefix}NodeStack`);
-new JavaStack(app, `${prefix}JavaStack`);
-new ManualStack(app, `${prefix}ManualStack`);
-new DockerizedStack(app, `${prefix}DockerizedStack`);
-new PythonTracingScenariosStack(app, `${prefix}PythonTracingScenariosStack`);
-new NodeTracingScenariosStack(app, `${prefix}NodeTracingScenariosStack`);
-new JavaTracingScenariosStack(app, `${prefix}JavaTracingScenariosStack`);
-new DbTestingStack(app, `${prefix}DbTestingStack`);
+const sharedResources = new SharedResourcesStack(app, `${prefix}SharedResourcesStack`);
+
+const prStacks = [
+  new PythonStack(app, `${prefix}PythonStack`),
+  new NodeStack(app, `${prefix}NodeStack`),
+  new JavaStack(app, `${prefix}JavaStack`),
+  new ManualStack(app, `${prefix}ManualStack`),
+  new DockerizedStack(app, `${prefix}DockerizedStack`),
+  new PythonTracingScenariosStack(app, `${prefix}PythonTracingScenariosStack`),
+  new NodeTracingScenariosStack(app, `${prefix}NodeTracingScenariosStack`),
+  new JavaTracingScenariosStack(app, `${prefix}JavaTracingScenariosStack`),
+  new DbTestingStack(app, `${prefix}DbTestingStack`),
+];
+
+for (const stack of prStacks) {
+  stack.addDependency(sharedResources);
+}
 
 // Manually deployed, long-lived shared database infrastructure
 new SharedDbStack(app, 'SharedDbStack');
