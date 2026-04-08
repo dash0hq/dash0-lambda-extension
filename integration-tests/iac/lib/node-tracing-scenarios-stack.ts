@@ -15,29 +15,15 @@ import * as events from 'aws-cdk-lib/aws-events';
 import * as events_targets from 'aws-cdk-lib/aws-events-targets';
 import * as lambda_event_sources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as path from 'path';
+import { getLatestLayerVersion, importSharedResources } from './shared-resources-stack';
 
-export interface NodeTracingScenariosStackProps extends cdk.NestedStackProps {
-  layer: lambda.ILayerVersion;
-  logGroup: logs.ILogGroup;
-  prefix: string;
-}
-
-export class NodeTracingScenariosStack extends cdk.NestedStack {
-  constructor(scope: Construct, id: string, props: NodeTracingScenariosStackProps) {
+export class NodeTracingScenariosStack extends cdk.Stack {
+  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    const role = new iam.Role(this, 'NodeTracingScenariosLambdaRole', {
-      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
-      managedPolicies: [
-        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
-        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSQSFullAccess'),
-        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSNSFullAccess'),
-        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonKinesisFullAccess'),
-        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonEventBridgeFullAccess'),
-        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonS3FullAccess'),
-        iam.ManagedPolicy.fromAwsManagedPolicyName('AWSLambda_FullAccess'),
-      ],
-    });
+    const prefix = process.env.RESOURCE_PREFIX ?? '';
+    const { role, logGroup } = importSharedResources(this);
+    const layer = getLatestLayerVersion(this, 'nodeLayer', `${prefix}dash0-extension-node`);
 
     const nodeCode = lambda.Code.fromAsset(path.join(__dirname, '../lambdas/node'));
     const baseEnvironment = {
@@ -51,7 +37,6 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
       lambda.Runtime.NODEJS_22_X,
       lambda.Runtime.NODEJS_24_X,
     ];
-    const prefix = props.prefix;
     for (const runtime of runtimes) {
       const runtimeName = runtime.name.replace(/\./g, '-');
 
@@ -66,10 +51,10 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         runtime,
         handler: 'sqs_producer.handler',
         code: nodeCode,
-        layers: [props.layer],
+        layers: [layer],
         role,
         timeout: cdk.Duration.seconds(10),
-        logGroup: props.logGroup,
+        logGroup,
         environment: {
           ...baseEnvironment,
           QUEUE_URL: sqsQueue.queueUrl,
@@ -81,10 +66,10 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         runtime,
         handler: 'consumer.handler',
         code: nodeCode,
-        layers: [props.layer],
+        layers: [layer],
         role,
         timeout: cdk.Duration.seconds(10),
-        logGroup: props.logGroup,
+        logGroup,
         environment: baseEnvironment,
       });
       sqsConsumer.addEventSource(new lambda_event_sources.SqsEventSource(sqsQueue, {
@@ -101,10 +86,10 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         runtime,
         handler: 'sns_producer.handler',
         code: nodeCode,
-        layers: [props.layer],
+        layers: [layer],
         role,
         timeout: cdk.Duration.seconds(10),
-        logGroup: props.logGroup,
+        logGroup,
         environment: {
           ...baseEnvironment,
           TOPIC_ARN: snsTopic.topicArn,
@@ -116,10 +101,10 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         runtime,
         handler: 'consumer.handler',
         code: nodeCode,
-        layers: [props.layer],
+        layers: [layer],
         role,
         timeout: cdk.Duration.seconds(10),
-        logGroup: props.logGroup,
+        logGroup,
         environment: baseEnvironment,
       });
       snsTopic.addSubscription(new sns_subscriptions.LambdaSubscription(snsConsumer));
@@ -142,10 +127,10 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         runtime,
         handler: 'sns_producer.handler',
         code: nodeCode,
-        layers: [props.layer],
+        layers: [layer],
         role,
         timeout: cdk.Duration.seconds(10),
-        logGroup: props.logGroup,
+        logGroup,
         environment: {
           ...baseEnvironment,
           TOPIC_ARN: snsSqsTopic.topicArn,
@@ -157,10 +142,10 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         runtime,
         handler: 'consumer.handler',
         code: nodeCode,
-        layers: [props.layer],
+        layers: [layer],
         role,
         timeout: cdk.Duration.seconds(10),
-        logGroup: props.logGroup,
+        logGroup,
         environment: baseEnvironment,
       });
       snsSqsConsumer.addEventSource(new lambda_event_sources.SqsEventSource(snsSqsQueue, {
@@ -179,10 +164,10 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         runtime,
         handler: 'kinesis_producer.handler',
         code: nodeCode,
-        layers: [props.layer],
+        layers: [layer],
         role,
         timeout: cdk.Duration.seconds(10),
-        logGroup: props.logGroup,
+        logGroup,
         environment: {
           ...baseEnvironment,
           STREAM_NAME: kinesisStream.streamName,
@@ -194,10 +179,10 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         runtime,
         handler: 'consumer.handler',
         code: nodeCode,
-        layers: [props.layer],
+        layers: [layer],
         role,
         timeout: cdk.Duration.seconds(10),
-        logGroup: props.logGroup,
+        logGroup,
         environment: baseEnvironment,
       });
       kinesisConsumer.addEventSource(new lambda_event_sources.KinesisEventSource(kinesisStream, {
@@ -215,10 +200,10 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         runtime,
         handler: 'consumer.handler',
         code: nodeCode,
-        layers: [props.layer],
+        layers: [layer],
         role,
         timeout: cdk.Duration.seconds(10),
-        logGroup: props.logGroup,
+        logGroup,
         environment: baseEnvironment,
       });
 
@@ -237,10 +222,10 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         runtime,
         handler: 'eventbridge_producer.handler',
         code: nodeCode,
-        layers: [props.layer],
+        layers: [layer],
         role,
         timeout: cdk.Duration.seconds(10),
-        logGroup: props.logGroup,
+        logGroup,
         environment: {
           ...baseEnvironment,
           EVENT_BUS_NAME: eventBus.eventBusName,
@@ -253,10 +238,10 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         runtime,
         handler: 'consumer.handler',
         code: nodeCode,
-        layers: [props.layer],
+        layers: [layer],
         role,
         timeout: cdk.Duration.seconds(10),
-        logGroup: props.logGroup,
+        logGroup,
         environment: baseEnvironment,
       });
 
@@ -271,10 +256,10 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         runtime,
         handler: 'apigateway_producer.handler',
         code: nodeCode,
-        layers: [props.layer],
+        layers: [layer],
         role,
         timeout: cdk.Duration.seconds(10),
-        logGroup: props.logGroup,
+        logGroup,
         environment: {
           ...baseEnvironment,
           API_URL: api.url,
@@ -287,10 +272,10 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         runtime,
         handler: 'consumer.handler',
         code: nodeCode,
-        layers: [props.layer],
+        layers: [layer],
         role,
         timeout: cdk.Duration.seconds(10),
-        logGroup: props.logGroup,
+        logGroup,
         environment: baseEnvironment,
       });
 
@@ -330,10 +315,10 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         runtime,
         handler: 'apigateway_producer.handler',
         code: nodeCode,
-        layers: [props.layer],
+        layers: [layer],
         role,
         timeout: cdk.Duration.seconds(10),
-        logGroup: props.logGroup,
+        logGroup,
         environment: {
           ...baseEnvironment,
           API_URL: httpApiUrl,
@@ -352,10 +337,10 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         runtime,
         handler: 'consumer.handler',
         code: nodeCode,
-        layers: [props.layer],
+        layers: [layer],
         role,
         timeout: cdk.Duration.seconds(10),
-        logGroup: props.logGroup,
+        logGroup,
         environment: baseEnvironment,
       });
 
@@ -370,10 +355,10 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         runtime,
         handler: 's3_producer.handler',
         code: nodeCode,
-        layers: [props.layer],
+        layers: [layer],
         role,
         timeout: cdk.Duration.seconds(10),
-        logGroup: props.logGroup,
+        logGroup,
         environment: {
           ...baseEnvironment,
           BUCKET_NAME: s3Bucket.bucketName,
@@ -386,10 +371,10 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         runtime,
         handler: 'consumer.handler',
         code: nodeCode,
-        layers: [props.layer],
+        layers: [layer],
         role,
         timeout: cdk.Duration.seconds(10),
-        logGroup: props.logGroup,
+        logGroup,
         environment: baseEnvironment,
       });
 
@@ -398,10 +383,10 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         runtime,
         handler: 'lambda_invoker.handler',
         code: nodeCode,
-        layers: [props.layer],
+        layers: [layer],
         role,
         timeout: cdk.Duration.seconds(10),
-        logGroup: props.logGroup,
+        logGroup,
         environment: {
           ...baseEnvironment,
           TARGET_FUNCTION_NAME: lambdaConsumer.functionName,

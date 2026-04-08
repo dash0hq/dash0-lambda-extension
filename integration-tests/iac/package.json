@@ -10,8 +10,9 @@
     "test": "jest",
     "cdk": "cdk",
     "setup-ecr": "bash scripts/setup-ecr.sh",
-    "deploy": "npm run setup-ecr && cdk deploy \"${RESOURCE_PREFIX}IntegrationTestsStack\" --require-approval never",
-    "deploy-shared-db": "cdk deploy SharedDbStack --require-approval never"
+    "deploy": "npm run setup-ecr && cdk deploy ${RESOURCE_PREFIX}PythonStack ${RESOURCE_PREFIX}NodeStack ${RESOURCE_PREFIX}JavaStack ${RESOURCE_PREFIX}ManualStack ${RESOURCE_PREFIX}DockerizedStack ${RESOURCE_PREFIX}PythonTracingScenariosStack ${RESOURCE_PREFIX}NodeTracingScenariosStack ${RESOURCE_PREFIX}JavaTracingScenariosStack ${RESOURCE_PREFIX}DbTestingStack --require-approval never --concurrency 10",
+    "deploy-shared-db": "cdk deploy SharedDbStack --require-approval never",
+    "deploy-shared-resources": "cdk deploy SharedResourcesStack --require-approval never"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",

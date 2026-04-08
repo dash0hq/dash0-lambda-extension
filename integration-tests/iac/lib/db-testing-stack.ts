@@ -5,26 +5,16 @@ import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as path from 'path';
+import { getLatestLayerVersion, importSharedResources } from './shared-resources-stack';
 
-export interface DbTestingStackProps extends cdk.NestedStackProps {
-  nodeLayer: lambda.ILayerVersion;
-  pythonLayer: lambda.ILayerVersion;
-  logGroup: logs.ILogGroup;
-  prefix: string;
-}
-
-export class DbTestingStack extends cdk.NestedStack {
-  constructor(scope: Construct, id: string, props: DbTestingStackProps) {
+export class DbTestingStack extends cdk.Stack {
+  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    const prefix = props.prefix;
-
-    const role = new iam.Role(this, 'DbTestingLambdaRole', {
-      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
-      managedPolicies: [
-        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
-      ],
-    });
+    const prefix = process.env.RESOURCE_PREFIX ?? '';
+    const { role, logGroup } = importSharedResources(this);
+    const nodeLayer = getLatestLayerVersion(this, 'nodeLayer', `${prefix}dash0-extension-node`);
+    const pythonLayer = getLatestLayerVersion(this, 'pythonLayer', `${prefix}dash0-extension-python`);
 
     const baseEnvironment = {
       AWS_LAMBDA_EXEC_WRAPPER: '/opt/wrapper',
@@ -67,7 +57,7 @@ export class DbTestingStack extends cdk.NestedStack {
         handler: 'handler',
         memorySize: 128,
         timeout: cdk.Duration.seconds(30),
-        layers: [props.nodeLayer],
+        layers: [nodeLayer],
         role,
         bundling: {
           nodeModules: ['pg'],
@@ -76,7 +66,7 @@ export class DbTestingStack extends cdk.NestedStack {
           ...baseEnvironment,
           ...postgresEnv,
         },
-        logGroup: props.logGroup,
+        logGroup,
         loggingFormat: lambda.LoggingFormat.TEXT,
       });
 
@@ -87,7 +77,7 @@ export class DbTestingStack extends cdk.NestedStack {
         handler: 'handler',
         memorySize: 128,
         timeout: cdk.Duration.seconds(30),
-        layers: [props.nodeLayer],
+        layers: [nodeLayer],
         role,
         bundling: {
           nodeModules: ['mysql2'],
@@ -96,7 +86,7 @@ export class DbTestingStack extends cdk.NestedStack {
           ...baseEnvironment,
           ...mysqlEnv,
         },
-        logGroup: props.logGroup,
+        logGroup,
         loggingFormat: lambda.LoggingFormat.TEXT,
       });
     }
@@ -131,13 +121,13 @@ export class DbTestingStack extends cdk.NestedStack {
         code: pythonDbCode,
         memorySize: 128,
         timeout: cdk.Duration.seconds(30),
-        layers: [props.pythonLayer],
+        layers: [pythonLayer],
         role,
         environment: {
           ...baseEnvironment,
           ...postgresEnv,
         },
-        logGroup: props.logGroup,
+        logGroup,
         loggingFormat: lambda.LoggingFormat.TEXT,
       });
 
@@ -148,13 +138,13 @@ export class DbTestingStack extends cdk.NestedStack {
         code: pythonDbCode,
         memorySize: 128,
         timeout: cdk.Duration.seconds(30),
-        layers: [props.pythonLayer],
+        layers: [pythonLayer],
         role,
         environment: {
           ...baseEnvironment,
           ...mysqlEnv,
         },
-        logGroup: props.logGroup,
+        logGroup,
         loggingFormat: lambda.LoggingFormat.TEXT,
       });
     }

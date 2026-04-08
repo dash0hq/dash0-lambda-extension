@@ -8,6 +8,7 @@ import * as sns from 'aws-cdk-lib/aws-sns';
 import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 import * as lambda_event_sources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as path from 'path';
+import { getLatestLayerVersion, importSharedResources } from './shared-resources-stack';
 
 export function createJavaCode(): lambda.Code {
   return lambda.Code.fromAsset(path.join(__dirname, '../lambdas/java'), {
@@ -21,24 +22,13 @@ export function createJavaCode(): lambda.Code {
   });
 }
 
-export interface JavaTracingScenariosStackProps extends cdk.NestedStackProps {
-  layer: lambda.ILayerVersion;
-  logGroup: logs.ILogGroup;
-  prefix: string;
-}
-
-export class JavaTracingScenariosStack extends cdk.NestedStack {
-  constructor(scope: Construct, id: string, props: JavaTracingScenariosStackProps) {
+export class JavaTracingScenariosStack extends cdk.Stack {
+  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    const role = new iam.Role(this, 'JavaTracingScenariosLambdaRole', {
-      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
-      managedPolicies: [
-        iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
-        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSQSFullAccess'),
-        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSNSFullAccess'),
-      ],
-    });
+    const prefix = process.env.RESOURCE_PREFIX ?? '';
+    const { role, logGroup } = importSharedResources(this);
+    const layer = getLatestLayerVersion(this, 'javaLayer', `${prefix}dash0-extension-java`);
 
     const javaCode = createJavaCode();
     const baseEnvironment = {
@@ -52,7 +42,6 @@ export class JavaTracingScenariosStack extends cdk.NestedStack {
       lambda.Runtime.JAVA_21,
       lambda.Runtime.JAVA_25,
     ];
-    const prefix = props.prefix;
     for (const runtime of runtimes) {
       const runtimeName = runtime.name.replace(/\./g, '-');
 
@@ -67,11 +56,11 @@ export class JavaTracingScenariosStack extends cdk.NestedStack {
         runtime,
         handler: 'org.example.SqsProducerHandler::handleRequest',
         code: javaCode,
-        layers: [props.layer],
+        layers: [layer],
         role,
         memorySize: 512,
         timeout: cdk.Duration.seconds(10),
-        logGroup: props.logGroup,
+        logGroup,
         environment: {
           ...baseEnvironment,
           QUEUE_URL: sqsQueue.queueUrl,
@@ -83,11 +72,11 @@ export class JavaTracingScenariosStack extends cdk.NestedStack {
         runtime,
         handler: 'org.example.ConsumerHandler::handleRequest',
         code: javaCode,
-        layers: [props.layer],
+        layers: [layer],
         role,
         memorySize: 512,
         timeout: cdk.Duration.seconds(10),
-        logGroup: props.logGroup,
+        logGroup,
         environment: baseEnvironment,
       });
       sqsConsumer.addEventSource(new lambda_event_sources.SqsEventSource(sqsQueue, {
@@ -104,11 +93,11 @@ export class JavaTracingScenariosStack extends cdk.NestedStack {
         runtime,
         handler: 'org.example.SnsProducerHandler::handleRequest',
         code: javaCode,
-        layers: [props.layer],
+        layers: [layer],
         role,
         memorySize: 512,
         timeout: cdk.Duration.seconds(10),
-        logGroup: props.logGroup,
+        logGroup,
         environment: {
           ...baseEnvironment,
           TOPIC_ARN: snsTopic.topicArn,
@@ -120,11 +109,11 @@ export class JavaTracingScenariosStack extends cdk.NestedStack {
         runtime,
         handler: 'org.example.SnsConsumerHandler::handleRequest',
         code: javaCode,
-        layers: [props.layer],
+        layers: [layer],
         role,
         memorySize: 512,
         timeout: cdk.Duration.seconds(10),
-        logGroup: props.logGroup,
+        logGroup,
         environment: baseEnvironment,
       });
       snsTopic.addSubscription(new sns_subscriptions.LambdaSubscription(snsConsumer));
@@ -147,11 +136,11 @@ export class JavaTracingScenariosStack extends cdk.NestedStack {
         runtime,
         handler: 'org.example.SnsProducerHandler::handleRequest',
         code: javaCode,
-        layers: [props.layer],
+        layers: [layer],
         role,
         memorySize: 512,
         timeout: cdk.Duration.seconds(10),
-        logGroup: props.logGroup,
+        logGroup,
         environment: {
           ...baseEnvironment,
           TOPIC_ARN: snsSqsTopic.topicArn,
@@ -163,11 +152,11 @@ export class JavaTracingScenariosStack extends cdk.NestedStack {
         runtime,
         handler: 'org.example.ConsumerHandler::handleRequest',
         code: javaCode,
-        layers: [props.layer],
+        layers: [layer],
         role,
         memorySize: 512,
         timeout: cdk.Duration.seconds(10),
-        logGroup: props.logGroup,
+        logGroup,
         environment: baseEnvironment,
       });
       snsSqsConsumer.addEventSource(new lambda_event_sources.SqsEventSource(snsSqsQueue, {

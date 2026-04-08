@@ -1,24 +1,29 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib/core';
-import { IntegrationTestsStack } from '../lib/integration-tests-stack';
+import { SharedResourcesStack } from '../lib/shared-resources-stack';
+import { PythonStack, NodeStack, JavaStack, ManualStack, DockerizedStack } from '../lib/integration-tests-stack';
+import { PythonTracingScenariosStack } from '../lib/python-tracing-scenarios-stack';
+import { NodeTracingScenariosStack } from '../lib/node-tracing-scenarios-stack';
+import { JavaTracingScenariosStack } from '../lib/java-tracing-scenarios-stack';
+import { DbTestingStack } from '../lib/db-testing-stack';
 import { SharedDbStack } from '../lib/shared-db-stack';
 
 const prefix = process.env.RESOURCE_PREFIX ?? '';
 const app = new cdk.App();
-new IntegrationTestsStack(app, `${prefix}IntegrationTestsStack`, {
-  /* If you don't specify 'env', this stack will be environment-agnostic.
-   * Account/Region-dependent features and context lookups will not work,
-   * but a single synthesized template can be deployed anywhere. */
 
-  /* Uncomment the next line to specialize this stack for the AWS Account
-   * and Region that are implied by the current CLI configuration. */
-  // env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
+// Manually deployed, long-lived shared resources (not managed by CI)
+new SharedResourcesStack(app, 'SharedResourcesStack');
 
-  /* Uncomment the next line if you know exactly what Account and Region you
-   * want to deploy the stack to. */
-  // env: { account: '123456789012', region: 'us-east-1' },
+// Per-PR stacks (deployed and destroyed by CI)
+new PythonStack(app, `${prefix}PythonStack`);
+new NodeStack(app, `${prefix}NodeStack`);
+new JavaStack(app, `${prefix}JavaStack`);
+new ManualStack(app, `${prefix}ManualStack`);
+new DockerizedStack(app, `${prefix}DockerizedStack`);
+new PythonTracingScenariosStack(app, `${prefix}PythonTracingScenariosStack`);
+new NodeTracingScenariosStack(app, `${prefix}NodeTracingScenariosStack`);
+new JavaTracingScenariosStack(app, `${prefix}JavaTracingScenariosStack`);
+new DbTestingStack(app, `${prefix}DbTestingStack`);
 
-  /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
-});
-
+// Manually deployed shared database infrastructure
 new SharedDbStack(app, 'SharedDbStack');
