@@ -230,7 +230,7 @@ fn _build_otlp_request(
             header::HeaderValue::from_static("application/x-protobuf"),
         );
 
-        if let Ok(token) = std::env::var("DASH0_TOKEN") {
+        if let Some(token) = crate::config::get_dash0_token() {
             if !token.is_empty() {
                 if let Ok(auth_val) =
                     header::HeaderValue::from_str(format!("Bearer {}", token).as_str())
@@ -264,6 +264,10 @@ async fn send_request(
     item_count: usize,
     item_type: &str,
 ) -> Result<(), ()> {
+    if crate::config::get_dash0_token().is_none() {
+        return Ok(());
+    }
+
     let max_attempts = request_retries() + 1;
 
     for attempt in 1..=max_attempts {

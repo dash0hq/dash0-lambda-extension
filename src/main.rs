@@ -69,6 +69,7 @@ async fn main() {
     stats::init_start();
 
     config::endpoints::latch_runtime_env();
+    config::token::init_dash0_token().await;
 
     init_masking_rules();
 
