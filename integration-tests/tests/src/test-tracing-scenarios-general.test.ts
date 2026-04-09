@@ -94,12 +94,26 @@ const fetchAndVerifyConsumerSpans = async (
             console.log(`Consumer handler span found: spanId=${consumerHandlerSpan!.spanId}, parentSpanId=${consumerHandlerSpan!.parentSpanId}`);
             console.log(`Trace chain verified: leaf(${leafSpanId}) -> consumer root(${consumerRootSpan!.spanId}) -> consumer handler(${consumerHandlerSpan!.spanId})`);
 
+            const consumerAttrs = getAttributesMap(consumerHandlerSpan!.attributes);
+
             if (scenarioName === 'eventbridge') {
-                const consumerAttrs = getAttributesMap(consumerHandlerSpan!.attributes);
                 expect(consumerAttrs['faas.trigger']).toBeDefined();
                 expect(consumerAttrs['dash0.faas.event_bridge_source']).toBeDefined();
                 expect(consumerAttrs['dash0.faas.event_bridge_detail_type']).toBeDefined();
                 console.log(`EventBridge attributes: faas.trigger=${JSON.stringify(consumerAttrs['faas.trigger'])}, source=${JSON.stringify(consumerAttrs['dash0.faas.event_bridge_source'])}, detail_type=${JSON.stringify(consumerAttrs['dash0.faas.event_bridge_detail_type'])}`);
+            }
+
+            // Verify trigger chain attributes for scenarios that support them
+            const expectedTriggerType: Record<string, string> = {
+                'eventbridge': 'aws:event_bridge', 's3': 'aws:s3',
+                'apigateway': 'aws:api_gateway', 'httpapi': 'aws:api_gateway',
+            };
+            const expectedType = expectedTriggerType[scenarioName];
+            if (expectedType) {
+                expect(consumerAttrs['dash0.trigger.chain.depth']?.intValue).toEqual('1');
+                expect(consumerAttrs['dash0.trigger.chain.0.type']?.stringValue).toEqual(expectedType);
+                expect(consumerAttrs['dash0.trigger.chain.0.name']).toBeDefined();
+                console.log(`Trigger chain (${scenarioName}): depth=1, type=${expectedType}, name=${consumerAttrs['dash0.trigger.chain.0.name']?.stringValue}`);
             }
 
             return;
