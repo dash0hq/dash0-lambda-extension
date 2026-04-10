@@ -39,7 +39,7 @@ def handler(event, context):
             )
             read = cur.fetchone()
 
-        print(f"just a change!!! Inserted and read back entry for request: {context.aws_request_id}")
+        print(f"Inserted and read back entry for request: {context.aws_request_id}")
 
         return {
             "statusCode": 200,
