@@ -25,6 +25,7 @@ import Dash0HttpInstrumentation from './instrumentations/https/HttpInstrumentati
 import Dash0IORedisInstrumentation from './instrumentations/ioredis/IORedisInstrumentation';
 import Dash0KafkaJsInstrumentation from './instrumentations/kafkajs/KafkaJsInstrumentation';
 import Dash0MongoDBInstrumentation from './instrumentations/mongodb/MongoDBInstrumentation';
+import Dash0Mysql2Instrumentation from './instrumentations/mysql2/Mysql2Instrumentation';
 import Dash0PgInstrumentation from './instrumentations/pg/PgInstrumentation';
 import Dash0PrismaInstrumentation from './instrumentations/prisma/PrismaInstrumentation';
 import Dash0RedisInstrumentation from './instrumentations/redis/RedisInstrumentation';
@@ -106,6 +107,7 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
       new Dash0IORedisInstrumentation(),
       new Dash0KafkaJsInstrumentation(),
       new Dash0MongoDBInstrumentation(),
+      new Dash0Mysql2Instrumentation(),
       new Dash0PgInstrumentation(),
       new Dash0PrismaInstrumentation(),
       new Dash0RedisInstrumentation(),

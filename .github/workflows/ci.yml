@@ -3,6 +3,7 @@ name: CI
 on:
   pull_request:
     branches: [main, master]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref }}
@@ -19,6 +20,7 @@ env:
 jobs:
   fmt:
     name: Format
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,6 +31,7 @@ jobs:
 
   test:
     name: Test
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,6 +41,7 @@ jobs:
 
   python-distro-test:
     name: Python Distro Unit Tests
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -54,6 +58,7 @@ jobs:
 
   node-distro-test:
     name: Node Distro Unit Tests
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -71,6 +76,7 @@ jobs:
 
   build:
     name: Build Rust Binaries
+    if: github.event.pull_request.draft == false
     uses: ./.github/workflows/build.yml
 
   deploy:
@@ -106,6 +112,15 @@ jobs:
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghcrunner
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf /usr/share/swift
+          docker system prune -af
+          df -h
       - name: Install dependencies
         working-directory: integration-tests/iac
         run: npm ci
@@ -114,6 +129,8 @@ jobs:
         run: npm run deploy
         env:
           DASH0_DEV_API_TOKEN: ${{ secrets.DASH0_DEV_API_TOKEN }}
+          TEST_POSTGRESS_PASSWORD: ${{ secrets.TEST_POSTGRESS_PASSWORD }}
+          TEST_MYSQL_PASSWORD: ${{ secrets.TEST_MYSQL_PASSWORD }}
           RESOURCE_PREFIX: ${{ env.RESOURCE_PREFIX }}
       - name: Install test dependencies
         working-directory: integration-tests/tests

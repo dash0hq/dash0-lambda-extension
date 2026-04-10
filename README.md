@@ -2,11 +2,26 @@
 
 An extension for capturing observability data from AWS Lambda invocations and shipping to Dash0.
 
-This extension has four main functionalities:
+## Table of Contents
+
+- [Layer ARNs](#layer-arns)
+- [Configuration](#configuration)
+  - [Required](#required)
+  - [Optional](#optional)
+  - [Secret Masking](#secret-masking)
+- [Manual Instrumentation](#manual-instrumentation)
+- [Enrichment Attributes](#enrichment-attributes)
+  - [Span Attributes](#span-attributes)
+  - [Log Attributes](#log-attributes)
+  - [Metrics](#metrics)
+- [Dockerized Lambdas](#dockerized-lambdas)
+
+This extension has five main functionalities:
 1. Enable auto-instrumentation for supported runtimes, which currently include Python, Node, Java.
 2. Receive traces from auto/manual instrumentations, enrich with data acquired in the extension, and send to Dash0.
 3. Detect runtime errors such as timeout or out of memory and create synthetic traces for them
 4. Collect all logs and send to Dash0, correlated with the trace id of the invocation.
+5. Create metrics for invocation duration, cold start duration, billed duration, and memory used.
 
 
 ## Layer ARNs
@@ -41,8 +56,6 @@ See the release page for the latest ARNs of the extension layers for each runtim
 * `DASH0_DISTRO_DEBUG` - When set to true, additional logs related to tracing and auto-instrumentation will be emitted. Default: `false`.
 
 * `DASH0_REQUEST_TIMEOUT` - Timeout in milliseconds for HTTP requests to the backend. Default: `2000`.
-
-* `DASH0_MAX_EVENT_PAYLOAD` - Maximum size in KB for event payloads (request/response bodies) captured in traces. Payloads exceeding this limit are truncated. Default: `20`.
 
 * `DASH0_CREATE_PAYLOAD_LOG_RECORDS` - When set to `true` (the default), the extension creates log records containing the request and response payloads for the lambda invocation and each client call. Set to `false` to disable. Default: `true`.
 
@@ -100,6 +113,16 @@ The following environment variables allow fine-grained control over secret maski
 * `DASH0_MASK_QUERY_PARAMS` - Regex patterns for masking HTTP query parameter names.
 
   Example: `DASH0_MASK_QUERY_PARAMS='[".*api_key.*", ".*token.*"]'`
+
+
+## Manual Instrumentation
+
+If you prefer to set up OpenTelemetry instrumentation yourself instead of relying on the extension's auto-instrumentation, you can use the manual layer and point your OTLP exporters to the extension's local endpoint. The extension will receive the telemetry, enrich it, and forward it to Dash0.
+
+1. Add the manual layer to your Lambda function: `arn:aws:lambda:<region>:115813213817:layer:dash0-extension-manual:<version>`.
+2. Configure your OTLP trace exporter to send to `http://127.0.0.1:9009/v1/traces`.
+3. If exporting metrics, configure your OTLP metric exporter to send to `http://127.0.0.1:9009/v1/metrics`.
+4. Make sure to flush all telemetry before the Lambda invocation completes (e.g., in a response hook or before returning the response).
 
 
 ## Enrichment Attributes
