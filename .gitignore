@@ -9,3 +9,4 @@ opt/node/distro/dist
 opt/node/dist
 .venv
 .env*
+.claude/

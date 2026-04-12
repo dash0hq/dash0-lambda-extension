@@ -24,3 +24,23 @@ pub const DASH0_FAAS_TRIGGER_ARN: &str = "dash0.faas.trigger_arn";
 pub const DASH0_FAAS_EVENT_BRIDGE_SOURCE: &str = "dash0.faas.event_bridge_source";
 pub const DASH0_FAAS_EVENT_BRIDGE_DETAIL_TYPE: &str = "dash0.faas.event_bridge_detail_type";
 pub const DASH0_FAAS_PAYLOAD_TYPE: &str = "dash0.faas.payload_type";
+
+// Dash0 trigger chain attributes
+pub const DASH0_TRIGGER_CHAIN_DEPTH: &str = "dash0.trigger.chain.depth";
+pub const DASH0_TRIGGER_CHAIN_TRUNCATED: &str = "dash0.trigger.chain.truncated";
+
+pub fn dash0_trigger_chain_type(index: usize) -> String {
+    format!("dash0.trigger.chain.{}.type", index)
+}
+
+pub fn dash0_trigger_chain_arn(index: usize) -> String {
+    format!("dash0.trigger.chain.{}.arn", index)
+}
+
+pub fn dash0_trigger_chain_name(index: usize) -> String {
+    format!("dash0.trigger.chain.{}.name", index)
+}
+
+pub fn dash0_trigger_chain_timestamp(index: usize) -> String {
+    format!("dash0.trigger.chain.{}.timestamp", index)
+}

@@ -11,6 +11,7 @@ import * as path from 'path';
 import { PythonTracingScenariosStack, createPythonCode } from './python-tracing-scenarios-stack';
 import { NodeTracingScenariosStack } from './node-tracing-scenarios-stack';
 import { JavaTracingScenariosStack } from './java-tracing-scenarios-stack';
+import { DbTestingStack } from './db-testing-stack';
 
 function getLatestLayerVersion(scope: Construct, id: string, layerName: string): lambda.ILayerVersion {
   const stack = cdk.Stack.of(scope);
@@ -437,6 +438,13 @@ export class IntegrationTestsStack extends cdk.Stack {
 
     new JavaTracingScenariosStack(this, 'JavaTracingScenariosStack', {
       layer: javaLayer,
+      logGroup: sharedLogGroup,
+      prefix,
+    });
+
+    new DbTestingStack(this, 'DbTestingStack', {
+      nodeLayer,
+      pythonLayer,
       logGroup: sharedLogGroup,
       prefix,
     });
