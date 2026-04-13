@@ -1,4 +1,4 @@
-service: ${env:RESOURCE_PREFIX, ''}sls-4-integration-test
+service: ${env:RESOURCE_PREFIX, ''}sls-3-integration-test
 
 provider:
   name: aws
@@ -18,13 +18,13 @@ custom:
 
 functions:
   hello-python:
-    name: ${env:RESOURCE_PREFIX, ''}sls-4-test-python
+    name: ${env:RESOURCE_PREFIX, ''}sls-3-test-python
     handler: lambdas/python/handler.hello
     runtime: python3.14
     dash0-traced: true
 
   hello-node:
-    name: ${env:RESOURCE_PREFIX, ''}sls-4-test-node
+    name: ${env:RESOURCE_PREFIX, ''}sls-3-test-node
     handler: lambdas/node/handler.hello
     runtime: nodejs24.x
     dash0-traced: true
