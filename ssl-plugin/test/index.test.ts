@@ -1,5 +1,7 @@
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const ServerlessDash0Plugin = require('../src/index');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const bundledVersions: Record<string, number> = require('../src/versions.json');
 
 function createMockServerless(overrides: {
   provider?: Record<string, unknown>;
@@ -286,9 +288,9 @@ describe('ServerlessDash0Plugin', () => {
       const plugin = new ServerlessDash0Plugin(serverless, {});
       plugin.hooks['before:package:initialize']();
 
-      // versions.json has version 1 for all layers
+      const expectedVersion = bundledVersions['dash0-extension-node'];
       expect(serverless.service.functions.myFunc.layers![0]).toBe(
-        'arn:aws:lambda:us-east-1:115813213817:layer:dash0-extension-node:1'
+        `arn:aws:lambda:us-east-1:115813213817:layer:dash0-extension-node:${expectedVersion}`
       );
     });
 
@@ -303,8 +305,9 @@ describe('ServerlessDash0Plugin', () => {
       const plugin = new ServerlessDash0Plugin(serverless, {});
       plugin.hooks['before:package:initialize']();
 
+      const expectedVersion = bundledVersions['dash0-extension-node'];
       expect(serverless.service.functions.myFunc.layers![0]).toBe(
-        'arn:aws:lambda:us-east-1:999888777666:layer:dash0-extension-node:1'
+        `arn:aws:lambda:us-east-1:999888777666:layer:dash0-extension-node:${expectedVersion}`
       );
     });
 
