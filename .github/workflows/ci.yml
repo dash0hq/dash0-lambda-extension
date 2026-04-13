@@ -99,13 +99,13 @@ jobs:
         with:
           node-version: '20'
       - name: Install dependencies
-        working-directory: ssl-plugin
+        working-directory: sls-plugin
         run: npm ci
       - name: Build
-        working-directory: ssl-plugin
+        working-directory: sls-plugin
         run: npm run build
       - name: Run tests
-        working-directory: ssl-plugin
+        working-directory: sls-plugin
         run: npm test
 
   deploy-sls:
@@ -128,10 +128,10 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
       - name: Install plugin dependencies
-        working-directory: ssl-plugin
+        working-directory: sls-plugin
         run: npm ci
       - name: Build plugin
-        working-directory: ssl-plugin
+        working-directory: sls-plugin
         run: npm run build
       - name: Install SLS project dependencies
         working-directory: integration-tests/sls/${{ matrix.sls-version }}

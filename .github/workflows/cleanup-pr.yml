@@ -36,10 +36,10 @@ jobs:
           TEST_POSTGRESS_PASSWORD: ${{ secrets.TEST_POSTGRESS_PASSWORD }}
           TEST_MYSQL_PASSWORD: ${{ secrets.TEST_MYSQL_PASSWORD }}
       - name: Install plugin dependencies
-        working-directory: ssl-plugin
+        working-directory: sls-plugin
         run: npm ci
       - name: Build plugin
-        working-directory: ssl-plugin
+        working-directory: sls-plugin
         run: npm run build
       - name: Resolve layer version
         run: |
