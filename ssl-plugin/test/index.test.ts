@@ -8,9 +8,7 @@ function createMockServerless(overrides: {
 } = {}): any {
   return {
     cli: { log: jest.fn() },
-    getProvider: jest.fn().mockReturnValue({
-      request: jest.fn(),
-    }),
+    getProvider: jest.fn().mockReturnValue({}),
     service: {
       provider: { region: 'us-east-1', runtime: 'nodejs20.x', ...overrides.provider },
       custom: {
@@ -27,7 +25,7 @@ function createMockServerless(overrides: {
 }
 
 describe('ServerlessDash0Plugin', () => {
-  it('adds layer and env vars to a traced function', async () => {
+  it('adds layer and env vars to a traced function', () => {
     const serverless = createMockServerless({
       functions: {
         myFunc: { handler: 'handler.hello', runtime: 'nodejs20.x', 'dash0-traced': true },
@@ -35,7 +33,7 @@ describe('ServerlessDash0Plugin', () => {
     });
 
     const plugin = new ServerlessDash0Plugin(serverless, {});
-    await plugin.hooks['before:package:initialize']();
+    plugin.hooks['before:package:initialize']();
 
     const func = serverless.service.functions.myFunc;
     expect(func.layers).toEqual([
@@ -46,7 +44,7 @@ describe('ServerlessDash0Plugin', () => {
     expect(func.environment.DASH0_TOKEN).toBe('test-token');
   });
 
-  it('does not touch untraced functions', async () => {
+  it('does not touch untraced functions', () => {
     const serverless = createMockServerless({
       functions: {
         myFunc: { handler: 'handler.hello', runtime: 'nodejs20.x' },
@@ -54,14 +52,14 @@ describe('ServerlessDash0Plugin', () => {
     });
 
     const plugin = new ServerlessDash0Plugin(serverless, {});
-    await plugin.hooks['before:package:initialize']();
+    plugin.hooks['before:package:initialize']();
 
     const func = serverless.service.functions.myFunc;
     expect(func.layers).toBeUndefined();
     expect(func.environment).toBeUndefined();
   });
 
-  it('does not touch functions with dash0-traced: false', async () => {
+  it('does not touch functions with dash0-traced: false', () => {
     const serverless = createMockServerless({
       functions: {
         myFunc: { handler: 'handler.hello', runtime: 'nodejs20.x', 'dash0-traced': false },
@@ -69,12 +67,12 @@ describe('ServerlessDash0Plugin', () => {
     });
 
     const plugin = new ServerlessDash0Plugin(serverless, {});
-    await plugin.hooks['before:package:initialize']();
+    plugin.hooks['before:package:initialize']();
 
     expect(serverless.service.functions.myFunc.layers).toBeUndefined();
   });
 
-  it('accepts dash0-traced as string "true"', async () => {
+  it('accepts dash0-traced as string "true"', () => {
     const serverless = createMockServerless({
       functions: {
         myFunc: { handler: 'handler.hello', runtime: 'nodejs20.x', 'dash0-traced': 'true' },
@@ -82,12 +80,12 @@ describe('ServerlessDash0Plugin', () => {
     });
 
     const plugin = new ServerlessDash0Plugin(serverless, {});
-    await plugin.hooks['before:package:initialize']();
+    plugin.hooks['before:package:initialize']();
 
     expect(serverless.service.functions.myFunc.layers).toHaveLength(1);
   });
 
-  it('preserves existing layers', async () => {
+  it('preserves existing layers', () => {
     const serverless = createMockServerless({
       functions: {
         myFunc: {
@@ -100,7 +98,7 @@ describe('ServerlessDash0Plugin', () => {
     });
 
     const plugin = new ServerlessDash0Plugin(serverless, {});
-    await plugin.hooks['before:package:initialize']();
+    plugin.hooks['before:package:initialize']();
 
     const func = serverless.service.functions.myFunc;
     expect(func.layers).toHaveLength(2);
@@ -108,7 +106,7 @@ describe('ServerlessDash0Plugin', () => {
     expect(func.layers![1]).toContain('dash0-extension-node');
   });
 
-  it('does not duplicate layer ARN on repeated invocation', async () => {
+  it('does not duplicate layer ARN on repeated invocation', () => {
     const serverless = createMockServerless({
       functions: {
         myFunc: { handler: 'handler.hello', runtime: 'nodejs20.x', 'dash0-traced': true },
@@ -116,13 +114,13 @@ describe('ServerlessDash0Plugin', () => {
     });
 
     const plugin = new ServerlessDash0Plugin(serverless, {});
-    await plugin.hooks['before:package:initialize']();
-    await plugin.hooks['before:package:initialize']();
+    plugin.hooks['before:package:initialize']();
+    plugin.hooks['before:package:initialize']();
 
     expect(serverless.service.functions.myFunc.layers).toHaveLength(1);
   });
 
-  it('does not overwrite existing env vars', async () => {
+  it('does not overwrite existing env vars', () => {
     const serverless = createMockServerless({
       functions: {
         myFunc: {
@@ -135,13 +133,13 @@ describe('ServerlessDash0Plugin', () => {
     });
 
     const plugin = new ServerlessDash0Plugin(serverless, {});
-    await plugin.hooks['before:package:initialize']();
+    plugin.hooks['before:package:initialize']();
 
     expect(serverless.service.functions.myFunc.environment.DASH0_EXTENSION_LOG_LEVEL).toBe('debug');
     expect(serverless.service.functions.myFunc.environment.AWS_LAMBDA_EXEC_WRAPPER).toBe('/opt/wrapper');
   });
 
-  it('uses correct layer for each runtime', async () => {
+  it('uses correct layer for each runtime', () => {
     const serverless = createMockServerless({
       functions: {
         nodeFunc: { handler: 'handler.hello', runtime: 'nodejs20.x', 'dash0-traced': true },
@@ -151,14 +149,14 @@ describe('ServerlessDash0Plugin', () => {
     });
 
     const plugin = new ServerlessDash0Plugin(serverless, {});
-    await plugin.hooks['before:package:initialize']();
+    plugin.hooks['before:package:initialize']();
 
     expect(serverless.service.functions.nodeFunc.layers![0]).toContain('dash0-extension-node');
     expect(serverless.service.functions.pyFunc.layers![0]).toContain('dash0-extension-python');
     expect(serverless.service.functions.javaFunc.layers![0]).toContain('dash0-extension-java');
   });
 
-  it('falls back to provider runtime', async () => {
+  it('falls back to provider runtime', () => {
     const serverless = createMockServerless({
       provider: { runtime: 'python3.12' },
       functions: {
@@ -167,12 +165,12 @@ describe('ServerlessDash0Plugin', () => {
     });
 
     const plugin = new ServerlessDash0Plugin(serverless, {});
-    await plugin.hooks['before:package:initialize']();
+    plugin.hooks['before:package:initialize']();
 
     expect(serverless.service.functions.myFunc.layers![0]).toContain('dash0-extension-python');
   });
 
-  it('warns and skips unsupported runtime', async () => {
+  it('warns and skips unsupported runtime', () => {
     const serverless = createMockServerless({
       functions: {
         myFunc: { handler: 'handler.hello', runtime: 'ruby3.3', 'dash0-traced': true },
@@ -180,7 +178,7 @@ describe('ServerlessDash0Plugin', () => {
     });
 
     const plugin = new ServerlessDash0Plugin(serverless, {});
-    await plugin.hooks['before:package:initialize']();
+    plugin.hooks['before:package:initialize']();
 
     expect(serverless.service.functions.myFunc.layers).toBeUndefined();
     expect(serverless.cli.log).toHaveBeenCalledWith(
@@ -188,7 +186,7 @@ describe('ServerlessDash0Plugin', () => {
     );
   });
 
-  it('warns and skips container image functions', async () => {
+  it('warns and skips container image functions', () => {
     const serverless = createMockServerless({
       functions: {
         myFunc: { image: 'my-image:latest', 'dash0-traced': true },
@@ -196,7 +194,7 @@ describe('ServerlessDash0Plugin', () => {
     });
 
     const plugin = new ServerlessDash0Plugin(serverless, {});
-    await plugin.hooks['before:package:initialize']();
+    plugin.hooks['before:package:initialize']();
 
     expect(serverless.service.functions.myFunc.layers).toBeUndefined();
     expect(serverless.cli.log).toHaveBeenCalledWith(
@@ -204,15 +202,15 @@ describe('ServerlessDash0Plugin', () => {
     );
   });
 
-  it('throws on missing config', async () => {
+  it('throws on missing config', () => {
     const serverless = createMockServerless();
     serverless.service.custom.dash0 = undefined as unknown;
 
     const plugin = new ServerlessDash0Plugin(serverless, {});
-    await expect(plugin.hooks['before:package:initialize']()).rejects.toThrow('[serverless-dash0]');
+    expect(() => plugin.hooks['before:package:initialize']()).toThrow('[serverless-dash0]');
   });
 
-  it('uses region from options over provider', async () => {
+  it('uses region from options over provider', () => {
     const serverless = createMockServerless({
       provider: { region: 'us-east-1' },
       functions: {
@@ -221,12 +219,12 @@ describe('ServerlessDash0Plugin', () => {
     });
 
     const plugin = new ServerlessDash0Plugin(serverless, { region: 'eu-west-1' });
-    await plugin.hooks['before:package:initialize']();
+    plugin.hooks['before:package:initialize']();
 
     expect(serverless.service.functions.myFunc.layers![0]).toContain('eu-west-1');
   });
 
-  it('works with SLS v4 logging utils', async () => {
+  it('works with SLS v4 logging utils', () => {
     const serverless = createMockServerless({
       functions: {
         myFunc: { handler: 'handler.hello', runtime: 'nodejs20.x', 'dash0-traced': true },
@@ -235,14 +233,14 @@ describe('ServerlessDash0Plugin', () => {
 
     const logUtils = { log: { notice: jest.fn(), warning: jest.fn(), error: jest.fn() } };
     const plugin = new ServerlessDash0Plugin(serverless, {}, logUtils);
-    await plugin.hooks['before:package:initialize']();
+    plugin.hooks['before:package:initialize']();
 
     expect(logUtils.log.notice).toHaveBeenCalledWith(
       expect.stringContaining('Configured tracing')
     );
   });
 
-  it('uses SLS v4 warning for unsupported runtime', async () => {
+  it('uses SLS v4 warning for unsupported runtime', () => {
     const serverless = createMockServerless({
       functions: {
         myFunc: { handler: 'handler.hello', runtime: 'ruby3.3', 'dash0-traced': true },
@@ -251,7 +249,7 @@ describe('ServerlessDash0Plugin', () => {
 
     const logUtils = { log: { notice: jest.fn(), warning: jest.fn(), error: jest.fn() } };
     const plugin = new ServerlessDash0Plugin(serverless, {}, logUtils);
-    await plugin.hooks['before:package:initialize']();
+    plugin.hooks['before:package:initialize']();
 
     expect(logUtils.log.warning).toHaveBeenCalledWith(
       expect.stringContaining('unsupported runtime')
@@ -259,7 +257,7 @@ describe('ServerlessDash0Plugin', () => {
   });
 
   describe('layerAccountId', () => {
-    it('uses custom account ID in layer ARN', async () => {
+    it('uses custom account ID in layer ARN', () => {
       const serverless = createMockServerless({
         dash0: { layerAccountId: '999888777666' },
         functions: {
@@ -268,7 +266,7 @@ describe('ServerlessDash0Plugin', () => {
       });
 
       const plugin = new ServerlessDash0Plugin(serverless, {});
-      await plugin.hooks['before:package:initialize']();
+      plugin.hooks['before:package:initialize']();
 
       expect(serverless.service.functions.myFunc.layers![0]).toBe(
         'arn:aws:lambda:us-east-1:999888777666:layer:dash0-extension-node:42'
@@ -277,7 +275,7 @@ describe('ServerlessDash0Plugin', () => {
   });
 
   describe('layerVersion: "latest"', () => {
-    it('resolves latest version via AWS API', async () => {
+    it('uses bundled version from versions.json', () => {
       const serverless = createMockServerless({
         dash0: { layerVersion: 'latest' },
         functions: {
@@ -285,67 +283,16 @@ describe('ServerlessDash0Plugin', () => {
         },
       });
 
-      const provider = serverless.getProvider('aws');
-      provider.request.mockResolvedValue({
-        LayerVersions: [{ Version: 7 }],
-      });
-
       const plugin = new ServerlessDash0Plugin(serverless, {});
-      await plugin.hooks['before:package:initialize']();
+      plugin.hooks['before:package:initialize']();
 
-      expect(provider.request).toHaveBeenCalledWith('Lambda', 'listLayerVersions', {
-        LayerName: 'arn:aws:lambda:us-east-1:115813213817:layer:dash0-extension-node',
-        MaxItems: 1,
-      });
+      // versions.json has version 1 for all layers
       expect(serverless.service.functions.myFunc.layers![0]).toBe(
-        'arn:aws:lambda:us-east-1:115813213817:layer:dash0-extension-node:7'
+        'arn:aws:lambda:us-east-1:115813213817:layer:dash0-extension-node:1'
       );
     });
 
-    it('caches latest version across functions with same layer', async () => {
-      const serverless = createMockServerless({
-        dash0: { layerVersion: 'latest' },
-        functions: {
-          func1: { handler: 'handler.hello', runtime: 'nodejs20.x', 'dash0-traced': true },
-          func2: { handler: 'handler.hello', runtime: 'nodejs22.x', 'dash0-traced': true },
-        },
-      });
-
-      const provider = serverless.getProvider('aws');
-      provider.request.mockResolvedValue({
-        LayerVersions: [{ Version: 5 }],
-      });
-
-      const plugin = new ServerlessDash0Plugin(serverless, {});
-      await plugin.hooks['before:package:initialize']();
-
-      // Only one API call for both node functions
-      expect(provider.request).toHaveBeenCalledTimes(1);
-    });
-
-    it('makes separate API calls for different runtimes', async () => {
-      const serverless = createMockServerless({
-        dash0: { layerVersion: 'latest' },
-        functions: {
-          nodeFunc: { handler: 'handler.hello', runtime: 'nodejs20.x', 'dash0-traced': true },
-          pyFunc: { handler: 'handler.hello', runtime: 'python3.12', 'dash0-traced': true },
-        },
-      });
-
-      const provider = serverless.getProvider('aws');
-      provider.request
-        .mockResolvedValueOnce({ LayerVersions: [{ Version: 10 }] })
-        .mockResolvedValueOnce({ LayerVersions: [{ Version: 8 }] });
-
-      const plugin = new ServerlessDash0Plugin(serverless, {});
-      await plugin.hooks['before:package:initialize']();
-
-      expect(provider.request).toHaveBeenCalledTimes(2);
-      expect(serverless.service.functions.nodeFunc.layers![0]).toContain(':10');
-      expect(serverless.service.functions.pyFunc.layers![0]).toContain(':8');
-    });
-
-    it('uses custom account ID when resolving latest', async () => {
+    it('uses bundled version with custom account ID', () => {
       const serverless = createMockServerless({
         dash0: { layerVersion: 'latest', layerAccountId: '999888777666' },
         functions: {
@@ -353,36 +300,30 @@ describe('ServerlessDash0Plugin', () => {
         },
       });
 
-      const provider = serverless.getProvider('aws');
-      provider.request.mockResolvedValue({
-        LayerVersions: [{ Version: 3 }],
-      });
-
       const plugin = new ServerlessDash0Plugin(serverless, {});
-      await plugin.hooks['before:package:initialize']();
+      plugin.hooks['before:package:initialize']();
 
-      expect(provider.request).toHaveBeenCalledWith('Lambda', 'listLayerVersions', {
-        LayerName: 'arn:aws:lambda:us-east-1:999888777666:layer:dash0-extension-node',
-        MaxItems: 1,
-      });
       expect(serverless.service.functions.myFunc.layers![0]).toBe(
-        'arn:aws:lambda:us-east-1:999888777666:layer:dash0-extension-node:3'
+        'arn:aws:lambda:us-east-1:999888777666:layer:dash0-extension-node:1'
       );
     });
 
-    it('throws if no versions found', async () => {
+    it('resolves correct bundled version per runtime', () => {
       const serverless = createMockServerless({
         dash0: { layerVersion: 'latest' },
         functions: {
-          myFunc: { handler: 'handler.hello', runtime: 'nodejs20.x', 'dash0-traced': true },
+          nodeFunc: { handler: 'handler.hello', runtime: 'nodejs20.x', 'dash0-traced': true },
+          pyFunc: { handler: 'handler.hello', runtime: 'python3.12', 'dash0-traced': true },
+          javaFunc: { handler: 'handler.hello', runtime: 'java21', 'dash0-traced': true },
         },
       });
 
-      const provider = serverless.getProvider('aws');
-      provider.request.mockResolvedValue({ LayerVersions: [] });
-
       const plugin = new ServerlessDash0Plugin(serverless, {});
-      await expect(plugin.hooks['before:package:initialize']()).rejects.toThrow('No versions found');
+      plugin.hooks['before:package:initialize']();
+
+      expect(serverless.service.functions.nodeFunc.layers![0]).toContain('dash0-extension-node');
+      expect(serverless.service.functions.pyFunc.layers![0]).toContain('dash0-extension-python');
+      expect(serverless.service.functions.javaFunc.layers![0]).toContain('dash0-extension-java');
     });
   });
 });

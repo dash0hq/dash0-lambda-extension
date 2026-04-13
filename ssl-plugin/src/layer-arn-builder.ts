@@ -4,8 +4,3 @@ export function buildLayerArn(region: string, layerName: string, layerVersion: n
   const account = accountId || DEFAULT_LAYER_ACCOUNT_ID;
   return `arn:aws:lambda:${region}:${account}:layer:${layerName}:${layerVersion}`;
 }
-
-export function buildLayerFullName(region: string, layerName: string, accountId?: string): string {
-  const account = accountId || DEFAULT_LAYER_ACCOUNT_ID;
-  return `arn:aws:lambda:${region}:${account}:layer:${layerName}`;
-}

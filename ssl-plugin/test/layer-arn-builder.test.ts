@@ -1,4 +1,4 @@
-import { buildLayerArn, buildLayerFullName } from '../src/layer-arn-builder';
+import { buildLayerArn } from '../src/layer-arn-builder';
 
 describe('buildLayerArn', () => {
   it('constructs correct ARN with default account', () => {
@@ -20,16 +20,3 @@ describe('buildLayerArn', () => {
   });
 });
 
-describe('buildLayerFullName', () => {
-  it('constructs full layer name with default account', () => {
-    expect(buildLayerFullName('us-east-1', 'dash0-extension-node')).toBe(
-      'arn:aws:lambda:us-east-1:115813213817:layer:dash0-extension-node'
-    );
-  });
-
-  it('uses custom account ID when provided', () => {
-    expect(buildLayerFullName('us-east-1', 'dash0-extension-node', '999888777666')).toBe(
-      'arn:aws:lambda:us-east-1:999888777666:layer:dash0-extension-node'
-    );
-  });
-});
