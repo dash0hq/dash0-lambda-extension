@@ -1,6 +1,7 @@
 export interface Dash0Config {
   endpoint: string;
-  layerVersion: number;
+  layerVersion: number | 'latest';
+  layerAccountId?: string;
   token?: string;
   tokenSecretArn?: string;
   tokenSecretKey?: string;
@@ -29,13 +30,17 @@ export function validateConfig(config: unknown): Dash0Config {
     throw new Error('[serverless-dash0] "custom.dash0.endpoint" is required and must be a string');
   }
 
-  if (
-    c.layerVersion === undefined ||
-    c.layerVersion === null ||
-    !Number.isInteger(c.layerVersion) ||
-    (c.layerVersion as number) < 1
-  ) {
-    throw new Error('[serverless-dash0] "custom.dash0.layerVersion" is required and must be a positive integer');
+  if (c.layerVersion === undefined || c.layerVersion === null) {
+    throw new Error('[serverless-dash0] "custom.dash0.layerVersion" is required (positive integer or "latest")');
+  }
+  if (c.layerVersion !== 'latest') {
+    if (!Number.isInteger(c.layerVersion) || (c.layerVersion as number) < 1) {
+      throw new Error('[serverless-dash0] "custom.dash0.layerVersion" must be a positive integer or "latest"');
+    }
+  }
+
+  if (c.layerAccountId !== undefined) {
+    c.layerAccountId = String(c.layerAccountId);
   }
 
   if (!c.token && !c.tokenSecretArn) {

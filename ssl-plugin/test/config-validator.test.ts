@@ -50,15 +50,33 @@ describe('validateConfig', () => {
   });
 
   it('throws if layerVersion is 0', () => {
-    expect(() => validateConfig({ ...VALID_CONFIG, layerVersion: 0 })).toThrow('"custom.dash0.layerVersion" is required');
+    expect(() => validateConfig({ ...VALID_CONFIG, layerVersion: 0 })).toThrow('"custom.dash0.layerVersion"');
   });
 
   it('throws if layerVersion is negative', () => {
-    expect(() => validateConfig({ ...VALID_CONFIG, layerVersion: -1 })).toThrow('"custom.dash0.layerVersion" is required');
+    expect(() => validateConfig({ ...VALID_CONFIG, layerVersion: -1 })).toThrow('"custom.dash0.layerVersion"');
   });
 
   it('throws if layerVersion is a float', () => {
-    expect(() => validateConfig({ ...VALID_CONFIG, layerVersion: 1.5 })).toThrow('"custom.dash0.layerVersion" is required');
+    expect(() => validateConfig({ ...VALID_CONFIG, layerVersion: 1.5 })).toThrow('"custom.dash0.layerVersion"');
+  });
+
+  it('passes with layerVersion "latest"', () => {
+    const config = { ...VALID_CONFIG, layerVersion: 'latest' };
+    const result = validateConfig(config);
+    expect(result.layerVersion).toBe('latest');
+  });
+
+  it('passes with layerAccountId as string', () => {
+    const config = { ...VALID_CONFIG, layerAccountId: '999888777666' };
+    const result = validateConfig(config);
+    expect(result.layerAccountId).toBe('999888777666');
+  });
+
+  it('coerces numeric layerAccountId to string', () => {
+    const config = { ...VALID_CONFIG, layerAccountId: 285732642181 };
+    const result = validateConfig(config);
+    expect(result.layerAccountId).toBe('285732642181');
   });
 
   it('throws if neither token nor tokenSecretArn is provided', () => {

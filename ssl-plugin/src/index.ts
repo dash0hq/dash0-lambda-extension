@@ -1,6 +1,6 @@
 import { validateConfig } from './config-validator';
 import { resolveLayerName } from './runtime-mapping';
-import { buildLayerArn } from './layer-arn-builder';
+import { buildLayerArn, buildLayerFullName } from './layer-arn-builder';
 import { buildEnvironment } from './env-injector';
 
 interface ServerlessService {
@@ -23,9 +23,13 @@ interface ServerlessFunction {
   [key: string]: unknown;
 }
 
+interface AwsProvider {
+  request(service: string, method: string, params: Record<string, unknown>): Promise<any>;
+}
+
 interface ServerlessInstance {
   cli: { log(msg: string): void };
-  getProvider(name: string): unknown;
+  getProvider(name: string): AwsProvider;
   service: ServerlessService;
 }
 
@@ -42,9 +46,10 @@ interface LogUtils {
 class ServerlessDash0Plugin {
   private serverless: ServerlessInstance;
   private options: ServerlessOptions;
+  private provider: AwsProvider;
   private log: (msg: string) => void;
   private warn: (msg: string) => void;
-  public hooks: Record<string, () => void>;
+  public hooks: Record<string, () => Promise<void>>;
 
   constructor(
     serverless: ServerlessInstance,
@@ -53,6 +58,7 @@ class ServerlessDash0Plugin {
   ) {
     this.serverless = serverless;
     this.options = options;
+    this.provider = serverless.getProvider('aws');
 
     this.log = utils?.log
       ? (msg: string) => utils.log!.notice(msg)
@@ -67,7 +73,22 @@ class ServerlessDash0Plugin {
     };
   }
 
-  private addDash0Tracing(): void {
+  private async resolveLatestVersion(region: string, layerName: string, accountId?: string): Promise<number> {
+    const fullName = buildLayerFullName(region, layerName, accountId);
+    const result = await this.provider.request('Lambda', 'listLayerVersions', {
+      LayerName: fullName,
+      MaxItems: 1,
+    });
+
+    const versions = result?.LayerVersions;
+    if (!versions || versions.length === 0) {
+      throw new Error(`[serverless-dash0] No versions found for layer "${fullName}"`);
+    }
+
+    return versions[0].Version;
+  }
+
+  private async addDash0Tracing(): Promise<void> {
     const dash0Config = validateConfig(this.serverless.service.custom?.dash0);
 
     const region =
@@ -79,6 +100,10 @@ class ServerlessDash0Plugin {
 
     const dash0Env = buildEnvironment(dash0Config);
     const functions = this.serverless.service.functions;
+    const useLatest = dash0Config.layerVersion === 'latest';
+
+    // Cache resolved latest versions per layer name to avoid duplicate API calls
+    const latestVersionCache = new Map<string, number>();
 
     for (const [funcName, funcDef] of Object.entries(functions)) {
       const traced = funcDef['dash0-traced'];
@@ -103,7 +128,20 @@ class ServerlessDash0Plugin {
         continue;
       }
 
-      const layerArn = buildLayerArn(region, layerName, dash0Config.layerVersion);
+      let layerVersion: number;
+      if (useLatest) {
+        if (latestVersionCache.has(layerName)) {
+          layerVersion = latestVersionCache.get(layerName)!;
+        } else {
+          layerVersion = await this.resolveLatestVersion(region, layerName, dash0Config.layerAccountId);
+          latestVersionCache.set(layerName, layerVersion);
+          this.log(`[serverless-dash0] Resolved latest version for ${layerName}: ${layerVersion}`);
+        }
+      } else {
+        layerVersion = dash0Config.layerVersion as number;
+      }
+
+      const layerArn = buildLayerArn(region, layerName, layerVersion, dash0Config.layerAccountId);
 
       // Append layer (no duplicates)
       funcDef.layers = funcDef.layers || [];
@@ -119,7 +157,7 @@ class ServerlessDash0Plugin {
         }
       }
 
-      this.log(`[serverless-dash0] Configured tracing for function "${funcName}" (${runtime})`);
+      this.log(`[serverless-dash0] Configured tracing for function "${funcName}" (${runtime}, layer v${layerVersion})`);
     }
   }
 }
