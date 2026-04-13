@@ -141,6 +141,10 @@ jobs:
           DASH0_LAYER_VERSION=$(aws lambda list-layer-versions \
             --layer-name "${{ env.RESOURCE_PREFIX }}dash0-extension-node" \
             --max-items 1 --query 'LayerVersions[0].Version' --output text)
+          if [ "$DASH0_LAYER_VERSION" = "None" ] || [ -z "$DASH0_LAYER_VERSION" ]; then
+            echo "::error::No layer versions found for ${{ env.RESOURCE_PREFIX }}dash0-extension-node"
+            exit 1
+          fi
           echo "DASH0_LAYER_VERSION=$DASH0_LAYER_VERSION" >> "$GITHUB_ENV"
       - name: Deploy with Serverless
         working-directory: integration-tests/sls/${{ matrix.sls-version }}
