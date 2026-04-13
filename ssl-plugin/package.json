@@ -1,0 +1,45 @@
+{
+  "name": "serverless-dash0",
+  "version": "1.0.0",
+  "description": "Serverless Framework plugin to automatically add Dash0 Lambda tracing layers and configuration",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "serverless",
+    "serverless-plugin",
+    "dash0",
+    "lambda",
+    "tracing",
+    "opentelemetry",
+    "observability"
+  ],
+  "author": "Dash0",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.3.2",
+    "typescript": "^5.8.3"
+  },
+  "peerDependencies": {
+    "serverless": ">=3.0.0"
+  },
+  "peerDependenciesMeta": {
+    "serverless": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ]
+}
