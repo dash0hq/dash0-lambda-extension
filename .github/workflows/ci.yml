@@ -108,8 +108,8 @@ jobs:
         working-directory: ssl-plugin
         run: npm test
 
-  sls-integration-test:
-    name: SLS Integration Test
+  deploy-sls:
+    name: Deploy SLS Stacks
     if: github.event.pull_request.head.repo.full_name == github.repository
     needs: deploy
     runs-on: ubuntu-latest
@@ -149,17 +149,9 @@ jobs:
           DASH0_DEV_API_TOKEN: ${{ secrets.DASH0_DEV_API_TOKEN }}
           DASH0_LAYER_VERSION: ${{ env.DASH0_LAYER_VERSION }}
           RESOURCE_PREFIX: ${{ env.RESOURCE_PREFIX }}
-      - name: Remove stack
-        if: always()
-        working-directory: integration-tests/sls/${{ matrix.sls-version }}
-        run: npx serverless remove
-        env:
-          DASH0_DEV_API_TOKEN: ${{ secrets.DASH0_DEV_API_TOKEN }}
-          DASH0_LAYER_VERSION: ${{ env.DASH0_LAYER_VERSION }}
-          RESOURCE_PREFIX: ${{ env.RESOURCE_PREFIX }}
 
-  integration-test:
-    name: Integration Test
+  deploy-cdk:
+    name: Deploy CDK Stack
     if: github.event.pull_request.head.repo.full_name == github.repository
     needs: deploy
     runs-on: ubuntu-latest
@@ -170,9 +162,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: |
-            integration-tests/iac/package-lock.json
-            integration-tests/tests/package-lock.json
+          cache-dependency-path: integration-tests/iac/package-lock.json
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -201,6 +191,24 @@ jobs:
           TEST_POSTGRESS_PASSWORD: ${{ secrets.TEST_POSTGRESS_PASSWORD }}
           TEST_MYSQL_PASSWORD: ${{ secrets.TEST_MYSQL_PASSWORD }}
           RESOURCE_PREFIX: ${{ env.RESOURCE_PREFIX }}
+
+  integration-test:
+    name: Integration Test
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    needs: [deploy-cdk, deploy-sls]
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: integration-tests/tests/package-lock.json
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
       - name: Install test dependencies
         working-directory: integration-tests/tests
         run: npm ci
@@ -210,3 +218,4 @@ jobs:
         env:
           DASH0_DEV_API_TOKEN: ${{ secrets.DASH0_DEV_API_TOKEN }}
           RESOURCE_PREFIX: ${{ env.RESOURCE_PREFIX }}
+

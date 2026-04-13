@@ -35,6 +35,34 @@ jobs:
           DASH0_DEV_API_TOKEN: ${{ secrets.DASH0_DEV_API_TOKEN }}
           TEST_POSTGRESS_PASSWORD: ${{ secrets.TEST_POSTGRESS_PASSWORD }}
           TEST_MYSQL_PASSWORD: ${{ secrets.TEST_MYSQL_PASSWORD }}
+      - name: Install plugin dependencies
+        working-directory: ssl-plugin
+        run: npm ci
+      - name: Build plugin
+        working-directory: ssl-plugin
+        run: npm run build
+      - name: Resolve layer version
+        run: |
+          DASH0_LAYER_VERSION=$(aws lambda list-layer-versions \
+            --layer-name "arn:aws:lambda:${{ vars.AWS_REGION }}:${{ vars.AWS_ACCOUNT_ID }}:layer:${RESOURCE_PREFIX}dash0-extension-node" \
+            --max-items 1 --query 'LayerVersions[0].Version' --output text 2>/dev/null || echo "1")
+          echo "DASH0_LAYER_VERSION=$DASH0_LAYER_VERSION" >> "$GITHUB_ENV"
+      - name: Destroy SLS v3 stack
+        working-directory: integration-tests/sls/v3
+        run: |
+          npm ci
+          npx serverless remove || true
+        env:
+          DASH0_DEV_API_TOKEN: ${{ secrets.DASH0_DEV_API_TOKEN }}
+          DASH0_LAYER_VERSION: ${{ env.DASH0_LAYER_VERSION }}
+      - name: Destroy SLS v4 stack
+        working-directory: integration-tests/sls/v4
+        run: |
+          npm ci
+          npx serverless remove || true
+        env:
+          DASH0_DEV_API_TOKEN: ${{ secrets.DASH0_DEV_API_TOKEN }}
+          DASH0_LAYER_VERSION: ${{ env.DASH0_LAYER_VERSION }}
       - name: Delete PR-specific Lambda layers
         run: |
           for layer in ${RESOURCE_PREFIX}dash0-extension-python ${RESOURCE_PREFIX}dash0-extension-node ${RESOURCE_PREFIX}dash0-extension-java ${RESOURCE_PREFIX}dash0-extension-manual; do
