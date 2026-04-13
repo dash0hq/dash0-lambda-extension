@@ -2,6 +2,7 @@ export interface Dash0Config {
   endpoint: string;
   layerVersion: number | 'latest';
   layerAccountId?: string;
+  layerNamePrefix?: string;
   token?: string;
   tokenSecretArn?: string;
   tokenSecretKey?: string;

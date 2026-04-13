@@ -119,7 +119,7 @@ class ServerlessDash0Plugin {
         ? this.getBundledVersion(layerName)
         : dash0Config.layerVersion as number;
 
-      const layerArn = buildLayerArn(region, layerName, layerVersion, dash0Config.layerAccountId);
+      const layerArn = buildLayerArn(region, layerName, layerVersion, dash0Config.layerAccountId, dash0Config.layerNamePrefix);
 
       // Append layer (no duplicates)
       funcDef.layers = funcDef.layers || [];

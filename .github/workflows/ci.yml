@@ -89,6 +89,71 @@ jobs:
       prefix: pr-${{ github.event.pull_request.number }}-
     secrets: inherit
 
+  sls-plugin-test:
+    name: SLS Plugin Unit Tests
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        working-directory: ssl-plugin
+        run: npm ci
+      - name: Build
+        working-directory: ssl-plugin
+        run: npm run build
+      - name: Run tests
+        working-directory: ssl-plugin
+        run: npm test
+
+  sls-integration-test:
+    name: SLS Integration Test
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    needs: deploy
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Install plugin dependencies
+        working-directory: ssl-plugin
+        run: npm ci
+      - name: Build plugin
+        working-directory: ssl-plugin
+        run: npm run build
+      - name: Install SLS project dependencies
+        working-directory: integration-tests/sls/v4
+        run: npm ci
+      - name: Resolve latest layer version
+        run: |
+          DASH0_LAYER_VERSION=$(aws lambda list-layer-versions \
+            --layer-name "arn:aws:lambda:${{ vars.AWS_REGION }}:${{ vars.AWS_ACCOUNT_ID }}:layer:${{ env.RESOURCE_PREFIX }}dash0-extension-node" \
+            --max-items 1 --query 'LayerVersions[0].Version' --output text)
+          echo "DASH0_LAYER_VERSION=$DASH0_LAYER_VERSION" >> "$GITHUB_ENV"
+      - name: Deploy with Serverless
+        working-directory: integration-tests/sls/v4
+        run: npx serverless deploy
+        env:
+          DASH0_DEV_API_TOKEN: ${{ secrets.DASH0_DEV_API_TOKEN }}
+          DASH0_LAYER_VERSION: ${{ env.DASH0_LAYER_VERSION }}
+          RESOURCE_PREFIX: ${{ env.RESOURCE_PREFIX }}
+      - name: Remove stack
+        if: always()
+        working-directory: integration-tests/sls/v4
+        run: npx serverless remove
+        env:
+          DASH0_DEV_API_TOKEN: ${{ secrets.DASH0_DEV_API_TOKEN }}
+          DASH0_LAYER_VERSION: ${{ env.DASH0_LAYER_VERSION }}
+          RESOURCE_PREFIX: ${{ env.RESOURCE_PREFIX }}
+
   integration-test:
     name: Integration Test
     if: github.event.pull_request.head.repo.full_name == github.repository
