@@ -44,7 +44,7 @@ jobs:
       - name: Resolve layer version
         run: |
           DASH0_LAYER_VERSION=$(aws lambda list-layer-versions \
-            --layer-name "arn:aws:lambda:${{ vars.AWS_REGION }}:${{ vars.AWS_ACCOUNT_ID }}:layer:${RESOURCE_PREFIX}dash0-extension-node" \
+            --layer-name "${RESOURCE_PREFIX}dash0-extension-node" \
             --max-items 1 --query 'LayerVersions[0].Version' --output text 2>/dev/null || echo "1")
           echo "DASH0_LAYER_VERSION=$DASH0_LAYER_VERSION" >> "$GITHUB_ENV"
       - name: Destroy SLS v3 stack
