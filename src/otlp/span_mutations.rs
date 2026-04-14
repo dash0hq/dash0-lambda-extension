@@ -479,6 +479,8 @@ pub fn apply_return_value_error_to_stored_traces(invocation_id: &str, return_val
         _ => return,
     };
 
+    let mut handler_span_data: Option<(Vec<KeyValue>, Option<Status>)> = None;
+
     invocation_entry::update_traces(invocation_id, |traces| {
         for trace in traces {
             if let Ok(mut decoded) = ExportTraceServiceRequest::decode(trace.body.as_slice()) {
@@ -493,8 +495,11 @@ pub fn apply_return_value_error_to_stored_traces(invocation_id: &str, return_val
                             continue;
                         }
                         for span in &mut scope_span.spans {
-                            apply_status_code_error(span, &json_val, status_code);
-                            modified = true;
+                            if apply_status_code_error(span, &json_val, status_code) {
+                                handler_span_data =
+                                    Some((span.attributes.clone(), span.status.clone()));
+                                modified = true;
+                            }
                         }
                     }
                 }
@@ -504,13 +509,22 @@ pub fn apply_return_value_error_to_stored_traces(invocation_id: &str, return_val
             }
         }
     });
+
+    // Update handler span data outside the traces lock to avoid deadlock
+    if let Some((attributes, status)) = handler_span_data {
+        invocation_entry::update(invocation_id, |entry| {
+            entry.handler_attributes = attributes;
+            entry.handler_status = status;
+        });
+    }
 }
 
-fn apply_status_code_error(span: &mut Span, json_val: &serde_json::Value, status_code: i64) {
-    let body = json_val
-        .get("body")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+fn apply_status_code_error(
+    span: &mut Span,
+    json_val: &serde_json::Value,
+    status_code: i64,
+) -> bool {
+    let body = json_val.get("body").and_then(|v| v.as_str()).unwrap_or("");
 
     // Try to extract a meaningful message from the body (it may be JSON itself)
     let message = serde_json::from_str::<serde_json::Value>(body)
@@ -562,6 +576,8 @@ fn apply_status_code_error(span: &mut Span, json_val: &serde_json::Value, status
         ],
         ..Default::default()
     });
+
+    true
 }
 
 fn store_handler_span_data(span: &Span, invocation_id: &str) {

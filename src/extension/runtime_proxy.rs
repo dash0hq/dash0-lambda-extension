@@ -10,7 +10,9 @@ use crate::config::endpoints;
 use crate::config::is_auto_instrumented_disabled;
 use crate::otlp::log_mutations::build_payload_log;
 use crate::otlp::masking::mask_json_string;
-use crate::otlp::span_mutations::{apply_return_value_error_to_stored_traces, build_synthetic_trace};
+use crate::otlp::span_mutations::{
+    apply_return_value_error_to_stored_traces, build_synthetic_trace,
+};
 use crate::state::invocation_data::store_current_invocation_id;
 use crate::state::invocation_entry;
 use crate::util::parsers::extract_invocation_id_from_path;
