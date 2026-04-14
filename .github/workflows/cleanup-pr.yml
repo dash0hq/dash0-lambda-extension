@@ -45,7 +45,7 @@ jobs:
         run: |
           DASH0_LAYER_VERSION=$(aws lambda list-layer-versions \
             --layer-name "${RESOURCE_PREFIX}dash0-extension-node" \
-            --max-items 1 --query 'LayerVersions[0].Version' --output text 2>/dev/null || echo "1")
+            --query 'LayerVersions[0].Version' --output text 2>/dev/null || echo "1")
           echo "DASH0_LAYER_VERSION=$DASH0_LAYER_VERSION" >> "$GITHUB_ENV"
       - name: Destroy SLS v3 stack
         working-directory: integration-tests/sls/v3
