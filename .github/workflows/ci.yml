@@ -138,8 +138,16 @@ jobs:
         run: npm ci
       - name: Resolve latest layer version
         run: |
+          echo "Region: $AWS_REGION"
+          echo "Account: $(aws sts get-caller-identity --query Account --output text)"
+          echo "Layer name: ${{ env.RESOURCE_PREFIX }}dash0-extension-node"
+          aws lambda list-layer-versions \
+            --layer-name "${{ env.RESOURCE_PREFIX }}dash0-extension-node" \
+            --region "${{ vars.AWS_REGION }}" \
+            --max-items 1
           DASH0_LAYER_VERSION=$(aws lambda list-layer-versions \
             --layer-name "${{ env.RESOURCE_PREFIX }}dash0-extension-node" \
+            --region "${{ vars.AWS_REGION }}" \
             --max-items 1 --query 'LayerVersions[0].Version' --output text)
           echo "Latest layer version: $DASH0_LAYER_VERSION"
           if [ "$DASH0_LAYER_VERSION" = "None" ] || [ -z "$DASH0_LAYER_VERSION" ]; then
