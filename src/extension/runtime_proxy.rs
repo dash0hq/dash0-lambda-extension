@@ -10,7 +10,7 @@ use crate::config::endpoints;
 use crate::config::is_auto_instrumented_disabled;
 use crate::otlp::log_mutations::build_payload_log;
 use crate::otlp::masking::mask_json_string;
-use crate::otlp::span_mutations::build_synthetic_trace;
+use crate::otlp::span_mutations::{apply_return_value_error_to_stored_traces, build_synthetic_trace};
 use crate::state::invocation_data::store_current_invocation_id;
 use crate::state::invocation_entry;
 use crate::util::parsers::extract_invocation_id_from_path;
@@ -246,12 +246,18 @@ pub async fn invocation_response_proxy(req: Request<Body>) -> Result<Response<Bo
             });
         }
 
+        invocation_entry::update(&id, |entry| {
+            entry.return_value = Some(return_payload.clone());
+        });
+
         if is_auto_instrumented_disabled() {
             if let Some(trace) =
                 build_synthetic_trace(&id, None, Some(return_payload.as_str()), &Vec::new())
             {
                 invocation_entry::store_trace_by_id(&id, trace);
             }
+        } else {
+            apply_return_value_error_to_stored_traces(&id, &return_payload);
         }
     }
     tracing::info!(
