@@ -141,6 +141,7 @@ jobs:
           DASH0_LAYER_VERSION=$(aws lambda list-layer-versions \
             --layer-name "${{ env.RESOURCE_PREFIX }}dash0-extension-node" \
             --max-items 1 --query 'LayerVersions[0].Version' --output text)
+          echo "Latest layer version: $DASH0_LAYER_VERSION"
           if [ "$DASH0_LAYER_VERSION" = "None" ] || [ -z "$DASH0_LAYER_VERSION" ]; then
             echo "::error::No layer versions found for ${{ env.RESOURCE_PREFIX }}dash0-extension-node"
             exit 1
