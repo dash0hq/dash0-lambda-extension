@@ -1,0 +1,53 @@
+name: Publish SLS Plugin
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g. 1.0.0, 1.1.0, patch, minor, major)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Install dependencies
+        working-directory: sls-plugin
+        run: npm ci
+      - name: Run tests
+        working-directory: sls-plugin
+        run: npm test
+      - name: Build
+        working-directory: sls-plugin
+        run: npm run build
+      - name: Set version
+        working-directory: sls-plugin
+        run: npm version ${{ inputs.version }} --no-git-tag-version
+      - name: Publish to npm
+        working-directory: sls-plugin
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Get published version
+        id: version
+        working-directory: sls-plugin
+        run: echo "version=$(node -p 'require(\"./package.json\").version')" >> "$GITHUB_OUTPUT"
+      - name: Commit version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add sls-plugin/package.json
+          git commit -m "chore: release serverless-dash0 v${{ steps.version.outputs.version }}"
+          git tag "sls-plugin-v${{ steps.version.outputs.version }}"
+          git push origin master --tags
