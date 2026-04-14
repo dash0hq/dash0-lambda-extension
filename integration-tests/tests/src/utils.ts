@@ -294,6 +294,7 @@ export const checkResourceAttributes = (attributes: Array<{ key: string, value: 
 export type MainSpansResult = {
     traceId: string;
     rootSpanId: string;
+    rootSpan: any;
     handlerSpanId: string;
     handlerSpan: any;
     resource: any;
@@ -391,6 +392,7 @@ export const checkMainSpans = async ({
             return {
                 traceId,
                 rootSpanId: rootSpan.spanId,
+                rootSpan,
                 handlerSpanId: handlerSpan.spanId,
                 handlerSpan,
                 resource: handlerResource,
