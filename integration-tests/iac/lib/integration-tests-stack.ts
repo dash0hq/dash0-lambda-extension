@@ -4,6 +4,7 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as ecr_assets from 'aws-cdk-lib/aws-ecr-assets';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as cr from 'aws-cdk-lib/custom-resources';
 import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs';
@@ -131,8 +132,10 @@ class PythonStack extends cdk.NestedStack {
       lambda.Runtime.PYTHON_3_14,
     ];
 
+    const pythonCode = createPythonCode();
+
     createLambdas(this, runtimes, props.layer, props.role, props.logGroup, props.prefix, {
-      code: createPythonCode(),
+      code: pythonCode,
       dash0TokenSecretArn: props.dash0TokenSecretArn,
     });
 
@@ -171,6 +174,36 @@ class PythonStack extends cdk.NestedStack {
         },
         logGroup: props.logGroup,
         loggingFormat: lambda.LoggingFormat.TEXT,
+      });
+    }
+
+    // API Gateway lambdas that always return 500
+    for (const runtime of runtimes) {
+      const runtimeName = runtime.name.replace(/\./g, '-');
+      const fn = new lambda.Function(this, `apigw-error-500-${runtimeName}`, {
+        functionName: `${props.prefix}apigw-error-500-${runtimeName}`,
+        runtime,
+        memorySize: 128,
+        handler: 'error_500.handler',
+        architecture: lambda.Architecture.X86_64,
+        timeout: cdk.Duration.seconds(10),
+        code: pythonCode,
+        layers: [props.layer],
+        role: props.role,
+        environment: {
+          AWS_LAMBDA_EXEC_WRAPPER: '/opt/wrapper',
+          DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
+          DASH0_ENDPOINT: 'https://ingress.eu-west-1.aws.dash0-dev.com:4318',
+          DASH0_EXTENSION_LOG_LEVEL: 'info',
+        },
+        logGroup: props.logGroup,
+        loggingFormat: lambda.LoggingFormat.TEXT,
+      });
+
+      new apigateway.LambdaRestApi(this, `ApiGw500-${runtimeName}`, {
+        restApiName: `${props.prefix}apigw-error-500-${runtimeName}`,
+        handler: fn,
+        proxy: true,
       });
     }
   }
