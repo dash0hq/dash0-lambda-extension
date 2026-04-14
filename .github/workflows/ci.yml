@@ -154,6 +154,7 @@ jobs:
           DASH0_DEV_API_TOKEN: ${{ secrets.DASH0_DEV_API_TOKEN }}
           DASH0_LAYER_VERSION: ${{ env.DASH0_LAYER_VERSION }}
           RESOURCE_PREFIX: ${{ env.RESOURCE_PREFIX }}
+          SERVERLESS_ACCESS_KEY: ${{ secrets.SERVERLESS_ACCESS_KEY }}
 
   deploy-cdk:
     name: Deploy CDK Stack
