@@ -35,9 +35,11 @@ export function validateConfig(config: unknown): Dash0Config {
     throw new Error('[serverless-dash0] "custom.dash0.layerVersion" is required (positive integer or "latest")');
   }
   if (c.layerVersion !== 'latest') {
-    if (!Number.isInteger(c.layerVersion) || (c.layerVersion as number) < 1) {
+    const parsed = Number(c.layerVersion);
+    if (!Number.isInteger(parsed) || parsed < 1) {
       throw new Error('[serverless-dash0] "custom.dash0.layerVersion" must be a positive integer or "latest"');
     }
+    c.layerVersion = parsed;
   }
 
   if (c.layerAccountId !== undefined) {

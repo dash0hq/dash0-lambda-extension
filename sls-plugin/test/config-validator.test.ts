@@ -49,6 +49,12 @@ describe('validateConfig', () => {
     expect(() => validateConfig(rest)).toThrow('"custom.dash0.layerVersion" is required');
   });
 
+  it('coerces string layerVersion to number', () => {
+    const config = { ...VALID_CONFIG, layerVersion: '6' };
+    const result = validateConfig(config);
+    expect(result.layerVersion).toBe(6);
+  });
+
   it('throws if layerVersion is 0', () => {
     expect(() => validateConfig({ ...VALID_CONFIG, layerVersion: 0 })).toThrow('"custom.dash0.layerVersion"');
   });
