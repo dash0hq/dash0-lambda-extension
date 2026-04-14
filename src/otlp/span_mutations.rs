@@ -465,6 +465,81 @@ fn reparent_to_root_span(span: &mut Span, invocation_id: &str) {
     }
 }
 
+/// For traced invocations: if the Lambda returned a payload with `statusCode >= 400`,
+/// mark the span as an error and attach an exception event.
+fn apply_return_value_error(span: &mut Span, invocation_id: &str) {
+    let return_value = match invocation_entry::get_return_value(invocation_id) {
+        Some(v) => v,
+        None => return,
+    };
+
+    let json_val = match serde_json::from_str::<serde_json::Value>(&return_value) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+
+    let status_code = match json_val.get("statusCode").and_then(|v| v.as_i64()) {
+        Some(code) if code >= 400 => code,
+        _ => return,
+    };
+
+    let body = json_val
+        .get("body")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    // Try to extract a meaningful message from the body (it may be JSON itself)
+    let message = serde_json::from_str::<serde_json::Value>(body)
+        .ok()
+        .and_then(|body_json| {
+            body_json
+                .get("error")
+                .or_else(|| body_json.get("message"))
+                .or_else(|| body_json.get("errorMessage"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        })
+        .unwrap_or_else(|| {
+            if body.is_empty() {
+                format!("HTTP {status_code}")
+            } else {
+                body.to_string()
+            }
+        });
+
+    span.status = Some(Status {
+        code: StatusCode::Error as i32,
+        message: message.clone(),
+        ..Default::default()
+    });
+
+    span.events.push(Event {
+        time_unix_nano: span.end_time_unix_nano,
+        name: "exception".to_string(),
+        attributes: vec![
+            KeyValue {
+                key: crate::otlp::attributes::EXCEPTION_TYPE.to_string(),
+                value: Some(AnyValue {
+                    value: Some(Value::StringValue(status_code.to_string())),
+                }),
+            },
+            KeyValue {
+                key: crate::otlp::attributes::EXCEPTION_MESSAGE.to_string(),
+                value: Some(AnyValue {
+                    value: Some(Value::StringValue(message)),
+                }),
+            },
+            KeyValue {
+                key: crate::otlp::attributes::EXCEPTION_ESCAPED.to_string(),
+                value: Some(AnyValue {
+                    value: Some(Value::StringValue("False".to_string())),
+                }),
+            },
+        ],
+        ..Default::default()
+    });
+}
+
 fn store_handler_span_data(span: &Span, invocation_id: &str) {
     let attributes = span.attributes.clone();
     let status = span.status.clone();
@@ -531,6 +606,7 @@ pub fn process_trace_request(
                 add_event_payload_to_span(span, &invocation_id);
                 store_span_ids(span, &invocation_id);
                 reparent_to_root_span(span, &invocation_id);
+                apply_return_value_error(span, &invocation_id);
                 store_handler_span_data(span, &invocation_id);
             }
         }
@@ -1731,6 +1807,170 @@ mod tests {
         assert_eq!(logs[0].invocation_id.as_deref(), Some(inv_id));
 
         disable_payload_log_records();
+    }
+
+    fn store_return_value(invocation_id: &str, return_value: &str) {
+        let rv = return_value.to_string();
+        invocation_entry::update(invocation_id, |entry| {
+            entry.return_value = Some(rv);
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn process_trace_request_marks_error_on_500_return_value() {
+        let invocation_id = "inv-return-500";
+        store_event_payload(invocation_id, r#"{"test":"data"}"#);
+        store_return_value(
+            invocation_id,
+            r#"{"statusCode": 500, "body": "{\"error\": \"Internal Server Error\"}"}"#,
+        );
+
+        let mut span = make_span_with_invocation(invocation_id);
+        span.end_time_unix_nano = 999;
+        let mut request =
+            make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
+        let mut invocation_ids = Vec::new();
+        let mut encoded_body = Vec::new();
+
+        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+
+        let span = &request.resource_spans[0].scope_spans[0].spans[0];
+
+        // status should be Error
+        let status = span.status.as_ref().expect("status should be set");
+        assert_eq!(status.code, StatusCode::Error as i32);
+        assert_eq!(status.message, "Internal Server Error");
+
+        // exception event should be present
+        let exception = span
+            .events
+            .iter()
+            .find(|e| e.name == "exception")
+            .expect("exception event should exist");
+        assert_eq!(exception.time_unix_nano, 999);
+
+        let ex_type = exception
+            .attributes
+            .iter()
+            .find(|kv| kv.key == "exception.type")
+            .and_then(|kv| kv.value.as_ref())
+            .and_then(|v| match &v.value {
+                Some(Value::StringValue(s)) => Some(s.clone()),
+                _ => None,
+            });
+        assert_eq!(ex_type, Some("500".to_string()));
+
+        let ex_msg = exception
+            .attributes
+            .iter()
+            .find(|kv| kv.key == "exception.message")
+            .and_then(|kv| kv.value.as_ref())
+            .and_then(|v| match &v.value {
+                Some(Value::StringValue(s)) => Some(s.clone()),
+                _ => None,
+            });
+        assert_eq!(ex_msg, Some("Internal Server Error".to_string()));
+    }
+
+    #[test]
+    #[serial]
+    fn process_trace_request_marks_error_on_400_return_value() {
+        let invocation_id = "inv-return-400";
+        store_event_payload(invocation_id, r#"{"test":"data"}"#);
+        store_return_value(
+            invocation_id,
+            r#"{"statusCode": 400, "body": "Bad Request"}"#,
+        );
+
+        let mut span = make_span_with_invocation(invocation_id);
+        span.end_time_unix_nano = 888;
+        let mut request =
+            make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
+        let mut invocation_ids = Vec::new();
+        let mut encoded_body = Vec::new();
+
+        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+
+        let span = &request.resource_spans[0].scope_spans[0].spans[0];
+
+        let status = span.status.as_ref().expect("status should be set");
+        assert_eq!(status.code, StatusCode::Error as i32);
+        assert_eq!(status.message, "Bad Request");
+    }
+
+    #[test]
+    #[serial]
+    fn process_trace_request_no_error_on_200_return_value() {
+        let invocation_id = "inv-return-200";
+        store_event_payload(invocation_id, r#"{"test":"data"}"#);
+        store_return_value(
+            invocation_id,
+            r#"{"statusCode": 200, "body": "OK"}"#,
+        );
+
+        let span = make_span_with_invocation(invocation_id);
+        let mut request =
+            make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
+        let mut invocation_ids = Vec::new();
+        let mut encoded_body = Vec::new();
+
+        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+
+        let span = &request.resource_spans[0].scope_spans[0].spans[0];
+
+        // No exception events
+        assert!(
+            span.events.iter().all(|e| e.name != "exception"),
+            "no exception event for 200 status"
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn process_trace_request_error_with_no_body() {
+        let invocation_id = "inv-return-502-nobody";
+        store_event_payload(invocation_id, r#"{"test":"data"}"#);
+        store_return_value(
+            invocation_id,
+            r#"{"statusCode": 502}"#,
+        );
+
+        let span = make_span_with_invocation(invocation_id);
+        let mut request =
+            make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
+        let mut invocation_ids = Vec::new();
+        let mut encoded_body = Vec::new();
+
+        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+
+        let span = &request.resource_spans[0].scope_spans[0].spans[0];
+
+        let status = span.status.as_ref().expect("status should be set");
+        assert_eq!(status.code, StatusCode::Error as i32);
+        assert_eq!(status.message, "HTTP 502");
+    }
+
+    #[test]
+    #[serial]
+    fn process_trace_request_no_error_without_return_value() {
+        let invocation_id = "inv-return-none";
+        store_event_payload(invocation_id, r#"{"test":"data"}"#);
+
+        let span = make_span_with_invocation(invocation_id);
+        let mut request =
+            make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
+        let mut invocation_ids = Vec::new();
+        let mut encoded_body = Vec::new();
+
+        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+
+        let span = &request.resource_spans[0].scope_spans[0].spans[0];
+
+        assert!(
+            span.events.iter().all(|e| e.name != "exception"),
+            "no exception event when no return value"
+        );
     }
 }
 
