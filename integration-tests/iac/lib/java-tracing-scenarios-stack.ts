@@ -8,6 +8,7 @@ import * as sns from 'aws-cdk-lib/aws-sns';
 import * as sns_subscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 import * as lambda_event_sources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as path from 'path';
+import { JAVA_CDK_RUNTIMES } from './runtime-utils';
 
 export function createJavaCode(): lambda.Code {
   return lambda.Code.fromAsset(path.join(__dirname, '../lambdas/java'), {
@@ -47,11 +48,7 @@ export class JavaTracingScenariosStack extends cdk.NestedStack {
       DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
       DASH0_EXTENSION_LOG_LEVEL: "info",
     };
-    const runtimes = [
-      lambda.Runtime.JAVA_17,
-      lambda.Runtime.JAVA_21,
-      lambda.Runtime.JAVA_25,
-    ];
+    const runtimes = JAVA_CDK_RUNTIMES;
     const prefix = props.prefix;
     for (const runtime of runtimes) {
       const runtimeName = runtime.name.replace(/\./g, '-');

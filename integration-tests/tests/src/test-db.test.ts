@@ -19,9 +19,10 @@ import {
     RETRY_DELAY_MS,
     TEST_TIMEOUT_MS,
 } from './config.js';
+import { NODE_RUNTIMES, PYTHON_RUNTIMES } from '../../runtimes';
 
-const nodeRuntimes = ['nodejs20-x', 'nodejs22-x', 'nodejs24-x'];
-const pythonRuntimes = ['python3-12', 'python3-13', 'python3-14'];
+const nodeRuntimes = NODE_RUNTIMES;
+const pythonRuntimes = PYTHON_RUNTIMES.filter(r => r !== 'python3-10' && r !== 'python3-11');
 
 interface DbSpanExpectation {
     scopeName: string;

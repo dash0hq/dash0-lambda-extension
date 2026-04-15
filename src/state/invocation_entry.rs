@@ -289,6 +289,14 @@ pub fn take_traces_by_id(invocation_id: &str) -> Vec<StoredTrace> {
     }
 }
 
+/// Mutate all stored traces for a specific invocation ID in place.
+pub fn update_traces(invocation_id: &str, f: impl FnOnce(&mut Vec<StoredTrace>)) {
+    let mut store = INVOCATION_STORE.lock();
+    if let Some(entry) = store.get_mut(invocation_id) {
+        f(&mut entry.traces);
+    }
+}
+
 /// Store a trace under a known invocation ID directly.
 pub fn store_trace_by_id(invocation_id: &str, trace: StoredTrace) {
     INVOCATION_STORE

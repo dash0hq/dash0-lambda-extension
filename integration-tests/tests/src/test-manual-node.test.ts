@@ -1,4 +1,5 @@
 import { describe, it } from 'vitest';
+import { NODE_RUNTIMES } from '../../runtimes';
 import {
     checkLogs,
     checkMainSpans,
@@ -45,7 +46,7 @@ const verifyManualInstrumentation = async (functionName: string) => {
 }
 
 describe.concurrent('Manual instrumentation Lambda', () => {
-    const runtimes = ['nodejs20-x', 'nodejs22-x', 'nodejs24-x'];
+    const runtimes = NODE_RUNTIMES;
     for (const runtime of runtimes) {
         const functionName = `${RESOURCE_PREFIX}manual-instrumentation-${runtime}`
         it(

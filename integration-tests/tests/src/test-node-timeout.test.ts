@@ -1,4 +1,5 @@
 import { describe } from 'vitest';
+import { NODE_RUNTIMES } from '../../runtimes';
 import {
     checkException,
     checkLogs,
@@ -40,6 +41,6 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
 }
 
 describe.concurrent('Lambda invocations with timeout', () => {
-    const runtimes = ['nodejs20-x', 'nodejs22-x', 'nodejs24-x'];
+    const runtimes = NODE_RUNTIMES;
     runAllTests('timeout', runtimes, verifySuccessInvocation);
 });
