@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     checkMainSpans,
+    getAttributesMap,
     invokeFunction,
     RESOURCE_PREFIX,
 } from "./utils";
@@ -18,6 +19,15 @@ const verify500Error = async (functionName: string) => {
     // Handler span should have error status
     expect(handlerSpan.status.code).toEqual(2); // ERROR
     expect(handlerSpan.status.message).toEqual('500');
+
+    // Handler span should have an exception event with the right attributes
+    expect(handlerSpan.events.length).toEqual(1);
+    const exceptionEvent = handlerSpan.events[0];
+    expect(exceptionEvent.name).toEqual('exception');
+    const eventAttrs = getAttributesMap(exceptionEvent.attributes);
+    expect(eventAttrs['exception.type'].stringValue).toEqual('500');
+    expect(eventAttrs['exception.message'].stringValue).toEqual('Internal Server Error');
+    expect(eventAttrs['exception.escaped'].stringValue).toEqual('False');
 
     // Root span should have error status
     expect(rootSpan.status.code).toEqual(2); // ERROR
