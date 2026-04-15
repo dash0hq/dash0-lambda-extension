@@ -248,10 +248,6 @@ pub async fn invocation_response_proxy(req: Request<Body>) -> Result<Response<Bo
             });
         }
 
-        invocation_entry::update(&id, |entry| {
-            entry.return_value = Some(return_payload.clone());
-        });
-
         if is_auto_instrumented_disabled() {
             if let Some(trace) =
                 build_synthetic_trace(&id, None, Some(return_payload.as_str()), &Vec::new())
