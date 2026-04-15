@@ -28,14 +28,17 @@ describe.concurrent('Lambda 500 error', () => {
     const runtimes = ['python3-10', 'python3-11', 'python3-12', 'python3-13', 'python3-14'];
 
     for (const runtime of runtimes) {
-        const functionName = `${RESOURCE_PREFIX}apigw-error-500-${runtime}`;
-        it(
-            `returns error status for ${functionName}`,
-            async () => {
-                console.log(`Starting test for ${functionName}`, new Date().toISOString());
-                await verify500Error(functionName);
-            },
-            TEST_TIMEOUT_MS,
-        );
+        for (const traced of [true, false]) {
+            const suffix = traced ? runtime : `untraced-${runtime}`;
+            const functionName = `${RESOURCE_PREFIX}apigw-error-500-${suffix}`;
+            it(
+                `returns error status for ${functionName}`,
+                async () => {
+                    console.log(`Starting test for ${functionName}`, new Date().toISOString());
+                    await verify500Error(functionName);
+                },
+                TEST_TIMEOUT_MS,
+            );
+        }
     }
 });

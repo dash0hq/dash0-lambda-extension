@@ -180,31 +180,39 @@ class PythonStack extends cdk.NestedStack {
     // API Gateway lambdas that always return 500
     for (const runtime of runtimes) {
       const runtimeName = runtime.name.replace(/\./g, '-');
-      const fn = new lambda.Function(this, `apigw-error-500-${runtimeName}`, {
-        functionName: `${props.prefix}apigw-error-500-${runtimeName}`,
-        runtime,
-        memorySize: 128,
-        handler: 'error_500.handler',
-        architecture: lambda.Architecture.X86_64,
-        timeout: cdk.Duration.seconds(10),
-        code: pythonCode,
-        layers: [props.layer],
-        role: props.role,
-        environment: {
+      for (const traced of [true, false]) {
+        const suffix = traced ? runtimeName : `untraced-${runtimeName}`;
+        const environment: Record<string, string> = {
           AWS_LAMBDA_EXEC_WRAPPER: '/opt/wrapper',
           DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
           DASH0_ENDPOINT: 'https://ingress.eu-west-1.aws.dash0-dev.com:4318',
           DASH0_EXTENSION_LOG_LEVEL: 'info',
-        },
-        logGroup: props.logGroup,
-        loggingFormat: lambda.LoggingFormat.TEXT,
-      });
+        };
+        if (!traced) {
+          environment['DASH0_DISABLE_AUTO_INSTRUMENTATION'] = 'true';
+        }
 
-      new apigateway.LambdaRestApi(this, `ApiGw500-${runtimeName}`, {
-        restApiName: `${props.prefix}apigw-error-500-${runtimeName}`,
-        handler: fn,
-        proxy: true,
-      });
+        const fn = new lambda.Function(this, `apigw-error-500-${suffix}`, {
+          functionName: `${props.prefix}apigw-error-500-${suffix}`,
+          runtime,
+          memorySize: 128,
+          handler: 'error_500.handler',
+          architecture: lambda.Architecture.X86_64,
+          timeout: cdk.Duration.seconds(10),
+          code: pythonCode,
+          layers: [props.layer],
+          role: props.role,
+          environment,
+          logGroup: props.logGroup,
+          loggingFormat: lambda.LoggingFormat.TEXT,
+        });
+
+        new apigateway.LambdaRestApi(this, `ApiGw500-${suffix}`, {
+          restApiName: `${props.prefix}apigw-error-500-${suffix}`,
+          handler: fn,
+          proxy: true,
+        });
+      }
     }
   }
 }
