@@ -213,29 +213,26 @@ fn create_exception_event(
 
             if let Some(status_code) = json_val.get("statusCode").and_then(|v| v.as_i64()) {
                 if status_code >= 400 {
-                    let body = json_val
-                        .get("body")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("500");
+                    let message = extract_error_message_from_status_code(&json_val, status_code);
                     return Some((
                         Event {
                             time_unix_nano: now_nanos,
                             name: "exception".to_string(),
                             attributes: vec![
                                 KeyValue {
-                                    key: "exception.type".to_string(),
+                                    key: crate::otlp::attributes::EXCEPTION_TYPE.to_string(),
                                     value: Some(AnyValue {
                                         value: Some(Value::StringValue(status_code.to_string())),
                                     }),
                                 },
                                 KeyValue {
-                                    key: "exception.message".to_string(),
+                                    key: crate::otlp::attributes::EXCEPTION_MESSAGE.to_string(),
                                     value: Some(AnyValue {
-                                        value: Some(Value::StringValue(body.to_string())),
+                                        value: Some(Value::StringValue(message.clone())),
                                     }),
                                 },
                                 KeyValue {
-                                    key: "exception.escaped".to_string(),
+                                    key: crate::otlp::attributes::EXCEPTION_ESCAPED.to_string(),
                                     value: Some(AnyValue {
                                         value: Some(Value::StringValue("False".to_string())),
                                     }),
@@ -519,15 +516,16 @@ pub fn apply_return_value_error_to_stored_traces(invocation_id: &str, return_val
     }
 }
 
-fn apply_status_code_error(
-    span: &mut Span,
+/// Extracts the error message from a Lambda return value JSON that has a statusCode >= 400.
+/// Tries to parse the `body` field as JSON and look for `error`, `message`, or `errorMessage`;
+/// falls back to the raw body string, or `"HTTP {status_code}"` if body is empty.
+fn extract_error_message_from_status_code(
     json_val: &serde_json::Value,
     status_code: i64,
-) -> bool {
+) -> String {
     let body = json_val.get("body").and_then(|v| v.as_str()).unwrap_or("");
 
-    // Try to extract a meaningful message from the body (it may be JSON itself)
-    let message = serde_json::from_str::<serde_json::Value>(body)
+    serde_json::from_str::<serde_json::Value>(body)
         .ok()
         .and_then(|body_json| {
             body_json
@@ -543,7 +541,15 @@ fn apply_status_code_error(
             } else {
                 body.to_string()
             }
-        });
+        })
+}
+
+fn apply_status_code_error(
+    span: &mut Span,
+    json_val: &serde_json::Value,
+    status_code: i64,
+) -> bool {
+    let message = extract_error_message_from_status_code(json_val, status_code);
 
     span.status = Some(Status {
         code: StatusCode::Error as i32,
