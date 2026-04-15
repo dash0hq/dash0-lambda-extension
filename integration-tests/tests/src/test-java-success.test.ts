@@ -1,4 +1,5 @@
 import { describe } from 'vitest';
+import { JAVA_RUNTIMES } from '../../runtimes';
 import {
     checkLogs,
     checkMainSpans,
@@ -56,6 +57,6 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
 }
 
 describe.concurrent('Lambdainvocation', () => {
-    const runtimes = ['java17', 'java21', 'java25'];
+    const runtimes = JAVA_RUNTIMES;
     runAllTests('success', runtimes, verifySuccessInvocation);
 });

@@ -5,6 +5,7 @@ import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as path from 'path';
+import { NODE_CDK_RUNTIMES, PYTHON_CDK_RUNTIMES } from './runtime-utils';
 
 export interface DbTestingStackProps extends cdk.NestedStackProps {
   nodeLayer: lambda.ILayerVersion;
@@ -51,11 +52,7 @@ export class DbTestingStack extends cdk.NestedStack {
 
     // --- Node.js lambdas ---
 
-    const nodeRuntimes = [
-      lambda.Runtime.NODEJS_20_X,
-      lambda.Runtime.NODEJS_22_X,
-      lambda.Runtime.NODEJS_24_X,
-    ];
+    const nodeRuntimes = NODE_CDK_RUNTIMES;
 
     for (const runtime of nodeRuntimes) {
       const runtimeName = runtime.name.replace(/\./g, '-');
@@ -103,11 +100,9 @@ export class DbTestingStack extends cdk.NestedStack {
 
     // --- Python lambdas ---
 
-    const pythonRuntimes = [
-      lambda.Runtime.PYTHON_3_12,
-      lambda.Runtime.PYTHON_3_13,
-      lambda.Runtime.PYTHON_3_14,
-    ];
+    const pythonRuntimes = PYTHON_CDK_RUNTIMES.filter(r =>
+      r !== lambda.Runtime.PYTHON_3_10 && r !== lambda.Runtime.PYTHON_3_11
+    );
 
     for (const runtime of pythonRuntimes) {
       const runtimeName = runtime.name.replace(/\./g, '-');

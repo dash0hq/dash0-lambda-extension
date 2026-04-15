@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { setTimeout as delay } from 'timers/promises';
 import fetch from 'node-fetch';
+import { NODE_RUNTIMES } from '../../runtimes';
 import {
     checkResourceAttributes,
     getAttributesMap,
@@ -150,7 +151,7 @@ const verifySingleTracedInvocation = async (functionName: string) => {
 };
 
 describe.concurrent('Single-traced Lambda invocation', () => {
-    const runtimes = ['nodejs20-x', 'nodejs22-x', 'nodejs24-x'];
+    const runtimes = NODE_RUNTIMES;
     for (const runtime of runtimes) {
         const functionName = `${RESOURCE_PREFIX}single-traced-${runtime}`;
         it(

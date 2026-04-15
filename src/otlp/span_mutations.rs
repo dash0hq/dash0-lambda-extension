@@ -213,29 +213,26 @@ fn create_exception_event(
 
             if let Some(status_code) = json_val.get("statusCode").and_then(|v| v.as_i64()) {
                 if status_code >= 400 {
-                    let body = json_val
-                        .get("body")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("500");
+                    let message = extract_error_message_from_status_code(&json_val, status_code);
                     return Some((
                         Event {
                             time_unix_nano: now_nanos,
                             name: "exception".to_string(),
                             attributes: vec![
                                 KeyValue {
-                                    key: "exception.type".to_string(),
+                                    key: crate::otlp::attributes::EXCEPTION_TYPE.to_string(),
                                     value: Some(AnyValue {
                                         value: Some(Value::StringValue(status_code.to_string())),
                                     }),
                                 },
                                 KeyValue {
-                                    key: "exception.message".to_string(),
+                                    key: crate::otlp::attributes::EXCEPTION_MESSAGE.to_string(),
                                     value: Some(AnyValue {
-                                        value: Some(Value::StringValue(body.to_string())),
+                                        value: Some(Value::StringValue(message.clone())),
                                     }),
                                 },
                                 KeyValue {
-                                    key: "exception.escaped".to_string(),
+                                    key: crate::otlp::attributes::EXCEPTION_ESCAPED.to_string(),
                                     value: Some(AnyValue {
                                         value: Some(Value::StringValue("False".to_string())),
                                     }),
@@ -463,6 +460,130 @@ fn reparent_to_root_span(span: &mut Span, invocation_id: &str) {
     if let Ok(bytes) = hex::decode(&root_span_id) {
         span.parent_span_id = bytes;
     }
+}
+
+/// For traced invocations: if the Lambda returned a payload with `statusCode >= 400`,
+/// mark the handler span as an error and attach an exception event.
+/// Called from the response proxy after the return value is captured.
+pub fn apply_return_value_error_to_stored_traces(invocation_id: &str, return_value: &str) {
+    let json_val = match serde_json::from_str::<serde_json::Value>(return_value) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+
+    let status_code = match json_val.get("statusCode").and_then(|v| v.as_i64()) {
+        Some(code) if code >= 400 => code,
+        _ => return,
+    };
+
+    let mut handler_span_data: Option<(Vec<KeyValue>, Option<Status>)> = None;
+
+    invocation_entry::update_traces(invocation_id, |traces| {
+        for trace in traces {
+            if let Ok(mut decoded) = ExportTraceServiceRequest::decode(trace.body.as_slice()) {
+                let mut modified = false;
+                for resource_span in &mut decoded.resource_spans {
+                    for scope_span in &mut resource_span.scope_spans {
+                        let is_lambda = scope_span
+                            .scope
+                            .as_ref()
+                            .map_or(false, |s| is_lambda_instrumentation_scope(&s.name));
+                        if !is_lambda {
+                            continue;
+                        }
+                        for span in &mut scope_span.spans {
+                            if apply_status_code_error(span, &json_val, status_code) {
+                                handler_span_data =
+                                    Some((span.attributes.clone(), span.status.clone()));
+                                modified = true;
+                            }
+                        }
+                    }
+                }
+                if modified {
+                    trace.body = decoded.encode_to_vec();
+                }
+            }
+        }
+    });
+
+    // Update handler span data outside the traces lock to avoid deadlock
+    if let Some((attributes, status)) = handler_span_data {
+        invocation_entry::update(invocation_id, |entry| {
+            entry.handler_attributes = attributes;
+            entry.handler_status = status;
+        });
+    }
+}
+
+/// Extracts the error message from a Lambda return value JSON that has a statusCode >= 400.
+/// Tries to parse the `body` field as JSON and look for `error`, `message`, or `errorMessage`;
+/// falls back to the raw body string, or `"HTTP {status_code}"` if body is empty.
+fn extract_error_message_from_status_code(
+    json_val: &serde_json::Value,
+    status_code: i64,
+) -> String {
+    let body = json_val.get("body").and_then(|v| v.as_str()).unwrap_or("");
+
+    serde_json::from_str::<serde_json::Value>(body)
+        .ok()
+        .and_then(|body_json| {
+            body_json
+                .get("error")
+                .or_else(|| body_json.get("message"))
+                .or_else(|| body_json.get("errorMessage"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        })
+        .unwrap_or_else(|| {
+            if body.is_empty() {
+                format!("HTTP {status_code}")
+            } else {
+                body.to_string()
+            }
+        })
+}
+
+fn apply_status_code_error(
+    span: &mut Span,
+    json_val: &serde_json::Value,
+    status_code: i64,
+) -> bool {
+    let message = extract_error_message_from_status_code(json_val, status_code);
+
+    span.status = Some(Status {
+        code: StatusCode::Error as i32,
+        message: status_code.to_string(),
+        ..Default::default()
+    });
+
+    span.events.push(Event {
+        time_unix_nano: span.end_time_unix_nano,
+        name: "exception".to_string(),
+        attributes: vec![
+            KeyValue {
+                key: crate::otlp::attributes::EXCEPTION_TYPE.to_string(),
+                value: Some(AnyValue {
+                    value: Some(Value::StringValue(status_code.to_string())),
+                }),
+            },
+            KeyValue {
+                key: crate::otlp::attributes::EXCEPTION_MESSAGE.to_string(),
+                value: Some(AnyValue {
+                    value: Some(Value::StringValue(message)),
+                }),
+            },
+            KeyValue {
+                key: crate::otlp::attributes::EXCEPTION_ESCAPED.to_string(),
+                value: Some(AnyValue {
+                    value: Some(Value::StringValue("False".to_string())),
+                }),
+            },
+        ],
+        ..Default::default()
+    });
+
+    true
 }
 
 fn store_handler_span_data(span: &Span, invocation_id: &str) {
@@ -1731,6 +1852,170 @@ mod tests {
         assert_eq!(logs[0].invocation_id.as_deref(), Some(inv_id));
 
         disable_payload_log_records();
+    }
+
+    /// Helper: store a trace for an invocation (simulating what receiver.rs does)
+    fn store_lambda_trace(invocation_id: &str, span: Span) {
+        let request = make_request_with_scope("opentelemetry.instrumentation.aws_lambda", span);
+        let body = request.encode_to_vec();
+        invocation_entry::store_trace_by_id(
+            invocation_id,
+            StoredTrace {
+                method: hyper::Method::POST,
+                path_and_query: "/v1/traces".to_string(),
+                headers: hyper::HeaderMap::new(),
+                body,
+                invocation_ids: vec![invocation_id.to_string()],
+            },
+        );
+    }
+
+    /// Helper: decode the stored trace back to inspect spans
+    fn decode_stored_traces(invocation_id: &str) -> ExportTraceServiceRequest {
+        let traces = invocation_entry::take_traces_by_id(invocation_id);
+        assert_eq!(traces.len(), 1, "expected exactly one stored trace");
+        ExportTraceServiceRequest::decode(traces[0].body.as_slice())
+            .expect("should decode stored trace")
+    }
+
+    #[test]
+    #[serial]
+    fn apply_return_value_error_marks_500_on_stored_trace() {
+        let invocation_id = "inv-return-500";
+        let mut span = make_span_with_invocation(invocation_id);
+        span.end_time_unix_nano = 999;
+        store_lambda_trace(invocation_id, span);
+
+        let return_value =
+            r#"{"statusCode": 500, "body": "{\"error\": \"Internal Server Error\"}"}"#;
+        super::apply_return_value_error_to_stored_traces(invocation_id, return_value);
+
+        let decoded = decode_stored_traces(invocation_id);
+        let span = &decoded.resource_spans[0].scope_spans[0].spans[0];
+
+        // status should be Error
+        let status = span.status.as_ref().expect("status should be set");
+        assert_eq!(status.code, StatusCode::Error as i32);
+        assert_eq!(status.message, "500");
+
+        // exception event should be present
+        let exception = span
+            .events
+            .iter()
+            .find(|e| e.name == "exception")
+            .expect("exception event should exist");
+        assert_eq!(exception.time_unix_nano, 999);
+
+        let ex_type = exception
+            .attributes
+            .iter()
+            .find(|kv| kv.key == "exception.type")
+            .and_then(|kv| kv.value.as_ref())
+            .and_then(|v| match &v.value {
+                Some(Value::StringValue(s)) => Some(s.clone()),
+                _ => None,
+            });
+        assert_eq!(ex_type, Some("500".to_string()));
+
+        let ex_msg = exception
+            .attributes
+            .iter()
+            .find(|kv| kv.key == "exception.message")
+            .and_then(|kv| kv.value.as_ref())
+            .and_then(|v| match &v.value {
+                Some(Value::StringValue(s)) => Some(s.clone()),
+                _ => None,
+            });
+        assert_eq!(ex_msg, Some("Internal Server Error".to_string()));
+    }
+
+    #[test]
+    #[serial]
+    fn apply_return_value_error_marks_400_on_stored_trace() {
+        let invocation_id = "inv-return-400";
+        let mut span = make_span_with_invocation(invocation_id);
+        span.end_time_unix_nano = 888;
+        store_lambda_trace(invocation_id, span);
+
+        let return_value = r#"{"statusCode": 400, "body": "Bad Request"}"#;
+        super::apply_return_value_error_to_stored_traces(invocation_id, return_value);
+
+        let decoded = decode_stored_traces(invocation_id);
+        let span = &decoded.resource_spans[0].scope_spans[0].spans[0];
+
+        let status = span.status.as_ref().expect("status should be set");
+        assert_eq!(status.code, StatusCode::Error as i32);
+        assert_eq!(status.message, "400");
+    }
+
+    #[test]
+    #[serial]
+    fn apply_return_value_error_no_error_on_200() {
+        let invocation_id = "inv-return-200";
+        let span = make_span_with_invocation(invocation_id);
+        store_lambda_trace(invocation_id, span);
+
+        let return_value = r#"{"statusCode": 200, "body": "OK"}"#;
+        super::apply_return_value_error_to_stored_traces(invocation_id, return_value);
+
+        let decoded = decode_stored_traces(invocation_id);
+        let span = &decoded.resource_spans[0].scope_spans[0].spans[0];
+
+        assert!(
+            span.events.iter().all(|e| e.name != "exception"),
+            "no exception event for 200 status"
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn apply_return_value_error_with_no_body() {
+        let invocation_id = "inv-return-502-nobody";
+        let span = make_span_with_invocation(invocation_id);
+        store_lambda_trace(invocation_id, span);
+
+        let return_value = r#"{"statusCode": 502}"#;
+        super::apply_return_value_error_to_stored_traces(invocation_id, return_value);
+
+        let decoded = decode_stored_traces(invocation_id);
+        let span = &decoded.resource_spans[0].scope_spans[0].spans[0];
+
+        let status = span.status.as_ref().expect("status should be set");
+        assert_eq!(status.code, StatusCode::Error as i32);
+        assert_eq!(status.message, "502");
+    }
+
+    #[test]
+    #[serial]
+    fn apply_return_value_error_skips_non_lambda_scopes() {
+        let invocation_id = "inv-return-500-nonlambda";
+
+        // Store a trace with a non-lambda scope
+        let span = make_span_with_invocation(invocation_id);
+        let request = make_request_with_scope("other.instrumentation.scope", span);
+        let body = request.encode_to_vec();
+        invocation_entry::store_trace_by_id(
+            invocation_id,
+            StoredTrace {
+                method: hyper::Method::POST,
+                path_and_query: "/v1/traces".to_string(),
+                headers: hyper::HeaderMap::new(),
+                body,
+                invocation_ids: vec![invocation_id.to_string()],
+            },
+        );
+
+        let return_value = r#"{"statusCode": 500, "body": "error"}"#;
+        super::apply_return_value_error_to_stored_traces(invocation_id, return_value);
+
+        let traces = invocation_entry::take_traces_by_id(invocation_id);
+        let decoded = ExportTraceServiceRequest::decode(traces[0].body.as_slice()).unwrap();
+        let span = &decoded.resource_spans[0].scope_spans[0].spans[0];
+
+        assert!(
+            span.events.iter().all(|e| e.name != "exception"),
+            "non-lambda scope should not be modified"
+        );
     }
 }
 
