@@ -1896,7 +1896,7 @@ mod tests {
         // status should be Error
         let status = span.status.as_ref().expect("status should be set");
         assert_eq!(status.code, StatusCode::Error as i32);
-        assert_eq!(status.message, "Internal Server Error");
+        assert_eq!(status.message, "500");
 
         // exception event should be present
         let exception = span
@@ -1945,7 +1945,7 @@ mod tests {
 
         let status = span.status.as_ref().expect("status should be set");
         assert_eq!(status.code, StatusCode::Error as i32);
-        assert_eq!(status.message, "Bad Request");
+        assert_eq!(status.message, "400");
     }
 
     #[test]
@@ -1982,7 +1982,7 @@ mod tests {
 
         let status = span.status.as_ref().expect("status should be set");
         assert_eq!(status.code, StatusCode::Error as i32);
-        assert_eq!(status.message, "HTTP 502");
+        assert_eq!(status.message, "502");
     }
 
     #[test]
