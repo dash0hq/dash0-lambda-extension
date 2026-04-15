@@ -6,6 +6,7 @@ import {
     RESOURCE_PREFIX,
 } from "./utils";
 import { TEST_TIMEOUT_MS } from "./config";
+import { PYTHON_RUNTIMES } from "../../runtimes";
 
 const verify500Error = async (functionName: string) => {
     const invocationId = await invokeFunction(functionName, true, false);
@@ -35,7 +36,7 @@ const verify500Error = async (functionName: string) => {
 };
 
 describe.concurrent('Lambda 500 error', () => {
-    const runtimes = ['python3-10', 'python3-11', 'python3-12', 'python3-13', 'python3-14'];
+    const runtimes = PYTHON_RUNTIMES;
 
     for (const runtime of runtimes) {
         for (const traced of [true, false]) {

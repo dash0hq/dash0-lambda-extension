@@ -1,6 +1,7 @@
 import fetch from 'node-fetch';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
+import { PYTHON_RUNTIMES } from '../../runtimes';
 import {DASH0_ENDPOINT, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from "./config";
 import {checkException, checkLogs, getAttributesMap, getRequestPayload, invokeFunction, LogToCheck, runAllTests} from "./utils";
 
@@ -63,6 +64,6 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
 }
 
 describe.concurrent('Lambda invocations with importerror', {retry: 1}, () => {
-    const runtimes = ['python3-10', 'python3-11', 'python3-12', 'python3-13', 'python3-14'];
+    const runtimes = PYTHON_RUNTIMES;
     runAllTests('importerror', runtimes, verifySuccessInvocation);
 });

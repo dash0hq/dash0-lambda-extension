@@ -13,6 +13,7 @@ import { PythonTracingScenariosStack, createPythonCode } from './python-tracing-
 import { NodeTracingScenariosStack } from './node-tracing-scenarios-stack';
 import { JavaTracingScenariosStack } from './java-tracing-scenarios-stack';
 import { DbTestingStack } from './db-testing-stack';
+import { PYTHON_CDK_RUNTIMES, NODE_CDK_RUNTIMES, JAVA_CDK_RUNTIMES } from './runtime-utils';
 
 function getLatestLayerVersion(scope: Construct, id: string, layerName: string): lambda.ILayerVersion {
   const stack = cdk.Stack.of(scope);
@@ -124,13 +125,7 @@ class PythonStack extends cdk.NestedStack {
   constructor(scope: Construct, id: string, props: SubStackProps) {
     super(scope, id, props);
 
-    const runtimes = [
-      lambda.Runtime.PYTHON_3_10,
-      lambda.Runtime.PYTHON_3_11,
-      lambda.Runtime.PYTHON_3_12,
-      lambda.Runtime.PYTHON_3_13,
-      lambda.Runtime.PYTHON_3_14,
-    ];
+    const runtimes = PYTHON_CDK_RUNTIMES;
 
     const pythonCode = createPythonCode();
 
@@ -221,11 +216,7 @@ class NodeStack extends cdk.NestedStack {
   constructor(scope: Construct, id: string, props: SubStackProps) {
     super(scope, id, props);
 
-    const runtimes = [
-      lambda.Runtime.NODEJS_20_X,
-      lambda.Runtime.NODEJS_22_X,
-      lambda.Runtime.NODEJS_24_X,
-    ];
+    const runtimes = NODE_CDK_RUNTIMES;
 
     createLambdas(this, runtimes, props.layer, props.role, props.logGroup, props.prefix, {
       dash0TokenSecretArn: props.dash0TokenSecretArn,
@@ -305,7 +296,7 @@ class JavaStack extends cdk.NestedStack {
       memorySize: 512,
       dash0TokenSecretArn: props.dash0TokenSecretArn,
     };
-    const runtimes = [lambda.Runtime.JAVA_25, lambda.Runtime.JAVA_21, lambda.Runtime.JAVA_17];
+    const runtimes = JAVA_CDK_RUNTIMES;
 
     createLambdas(this, runtimes, props.layer, props.role, props.logGroup, props.prefix, overrides);
   }
@@ -315,11 +306,7 @@ class ManualStack extends cdk.NestedStack {
   constructor(scope: Construct, id: string, props: SubStackProps) {
     super(scope, id, props);
 
-    const runtimes = [
-      lambda.Runtime.NODEJS_20_X,
-      lambda.Runtime.NODEJS_22_X,
-      lambda.Runtime.NODEJS_24_X,
-    ];
+    const runtimes = NODE_CDK_RUNTIMES;
     const code = lambda.Code.fromAsset(path.join(__dirname, '../lambdas/manual'), {
       bundling: {
         image: lambda.Runtime.NODEJS_24_X.bundlingImage,

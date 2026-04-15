@@ -534,7 +534,7 @@ export const checkException = (span: any, exception_type: string) => {
     expect(span.status.message).toEqual(exception_type);
 }
 
-export const runAllTests = (scenario: string, runtimes: string[], verifySuccessInvocation: Function) => {
+export const runAllTests = (scenario: string, runtimes: readonly string[], verifySuccessInvocation: Function) => {
     const architectures = ['x86_64', 'arm64'] as const;
     const invocationEndValues = [true, false] as const;
     const tracedValues = [true, false] as const;

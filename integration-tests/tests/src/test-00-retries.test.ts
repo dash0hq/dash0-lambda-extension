@@ -1,11 +1,12 @@
 import fetch from 'node-fetch';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
+import { PYTHON_RUNTIMES } from '../../runtimes';
 import { DASH0_ENDPOINT, DASH0_LAMBDA_TESTS_DATASET, DASH0_TOKEN } from './config';
 import { RESOURCE_PREFIX } from './utils';
 import { invokeProducerAndGetLeafSpan } from './utils-tracing-scenarios';
 
-const pythonRuntimes = ['python3-11', 'python3-12', 'python3-13', 'python3-14'];
+const pythonRuntimes = PYTHON_RUNTIMES.filter(r => r !== 'python3-10');
 
 const EXPECTED_CONSUMER_INVOCATIONS = 2;
 

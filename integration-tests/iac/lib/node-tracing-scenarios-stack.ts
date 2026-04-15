@@ -15,6 +15,7 @@ import * as events from 'aws-cdk-lib/aws-events';
 import * as events_targets from 'aws-cdk-lib/aws-events-targets';
 import * as lambda_event_sources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as path from 'path';
+import { NODE_CDK_RUNTIMES } from './runtime-utils';
 
 export interface NodeTracingScenariosStackProps extends cdk.NestedStackProps {
   layer: lambda.ILayerVersion;
@@ -46,11 +47,7 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
       DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
       DASH0_EXTENSION_LOG_LEVEL: "info",
     };
-    const runtimes = [
-      lambda.Runtime.NODEJS_20_X,
-      lambda.Runtime.NODEJS_22_X,
-      lambda.Runtime.NODEJS_24_X,
-    ];
+    const runtimes = NODE_CDK_RUNTIMES;
     const prefix = props.prefix;
     for (const runtime of runtimes) {
       const runtimeName = runtime.name.replace(/\./g, '-');

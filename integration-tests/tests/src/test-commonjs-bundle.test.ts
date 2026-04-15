@@ -1,4 +1,5 @@
 import { describe, it } from 'vitest';
+import { NODE_RUNTIMES } from '../../runtimes';
 import {
     checkLogs,
     checkMainSpans,
@@ -45,7 +46,7 @@ const verifyCjsSuccess = async (functionName: string) => {
 };
 
 describe.concurrent('CJS-bundled Lambda invocation', () => {
-    const runtimes = ['nodejs20-x', 'nodejs22-x', 'nodejs24-x'];
+    const runtimes = NODE_RUNTIMES;
     for (const runtime of runtimes) {
         const functionName = `${RESOURCE_PREFIX}cjs-success-${runtime}`;
         it(

@@ -1,12 +1,13 @@
 import fetch from 'node-fetch';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
+import { PYTHON_RUNTIMES, NODE_RUNTIMES, JAVA_RUNTIMES } from '../../runtimes';
 import {DASH0_ENDPOINT, DASH0_LAMBDA_TESTS_DATASET, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from './config';
 import { findHandlerSpan, getAttributesMap, getRequestPayload, invokeFunction, RESOURCE_PREFIX } from './utils';
 
-const pythonRuntimes = ['python3-11', 'python3-12', 'python3-13', 'python3-14'];
-const nodeRuntimes = ['nodejs20-x', 'nodejs22-x', 'nodejs24-x'];
-const javaRuntimes = ['java17', 'java21', 'java25'];
+const pythonRuntimes = PYTHON_RUNTIMES.filter(r => r !== 'python3-10');
+const nodeRuntimes = NODE_RUNTIMES;
+const javaRuntimes = JAVA_RUNTIMES;
 
 const scenarios = [
     { name: 'sqs', producerPrefix: `${RESOURCE_PREFIX}tracing-sqs-producer`, consumerPrefix: `${RESOURCE_PREFIX}tracing-sqs-consumer`, runtimes: [...pythonRuntimes, ...nodeRuntimes, ...javaRuntimes] },

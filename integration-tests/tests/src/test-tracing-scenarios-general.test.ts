@@ -1,12 +1,13 @@
 import fetch from 'node-fetch';
 import { setTimeout as delay } from 'node:timers/promises';
 import { describe, expect, it } from 'vitest';
+import { PYTHON_RUNTIMES, NODE_RUNTIMES } from '../../runtimes';
 import {DASH0_ENDPOINT, DASH0_LAMBDA_TESTS_DATASET, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS} from './config';
 import { getAttributesMap, RESOURCE_PREFIX } from './utils';
 import { invokeProducerAndGetLeafSpan } from './utils-tracing-scenarios';
 
-const pythonRuntimes = ['python3-11', 'python3-12', 'python3-13', 'python3-14'];
-const nodeRuntimes = ['nodejs20-x', 'nodejs22-x', 'nodejs24-x'];
+const pythonRuntimes = PYTHON_RUNTIMES.filter(r => r !== 'python3-10');
+const nodeRuntimes = NODE_RUNTIMES;
 
 const scenarios = [
     { name: 'eventbridge', producerPrefix: `${RESOURCE_PREFIX}tracing-eventbridge-producer`, consumerPrefix: `${RESOURCE_PREFIX}tracing-eventbridge-consumer`, runtimes: [...pythonRuntimes, ...nodeRuntimes] },

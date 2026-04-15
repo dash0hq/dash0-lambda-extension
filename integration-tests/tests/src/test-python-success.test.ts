@@ -1,4 +1,5 @@
 import { describe, expect } from 'vitest';
+import { PYTHON_RUNTIMES } from '../../runtimes';
 import {
     checkHttpSpan,
     checkLogs,
@@ -80,6 +81,6 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
 }
 
 describe.concurrent('Lambdainvocation', () => {
-    const runtimes = ['python3-10', 'python3-11', 'python3-12', 'python3-13', 'python3-14'];
+    const runtimes = PYTHON_RUNTIMES;
     runAllTests('success', runtimes, verifySuccessInvocation);
 });

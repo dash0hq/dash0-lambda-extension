@@ -15,6 +15,7 @@ import * as events from 'aws-cdk-lib/aws-events';
 import * as events_targets from 'aws-cdk-lib/aws-events-targets';
 import * as lambda_event_sources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as path from 'path';
+import { PYTHON_CDK_RUNTIMES } from './runtime-utils';
 
 export function createPythonCode(): lambda.Code {
   return lambda.Code.fromAsset(path.join(__dirname, '../lambdas/python'), {
@@ -58,12 +59,7 @@ export class PythonTracingScenariosStack extends cdk.NestedStack {
       DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
       DASH0_EXTENSION_LOG_LEVEL: "info",
     };
-    const runtimes = [
-      lambda.Runtime.PYTHON_3_11,
-      lambda.Runtime.PYTHON_3_12,
-      lambda.Runtime.PYTHON_3_13,
-      lambda.Runtime.PYTHON_3_14,
-    ];
+    const runtimes = PYTHON_CDK_RUNTIMES.filter(r => r !== lambda.Runtime.PYTHON_3_10);
     const prefix = props.prefix;
     for (const runtime of runtimes) {
       const runtimeName = runtime.name.replace(/\./g, '-');
