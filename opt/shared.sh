@@ -27,6 +27,10 @@ setup_otel_env() {
   if [[ -z "$OTEL_TRACES_SAMPLER" ]]; then
     export OTEL_TRACES_SAMPLER="always_on"
   fi
+
+  if [[ -z "$ENABLE_KINESIS_INSTRUMENTATION" ]]; then
+    export ENABLE_KINESIS_INSTRUMENTATION="true"
+  fi
 }
 
 write_env_vars() {
