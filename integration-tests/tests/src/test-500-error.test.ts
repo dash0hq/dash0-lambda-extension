@@ -17,11 +17,11 @@ const verify500Error = async (functionName: string) => {
 
     // Handler span should have error status
     expect(handlerSpan.status.code).toEqual(2); // ERROR
-    expect(handlerSpan.status.message).toEqual('Internal Server Error');
+    expect(handlerSpan.status.message).toEqual('500');
 
     // Root span should have error status
     expect(rootSpan.status.code).toEqual(2); // ERROR
-    expect(rootSpan.status.message).toEqual('Internal Server Error');
+    expect(rootSpan.status.message).toEqual('500');
 };
 
 describe.concurrent('Lambda 500 error', () => {

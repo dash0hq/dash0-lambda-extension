@@ -553,7 +553,7 @@ fn apply_status_code_error(
 
     span.status = Some(Status {
         code: StatusCode::Error as i32,
-        message: message.clone(),
+        message: status_code.to_string(),
         ..Default::default()
     });
 
