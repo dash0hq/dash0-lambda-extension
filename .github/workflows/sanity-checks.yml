@@ -1,0 +1,102 @@
+name: Production Sanity Checks
+
+on:
+  workflow_call:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  resolve-layers:
+    name: Resolve Production Layer Versions
+    runs-on: ubuntu-latest
+    environment: prod-integration
+    outputs:
+      python_version: ${{ steps.resolve.outputs.python_version }}
+      node_version: ${{ steps.resolve.outputs.node_version }}
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: eu-central-1
+
+      - name: Resolve latest production layer versions
+        id: resolve
+        run: |
+          for layer in python node; do
+            version=$(aws lambda list-layer-versions \
+              --layer-name "dash0-extension-${layer}" \
+              --query 'LayerVersions[0].Version' \
+              --output text)
+            if [ "$version" = "None" ] || [ -z "$version" ]; then
+              echo "ERROR: Could not resolve version for dash0-extension-${layer}"
+              exit 1
+            fi
+            echo "${layer}_version=${version}" >> "$GITHUB_OUTPUT"
+            echo "Resolved dash0-extension-${layer} → version ${version}"
+          done
+
+  run-sanity:
+    name: Deploy and Test
+    needs: resolve-layers
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      SANITY_NODE_LAYER_ARN: arn:aws:lambda:${{ vars.AWS_REGION }}:115813213817:layer:dash0-extension-node:${{ needs.resolve-layers.outputs.node_version }}
+      SANITY_PYTHON_LAYER_ARN: arn:aws:lambda:${{ vars.AWS_REGION }}:115813213817:layer:dash0-extension-python:${{ needs.resolve-layers.outputs.python_version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            integration-tests/iac/package-lock.json
+            integration-tests/tests/package-lock.json
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghcrunner
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf /usr/share/swift
+          docker system prune -af
+          df -h
+
+      - name: Install CDK dependencies
+        working-directory: integration-tests/iac
+        run: npm ci
+
+      - name: Deploy sanity checks stack
+        working-directory: integration-tests/iac
+        run: npm run deploy-sanity
+        env:
+          DASH0_DEV_API_TOKEN: ${{ secrets.DASH0_DEV_API_TOKEN }}
+
+      - name: Install test dependencies
+        working-directory: integration-tests/tests
+        run: npm ci
+
+      - name: Run sanity tests
+        working-directory: integration-tests/tests
+        run: npm run test:sanity
+        env:
+          DASH0_DEV_API_TOKEN: ${{ secrets.DASH0_DEV_API_TOKEN }}
+
+      - name: Destroy sanity checks stack
+        if: always()
+        working-directory: integration-tests/iac
+        run: npm run destroy-sanity
+        env:
+          DASH0_DEV_API_TOKEN: ${{ secrets.DASH0_DEV_API_TOKEN }}
