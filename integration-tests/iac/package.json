@@ -11,6 +11,8 @@
     "cdk": "cdk",
     "setup-ecr": "bash scripts/setup-ecr.sh",
     "deploy": "npm run setup-ecr && cdk deploy \"${RESOURCE_PREFIX}IntegrationTestsStack\" --require-approval never",
+    "deploy-sanity": "cdk deploy SanityChecksStack --require-approval never",
+    "destroy-sanity": "cdk destroy SanityChecksStack --force",
     "deploy-shared-db": "cdk deploy SharedDbStack --require-approval never"
   },
   "devDependencies": {

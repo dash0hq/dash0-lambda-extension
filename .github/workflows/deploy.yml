@@ -37,6 +37,12 @@ jobs:
       region: ${{ matrix.region }}
     secrets: inherit
 
+  sanity-checks:
+    if: github.event_name == 'workflow_dispatch'
+    needs: deploy-prod
+    uses: ./.github/workflows/sanity-checks.yml
+    secrets: inherit
+
   create-release:
     if: github.event_name == 'workflow_dispatch'
     needs: deploy-prod
