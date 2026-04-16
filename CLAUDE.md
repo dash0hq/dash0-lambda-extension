@@ -1,6 +1,6 @@
 ## Session Logging
 
-After every prompt, keep a log of the conversation in a markdown file. This will help you keep track of the tasks you've completed and the interactions you've had with the user.
+After every prompt, keep a log of the conversation in a markdown file. The main motivation is to aid in code review and to provide a clear record of the changes made by the AI. BTW, feel free to read this log to keep track of the work done in the current branch.
 
 After completing every task, append an entry to `.claude-sessions/<git-branch-name>.md`:
 
