@@ -89,13 +89,6 @@ jobs:
       prefix: pr-${{ github.event.pull_request.number }}-
     secrets: inherit
 
-  # TODO: remove before merging - temporary to test sanity checks from PR
-  sanity-checks:
-    name: Sanity Checks
-    if: github.event.pull_request.head.repo.full_name == github.repository
-    uses: ./.github/workflows/sanity-checks.yml
-    secrets: inherit
-
   integration-test:
     name: Integration Test
     if: github.event.pull_request.head.repo.full_name == github.repository
