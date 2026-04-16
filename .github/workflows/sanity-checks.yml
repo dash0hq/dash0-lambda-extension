@@ -1,4 +1,4 @@
-name: Production Sanity Checks
+name: Sanity Checks
 
 on:
   workflow_call:
