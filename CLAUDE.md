@@ -23,7 +23,7 @@ After completing every task, append an entry to `.claude-sessions/<git-branch-na
 \```
 
 When making a plan, write the full plan in the log.
-When a user asked to undo, redo, or revert a change, log the action and the result in the same format as above.
+When a user asked to undo a change, you can just remove the relevant entry from the log, but make sure to keep the rest of the log intact.
 
 If the file doesn't exist, create it. Do not summarize or edit either block.
 The file you create should be staged for commit, but do not commit it yourself.
