@@ -120,7 +120,7 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
 
     if data.duration > 0.0 {
         metrics.push(create_histogram_metric(
-            "faas.duration",
+            "faas.invoke_duration",
             "Duration of the invocation",
             "ms",
             data.duration,
@@ -159,7 +159,7 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
 
     if data.memory_usage > 0 {
         metrics.push(create_histogram_metric(
-            "dash0.faas.memory_used",
+            "faas.mem_usage",
             "Memory used by the invocation",
             "MB",
             data.memory_usage as f64,
@@ -278,8 +278,8 @@ mod tests {
         let metrics = &decoded.resource_metrics[0].scope_metrics[0].metrics;
         assert_eq!(metrics.len(), 4);
 
-        // faas.duration
-        let duration_metric = find_metric_by_name(metrics, "faas.duration").unwrap();
+        // faas.invoke_duration
+        let duration_metric = find_metric_by_name(metrics, "faas.invoke_duration").unwrap();
         assert_eq!(duration_metric.unit, "ms");
         if let Some(Data::Histogram(h)) = &duration_metric.data {
             assert_eq!(
@@ -307,7 +307,7 @@ mod tests {
             assert!(dp.attributes.iter().any(|kv| kv.key == "cloud.resource_id"));
             assert!(dp.attributes.iter().any(|kv| kv.key == "cloud.account.id"));
         } else {
-            panic!("Expected Histogram data for faas.duration");
+            panic!("Expected Histogram data for faas.invoke_duration");
         }
 
         // faas.init_duration
@@ -328,13 +328,13 @@ mod tests {
             panic!("Expected Histogram data for dash0.faas.billed_duration");
         }
 
-        // dash0.faas.memory_used
-        let memory_metric = find_metric_by_name(metrics, "dash0.faas.memory_used").unwrap();
+        // faas.mem_usage
+        let memory_metric = find_metric_by_name(metrics, "faas.mem_usage").unwrap();
         assert_eq!(memory_metric.unit, "MB");
         if let Some(Data::Histogram(h)) = &memory_metric.data {
             assert_eq!(h.data_points[0].sum, Some(128.0));
         } else {
-            panic!("Expected Histogram data for dash0.faas.memory_used");
+            panic!("Expected Histogram data for faas.mem_usage");
         }
 
         // Check resource service.name
@@ -381,13 +381,14 @@ mod tests {
 
         assert_eq!(metrics.len(), 3);
         assert!(find_metric_by_name(metrics, "faas.init_duration").is_none());
-        assert!(find_metric_by_name(metrics, "faas.duration").is_some());
+        assert!(find_metric_by_name(metrics, "faas.invoke_duration").is_some());
         assert!(find_metric_by_name(metrics, "dash0.faas.billed_duration").is_some());
-        assert!(find_metric_by_name(metrics, "dash0.faas.memory_used").is_some());
+        assert!(find_metric_by_name(metrics, "faas.mem_usage").is_some());
 
         // Timestamps should use start_time directly (no init_duration subtraction)
-        if let Some(Data::Histogram(h)) =
-            &find_metric_by_name(metrics, "faas.duration").unwrap().data
+        if let Some(Data::Histogram(h)) = &find_metric_by_name(metrics, "faas.invoke_duration")
+            .unwrap()
+            .data
         {
             assert_eq!(h.data_points[0].start_time_unix_nano, 1_000_000_000); // 1000 * 1_000_000
         }
