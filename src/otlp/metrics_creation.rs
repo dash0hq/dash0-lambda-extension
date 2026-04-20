@@ -386,8 +386,9 @@ mod tests {
         assert!(find_metric_by_name(metrics, "faas.mem_usage").is_some());
 
         // Timestamps should use start_time directly (no init_duration subtraction)
-        if let Some(Data::Histogram(h)) =
-            &find_metric_by_name(metrics, "faas.invoke_duration").unwrap().data
+        if let Some(Data::Histogram(h)) = &find_metric_by_name(metrics, "faas.invoke_duration")
+            .unwrap()
+            .data
         {
             assert_eq!(h.data_points[0].start_time_unix_nano, 1_000_000_000); // 1000 * 1_000_000
         }
