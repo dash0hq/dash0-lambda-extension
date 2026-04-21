@@ -76,7 +76,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
 
     await checkMetrics({
         functionName,
-        metricNames: ['faas.duration', 'dash0.faas.billed_duration', 'dash0.faas.memory_used', 'faas.init_duration'],
+        metricNames: ['faas.invoke_duration', 'dash0.faas.billed_duration', 'faas.mem_usage', 'faas.init_duration'],
     });
 }
 
