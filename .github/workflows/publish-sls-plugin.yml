@@ -2,11 +2,6 @@ name: Publish SLS Plugin
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to publish (e.g. 1.0.0, 1.1.0, patch, minor, major)'
-        required: true
-        type: string
 
 permissions:
   contents: write
@@ -22,6 +17,16 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
+      - name: Read version from package.json
+        id: version
+        working-directory: sls-plugin
+        run: echo "version=$(node -p 'require(\"./package.json\").version')" >> "$GITHUB_OUTPUT"
+      - name: Fail if tag already exists
+        run: |
+          if git rev-parse "sls-plugin-v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "Tag sls-plugin-v${{ steps.version.outputs.version }} already exists — bump the version in sls-plugin/package.json via a PR first."
+            exit 1
+          fi
       - name: Install dependencies
         working-directory: sls-plugin
         run: npm ci
@@ -31,23 +36,12 @@ jobs:
       - name: Build
         working-directory: sls-plugin
         run: npm run build
-      - name: Set version
-        working-directory: sls-plugin
-        run: npm version ${{ inputs.version }} --no-git-tag-version
       - name: Publish to npm
         working-directory: sls-plugin
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - name: Get published version
-        id: version
-        working-directory: sls-plugin
-        run: echo "version=$(node -p 'require(\"./package.json\").version')" >> "$GITHUB_OUTPUT"
-      - name: Commit version bump
+      - name: Tag release
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add sls-plugin/package.json
-          git commit -m "chore: release serverless-dash0 v${{ steps.version.outputs.version }}"
           git tag "sls-plugin-v${{ steps.version.outputs.version }}"
-          git push origin master --tags
+          git push origin "sls-plugin-v${{ steps.version.outputs.version }}"
