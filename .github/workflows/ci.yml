@@ -153,7 +153,6 @@ jobs:
         env:
           DASH0_DEV_API_TOKEN: ${{ secrets.DASH0_DEV_API_TOKEN }}
           DASH0_LAYER_VERSION: ${{ env.DASH0_LAYER_VERSION }}
-          RESOURCE_PREFIX: ${{ env.RESOURCE_PREFIX }}
           SERVERLESS_ACCESS_KEY: ${{ secrets.SERVERLESS_ACCESS_KEY }}
 
   deploy-cdk:
@@ -196,7 +195,6 @@ jobs:
           DASH0_DEV_API_TOKEN: ${{ secrets.DASH0_DEV_API_TOKEN }}
           TEST_POSTGRESS_PASSWORD: ${{ secrets.TEST_POSTGRESS_PASSWORD }}
           TEST_MYSQL_PASSWORD: ${{ secrets.TEST_MYSQL_PASSWORD }}
-          RESOURCE_PREFIX: ${{ env.RESOURCE_PREFIX }}
 
   integration-test:
     name: Integration Test
@@ -223,5 +221,4 @@ jobs:
         run: npm run test
         env:
           DASH0_DEV_API_TOKEN: ${{ secrets.DASH0_DEV_API_TOKEN }}
-          RESOURCE_PREFIX: ${{ env.RESOURCE_PREFIX }}
 
