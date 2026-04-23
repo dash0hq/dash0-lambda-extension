@@ -1,0 +1,47 @@
+name: Publish SLS Plugin
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Read version from package.json
+        id: version
+        working-directory: sls-plugin
+        run: echo "version=$(node -p 'require(\"./package.json\").version')" >> "$GITHUB_OUTPUT"
+      - name: Fail if tag already exists
+        run: |
+          if git rev-parse "sls-plugin-v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "Tag sls-plugin-v${{ steps.version.outputs.version }} already exists — bump the version in sls-plugin/package.json via a PR first."
+            exit 1
+          fi
+      - name: Install dependencies
+        working-directory: sls-plugin
+        run: npm ci
+      - name: Run tests
+        working-directory: sls-plugin
+        run: npm test
+      - name: Build
+        working-directory: sls-plugin
+        run: npm run build
+      - name: Publish to npm
+        working-directory: sls-plugin
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Tag release
+        run: |
+          git tag "sls-plugin-v${{ steps.version.outputs.version }}"
+          git push origin "sls-plugin-v${{ steps.version.outputs.version }}"

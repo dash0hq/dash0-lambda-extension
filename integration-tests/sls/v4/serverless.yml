@@ -1,0 +1,30 @@
+service: ${env:RESOURCE_PREFIX, ''}sls-4-integration-test
+
+provider:
+  name: aws
+  region: ${env:AWS_REGION, 'us-east-1'}
+
+plugins:
+  - serverless-dash0
+
+custom:
+  dash0:
+    endpoint: https://ingress.eu-west-1.aws.dash0-dev.com:4318
+    token: ${env:DASH0_DEV_API_TOKEN}
+    layerAccountId: ${aws:accountId}
+    layerNamePrefix: ${env:RESOURCE_PREFIX, ''}
+    layerVersion: ${env:DASH0_LAYER_VERSION, 'latest'}
+    extensionLogLevel: info
+
+functions:
+  hello-python:
+    name: ${env:RESOURCE_PREFIX, ''}sls-4-test-python
+    handler: lambdas/python/handler.hello
+    runtime: python3.14
+    dash0-traced: true
+
+  hello-node:
+    name: ${env:RESOURCE_PREFIX, ''}sls-4-test-node
+    handler: lambdas/node/handler.hello
+    runtime: nodejs24.x
+    dash0-traced: true

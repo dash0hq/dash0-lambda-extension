@@ -14,6 +14,7 @@ An extension for capturing observability data from AWS Lambda invocations and sh
   - [Span Attributes](#span-attributes)
   - [Log Attributes](#log-attributes)
   - [Metrics](#metrics)
+- [Serverless Framework Plugin](#serverless-framework-plugin)
 - [Dockerized Lambdas](#dockerized-lambdas)
 
 This extension has five main functionalities:
@@ -200,6 +201,10 @@ These attributes are added to the resource of metric data:
 |---|---|---|
 | `service.name` | string | The service name, from `OTEL_SERVICE_NAME` or defaults to `unknown_service`. |
 
+
+## Serverless Framework Plugin
+
+For Serverless Framework users, the `serverless-dash0` plugin can automatically add the Dash0 layer and configuration to your Lambda functions. See the [plugin README](sls-plugin/README.md) for setup instructions and configuration options.
 
 ## Dockerized Lambdas
 

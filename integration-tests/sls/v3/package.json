@@ -1,0 +1,14 @@
+{
+  "name": "dash0-sls-3-integration-test",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "package": "serverless package",
+    "deploy": "serverless deploy",
+    "remove": "serverless remove"
+  },
+  "devDependencies": {
+    "serverless": "^3.0.0",
+    "serverless-dash0": "file:../../../sls-plugin"
+  }
+}
