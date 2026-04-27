@@ -188,6 +188,7 @@ async fn fetch_secret_value(secret_arn: &str) -> Result<String, String> {
 
     let https = HttpsConnectorBuilder::new()
         .with_native_roots()
+        .map_err(|e| format!("Failed to load native TLS root certificates: {}", e))?
         .https_only()
         .enable_http1()
         .build();

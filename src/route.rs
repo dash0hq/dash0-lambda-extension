@@ -39,6 +39,7 @@ pub(crate) static HTTPS_CLIENT: Lazy<
 > = Lazy::new(|| {
     let https = HttpsConnectorBuilder::new()
         .with_native_roots()
+        .expect("failed to load native TLS root certificates")
         .https_only()
         .enable_http1()
         .build();
