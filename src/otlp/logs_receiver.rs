@@ -1,15 +1,19 @@
 use std::time::Instant;
 
-use hyper::{Body, Error, Request, Response};
+use bytes::Bytes;
+use http_body_util::{BodyExt, Full};
+use hyper::body::Incoming;
+use hyper::{Request, Response};
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use prost::Message;
 
+use crate::route::ResBody;
 use crate::state::invocation_data::{store_log, StoredLog};
 
-pub async fn logs(req: Request<Body>) -> Result<Response<Body>, Error> {
+pub async fn logs(req: Request<Incoming>) -> Result<Response<ResBody>, hyper::Error> {
     let start = Instant::now();
     let (parts, body) = req.into_parts();
-    let body_bytes = hyper::body::to_bytes(body).await?;
+    let body_bytes = body.collect().await?.to_bytes();
 
     let mut encoded_body: Vec<u8> = body_bytes.to_vec();
     let mut converted_from_json = false;
@@ -80,5 +84,8 @@ pub async fn logs(req: Request<Body>) -> Result<Response<Body>, Error> {
         crate::log_prefix(),
         start.elapsed().as_millis(),
     );
-    Ok(Response::builder().status(200).body(Body::empty()).unwrap())
+    Ok(Response::builder()
+        .status(200)
+        .body(Full::new(Bytes::new()))
+        .unwrap())
 }

@@ -1,12 +1,14 @@
 use std::time::Duration;
 
-use hyper::{header, Body, Request, Uri};
+use bytes::Bytes;
+use http_body_util::Full;
+use hyper::{header, Request, Uri};
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 
 use crate::config::{get_dash0_dataset, request_retries, request_timeout_ms};
 use crate::otlp::log_mutations::{get_resources_attributes, map_logs_to_otlp};
-use crate::route::HTTPS_CLIENT;
+use crate::route::{HTTPS_CLIENT, ReqBody};
 use crate::state::invocation_data::{
     take_logs, take_metrics, StoredLog, StoredMetric, StoredTrace,
 };
@@ -203,7 +205,7 @@ fn _build_otlp_request(
     path: &str,
     method: hyper::Method,
     body: Vec<u8>,
-) -> Result<Request<Body>, String> {
+) -> Result<Request<ReqBody>, String> {
     let (scheme, authority) =
         parse_otlp_endpoint().ok_or_else(|| "Failed to parse OTLP endpoint".to_string())?;
 
@@ -253,7 +255,7 @@ fn _build_otlp_request(
     }
 
     builder
-        .body(Body::from(body))
+        .body(Full::new(Bytes::from(body)))
         .map_err(|err| format!("Failed to build request: {}", err))
 }
 
