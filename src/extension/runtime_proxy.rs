@@ -68,11 +68,7 @@ pub async fn next(
         }
     };
 
-    let mut req = match Request::builder()
-        .method("GET")
-        .uri(uri)
-        .body(req_empty())
-    {
+    let mut req = match Request::builder().method("GET").uri(uri).body(req_empty()) {
         Ok(req) => req,
         Err(e) => {
             tracing::error!(
@@ -117,7 +113,9 @@ pub async fn next(
 
 /// Pass-through the request, but log the unhandled path and method
 #[allow(dead_code)]
-pub async fn notfound_passthru_proxy(req: Request<Incoming>) -> Result<Response<ResBody>, hyper::Error> {
+pub async fn notfound_passthru_proxy(
+    req: Request<Incoming>,
+) -> Result<Response<ResBody>, hyper::Error> {
     tracing::info!(
         "[{}] Route not found: path={} method={}",
         crate::log_prefix(),
@@ -172,8 +170,7 @@ pub async fn passthru_proxy(req: Request<Incoming>) -> Result<Response<ResBody>,
         }
     };
 
-    let mut endpoint_req: Request<ReqBody> =
-        Request::from_parts(parts, req_from_bytes(body_bytes));
+    let mut endpoint_req: Request<ReqBody> = Request::from_parts(parts, req_from_bytes(body_bytes));
     *endpoint_req.uri_mut() = endpoint_uri.clone();
 
     let method = endpoint_req.method().clone();
@@ -213,7 +210,9 @@ async fn collect_response(res: Response<Incoming>) -> Result<Response<ResBody>, 
     Ok(Response::from_parts(parts, full_body(bytes)))
 }
 
-pub async fn proxy_invocation_next(req: Request<Incoming>) -> Result<Response<ResBody>, hyper::Error> {
+pub async fn proxy_invocation_next(
+    req: Request<Incoming>,
+) -> Result<Response<ResBody>, hyper::Error> {
     'getNext: loop {
         // track either initialization  -or-
         // how long it took to process the event and request next
@@ -258,7 +257,9 @@ pub async fn proxy_invocation_next(req: Request<Incoming>) -> Result<Response<Re
     }
 }
 
-pub async fn invocation_response_proxy(req: Request<Incoming>) -> Result<Response<ResBody>, hyper::Error> {
+pub async fn invocation_response_proxy(
+    req: Request<Incoming>,
+) -> Result<Response<ResBody>, hyper::Error> {
     let start = Instant::now();
     let invocation_id = extract_invocation_id_from_path(req.uri().path());
     let (parts, body) = req.into_parts();
@@ -328,8 +329,7 @@ async fn passthru_proxy_bytes(
         }
     };
 
-    let mut endpoint_req: Request<ReqBody> =
-        Request::from_parts(parts, req_from_bytes(body_bytes));
+    let mut endpoint_req: Request<ReqBody> = Request::from_parts(parts, req_from_bytes(body_bytes));
     *endpoint_req.uri_mut() = endpoint_uri.clone();
 
     let method = endpoint_req.method().clone();

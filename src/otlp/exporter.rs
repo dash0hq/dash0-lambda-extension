@@ -8,7 +8,7 @@ use prost::Message;
 
 use crate::config::{get_dash0_dataset, request_retries, request_timeout_ms};
 use crate::otlp::log_mutations::{get_resources_attributes, map_logs_to_otlp};
-use crate::route::{HTTPS_CLIENT, ReqBody};
+use crate::route::{ReqBody, HTTPS_CLIENT};
 use crate::state::invocation_data::{
     take_logs, take_metrics, StoredLog, StoredMetric, StoredTrace,
 };

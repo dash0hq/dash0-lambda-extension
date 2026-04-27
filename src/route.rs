@@ -71,8 +71,11 @@ static ROUTES: Lazy<Routes> = Lazy::new(|| {
     let mut get = MatchitRouter::new();
     let mut post = MatchitRouter::new();
     get.insert("/", h_passthru as Handler).unwrap();
-    get.insert("/:apiver/runtime/invocation/next", h_invocation_next as Handler)
-        .unwrap();
+    get.insert(
+        "/:apiver/runtime/invocation/next",
+        h_invocation_next as Handler,
+    )
+    .unwrap();
     post.insert(
         "/:apiver/runtime/invocation/:id/response",
         h_invocation_response as Handler,
@@ -85,7 +88,8 @@ static ROUTES: Lazy<Routes> = Lazy::new(|| {
     .unwrap();
     post.insert("/:apiver/traces", h_traces as Handler).unwrap();
     post.insert("/:apiver/logs", h_logs as Handler).unwrap();
-    post.insert("/:apiver/metrics", h_metrics as Handler).unwrap();
+    post.insert("/:apiver/metrics", h_metrics as Handler)
+        .unwrap();
     post.insert("/:apiver/telemetry", h_telemetry as Handler)
         .unwrap();
     Routes { get, post }

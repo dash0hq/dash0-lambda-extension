@@ -7,9 +7,8 @@ use once_cell::sync::{Lazy, OnceCell};
 use crate::config::endpoints;
 use crate::route::ReqBody;
 
-static HTTP_CLIENT: Lazy<
-    Client<hyper_util::client::legacy::connect::HttpConnector, ReqBody>,
-> = Lazy::new(|| Client::builder(TokioExecutor::new()).build_http());
+static HTTP_CLIENT: Lazy<Client<hyper_util::client::legacy::connect::HttpConnector, ReqBody>> =
+    Lazy::new(|| Client::builder(TokioExecutor::new()).build_http());
 
 /// Canonical Lambda Extensions API version
 const EXTENSION_API_VERSION: &str = "2020-01-01";

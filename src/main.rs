@@ -89,7 +89,10 @@ async fn main() {
         Ok(listener) => listener,
         Err(e) => {
             tracing::error!("[{}] Failed to bind listener: {}", crate::log_prefix(), e);
-            panic!("[{}] Cannot start without bound listener", crate::log_prefix());
+            panic!(
+                "[{}] Cannot start without bound listener",
+                crate::log_prefix()
+            );
         }
     };
 
@@ -128,6 +131,10 @@ async fn main() {
     });
 
     if let Err(e) = server_join_handle.await {
-        tracing::error!("[{}] Failed to join server task: {}", crate::log_prefix(), e);
+        tracing::error!(
+            "[{}] Failed to join server task: {}",
+            crate::log_prefix(),
+            e
+        );
     }
 }
