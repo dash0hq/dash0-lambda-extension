@@ -100,13 +100,23 @@ function createLambdas(
             const code = overrides?.code ?? lambda.Code.fromAsset(path.join(__dirname, '../lambdas/node'));
             const memorySize = overrides?.memorySize ?? 128;
 
+            // Python 3.14 + the dash0 distribution's import graph is slow enough that
+            // Lambda's recovery init (phase=invoke) can't run to completion within the
+            // default 10s, so failure-mode tests see `timeout` instead of the expected
+            // error type. Give those scenarios more headroom on 3.14 only.
+            const timeoutSeconds =
+              runtime === lambda.Runtime.PYTHON_3_14 &&
+              (scenario === "importerror" || scenario === "outofmemory")
+                ? 30
+                : 10;
+
             new lambda.Function(scope, functionName, {
               functionName: functionName,
               runtime: runtime,
               memorySize,
               handler,
               architecture: architecture,
-              timeout: cdk.Duration.seconds(10),
+              timeout: cdk.Duration.seconds(timeoutSeconds),
               code,
               layers: [layer],
               role: role,
