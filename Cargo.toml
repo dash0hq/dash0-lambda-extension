@@ -14,6 +14,7 @@ hyper-util = { version = "0.1", features = ["client-legacy", "server", "http1", 
 http-body-util = "0.1"
 bytes = "1"
 hyper-rustls = { version = "0.27", features = ["http1", "native-tokio", "tls12", "ring"] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
 matchit = "0.7"
 opentelemetry-proto = { version = "0.31", features = ["trace", "logs", "metrics", "with-serde"] }
 chrono = { version = "0.4", features = ["serde"] }

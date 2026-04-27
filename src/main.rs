@@ -51,6 +51,13 @@ pub fn log_prefix_with(suffix: &str) -> String {
 ///
 #[tokio::main]
 async fn main() {
+    // Both `ring` and `aws-lc-rs` are pulled into the dependency tree (tonic enables
+    // aws-lc-rs transitively), so rustls cannot auto-select a CryptoProvider. Pick ring
+    // explicitly before anything builds a TLS connector.
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("failed to install default rustls crypto provider");
+
     let filter = EnvFilter::try_new(&config::extension_log_level())
         .unwrap_or_else(|_| EnvFilter::new("warn"));
     tracing_subscriber::fmt()

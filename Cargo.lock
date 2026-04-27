@@ -68,6 +68,7 @@ dependencies = [
  "parking_lot",
  "prost",
  "regex",
+ "rustls",
  "serde",
  "serde_json",
  "serial_test",
