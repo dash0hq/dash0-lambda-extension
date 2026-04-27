@@ -10,12 +10,15 @@ jobs:
   publish:
     name: Publish to npm
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # REQUIRED for OIDC / trusted publishing
     if: github.ref == 'refs/heads/master'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           registry-url: 'https://registry.npmjs.org'
       - name: Read version from package.json
         id: version
@@ -27,6 +30,7 @@ jobs:
             echo "Tag sls-plugin-v${{ steps.version.outputs.version }} already exists — bump the version in sls-plugin/package.json via a PR first."
             exit 1
           fi
+      - run: npm install -g npm@latest  # npm 11.5.1+ is required for trusted publishing
       - name: Install dependencies
         working-directory: sls-plugin
         run: npm ci
@@ -39,8 +43,6 @@ jobs:
       - name: Publish to npm
         working-directory: sls-plugin
         run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Tag release
         run: |
           git tag "sls-plugin-v${{ steps.version.outputs.version }}"
