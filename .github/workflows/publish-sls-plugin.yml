@@ -11,7 +11,7 @@ jobs:
     name: Publish to npm
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write   # REQUIRED to push the release tag
       id-token: write   # REQUIRED for OIDC / trusted publishing
     steps:
       - uses: actions/checkout@v4
