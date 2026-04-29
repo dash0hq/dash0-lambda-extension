@@ -1,14 +1,13 @@
 use std::time::Instant;
 
-use bytes::Bytes;
-use http_body_util::{BodyExt, Full};
+use http_body_util::BodyExt;
 use hyper::body::Incoming;
 use hyper::{Request, Response};
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 
 use crate::otlp::span_mutations::{drop_duplicate_java_instrumenations, process_trace_request};
-use crate::route::ResBody;
+use crate::route::{empty_body, ResBody};
 use crate::state::invocation_data::StoredTrace;
 use crate::state::invocation_entry;
 
@@ -31,10 +30,7 @@ pub async fn traces(req: Request<Incoming>) -> Result<Response<ResBody>, hyper::
     match ExportTraceServiceRequest::decode(body_bytes.as_ref()) {
         Ok(mut decoded) => {
             if drop_duplicate_java_instrumenations(&decoded) {
-                return Ok(Response::builder()
-                    .status(200)
-                    .body(Full::new(Bytes::new()))
-                    .unwrap());
+                return Ok(Response::builder().status(200).body(empty_body()).unwrap());
             }
 
             process_trace_request(&mut decoded, &mut invocation_ids, &mut encoded_body);
@@ -131,8 +127,5 @@ pub async fn traces(req: Request<Incoming>) -> Result<Response<ResBody>, hyper::
         crate::log_prefix(),
         start.elapsed().as_millis(),
     );
-    Ok(Response::builder()
-        .status(200)
-        .body(Full::new(Bytes::new()))
-        .unwrap())
+    Ok(Response::builder().status(200).body(empty_body()).unwrap())
 }

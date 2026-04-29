@@ -3,7 +3,8 @@ use std::future::Future;
 use std::pin::Pin;
 
 use bytes::Bytes;
-use http_body_util::Full;
+use http_body_util::combinators::BoxBody;
+use http_body_util::{BodyExt, Empty, Full};
 use hyper::body::Incoming;
 use hyper::{Method, Request, Response};
 use hyper_rustls::HttpsConnectorBuilder;
@@ -20,11 +21,29 @@ use crate::otlp::metrics_receiver::metrics;
 use crate::otlp::receiver::traces;
 use crate::state::invocation_entry;
 
-/// Body type used for all responses produced by this proxy.
-pub type ResBody = Full<Bytes>;
+pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
+
+/// Body type used for all responses produced by this proxy. Boxed so handlers
+/// can return either a buffered body (`Full<Bytes>`) or a streaming upstream
+/// body (`Incoming`) — pure pass-through paths stream rather than collecting.
+pub type ResBody = BoxBody<Bytes, BoxError>;
 
 /// Outgoing request body type used by HTTP clients in this crate.
 pub type ReqBody = Full<Bytes>;
+
+pub fn empty_body() -> ResBody {
+    Empty::<Bytes>::new()
+        .map_err(|never| match never {})
+        .boxed()
+}
+
+pub fn full_body(bytes: Bytes) -> ResBody {
+    Full::new(bytes).map_err(|never| match never {}).boxed()
+}
+
+pub fn streaming_body(body: Incoming) -> ResBody {
+    body.map_err(|e| Box::new(e) as BoxError).boxed()
+}
 
 type HandlerFut =
     Pin<Box<dyn Future<Output = Result<Response<ResBody>, hyper::Error>> + Send + 'static>>;
@@ -118,7 +137,7 @@ pub async fn dispatch(req: Request<Incoming>) -> Result<Response<ResBody>, Infal
             tracing::error!("[{}] Handler error: {}", crate::log_prefix(), e);
             Ok(Response::builder()
                 .status(500)
-                .body(Full::new(Bytes::from_static(b"500 - Internal Error")))
+                .body(full_body(Bytes::from_static(b"500 - Internal Error")))
                 .unwrap())
         }
     }

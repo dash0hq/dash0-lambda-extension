@@ -1,13 +1,12 @@
 use std::time::Instant;
 
-use bytes::Bytes;
-use http_body_util::{BodyExt, Full};
+use http_body_util::BodyExt;
 use hyper::body::Incoming;
 use hyper::{Request, Response};
 use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
 use prost::Message;
 
-use crate::route::ResBody;
+use crate::route::{empty_body, ResBody};
 use crate::state::invocation_data::{store_metric, StoredMetric};
 
 pub async fn metrics(req: Request<Incoming>) -> Result<Response<ResBody>, hyper::Error> {
@@ -84,8 +83,5 @@ pub async fn metrics(req: Request<Incoming>) -> Result<Response<ResBody>, hyper:
         crate::log_prefix(),
         start.elapsed().as_millis(),
     );
-    Ok(Response::builder()
-        .status(200)
-        .body(Full::new(Bytes::new()))
-        .unwrap())
+    Ok(Response::builder().status(200).body(empty_body()).unwrap())
 }

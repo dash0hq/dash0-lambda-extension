@@ -19,21 +19,13 @@ use crate::otlp::masking::mask_json_string;
 use crate::otlp::span_mutations::{
     apply_return_value_error_to_stored_traces, build_synthetic_trace,
 };
-use crate::route::{ReqBody, ResBody};
+use crate::route::{empty_body, full_body, streaming_body, ReqBody, ResBody};
 use crate::state::invocation_data::store_current_invocation_id;
 use crate::state::invocation_entry;
 use crate::util::parsers::extract_invocation_id_from_path;
 
 static HTTP_CLIENT: Lazy<Client<HttpConnector, ReqBody>> =
     Lazy::new(|| Client::builder(TokioExecutor::new()).build_http());
-
-fn empty_body() -> ResBody {
-    Full::new(Bytes::new())
-}
-
-fn full_body(bytes: Bytes) -> ResBody {
-    Full::new(bytes)
-}
 
 fn req_empty() -> ReqBody {
     Full::new(Bytes::new())
@@ -184,7 +176,7 @@ pub async fn passthru_proxy(req: Request<Incoming>) -> Result<Response<ResBody>,
                 endpoint_uri,
                 start.elapsed().as_millis()
             );
-            collect_response(res).await
+            Ok(stream_response(res))
         }
         Err(e) => {
             tracing::error!(
@@ -204,10 +196,9 @@ pub async fn passthru_proxy(req: Request<Incoming>) -> Result<Response<ResBody>,
     }
 }
 
-async fn collect_response(res: Response<Incoming>) -> Result<Response<ResBody>, hyper::Error> {
+fn stream_response(res: Response<Incoming>) -> Response<ResBody> {
     let (parts, body) = res.into_parts();
-    let bytes = body.collect().await?.to_bytes();
-    Ok(Response::from_parts(parts, full_body(bytes)))
+    Response::from_parts(parts, streaming_body(body))
 }
 
 pub async fn proxy_invocation_next(
@@ -343,7 +334,7 @@ async fn passthru_proxy_bytes(
                 endpoint_uri,
                 start.elapsed().as_millis()
             );
-            collect_response(res).await
+            Ok(stream_response(res))
         }
         Err(e) => {
             tracing::error!(

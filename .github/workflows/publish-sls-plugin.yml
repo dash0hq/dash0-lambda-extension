@@ -13,6 +13,7 @@ jobs:
     permissions:
       contents: write   # REQUIRED to push the release tag
       id-token: write   # REQUIRED for OIDC / trusted publishing
+    if: github.ref == 'refs/heads/master'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
