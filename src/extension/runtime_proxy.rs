@@ -119,9 +119,6 @@ pub async fn notfound_passthru_proxy(
 
 #[allow(dead_code)]
 pub async fn passthru_proxy(req: Request<Incoming>) -> Result<Response<ResBody>, hyper::Error> {
-    let start = Instant::now();
-
-    // Extract and print body
     let (parts, body) = req.into_parts();
     let body_bytes = match body.collect().await {
         Ok(collected) => collected.to_bytes(),
@@ -140,60 +137,7 @@ pub async fn passthru_proxy(req: Request<Incoming>) -> Result<Response<ResBody>,
         }
     };
 
-    let endpoint_uri: Uri = match Uri::builder()
-        .scheme("http")
-        .authority(endpoints::sandbox_runtime_api())
-        .path_and_query(parts.uri.path())
-        .build()
-    {
-        Ok(uri) => uri,
-        Err(e) => {
-            tracing::error!(
-                "[{}] Failed to build URI for sandbox runtime API: {}",
-                crate::log_prefix(),
-                e
-            );
-            return Ok(Response::builder()
-                .status(502)
-                .body(full_body(Bytes::from_static(
-                    b"502 - Bad Gateway: Invalid runtime API configuration",
-                )))
-                .unwrap_or_else(|_| Response::new(empty_body())));
-        }
-    };
-
-    let mut endpoint_req: Request<ReqBody> = Request::from_parts(parts, req_from_bytes(body_bytes));
-    *endpoint_req.uri_mut() = endpoint_uri.clone();
-
-    let method = endpoint_req.method().clone();
-
-    match HTTP_CLIENT.request(endpoint_req).await {
-        Ok(res) => {
-            tracing::info!(
-                "[{}] passthru_proxy - {} {} completed in {} ms",
-                crate::log_prefix(),
-                method,
-                endpoint_uri,
-                start.elapsed().as_millis()
-            );
-            Ok(stream_response(res))
-        }
-        Err(e) => {
-            tracing::error!(
-                "[{}] Error invoking endpoint ({} on {}): {:?}",
-                crate::log_prefix(),
-                method,
-                endpoint_uri,
-                e
-            );
-            Ok(Response::builder()
-                .status(502)
-                .body(full_body(Bytes::from_static(
-                    b"502 - Bad Gateway: Lambda Runtime API did not process request",
-                )))
-                .unwrap())
-        }
-    }
+    forward_to_runtime_api(parts, body_bytes).await
 }
 
 fn stream_response(res: Response<Incoming>) -> Response<ResBody> {
@@ -257,9 +201,7 @@ pub async fn invocation_response_proxy(
     let body_bytes = body.collect().await?.to_bytes();
 
     let return_payload = mask_json_string(&String::from_utf8_lossy(&body_bytes));
-    // Reconstruct as a server-side request (Incoming-bodied) for passthru_proxy.
-    // We can't synthesize Incoming directly, so route to a helper that accepts bytes.
-    let res = passthru_proxy_bytes(parts, body_bytes).await;
+    let res = forward_to_runtime_api(parts, body_bytes).await;
     if let Some(id) = invocation_id {
         if let Some(log) = build_payload_log(
             &return_payload,
@@ -292,8 +234,11 @@ pub async fn invocation_response_proxy(
     res
 }
 
-/// Same as passthru_proxy but the body has already been buffered to bytes.
-async fn passthru_proxy_bytes(
+/// Forward a request whose body has already been buffered to bytes to the
+/// sandbox runtime API. Shared by `passthru_proxy` (which collects the
+/// `Incoming` body itself) and `invocation_response_proxy` (which needs the
+/// body buffered for masking before forwarding).
+async fn forward_to_runtime_api(
     parts: hyper::http::request::Parts,
     body_bytes: Bytes,
 ) -> Result<Response<ResBody>, hyper::Error> {
