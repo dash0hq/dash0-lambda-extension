@@ -131,8 +131,8 @@ export const checkHttpSpan = async ({
                         },
                     ],
                     timeRange: {
-                        from: new Date(now - 5 * 60_000).toISOString(),
-                        to: new Date(now + 5 * 60_000).toISOString(),
+                        from: new Date(now - 10 * 60_000).toISOString(),
+                        to: new Date(now + 10 * 60_000).toISOString(),
                     },
                     sampling: {mode: 'adaptive'},
                     dataset: DASH0_LAMBDA_TESTS_DATASET

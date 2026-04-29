@@ -9,6 +9,6 @@
   },
   "devDependencies": {
     "serverless": "^4.0.0",
-    "serverless-dash0": "file:../../../sls-plugin"
+    "@dash0/serverless-dash0": "file:../../../sls-plugin"
   }
 }

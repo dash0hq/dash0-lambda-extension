@@ -1,14 +1,9 @@
-#[allow(unused_imports)]
-use std::{
-    convert::Infallible,
-    io::{Read, Write},
-    net::SocketAddr,
-    process::Stdio,
-    sync::Arc,
-};
+use std::net::SocketAddr;
 
-#[allow(unused_imports)]
-use hyper::{Body, Request, Response, Server};
+use hyper::server::conn::http1;
+use hyper::service::service_fn;
+use hyper_util::rt::TokioIo;
+use tokio::net::TcpListener;
 
 use crate::otlp::masking::init_masking_rules;
 use tokio::{self};
@@ -50,12 +45,19 @@ pub fn log_prefix_with(suffix: &str) -> String {
 /// Four initialization tasks:
 ///
 /// 1. create a hyper server
-/// 2. create a Tower service for the Lambda Runtime API to serve HTTP requests
+/// 2. dispatch incoming HTTP requests through the route table to handlers
 /// 3. register as an Extension, allowing Application runtime to begin initializing
 /// 4. request `next` event from Extension API, fulfilling lifecycle contract
 ///
 #[tokio::main]
 async fn main() {
+    // Both `ring` and `aws-lc-rs` are pulled into the dependency tree (tonic enables
+    // aws-lc-rs transitively), so rustls cannot auto-select a CryptoProvider. Pick ring
+    // explicitly before anything builds a TLS connector.
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("failed to install default rustls crypto provider");
+
     let filter = EnvFilter::try_new(&config::extension_log_level())
         .unwrap_or_else(|_| EnvFilter::new("warn"));
     tracing_subscriber::fmt()
@@ -72,6 +74,7 @@ async fn main() {
     config::token::init_dash0_token().await;
 
     init_masking_rules();
+    route::init();
 
     let addr: SocketAddr = match config::endpoints::dash0_api().parse() {
         Ok(addr) => addr,
@@ -89,11 +92,37 @@ async fn main() {
     };
     tracing::info!("[{}] listening on {}", crate::log_prefix(), addr);
 
-    // bind the server to the Lambda Runtime API Router service
-    let server = Server::bind(&addr).serve(route::make_route().into_service());
+    let listener = match TcpListener::bind(addr).await {
+        Ok(listener) => listener,
+        Err(e) => {
+            tracing::error!("[{}] Failed to bind listener: {}", crate::log_prefix(), e);
+            panic!(
+                "[{}] Cannot start without bound listener",
+                crate::log_prefix()
+            );
+        }
+    };
 
-    // launch the Proxy server task
-    let server_join_handle = tokio::spawn(server);
+    let server_join_handle = tokio::spawn(async move {
+        loop {
+            let (stream, _peer) = match listener.accept().await {
+                Ok(pair) => pair,
+                Err(e) => {
+                    tracing::error!("[{}] accept() failed: {}", crate::log_prefix(), e);
+                    continue;
+                }
+            };
+            let io = TokioIo::new(stream);
+            tokio::spawn(async move {
+                if let Err(e) = http1::Builder::new()
+                    .serve_connection(io, service_fn(route::dispatch))
+                    .await
+                {
+                    tracing::debug!("[{}] connection error: {}", crate::log_prefix(), e);
+                }
+            });
+        }
+    });
 
     // Initialize the extension and continually get next extension event.
     tokio::task::spawn(async {
@@ -108,20 +137,11 @@ async fn main() {
         }
     });
 
-    match server_join_handle.await {
-        Ok(Ok(_)) => {
-            // Server shut down cleanly (should never happen)
-            tracing::info!("[{}] Server shut down cleanly", crate::log_prefix());
-        }
-        Ok(Err(e)) => {
-            tracing::error!("[{}] Hyper server error: {}", crate::log_prefix(), e);
-        }
-        Err(e) => {
-            tracing::error!(
-                "[{}] Failed to join server task: {}",
-                crate::log_prefix(),
-                e
-            );
-        }
+    if let Err(e) = server_join_handle.await {
+        tracing::error!(
+            "[{}] Failed to join server task: {}",
+            crate::log_prefix(),
+            e
+        );
     }
 }

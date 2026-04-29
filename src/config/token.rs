@@ -1,6 +1,10 @@
+use bytes::Bytes;
 use hmac::{Hmac, Mac};
-use hyper::{body, Body, Client, Method, Request};
+use http_body_util::{BodyExt, Full};
+use hyper::{Method, Request};
 use hyper_rustls::HttpsConnectorBuilder;
+use hyper_util::client::legacy::Client;
+use hyper_util::rt::TokioExecutor;
 use once_cell::sync::OnceCell;
 use sha2::{Digest, Sha256};
 
@@ -183,15 +187,16 @@ async fn fetch_secret_value(secret_arn: &str) -> Result<String, String> {
     }
 
     let request = builder
-        .body(Body::from(request_body))
+        .body(Full::new(Bytes::from(request_body)))
         .map_err(|e| format!("Failed to build request: {}", e))?;
 
     let https = HttpsConnectorBuilder::new()
         .with_native_roots()
+        .map_err(|e| format!("Failed to load native TLS root certificates: {}", e))?
         .https_only()
         .enable_http1()
         .build();
-    let client = Client::builder().build(https);
+    let client: Client<_, Full<Bytes>> = Client::builder(TokioExecutor::new()).build(https);
 
     let timeout = std::time::Duration::from_millis(crate::config::request_timeout_ms());
     let response = tokio::time::timeout(timeout, client.request(request))
@@ -205,8 +210,11 @@ async fn fetch_secret_value(secret_arn: &str) -> Result<String, String> {
         .map_err(|e| format!("Secrets Manager request failed: {}", e))?;
 
     let status = response.status();
-    let response_body = body::to_bytes(response.into_body())
+    let response_body = response
+        .into_body()
+        .collect()
         .await
+        .map(|c| c.to_bytes())
         .map_err(|e| format!("Failed to read response body: {}", e))?;
 
     if !status.is_success() {

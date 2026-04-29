@@ -5,7 +5,7 @@ provider:
   region: ${env:AWS_REGION, 'us-east-1'}
 
 plugins:
-  - serverless-dash0
+  - "@dash0/serverless-dash0"
 
 custom:
   dash0:

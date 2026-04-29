@@ -1,15 +1,23 @@
+use http_body_util::BodyExt;
+use hyper::body::Incoming;
+use hyper::{Request, Response};
+
 use crate::config::user::is_telemetry_log_collection_disabled;
 use crate::otlp::exporter::{flush_telemetry_logs, send_traces};
 use crate::otlp::metrics_creation::create_supplementary_metrics;
 use crate::otlp::span_creation::{create_overhead_supplementary_span, create_supplementary_spans};
 use crate::otlp::span_mutations::build_synthetic_trace;
+use crate::route::{empty_body, ResBody};
 use crate::state::invocation_entry;
 use crate::util::parsers::extract_error_invocation_ids;
-use hyper::{Body, Error, Request, Response};
 
-pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
+pub async fn telemetry(req: Request<Incoming>) -> Result<Response<ResBody>, hyper::Error> {
     let (parts, body) = req.into_parts();
-    let body_bytes = hyper::body::to_bytes(body).await.unwrap_or_default();
+    let body_bytes = body
+        .collect()
+        .await
+        .map(|c| c.to_bytes())
+        .unwrap_or_default();
     let body_text = String::from_utf8_lossy(&body_bytes);
 
     let error_invocation_ids = extract_error_invocation_ids(&body_bytes, body_text.as_ref());
@@ -98,5 +106,5 @@ pub async fn telemetry(req: Request<Body>) -> Result<Response<Body>, Error> {
         flush_telemetry_logs(None).await;
     }
 
-    Ok(Response::builder().status(200).body(Body::empty()).unwrap())
+    Ok(Response::builder().status(200).body(empty_body()).unwrap())
 }

@@ -1,7 +1,14 @@
-use hyper::Body;
-use once_cell::sync::OnceCell;
+use bytes::Bytes;
+use http_body_util::{BodyExt, Full};
+use hyper_util::client::legacy::Client;
+use hyper_util::rt::TokioExecutor;
+use once_cell::sync::{Lazy, OnceCell};
 
 use crate::config::endpoints;
+use crate::route::ReqBody;
+
+static HTTP_CLIENT: Lazy<Client<hyper_util::client::legacy::connect::HttpConnector, ReqBody>> =
+    Lazy::new(|| Client::builder(TokioExecutor::new()).build_http());
 
 /// Canonical Lambda Extensions API version
 const EXTENSION_API_VERSION: &str = "2020-01-01";
@@ -55,7 +62,7 @@ fn make_uri(path: &str) -> hyper::Uri {
 pub async fn register() {
     let uri = make_uri(&format!("/{}/extension/register", EXTENSION_API_VERSION));
 
-    let body = Body::from(r#"{"events":["INVOKE","SHUTDOWN"]}"#);
+    let body = Full::new(Bytes::from_static(br#"{"events":["INVOKE","SHUTDOWN"]}"#));
     let mut request = match hyper::Request::builder().method("POST").uri(uri).body(body) {
         Ok(req) => req,
         Err(e) => {
@@ -99,7 +106,7 @@ pub async fn register() {
         "accountId".try_into().unwrap(),
     );
 
-    let response = match hyper::Client::new().request(request).await {
+    let response = match HTTP_CLIENT.request(request).await {
         Ok(resp) => resp,
         Err(e) => {
             tracing::error!(
@@ -145,7 +152,7 @@ pub async fn register() {
     };
 
     // Parse response body to extract accountId
-    if let Ok(body_bytes) = hyper::body::to_bytes(response.into_body()).await {
+    if let Ok(body_bytes) = response.into_body().collect().await.map(|c| c.to_bytes()) {
         if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&body_bytes) {
             if let Some(account_id) = json.get("accountId").and_then(|v| v.as_str()) {
                 crate::state::global::store_account_id(account_id);
@@ -206,7 +213,7 @@ pub async fn register_telemetry() {
         .method("PUT")
         .uri(uri.clone())
         .header(hyper::header::CONTENT_TYPE, "application/json")
-        .body(Body::from(payload))
+        .body(Full::new(Bytes::from(payload)))
     {
         Ok(req) => req,
         Err(e) => {
@@ -235,11 +242,11 @@ pub async fn register_telemetry() {
         }
     }
 
-    match hyper::Client::new().request(request).await {
+    match HTTP_CLIENT.request(request).await {
         Ok(response) => {
             let status = response.status();
-            let body_bytes = match hyper::body::to_bytes(response.into_body()).await {
-                Ok(bytes) => bytes,
+            let body_bytes = match response.into_body().collect().await {
+                Ok(collected) => collected.to_bytes(),
                 Err(err) => {
                     tracing::error!(
                         "[{}] Failed to read telemetry registration body: {}",

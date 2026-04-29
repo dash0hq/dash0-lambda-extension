@@ -1,17 +1,20 @@
 use std::time::Instant;
 
-use hyper::{Body, Error, Request, Response};
+use http_body_util::BodyExt;
+use hyper::body::Incoming;
+use hyper::{Request, Response};
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 
 use crate::otlp::span_mutations::{drop_duplicate_java_instrumenations, process_trace_request};
+use crate::route::{empty_body, ResBody};
 use crate::state::invocation_data::StoredTrace;
 use crate::state::invocation_entry;
 
-pub async fn traces(req: Request<Body>) -> Result<Response<Body>, Error> {
+pub async fn traces(req: Request<Incoming>) -> Result<Response<ResBody>, hyper::Error> {
     let start = Instant::now();
     let (parts, body) = req.into_parts();
-    let body_bytes = hyper::body::to_bytes(body).await?;
+    let body_bytes = body.collect().await?.to_bytes();
 
     // Try to decode and add event payload to server span from AWS Lambda instrumentation
     let mut encoded_body: Vec<u8> = body_bytes.to_vec();
@@ -27,7 +30,7 @@ pub async fn traces(req: Request<Body>) -> Result<Response<Body>, Error> {
     match ExportTraceServiceRequest::decode(body_bytes.as_ref()) {
         Ok(mut decoded) => {
             if drop_duplicate_java_instrumenations(&decoded) {
-                return Ok(Response::builder().status(200).body(Body::empty()).unwrap());
+                return Ok(Response::builder().status(200).body(empty_body()).unwrap());
             }
 
             process_trace_request(&mut decoded, &mut invocation_ids, &mut encoded_body);
@@ -124,5 +127,5 @@ pub async fn traces(req: Request<Body>) -> Result<Response<Body>, Error> {
         crate::log_prefix(),
         start.elapsed().as_millis(),
     );
-    Ok(Response::builder().status(200).body(Body::empty()).unwrap())
+    Ok(Response::builder().status(200).body(empty_body()).unwrap())
 }

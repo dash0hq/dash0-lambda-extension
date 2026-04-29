@@ -1,8 +1,16 @@
-use hyper::Body;
+use bytes::Bytes;
+use http_body_util::{BodyExt, Full};
+use hyper_util::client::legacy::Client;
+use hyper_util::rt::TokioExecutor;
+use once_cell::sync::Lazy;
 use std::time::{Duration, Instant};
 
+use crate::route::ReqBody;
 use crate::state;
 use crate::util::parsers::{generate_random_span_id, get_span_id_from_invocation_id};
+
+static HTTP_CLIENT: Lazy<Client<hyper_util::client::legacy::connect::HttpConnector, ReqBody>> =
+    Lazy::new(|| Client::builder(TokioExecutor::new()).build_http());
 
 const EXTENSION_API_VERSION: &str = "2020-01-01";
 
@@ -142,7 +150,7 @@ pub async fn get_next() {
     let mut request = match hyper::Request::builder()
         .method("GET")
         .uri(uri)
-        .body(Body::empty())
+        .body(Full::new(Bytes::new()))
     {
         Ok(req) => req,
         Err(e) => {
@@ -172,11 +180,11 @@ pub async fn get_next() {
     }
 
     let start = Instant::now();
-    match hyper::Client::new().request(request).await {
+    match HTTP_CLIENT.request(request).await {
         Ok(response) => {
             let status = response.status();
-            let body_bytes = match hyper::body::to_bytes(response.into_body()).await {
-                Ok(bytes) => bytes,
+            let body_bytes = match response.into_body().collect().await {
+                Ok(collected) => collected.to_bytes(),
                 Err(err) => {
                     tracing::error!(
                         "[{}] Failed to read extension event body: {}",

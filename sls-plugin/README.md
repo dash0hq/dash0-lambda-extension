@@ -7,7 +7,7 @@ Compatible with Serverless Framework v3 and v4.
 ## Installation
 
 ```bash
-npm install --save-dev serverless-dash0
+npm install --save-dev @dash0/serverless-dash0
 ```
 
 ## Usage
@@ -16,7 +16,7 @@ Add the plugin to your `serverless.yml` and configure the `custom.dash0` section
 
 ```yaml
 plugins:
-  - serverless-dash0
+  - "@dash0/serverless-dash0"
 
 custom:
   dash0:
