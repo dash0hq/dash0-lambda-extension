@@ -264,21 +264,26 @@ fn extract_span_links(event_payload: &str) -> Vec<Link> {
 
 fn add_resource_attributes(span: &mut Span) {
     use crate::otlp::attributes::*;
-    if let Some(account_id) = crate::state::global::get_account_id() {
-        span.attributes.push(KeyValue {
-            key: CLOUD_ACCOUNT_ID.to_string(),
-            value: Some(AnyValue {
-                value: Some(Value::StringValue(account_id)),
-            }),
-        });
+    let has_attribute = |span: &Span, key: &str| span.attributes.iter().any(|kv| kv.key == key);
+    if !has_attribute(span, CLOUD_ACCOUNT_ID) {
+        if let Some(account_id) = crate::state::global::get_account_id() {
+            span.attributes.push(KeyValue {
+                key: CLOUD_ACCOUNT_ID.to_string(),
+                value: Some(AnyValue {
+                    value: Some(Value::StringValue(account_id)),
+                }),
+            });
+        }
     }
-    if let Some(function_arn) = crate::state::global::get_function_arn() {
-        span.attributes.push(KeyValue {
-            key: CLOUD_RESOURCE_ID.to_string(),
-            value: Some(AnyValue {
-                value: Some(Value::StringValue(function_arn)),
-            }),
-        });
+    if !has_attribute(span, CLOUD_RESOURCE_ID) {
+        if let Some(function_arn) = crate::state::global::get_function_arn() {
+            span.attributes.push(KeyValue {
+                key: CLOUD_RESOURCE_ID.to_string(),
+                value: Some(AnyValue {
+                    value: Some(Value::StringValue(function_arn)),
+                }),
+            });
+        }
     }
 }
 
@@ -641,6 +646,7 @@ pub fn process_trace_request(
             }
 
             for span in &mut scope_span.spans {
+                add_resource_attributes(span);
                 let invocation_id = match extract_invocation_id(span) {
                     Some(id) => id,
                     None => continue,
@@ -993,6 +999,115 @@ mod tests {
             invocation_ids.is_empty(),
             "invocation_ids should remain empty for non-lambda scopes"
         );
+    }
+
+    #[test]
+    #[serial]
+    fn add_resource_attributes_does_not_duplicate_existing_keys() {
+        use crate::otlp::attributes::{CLOUD_ACCOUNT_ID, CLOUD_RESOURCE_ID};
+
+        crate::state::global::reset_for_tests();
+        crate::state::global::store_account_id("999988887777");
+        crate::state::global::store_function_arn(
+            "arn:aws:lambda:us-east-1:999988887777:function:from-global",
+        );
+
+        let mut span = Span {
+            attributes: vec![
+                KeyValue {
+                    key: CLOUD_ACCOUNT_ID.to_string(),
+                    value: Some(AnyValue {
+                        value: Some(Value::StringValue("preexisting-account".to_string())),
+                    }),
+                },
+                KeyValue {
+                    key: CLOUD_RESOURCE_ID.to_string(),
+                    value: Some(AnyValue {
+                        value: Some(Value::StringValue("preexisting-arn".to_string())),
+                    }),
+                },
+            ],
+            ..Default::default()
+        };
+
+        super::add_resource_attributes(&mut span);
+
+        let account_keys: Vec<&KeyValue> = span
+            .attributes
+            .iter()
+            .filter(|kv| kv.key == CLOUD_ACCOUNT_ID)
+            .collect();
+        assert_eq!(
+            account_keys.len(),
+            1,
+            "cloud.account.id should not duplicate"
+        );
+        assert_eq!(
+            account_keys[0]
+                .value
+                .as_ref()
+                .and_then(|v| v.value.as_ref()),
+            Some(&Value::StringValue("preexisting-account".to_string())),
+            "preexisting cloud.account.id should be preserved"
+        );
+
+        let resource_keys: Vec<&KeyValue> = span
+            .attributes
+            .iter()
+            .filter(|kv| kv.key == CLOUD_RESOURCE_ID)
+            .collect();
+        assert_eq!(
+            resource_keys.len(),
+            1,
+            "cloud.resource_id should not duplicate"
+        );
+        assert_eq!(
+            resource_keys[0]
+                .value
+                .as_ref()
+                .and_then(|v| v.value.as_ref()),
+            Some(&Value::StringValue("preexisting-arn".to_string())),
+            "preexisting cloud.resource_id should be preserved"
+        );
+
+        crate::state::global::reset_for_tests();
+    }
+
+    #[test]
+    #[serial]
+    fn add_resource_attributes_adds_when_missing() {
+        use crate::otlp::attributes::{CLOUD_ACCOUNT_ID, CLOUD_RESOURCE_ID};
+
+        crate::state::global::reset_for_tests();
+        crate::state::global::store_account_id("111122223333");
+        crate::state::global::store_function_arn(
+            "arn:aws:lambda:us-east-1:111122223333:function:added",
+        );
+
+        let mut span = Span::default();
+        super::add_resource_attributes(&mut span);
+
+        let account = find_attribute(&span, CLOUD_ACCOUNT_ID)
+            .and_then(|v| v.value.as_ref())
+            .cloned();
+        assert_eq!(
+            account,
+            Some(Value::StringValue("111122223333".to_string())),
+            "cloud.account.id should be added from global state"
+        );
+
+        let resource = find_attribute(&span, CLOUD_RESOURCE_ID)
+            .and_then(|v| v.value.as_ref())
+            .cloned();
+        assert_eq!(
+            resource,
+            Some(Value::StringValue(
+                "arn:aws:lambda:us-east-1:111122223333:function:added".to_string()
+            )),
+            "cloud.resource_id should be added from global state"
+        );
+
+        crate::state::global::reset_for_tests();
     }
 
     #[test]

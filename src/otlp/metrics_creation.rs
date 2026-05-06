@@ -174,6 +174,8 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
         return None;
     }
 
+    let metric_names: Vec<String> = metrics.iter().map(|m| m.name.clone()).collect();
+
     let scope_metrics = ScopeMetrics {
         scope: Some(InstrumentationScope {
             name: "dash0.lambda-extension".to_string(),
@@ -214,6 +216,13 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
         header::HeaderValue::from_static("application/x-protobuf"),
     );
 
+    tracing::info!(
+        "[{}] Created supplementary metrics for invocation {}: {}",
+        crate::log_prefix(),
+        invocation_id,
+        metric_names.join(", "),
+    );
+
     Some(StoredMetric {
         method: hyper::Method::POST,
         path_and_query: "/v1/metrics".to_string(),
@@ -224,13 +233,6 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
 
 pub fn create_supplementary_metrics(invocation_id: &str) {
     if let Some(metric) = create_metrics(invocation_id) {
-        tracing::info!(
-            "[{}] Created supplementary metrics for invocation {}: path={} body_len={}",
-            crate::log_prefix(),
-            invocation_id,
-            metric.path_and_query,
-            metric.body.len()
-        );
         store_metric(metric);
     }
 }

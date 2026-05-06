@@ -96,6 +96,13 @@ pub fn get_env_var_attrs() -> Vec<KeyValue> {
 }
 
 #[cfg(test)]
+pub(crate) fn reset_for_tests() {
+    FUNCTION_ARN.lock().take();
+    ACCOUNT_ID.lock().take();
+    ENV_VAR_ATTRS.lock().clear();
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use serial_test::serial;
