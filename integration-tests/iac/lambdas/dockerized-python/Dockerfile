@@ -2,7 +2,7 @@ ARG EXTENSION_IMAGE=dash0/extension-python:latest
 
 FROM ${EXTENSION_IMAGE} AS extension
 
-FROM public.ecr.aws/lambda/python:3.12
+FROM public.ecr.aws/lambda/python:3.13
 
 # Copy extension from extension image
 COPY --from=extension /opt /opt
