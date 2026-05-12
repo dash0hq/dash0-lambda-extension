@@ -64,6 +64,8 @@ See the release page for the latest ARNs of the extension layers for each runtim
 
 * `DASH0_DISABLE_TELEMETRY_METRICS` - When set to `true`, disables emission of the supplementary FaaS metrics (`faas.invoke_duration`, `faas.init_duration`, `dash0.faas.billed_duration`, `faas.mem_usage`). Default: `false`.
 
+* `DASH0_DISABLE_TELEMETRY_TRACES` - When set to `true`, disables both auto-instrumentation and any synthetic spans created by the extension (including error-path synthetic traces). Stronger than `DASH0_DISABLE_AUTO_INSTRUMENTATION`, which only disables auto-instrumentation while still emitting synthetic spans. Default: `false`.
+
 * `DASH0_DATASET` - When set, the extension adds a `Dash0-Dataset` header to all OTLP export requests, routing telemetry to the specified dataset in the Dash0 backend.
 
 * `DASH0_XRAY_TRACES_ENABLED` - When set to `true`, the extension preserves the original X-Ray trace context instead of creating supplementary spans. Use this when AWS X-Ray active tracing is enabled on the Lambda function. Default: `false`.

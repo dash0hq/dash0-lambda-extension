@@ -15,6 +15,10 @@ pub fn is_auto_instrumented_disabled() -> bool {
         return true;
     }
 
+    if is_telemetry_traces_disabled() {
+        return true;
+    }
+
     match std::env::var("DASH0_DISABLE_AUTO_INSTRUMENTATION") {
         Ok(val) => matches!(
             val.as_str(),
@@ -98,12 +102,22 @@ pub fn is_telemetry_metrics_disabled() -> bool {
     }
 }
 
+pub fn is_telemetry_traces_disabled() -> bool {
+    match std::env::var("DASH0_DISABLE_TELEMETRY_TRACES") {
+        Ok(val) => matches!(
+            val.as_str(),
+            "1" | "true" | "TRUE" | "True" | "yes" | "YES" | "Yes" | "y" | "Y"
+        ),
+        Err(_) => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         is_auto_instrumented_disabled, is_send_on_invocation_end,
         is_telemetry_log_collection_disabled, is_telemetry_metrics_disabled,
-        max_event_payload_size,
+        is_telemetry_traces_disabled, max_event_payload_size,
     };
     use serial_test::serial;
 
@@ -235,5 +249,43 @@ mod tests {
             assert!(!is_telemetry_metrics_disabled(), "value {}", val);
         }
         std::env::remove_var("DASH0_DISABLE_TELEMETRY_METRICS");
+    }
+
+    #[test]
+    #[serial]
+    fn telemetry_traces_enabled_by_default() {
+        std::env::remove_var("DASH0_DISABLE_TELEMETRY_TRACES");
+        assert!(!is_telemetry_traces_disabled());
+    }
+
+    #[test]
+    #[serial]
+    fn telemetry_traces_disabled_with_truthy_values() {
+        for val in ["1", "true", "TRUE", "True", "yes", "YES", "Yes", "y", "Y"] {
+            std::env::set_var("DASH0_DISABLE_TELEMETRY_TRACES", val);
+            assert!(is_telemetry_traces_disabled(), "value {}", val);
+        }
+        std::env::remove_var("DASH0_DISABLE_TELEMETRY_TRACES");
+    }
+
+    #[test]
+    #[serial]
+    fn telemetry_traces_not_disabled_with_falsy_values() {
+        for val in ["0", "false", "no", "maybe", ""] {
+            std::env::set_var("DASH0_DISABLE_TELEMETRY_TRACES", val);
+            assert!(!is_telemetry_traces_disabled(), "value {}", val);
+        }
+        std::env::remove_var("DASH0_DISABLE_TELEMETRY_TRACES");
+    }
+
+    #[test]
+    #[serial]
+    fn telemetry_traces_disabled_implies_auto_instrumentation_disabled() {
+        std::env::set_var("AWS_LAMBDA_EXEC_WRAPPER", "/opt/lumigo_wrapper");
+        std::env::remove_var("DASH0_DISABLE_AUTO_INSTRUMENTATION");
+        std::env::set_var("DASH0_DISABLE_TELEMETRY_TRACES", "true");
+        assert!(is_auto_instrumented_disabled());
+        std::env::remove_var("DASH0_DISABLE_TELEMETRY_TRACES");
+        std::env::remove_var("AWS_LAMBDA_EXEC_WRAPPER");
     }
 }

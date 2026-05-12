@@ -12,6 +12,7 @@ export interface Dash0Config {
   sendOnInvocationEnd?: boolean | string;
   disableTelemetryLogCollection?: boolean | string;
   disableTelemetryMetrics?: boolean | string;
+  disableTelemetryTraces?: boolean | string;
   createPayloadLogRecords?: boolean | string;
   requestTimeout?: number;
   xrayTracesEnabled?: boolean | string;

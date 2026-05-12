@@ -26,6 +26,9 @@ pub fn build_synthetic_trace(
     return_value: Option<&str>,
     existing_traces: &[StoredTrace],
 ) -> Option<StoredTrace> {
+    if crate::config::user::is_telemetry_traces_disabled() {
+        return None;
+    }
     let (trace_id, span_id) = get_trace_span_ids(invocation_id, existing_traces);
     let parent_span_id = invocation_entry::get_root_span_id(invocation_id)
         .and_then(|id| hex::decode(&id).ok())

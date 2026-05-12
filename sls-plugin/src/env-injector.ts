@@ -7,6 +7,7 @@ const OPTIONAL_MAPPINGS: Record<string, string> = {
   sendOnInvocationEnd: 'DASH0_SEND_ON_INVOCATION_END',
   disableTelemetryLogCollection: 'DASH0_DISABLE_TELEMETRY_LOG_COLLECTION',
   disableTelemetryMetrics: 'DASH0_DISABLE_TELEMETRY_METRICS',
+  disableTelemetryTraces: 'DASH0_DISABLE_TELEMETRY_TRACES',
   createPayloadLogRecords: 'DASH0_CREATE_PAYLOAD_LOG_RECORDS',
   requestTimeout: 'DASH0_REQUEST_TIMEOUT',
   xrayTracesEnabled: 'DASH0_XRAY_TRACES_ENABLED',
