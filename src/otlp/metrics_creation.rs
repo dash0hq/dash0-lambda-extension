@@ -13,8 +13,7 @@ use opentelemetry_proto::tonic::resource::v1::Resource;
 use prost::Message;
 
 const DURATION_BOUNDS: &[f64] = &[
-    0.0, 5.0, 10.0, 25.0, 50.0, 75.0, 100.0, 250.0, 500.0, 750.0, 1000.0, 2500.0, 5000.0, 7500.0,
-    10000.0,
+    0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0,
 ];
 
 const MEMORY_BOUNDS: &[f64] = &[
@@ -122,8 +121,8 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
         metrics.push(create_histogram_metric(
             "faas.invoke_duration",
             "Duration of the invocation",
-            "ms",
-            data.duration,
+            "s",
+            data.duration / 1000.0,
             get_metric_attributes(),
             start_time_unix_nano,
             time_unix_nano,
@@ -135,8 +134,8 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
         metrics.push(create_histogram_metric(
             "faas.init_duration",
             "Duration of the cold start initialization",
-            "ms",
-            data.init_duration,
+            "s",
+            data.init_duration / 1000.0,
             get_metric_attributes(),
             start_time_unix_nano,
             time_unix_nano,
@@ -148,8 +147,8 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
         metrics.push(create_histogram_metric(
             "dash0.faas.billed_duration",
             "Billed duration of the invocation",
-            "ms",
-            data.billed_duration,
+            "s",
+            data.billed_duration / 1000.0,
             get_metric_attributes(),
             start_time_unix_nano,
             time_unix_nano,
@@ -282,7 +281,7 @@ mod tests {
 
         // faas.invoke_duration
         let duration_metric = find_metric_by_name(metrics, "faas.invoke_duration").unwrap();
-        assert_eq!(duration_metric.unit, "ms");
+        assert_eq!(duration_metric.unit, "s");
         if let Some(Data::Histogram(h)) = &duration_metric.data {
             assert_eq!(
                 h.aggregation_temporality,
@@ -290,13 +289,13 @@ mod tests {
             );
             let dp = &h.data_points[0];
             assert_eq!(dp.count, 1);
-            assert_eq!(dp.sum, Some(200.0));
-            assert_eq!(dp.min, Some(200.0));
-            assert_eq!(dp.max, Some(200.0));
+            assert_eq!(dp.sum, Some(0.2));
+            assert_eq!(dp.min, Some(0.2));
+            assert_eq!(dp.max, Some(0.2));
             assert_eq!(dp.explicit_bounds, DURATION_BOUNDS.to_vec());
-            // 200ms <= 250.0, which is bounds[7], so bucket index 7
+            // 0.2s <= 0.25, which is bounds[6], so bucket index 6
             let mut expected_counts = vec![0u64; DURATION_BOUNDS.len() + 1];
-            expected_counts[7] = 1;
+            expected_counts[6] = 1;
             assert_eq!(dp.bucket_counts, expected_counts);
             assert_eq!(dp.start_time_unix_nano, 850_000_000); // (1000 - 150) * 1_000_000
             assert_eq!(dp.time_unix_nano, 1_200_000_000); // 1200 * 1_000_000
@@ -314,18 +313,18 @@ mod tests {
 
         // faas.init_duration
         let init_metric = find_metric_by_name(metrics, "faas.init_duration").unwrap();
-        assert_eq!(init_metric.unit, "ms");
+        assert_eq!(init_metric.unit, "s");
         if let Some(Data::Histogram(h)) = &init_metric.data {
-            assert_eq!(h.data_points[0].sum, Some(150.0));
+            assert_eq!(h.data_points[0].sum, Some(0.15));
         } else {
             panic!("Expected Histogram data for faas.init_duration");
         }
 
         // dash0.faas.billed_duration
         let billed_metric = find_metric_by_name(metrics, "dash0.faas.billed_duration").unwrap();
-        assert_eq!(billed_metric.unit, "ms");
+        assert_eq!(billed_metric.unit, "s");
         if let Some(Data::Histogram(h)) = &billed_metric.data {
-            assert_eq!(h.data_points[0].sum, Some(300.0));
+            assert_eq!(h.data_points[0].sum, Some(0.3));
         } else {
             panic!("Expected Histogram data for dash0.faas.billed_duration");
         }
