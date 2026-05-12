@@ -11,6 +11,8 @@ export interface Dash0Config {
   disableAutoInstrumentation?: boolean | string;
   sendOnInvocationEnd?: boolean | string;
   disableTelemetryLogCollection?: boolean | string;
+  disableTelemetryMetrics?: boolean | string;
+  disableTelemetryTraces?: boolean | string;
   createPayloadLogRecords?: boolean | string;
   requestTimeout?: number;
   xrayTracesEnabled?: boolean | string;

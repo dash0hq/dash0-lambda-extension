@@ -70,6 +70,8 @@ All options are set under `custom.dash0` in your `serverless.yml`.
 | `disableAutoInstrumentation` | `boolean` | `false` | `DASH0_DISABLE_AUTO_INSTRUMENTATION` | Disable auto-instrumentation. The extension will still create synthetic spans. |
 | `sendOnInvocationEnd` | `boolean` | `true` | `DASH0_SEND_ON_INVOCATION_END` | Send telemetry at the end of the current invocation instead of the beginning of the next. |
 | `disableTelemetryLogCollection` | `boolean` | `false` | `DASH0_DISABLE_TELEMETRY_LOG_COLLECTION` | Disable Lambda Telemetry API log collection. |
+| `disableTelemetryMetrics` | `boolean` | `false` | `DASH0_DISABLE_TELEMETRY_METRICS` | Disable emission of supplementary FaaS metrics. |
+| `disableTelemetryTraces` | `boolean` | `false` | `DASH0_DISABLE_TELEMETRY_TRACES` | Disable both auto-instrumentation and synthetic spans (including error-path traces). |
 | `createPayloadLogRecords` | `boolean` | `true` | `DASH0_CREATE_PAYLOAD_LOG_RECORDS` | Create log records for request/response payloads. |
 | `requestTimeout` | `number` | `2000` | `DASH0_REQUEST_TIMEOUT` | HTTP request timeout in milliseconds. |
 | `xrayTracesEnabled` | `boolean` | `false` | `DASH0_XRAY_TRACES_ENABLED` | Preserve X-Ray trace context. |

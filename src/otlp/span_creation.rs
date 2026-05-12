@@ -222,7 +222,9 @@ pub fn create_spans(
 }
 
 pub fn create_supplementary_spans(invocation_id: &str, store: bool) -> Option<StoredTrace> {
-    if crate::config::user::is_xray_traces_enabled() {
+    if crate::config::user::is_xray_traces_enabled()
+        || crate::config::user::is_telemetry_traces_disabled()
+    {
         return None;
     }
     let trace = create_spans(invocation_id, true, false);
@@ -235,7 +237,9 @@ pub fn create_supplementary_spans(invocation_id: &str, store: bool) -> Option<St
 }
 
 pub fn create_overhead_supplementary_span(invocation_id: &str) {
-    if crate::config::user::is_xray_traces_enabled() {
+    if crate::config::user::is_xray_traces_enabled()
+        || crate::config::user::is_telemetry_traces_disabled()
+    {
         return;
     }
     if let Some(trace) = create_spans(invocation_id, false, true) {
