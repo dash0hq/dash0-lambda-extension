@@ -17,7 +17,18 @@ const DURATION_BOUNDS: &[f64] = &[
 ];
 
 const MEMORY_BOUNDS: &[f64] = &[
-    0.0, 64.0, 128.0, 256.0, 512.0, 1024.0, 1536.0, 2048.0, 3072.0, 4096.0, 8192.0, 10240.0,
+    0.0,
+    67_108_864.0,
+    134_217_728.0,
+    268_435_456.0,
+    536_870_912.0,
+    1_073_741_824.0,
+    1_610_612_736.0,
+    2_147_483_648.0,
+    3_221_225_472.0,
+    4_294_967_296.0,
+    8_589_934_592.0,
+    10_737_418_240.0,
 ];
 
 fn compute_bucket_counts(value: f64, bounds: &[f64]) -> Vec<u64> {
@@ -160,8 +171,8 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
         metrics.push(create_histogram_metric(
             "faas.mem_usage",
             "Memory used by the invocation",
-            "MB",
-            data.memory_usage as f64,
+            "By",
+            data.memory_usage as f64 * 1024.0 * 1024.0,
             get_metric_attributes(),
             start_time_unix_nano,
             time_unix_nano,
@@ -331,9 +342,10 @@ mod tests {
 
         // faas.mem_usage
         let memory_metric = find_metric_by_name(metrics, "faas.mem_usage").unwrap();
-        assert_eq!(memory_metric.unit, "MB");
+        assert_eq!(memory_metric.unit, "By");
         if let Some(Data::Histogram(h)) = &memory_metric.data {
-            assert_eq!(h.data_points[0].sum, Some(128.0));
+            // 128 MB = 128 * 1024 * 1024 bytes
+            assert_eq!(h.data_points[0].sum, Some(134_217_728.0));
         } else {
             panic!("Expected Histogram data for faas.mem_usage");
         }
