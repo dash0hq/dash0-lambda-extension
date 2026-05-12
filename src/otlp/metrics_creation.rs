@@ -242,6 +242,9 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
 }
 
 pub fn create_supplementary_metrics(invocation_id: &str) {
+    if crate::config::user::is_telemetry_metrics_disabled() {
+        return;
+    }
     if let Some(metric) = create_metrics(invocation_id) {
         store_metric(metric);
     }
@@ -405,6 +408,20 @@ mod tests {
         {
             assert_eq!(h.data_points[0].start_time_unix_nano, 1_000_000_000); // 1000 * 1_000_000
         }
+    }
+
+    #[test]
+    #[serial]
+    fn supplementary_metrics_skipped_when_disabled() {
+        reset_store();
+        let invocation_id = "inv-metric-1";
+        setup_invocation(invocation_id, 150.0);
+
+        std::env::set_var("DASH0_DISABLE_TELEMETRY_METRICS", "true");
+        create_supplementary_metrics(invocation_id);
+        std::env::remove_var("DASH0_DISABLE_TELEMETRY_METRICS");
+
+        assert!(crate::state::invocation_data::take_metrics().is_empty());
     }
 
     #[test]

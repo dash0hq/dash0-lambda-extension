@@ -88,11 +88,22 @@ pub fn is_telemetry_log_collection_disabled() -> bool {
     }
 }
 
+pub fn is_telemetry_metrics_disabled() -> bool {
+    match std::env::var("DASH0_DISABLE_TELEMETRY_METRICS") {
+        Ok(val) => matches!(
+            val.as_str(),
+            "1" | "true" | "TRUE" | "True" | "yes" | "YES" | "Yes" | "y" | "Y"
+        ),
+        Err(_) => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         is_auto_instrumented_disabled, is_send_on_invocation_end,
-        is_telemetry_log_collection_disabled, max_event_payload_size,
+        is_telemetry_log_collection_disabled, is_telemetry_metrics_disabled,
+        max_event_payload_size,
     };
     use serial_test::serial;
 
@@ -197,5 +208,32 @@ mod tests {
             assert!(!is_telemetry_log_collection_disabled(), "value {}", val);
         }
         std::env::remove_var("DASH0_DISABLE_TELEMETRY_LOG_COLLECTION");
+    }
+
+    #[test]
+    #[serial]
+    fn telemetry_metrics_enabled_by_default() {
+        std::env::remove_var("DASH0_DISABLE_TELEMETRY_METRICS");
+        assert!(!is_telemetry_metrics_disabled());
+    }
+
+    #[test]
+    #[serial]
+    fn telemetry_metrics_disabled_with_truthy_values() {
+        for val in ["1", "true", "TRUE", "True", "yes", "YES", "Yes", "y", "Y"] {
+            std::env::set_var("DASH0_DISABLE_TELEMETRY_METRICS", val);
+            assert!(is_telemetry_metrics_disabled(), "value {}", val);
+        }
+        std::env::remove_var("DASH0_DISABLE_TELEMETRY_METRICS");
+    }
+
+    #[test]
+    #[serial]
+    fn telemetry_metrics_not_disabled_with_falsy_values() {
+        for val in ["0", "false", "no", "maybe", ""] {
+            std::env::set_var("DASH0_DISABLE_TELEMETRY_METRICS", val);
+            assert!(!is_telemetry_metrics_disabled(), "value {}", val);
+        }
+        std::env::remove_var("DASH0_DISABLE_TELEMETRY_METRICS");
     }
 }
