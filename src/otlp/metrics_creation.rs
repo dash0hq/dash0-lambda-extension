@@ -13,12 +13,22 @@ use opentelemetry_proto::tonic::resource::v1::Resource;
 use prost::Message;
 
 const DURATION_BOUNDS: &[f64] = &[
-    0.0, 5.0, 10.0, 25.0, 50.0, 75.0, 100.0, 250.0, 500.0, 750.0, 1000.0, 2500.0, 5000.0, 7500.0,
-    10000.0,
+    0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0,
 ];
 
 const MEMORY_BOUNDS: &[f64] = &[
-    0.0, 64.0, 128.0, 256.0, 512.0, 1024.0, 1536.0, 2048.0, 3072.0, 4096.0, 8192.0, 10240.0,
+    0.0,
+    67_108_864.0,
+    134_217_728.0,
+    268_435_456.0,
+    536_870_912.0,
+    1_073_741_824.0,
+    1_610_612_736.0,
+    2_147_483_648.0,
+    3_221_225_472.0,
+    4_294_967_296.0,
+    8_589_934_592.0,
+    10_737_418_240.0,
 ];
 
 fn compute_bucket_counts(value: f64, bounds: &[f64]) -> Vec<u64> {
@@ -122,8 +132,8 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
         metrics.push(create_histogram_metric(
             "faas.invoke_duration",
             "Duration of the invocation",
-            "ms",
-            data.duration,
+            "s",
+            data.duration / 1000.0,
             get_metric_attributes(),
             start_time_unix_nano,
             time_unix_nano,
@@ -135,8 +145,8 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
         metrics.push(create_histogram_metric(
             "faas.init_duration",
             "Duration of the cold start initialization",
-            "ms",
-            data.init_duration,
+            "s",
+            data.init_duration / 1000.0,
             get_metric_attributes(),
             start_time_unix_nano,
             time_unix_nano,
@@ -148,8 +158,8 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
         metrics.push(create_histogram_metric(
             "dash0.faas.billed_duration",
             "Billed duration of the invocation",
-            "ms",
-            data.billed_duration,
+            "s",
+            data.billed_duration / 1000.0,
             get_metric_attributes(),
             start_time_unix_nano,
             time_unix_nano,
@@ -161,8 +171,8 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
         metrics.push(create_histogram_metric(
             "faas.mem_usage",
             "Memory used by the invocation",
-            "MB",
-            data.memory_usage as f64,
+            "By",
+            data.memory_usage as f64 * 1024.0 * 1024.0,
             get_metric_attributes(),
             start_time_unix_nano,
             time_unix_nano,
@@ -232,6 +242,9 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
 }
 
 pub fn create_supplementary_metrics(invocation_id: &str) {
+    if crate::config::user::is_telemetry_metrics_disabled() {
+        return;
+    }
     if let Some(metric) = create_metrics(invocation_id) {
         store_metric(metric);
     }
@@ -282,7 +295,7 @@ mod tests {
 
         // faas.invoke_duration
         let duration_metric = find_metric_by_name(metrics, "faas.invoke_duration").unwrap();
-        assert_eq!(duration_metric.unit, "ms");
+        assert_eq!(duration_metric.unit, "s");
         if let Some(Data::Histogram(h)) = &duration_metric.data {
             assert_eq!(
                 h.aggregation_temporality,
@@ -290,13 +303,13 @@ mod tests {
             );
             let dp = &h.data_points[0];
             assert_eq!(dp.count, 1);
-            assert_eq!(dp.sum, Some(200.0));
-            assert_eq!(dp.min, Some(200.0));
-            assert_eq!(dp.max, Some(200.0));
+            assert_eq!(dp.sum, Some(0.2));
+            assert_eq!(dp.min, Some(0.2));
+            assert_eq!(dp.max, Some(0.2));
             assert_eq!(dp.explicit_bounds, DURATION_BOUNDS.to_vec());
-            // 200ms <= 250.0, which is bounds[7], so bucket index 7
+            // 0.2s <= 0.25, which is bounds[6], so bucket index 6
             let mut expected_counts = vec![0u64; DURATION_BOUNDS.len() + 1];
-            expected_counts[7] = 1;
+            expected_counts[6] = 1;
             assert_eq!(dp.bucket_counts, expected_counts);
             assert_eq!(dp.start_time_unix_nano, 850_000_000); // (1000 - 150) * 1_000_000
             assert_eq!(dp.time_unix_nano, 1_200_000_000); // 1200 * 1_000_000
@@ -314,27 +327,28 @@ mod tests {
 
         // faas.init_duration
         let init_metric = find_metric_by_name(metrics, "faas.init_duration").unwrap();
-        assert_eq!(init_metric.unit, "ms");
+        assert_eq!(init_metric.unit, "s");
         if let Some(Data::Histogram(h)) = &init_metric.data {
-            assert_eq!(h.data_points[0].sum, Some(150.0));
+            assert_eq!(h.data_points[0].sum, Some(0.15));
         } else {
             panic!("Expected Histogram data for faas.init_duration");
         }
 
         // dash0.faas.billed_duration
         let billed_metric = find_metric_by_name(metrics, "dash0.faas.billed_duration").unwrap();
-        assert_eq!(billed_metric.unit, "ms");
+        assert_eq!(billed_metric.unit, "s");
         if let Some(Data::Histogram(h)) = &billed_metric.data {
-            assert_eq!(h.data_points[0].sum, Some(300.0));
+            assert_eq!(h.data_points[0].sum, Some(0.3));
         } else {
             panic!("Expected Histogram data for dash0.faas.billed_duration");
         }
 
         // faas.mem_usage
         let memory_metric = find_metric_by_name(metrics, "faas.mem_usage").unwrap();
-        assert_eq!(memory_metric.unit, "MB");
+        assert_eq!(memory_metric.unit, "By");
         if let Some(Data::Histogram(h)) = &memory_metric.data {
-            assert_eq!(h.data_points[0].sum, Some(128.0));
+            // 128 MB = 128 * 1024 * 1024 bytes
+            assert_eq!(h.data_points[0].sum, Some(134_217_728.0));
         } else {
             panic!("Expected Histogram data for faas.mem_usage");
         }
@@ -394,6 +408,20 @@ mod tests {
         {
             assert_eq!(h.data_points[0].start_time_unix_nano, 1_000_000_000); // 1000 * 1_000_000
         }
+    }
+
+    #[test]
+    #[serial]
+    fn supplementary_metrics_skipped_when_disabled() {
+        reset_store();
+        let invocation_id = "inv-metric-1";
+        setup_invocation(invocation_id, 150.0);
+
+        std::env::set_var("DASH0_DISABLE_TELEMETRY_METRICS", "true");
+        create_supplementary_metrics(invocation_id);
+        std::env::remove_var("DASH0_DISABLE_TELEMETRY_METRICS");
+
+        assert!(crate::state::invocation_data::take_metrics().is_empty());
     }
 
     #[test]

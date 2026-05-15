@@ -5,8 +5,10 @@ source /opt/shared.sh
 setup_otel_env
 write_env_vars
 
-# enable auto instrumentation unless DASH0_DISABLE_AUTO_INSTRUMENTATION is set
-if [ -z "$DASH0_DISABLE_AUTO_INSTRUMENTATION" ] || [ "${DASH0_DISABLE_AUTO_INSTRUMENTATION,,}" = "false" ]; then
+# enable auto instrumentation unless DASH0_DISABLE_AUTO_INSTRUMENTATION
+# or DASH0_DISABLE_TELEMETRY_TRACES is set to a truthy value
+if { [ -z "$DASH0_DISABLE_AUTO_INSTRUMENTATION" ] || [ "${DASH0_DISABLE_AUTO_INSTRUMENTATION,,}" = "false" ]; } \
+   && { [ -z "$DASH0_DISABLE_TELEMETRY_TRACES" ] || [ "${DASH0_DISABLE_TELEMETRY_TRACES,,}" = "false" ]; }; then
 
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

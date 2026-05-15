@@ -6,8 +6,10 @@ setup_otel_env
 write_env_vars
 
 
-# enable auto instrumentation unless DASH0_DISABLE_AUTO_INSTRUMENTATION is set
-if [ -z "$DASH0_DISABLE_AUTO_INSTRUMENTATION" ] || [ "${DASH0_DISABLE_AUTO_INSTRUMENTATION,,}" = "false" ]; then
+# enable auto instrumentation unless DASH0_DISABLE_AUTO_INSTRUMENTATION
+# or DASH0_DISABLE_TELEMETRY_TRACES is set to a truthy value
+if { [ -z "$DASH0_DISABLE_AUTO_INSTRUMENTATION" ] || [ "${DASH0_DISABLE_AUTO_INSTRUMENTATION,,}" = "false" ]; } \
+   && { [ -z "$DASH0_DISABLE_TELEMETRY_TRACES" ] || [ "${DASH0_DISABLE_TELEMETRY_TRACES,,}" = "false" ]; }; then
   export LAMBDA_LAYER_PKGS_DIR="/opt/python";
   LAMBDA_LAYER_SITE_PACKAGES="/opt/python/lib/${AWS_EXECUTION_ENV#AWS_Lambda_}/site-packages"
   export PYTHONPATH="$LAMBDA_LAYER_SITE_PACKAGES:$LAMBDA_LAYER_PKGS_DIR:$PYTHONPATH";
