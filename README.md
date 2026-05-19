@@ -170,12 +170,12 @@ The following attributes are added to log records by the extension (if relevant)
 
 These attributes are added to the resource of log data:
 
-| Attribute | Type | Description |
-|---|---|---|
-| `cloud.platform` | string | Always set to `aws_lambda`. |
-| `cloud.resource.id` | string | The full ARN of the Lambda function. |
-| `cloud.account.id` | string | The AWS account ID. |
-| `service.name` | string | The service name, from `OTEL_SERVICE_NAME` or defaults to `unknown_service`. |
+| Attribute           | Type | Description |
+|---------------------|---|---|
+| `cloud.platform`    | string | Always set to `aws_lambda`. |
+| `cloud.resource_id` | string | The full ARN of the Lambda function. |
+| `cloud.account.id`  | string | The AWS account ID. |
+| `service.name`      | string | The service name, from `OTEL_SERVICE_NAME` or defaults to `unknown_service`. |
 
 ### Metrics
 
@@ -188,22 +188,16 @@ The extension creates the following histogram metrics for each Lambda invocation
 | `dash0.faas.billed_duration` | ms | Billed duration of the invocation. |
 | `faas.mem_usage` | MB | Memory used by the invocation. |
 
-#### Metric Attributes
-
-The following attributes are added to each metric data point:
-
-| Attribute | Type | Description |
-|---|---|---|
-| `cloud.resource_id` | string | The full ARN of the Lambda function. |
-| `cloud.account.id` | string | The AWS account ID. |
-
 #### Resource Attributes (Metrics)
 
 These attributes are added to the resource of metric data:
 
-| Attribute | Type | Description |
-|---|---|---|
-| `service.name` | string | The service name, from `OTEL_SERVICE_NAME` or defaults to `unknown_service`. |
+| Attribute           | Type | Description |
+|---------------------|---|---|
+| `cloud.platform`    | string | Always set to `aws_lambda`. |
+| `cloud.resource_id` | string | The full ARN of the Lambda function. |
+| `cloud.account.id`  | string | The AWS account ID. |
+| `service.name`      | string | The service name, from `OTEL_SERVICE_NAME` or defaults to `unknown_service`. |
 
 
 ## Serverless Framework Plugin

@@ -1,10 +1,9 @@
-use crate::otlp::log_mutations::try_read_env_from_file;
+use crate::otlp::resources::get_resources_attributes;
 use crate::state::invocation_data::{store_metric, StoredMetric};
 use crate::state::invocation_entry;
 use hyper::header;
 use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
-use opentelemetry_proto::tonic::common::v1::any_value::Value;
-use opentelemetry_proto::tonic::common::v1::{AnyValue, InstrumentationScope, KeyValue};
+use opentelemetry_proto::tonic::common::v1::{InstrumentationScope, KeyValue};
 use opentelemetry_proto::tonic::metrics::v1::metric::Data;
 use opentelemetry_proto::tonic::metrics::v1::{
     AggregationTemporality, Histogram, HistogramDataPoint, Metric, ResourceMetrics, ScopeMetrics,
@@ -93,29 +92,6 @@ fn create_histogram_metric(
     }
 }
 
-fn get_metric_attributes() -> Vec<KeyValue> {
-    use crate::otlp::attributes::*;
-    vec![
-        KeyValue {
-            key: CLOUD_RESOURCE_ID.to_string(),
-            value: Some(AnyValue {
-                value: Some(Value::StringValue(
-                    crate::state::global::get_function_arn()
-                        .unwrap_or_else(|| "unknown".to_string()),
-                )),
-            }),
-        },
-        KeyValue {
-            key: CLOUD_ACCOUNT_ID.to_string(),
-            value: Some(AnyValue {
-                value: Some(Value::StringValue(
-                    crate::state::global::get_account_id().unwrap_or_else(|| "unknown".to_string()),
-                )),
-            }),
-        },
-    ]
-}
-
 pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
     let data = invocation_entry::get_metrics_data(invocation_id)?;
 
@@ -134,7 +110,7 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
             "Duration of the invocation",
             "s",
             data.duration / 1000.0,
-            get_metric_attributes(),
+            Vec::new(),
             start_time_unix_nano,
             time_unix_nano,
             DURATION_BOUNDS,
@@ -147,7 +123,7 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
             "Duration of the cold start initialization",
             "s",
             data.init_duration / 1000.0,
-            get_metric_attributes(),
+            Vec::new(),
             start_time_unix_nano,
             time_unix_nano,
             DURATION_BOUNDS,
@@ -160,7 +136,7 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
             "Billed duration of the invocation",
             "s",
             data.billed_duration / 1000.0,
-            get_metric_attributes(),
+            Vec::new(),
             start_time_unix_nano,
             time_unix_nano,
             DURATION_BOUNDS,
@@ -173,7 +149,7 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
             "Memory used by the invocation",
             "By",
             data.memory_usage as f64 * 1024.0 * 1024.0,
-            get_metric_attributes(),
+            Vec::new(),
             start_time_unix_nano,
             time_unix_nano,
             MEMORY_BOUNDS,
@@ -197,18 +173,7 @@ pub fn create_metrics(invocation_id: &str) -> Option<StoredMetric> {
     };
 
     let resource = Resource {
-        attributes: vec![KeyValue {
-            key: crate::otlp::attributes::SERVICE_NAME.to_string(),
-            value: Some(AnyValue {
-                value: Some(Value::StringValue(
-                    std::env::var("OTEL_SERVICE_NAME")
-                        .ok()
-                        .filter(|v| !v.is_empty())
-                        .or_else(|| try_read_env_from_file("OTEL_SERVICE_NAME"))
-                        .unwrap_or_else(|| "unknown_service".to_string()),
-                )),
-            }),
-        }],
+        attributes: get_resources_attributes(),
         ..Default::default()
     };
 
@@ -314,13 +279,8 @@ mod tests {
             assert_eq!(dp.start_time_unix_nano, 850_000_000); // (1000 - 150) * 1_000_000
             assert_eq!(dp.time_unix_nano, 1_200_000_000); // 1200 * 1_000_000
 
-            // Check attributes — no high-cardinality invocation_id on metrics
-            assert!(!dp
-                .attributes
-                .iter()
-                .any(|kv| kv.key == "faas.invocation_id"));
-            assert!(dp.attributes.iter().any(|kv| kv.key == "cloud.resource_id"));
-            assert!(dp.attributes.iter().any(|kv| kv.key == "cloud.account.id"));
+            // Data points carry no attributes — cloud.* live on the resource.
+            assert!(dp.attributes.is_empty());
         } else {
             panic!("Expected Histogram data for faas.invoke_duration");
         }
@@ -353,8 +313,18 @@ mod tests {
             panic!("Expected Histogram data for faas.mem_usage");
         }
 
-        // Check resource service.name
+        // Check resource attributes — aligned with logs/spans.
         let resource = decoded.resource_metrics[0].resource.as_ref().unwrap();
+        let resource_keys: Vec<&str> = resource
+            .attributes
+            .iter()
+            .map(|kv| kv.key.as_str())
+            .collect();
+        assert!(resource_keys.contains(&"service.name"));
+        assert!(resource_keys.contains(&"cloud.platform"));
+        assert!(resource_keys.contains(&"cloud.resource_id"));
+        assert!(resource_keys.contains(&"cloud.account.id"));
+
         let service_name = resource
             .attributes
             .iter()

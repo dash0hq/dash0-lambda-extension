@@ -194,7 +194,7 @@ pub fn create_spans(
     };
 
     let resource = Resource {
-        attributes: crate::otlp::log_mutations::get_resources_attributes(),
+        attributes: crate::otlp::resources::get_resources_attributes(),
         ..Default::default()
     };
 
