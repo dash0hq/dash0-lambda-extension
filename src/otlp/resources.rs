@@ -108,7 +108,7 @@ mod tests {
         let attributes = get_resources_attributes();
 
         let keys: Vec<String> = attributes.iter().map(|kv| kv.key.clone()).collect();
-        assert!(keys.contains(&"cloud.resource.id".to_string()));
+        assert!(keys.contains(&"cloud.resource_id".to_string()));
         assert!(keys.contains(&"cloud.account.id".to_string()));
         assert!(keys.contains(&"service.name".to_string()));
 

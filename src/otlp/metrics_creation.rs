@@ -322,7 +322,7 @@ mod tests {
             .collect();
         assert!(resource_keys.contains(&"service.name"));
         assert!(resource_keys.contains(&"cloud.platform"));
-        assert!(resource_keys.contains(&"cloud.resource.id"));
+        assert!(resource_keys.contains(&"cloud.resource_id"));
         assert!(resource_keys.contains(&"cloud.account.id"));
 
         let service_name = resource
