@@ -315,8 +315,11 @@ mod tests {
 
         // Check resource attributes — aligned with logs/spans.
         let resource = decoded.resource_metrics[0].resource.as_ref().unwrap();
-        let resource_keys: Vec<&str> =
-            resource.attributes.iter().map(|kv| kv.key.as_str()).collect();
+        let resource_keys: Vec<&str> = resource
+            .attributes
+            .iter()
+            .map(|kv| kv.key.as_str())
+            .collect();
         assert!(resource_keys.contains(&"service.name"));
         assert!(resource_keys.contains(&"cloud.platform"));
         assert!(resource_keys.contains(&"cloud.resource.id"));
