@@ -2,7 +2,6 @@
 pub const CLOUD_RESOURCE_ID: &str = "cloud.resource_id";
 pub const CLOUD_ACCOUNT_ID: &str = "cloud.account.id";
 pub const CLOUD_PLATFORM: &str = "cloud.platform";
-pub const CLOUD_RESOURCE_ID_SEMCONV: &str = "cloud.resource.id";
 pub const SERVICE_NAME: &str = "service.name";
 pub const FAAS_INVOCATION_ID: &str = "faas.invocation_id";
 pub const FAAS_TRIGGER: &str = "faas.trigger";

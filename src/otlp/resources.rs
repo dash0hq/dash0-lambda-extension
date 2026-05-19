@@ -23,7 +23,7 @@ pub fn get_resources_attributes() -> Vec<KeyValue> {
             }),
         },
         KeyValue {
-            key: CLOUD_RESOURCE_ID_SEMCONV.to_string(),
+            key: CLOUD_RESOURCE_ID.to_string(),
             value: Some(AnyValue {
                 value: Some(
                     opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(
