@@ -92,12 +92,12 @@ fn format_platform_runtime_done_message(
     format!("END RequestId: {}", request_id)
 }
 
-/// Attempts to parse the severity level from a Node.js Lambda log message.
+/// Attempts to parse a Node.js Lambda log message into its severity and body.
 /// Node.js Lambda logs follow the format:
 ///   <ISO-8601 timestamp>\t<UUID request-id>\t<SEVERITY>\t<message>
 /// e.g.: 2026-03-02T11:53:38.040Z\tf0ae1bc7-ae4b-4317-abf9-3a562e3127ef\tINFO\tresponse.statusCode: 201
-/// Returns the severity text (e.g. "INFO", "WARN", "ERROR") if found.
-fn parse_severity_from_log_message(message: &str) -> Option<&str> {
+/// Returns (severity, body) when the prefix matches, otherwise None.
+fn parse_node_lambda_log_message(message: &str) -> Option<(&str, &str)> {
     use once_cell::sync::Lazy;
     use regex::Regex;
 
@@ -111,6 +111,7 @@ fn parse_severity_from_log_message(message: &str) -> Option<&str> {
     let timestamp = parts.next()?;
     let request_id = parts.next()?;
     let severity = parts.next()?.trim();
+    let body = parts.next()?;
 
     if !TIMESTAMP_RE.is_match(timestamp) {
         return None;
@@ -121,7 +122,7 @@ fn parse_severity_from_log_message(message: &str) -> Option<&str> {
     if severity.is_empty() {
         return None;
     }
-    Some(severity)
+    Some((severity, body))
 }
 
 /// Maps a severity text to its OTLP severity number.
@@ -211,7 +212,7 @@ pub fn map_logs_to_otlp(logs: &[TelemetryLog]) -> Vec<LogRecord> {
         };
 
         // Skip if we couldn't extract a body message
-        let body_message = match body_message {
+        let mut body_message = match body_message {
             Some(msg) => msg,
             None => continue,
         };
@@ -281,16 +282,20 @@ pub fn map_logs_to_otlp(logs: &[TelemetryLog]) -> Vec<LogRecord> {
             });
         }
 
-        let severity = if is_platform_log {
-            "INFO"
+        let severity: String = if is_platform_log {
+            "INFO".to_string()
+        } else if let Some((sev, body)) = parse_node_lambda_log_message(&body_message) {
+            let sev = sev.to_string();
+            body_message = body.to_string();
+            sev
         } else {
-            parse_severity_from_log_message(&body_message).unwrap_or("INFO")
+            "INFO".to_string()
         };
 
         let log_record = LogRecord {
             time_unix_nano: timestamp_nanos,
             observed_time_unix_nano: timestamp_nanos,
-            severity_number: severity_text_to_number(severity),
+            severity_number: severity_text_to_number(&severity),
             severity_text: severity.to_uppercase(),
             body: Some(AnyValue {
                 value: Some(
@@ -990,50 +995,64 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_severity_from_node_log_message() {
+    fn test_parse_node_lambda_log_message() {
         assert_eq!(
-            parse_severity_from_log_message(
+            parse_node_lambda_log_message(
                 "2026-03-02T11:53:38.040Z\tf0ae1bc7-ae4b-4317-abf9-3a562e3127ef\tINFO\tresponse.statusCode: 201"
             ),
-            Some("INFO")
+            Some(("INFO", "response.statusCode: 201"))
         );
         assert_eq!(
-            parse_severity_from_log_message(
+            parse_node_lambda_log_message(
                 "2026-03-02T11:53:38.040Z\tf0ae1bc7-ae4b-4317-abf9-3a562e3127ef\tERROR\tsomething went wrong"
             ),
-            Some("ERROR")
+            Some(("ERROR", "something went wrong"))
         );
         assert_eq!(
-            parse_severity_from_log_message(
+            parse_node_lambda_log_message(
                 "2026-03-02T11:53:38.040Z\tf0ae1bc7-ae4b-4317-abf9-3a562e3127ef\tWARN\tlow memory"
             ),
-            Some("WARN")
+            Some(("WARN", "low memory"))
         );
         assert_eq!(
-            parse_severity_from_log_message(
+            parse_node_lambda_log_message(
                 "2026-03-02T11:53:38.040Z\tf0ae1bc7-ae4b-4317-abf9-3a562e3127ef\tDEBUG\tverbose output"
             ),
-            Some("DEBUG")
+            Some(("DEBUG", "verbose output"))
+        );
+        // JSON body with trailing newline is preserved as-is in the body
+        assert_eq!(
+            parse_node_lambda_log_message(
+                "2026-05-27T19:59:22.469Z\t07c660f0-ea0a-4b1c-bfcf-49fa39e154ca\tINFO\t{\"hello\":\"ok\"}\n"
+            ),
+            Some(("INFO", "{\"hello\":\"ok\"}\n"))
         );
         // No tabs, can't parse
-        assert_eq!(parse_severity_from_log_message("Hello World"), None);
+        assert_eq!(parse_node_lambda_log_message("Hello World"), None);
         // Only one tab
-        assert_eq!(parse_severity_from_log_message("a\tb"), None);
+        assert_eq!(parse_node_lambda_log_message("a\tb"), None);
+        // Three parts but no body
+        assert_eq!(
+            parse_node_lambda_log_message(
+                "2026-03-02T11:53:38.040Z\tf0ae1bc7-ae4b-4317-abf9-3a562e3127ef\tINFO"
+            ),
+            None
+        );
         // Invalid timestamp format
         assert_eq!(
-            parse_severity_from_log_message(
+            parse_node_lambda_log_message(
                 "not-a-timestamp\tf0ae1bc7-ae4b-4317-abf9-3a562e3127ef\tINFO\tmsg"
             ),
             None
         );
         // Invalid request ID format
         assert_eq!(
-            parse_severity_from_log_message("2026-03-02T11:53:38.040Z\tnot-a-uuid\tINFO\tmsg"),
+            parse_node_lambda_log_message("2026-03-02T11:53:38.040Z\tnot-a-uuid\tINFO\tmsg"),
             None
         );
         // Uppercase hex in request ID should not match
         assert_eq!(
-            parse_severity_from_log_message(
+            parse_node_lambda_log_message(
                 "2026-03-02T11:53:38.040Z\tF0AE1BC7-AE4B-4317-ABF9-3A562E3127EF\tINFO\tmsg"
             ),
             None
@@ -1070,6 +1089,19 @@ mod tests {
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].severity_number, 17); // ERROR
         assert_eq!(result[0].severity_text, "ERROR");
+        // Body should be just the message, with timestamp/request-id/severity stripped.
+        let body = result[0]
+            .body
+            .as_ref()
+            .and_then(|v| v.value.as_ref())
+            .and_then(|v| match v {
+                opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(s) => {
+                    Some(s.as_str())
+                }
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(body, "something failed");
     }
 
     #[test]
@@ -1088,5 +1120,18 @@ mod tests {
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].severity_number, 9); // INFO (fallback)
         assert_eq!(result[0].severity_text, "INFO");
+        // No Node prefix → body is unchanged.
+        let body = result[0]
+            .body
+            .as_ref()
+            .and_then(|v| v.value.as_ref())
+            .and_then(|v| match v {
+                opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(s) => {
+                    Some(s.as_str())
+                }
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(body, "just a plain log message");
     }
 }

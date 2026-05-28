@@ -42,6 +42,9 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
         { message: 'START RequestId: ' },
         { message: "Handler invoked with event:" },
         { message: "let's parse this as a warning", severity: "warn" },
+        // Verifies the extension strips the `<timestamp>\t<requestId>\tINFO\t` Node
+        // prefix so the body is the original JSON payload (JSON.parse would fail otherwise).
+        { message: JSON.stringify({ jsonLog: true, value: "parsed" }), isJson: true },
         { message: 'END RequestId: ' },
         { message: JSON.stringify({ name: "dash0_payload", type: "lambda_event", message: { parameter1: "right", masked_field: "****" } }), isJson: true, attributes: { "dash0.faas.payload_type": "lambda_event" } },
         { message: JSON.stringify({ name: "dash0_payload", type: "lambda_return_value", message: { statusCode: 200 } }), isJson: true, attributes: { "dash0.faas.payload_type": "lambda_return_value" } },

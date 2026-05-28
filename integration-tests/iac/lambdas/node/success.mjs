@@ -28,6 +28,7 @@ export async function handler(event) {
 
     console.log(`response.statusCode: ${response.statusCode}`);
     console.warn("let's parse this as a warning");
+    console.log(JSON.stringify({ jsonLog: true, value: "parsed" }));
 
     return {
         statusCode: 200,
