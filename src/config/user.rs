@@ -35,6 +35,13 @@ pub fn max_event_payload_size() -> usize {
     }
 }
 
+pub fn log_json_body_max_attributes() -> usize {
+    match std::env::var("DASH0_LOG_JSON_BODY_MAX_ATTRIBUTES") {
+        Ok(val) => val.parse::<usize>().unwrap_or(25),
+        Err(_) => 25,
+    }
+}
+
 pub fn request_timeout_ms() -> u64 {
     match std::env::var("DASH0_REQUEST_TIMEOUT") {
         Ok(val) => val.parse::<u64>().unwrap_or(2000),
@@ -117,7 +124,7 @@ mod tests {
     use super::{
         is_auto_instrumented_disabled, is_send_on_invocation_end,
         is_telemetry_log_collection_disabled, is_telemetry_metrics_disabled,
-        is_telemetry_traces_disabled, max_event_payload_size,
+        is_telemetry_traces_disabled, log_json_body_max_attributes, max_event_payload_size,
     };
     use serial_test::serial;
 
@@ -287,5 +294,36 @@ mod tests {
         assert!(is_auto_instrumented_disabled());
         std::env::remove_var("DASH0_DISABLE_TELEMETRY_TRACES");
         std::env::remove_var("AWS_LAMBDA_EXEC_WRAPPER");
+    }
+
+    #[test]
+    #[serial]
+    fn log_json_body_max_attributes_defaults_to_25() {
+        std::env::remove_var("DASH0_LOG_JSON_BODY_MAX_ATTRIBUTES");
+        assert_eq!(log_json_body_max_attributes(), 25);
+    }
+
+    #[test]
+    #[serial]
+    fn log_json_body_max_attributes_parses_value() {
+        std::env::set_var("DASH0_LOG_JSON_BODY_MAX_ATTRIBUTES", "10");
+        assert_eq!(log_json_body_max_attributes(), 10);
+        std::env::remove_var("DASH0_LOG_JSON_BODY_MAX_ATTRIBUTES");
+    }
+
+    #[test]
+    #[serial]
+    fn log_json_body_max_attributes_handles_invalid_value() {
+        std::env::set_var("DASH0_LOG_JSON_BODY_MAX_ATTRIBUTES", "not_a_number");
+        assert_eq!(log_json_body_max_attributes(), 25);
+        std::env::remove_var("DASH0_LOG_JSON_BODY_MAX_ATTRIBUTES");
+    }
+
+    #[test]
+    #[serial]
+    fn log_json_body_max_attributes_zero_is_valid() {
+        std::env::set_var("DASH0_LOG_JSON_BODY_MAX_ATTRIBUTES", "0");
+        assert_eq!(log_json_body_max_attributes(), 0);
+        std::env::remove_var("DASH0_LOG_JSON_BODY_MAX_ATTRIBUTES");
     }
 }
