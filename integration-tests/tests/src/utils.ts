@@ -519,7 +519,8 @@ export const checkMetrics = async ({
     }
 }
 
-export const checkException = (span: any, exception_type: string) => {
+export const checkException = (span: any, exception_type: string | string[]): string => {
+    const acceptedTypes = Array.isArray(exception_type) ? exception_type : [exception_type];
     const events = span.events;
     expect(events.length).toEqual(1);
     const exceptionEvent = events[0];
@@ -529,9 +530,11 @@ export const checkException = (span: any, exception_type: string) => {
     for (const attr of eventAttributes) {
         eventAttrMap[attr.key] = attr.value;
     }
-    expect(eventAttrMap['exception.type'].stringValue).toEqual(exception_type);
+    const actualType = eventAttrMap['exception.type'].stringValue;
+    expect(acceptedTypes, `Unexpected exception.type: ${actualType}`).toContain(actualType);
     expect(span.status.code).toEqual(2); // 2 = ERROR
-    expect(span.status.message).toEqual(exception_type);
+    expect(span.status.message).toEqual(actualType);
+    return actualType;
 }
 
 export const runAllTests = (scenario: string, runtimes: readonly string[], verifySuccessInvocation: Function) => {
