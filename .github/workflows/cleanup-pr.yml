@@ -16,6 +16,10 @@ jobs:
     environment: staging
     env:
       RESOURCE_PREFIX: pr-${{ github.event.pull_request.number }}-
+      # Make the AWS CLI / SDK back off and retry on throttling (HTTP 429)
+      # instead of failing immediately.
+      AWS_RETRY_MODE: adaptive
+      AWS_MAX_ATTEMPTS: "10"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -25,55 +29,75 @@ jobs:
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
+
+      # From here on every step runs even if a previous one failed (so we never
+      # leak resources because of one early failure), but any failure still
+      # fails the overall job.
       - name: Install CDK dependencies
+        if: ${{ !cancelled() }}
         working-directory: integration-tests/iac
         run: npm ci
       - name: Destroy CDK stack
+        if: ${{ !cancelled() }}
         working-directory: integration-tests/iac
-        run: npx cdk destroy ${RESOURCE_PREFIX}IntegrationTestsStack --force || true
+        run: |
+          bash "$GITHUB_WORKSPACE/.github/scripts/retry.sh" 6 30 "CDK destroy" -- \
+            npx cdk destroy "${RESOURCE_PREFIX}IntegrationTestsStack" --force
         env:
           DASH0_DEV_API_TOKEN: ${{ secrets.DASH0_DEV_API_TOKEN }}
           TEST_POSTGRESS_PASSWORD: ${{ secrets.TEST_POSTGRESS_PASSWORD }}
           TEST_MYSQL_PASSWORD: ${{ secrets.TEST_MYSQL_PASSWORD }}
+
       - name: Install plugin dependencies
+        if: ${{ !cancelled() }}
         working-directory: sls-plugin
         run: npm ci
       - name: Build plugin
+        if: ${{ !cancelled() }}
         working-directory: sls-plugin
         run: npm run build
       - name: Resolve layer version
+        if: ${{ !cancelled() }}
         run: |
           DASH0_LAYER_VERSION=$(aws lambda list-layer-versions \
             --layer-name "${RESOURCE_PREFIX}dash0-extension-node" \
             --query 'LayerVersions[0].Version' --output text 2>/dev/null || echo "1")
           echo "DASH0_LAYER_VERSION=$DASH0_LAYER_VERSION" >> "$GITHUB_ENV"
       - name: Destroy SLS v3 stack
+        if: ${{ !cancelled() }}
         working-directory: integration-tests/sls/v3
         run: |
           npm ci
-          npx serverless remove || true
+          bash "$GITHUB_WORKSPACE/.github/scripts/retry.sh" 5 20 "SLS v3 remove" -- \
+            npx serverless remove
         env:
           DASH0_DEV_API_TOKEN: ${{ secrets.DASH0_DEV_API_TOKEN }}
           DASH0_LAYER_VERSION: ${{ env.DASH0_LAYER_VERSION }}
       - name: Destroy SLS v4 stack
+        if: ${{ !cancelled() }}
         working-directory: integration-tests/sls/v4
         run: |
           npm ci
-          npx serverless remove || true
+          bash "$GITHUB_WORKSPACE/.github/scripts/retry.sh" 5 20 "SLS v4 remove" -- \
+            npx serverless remove
         env:
           DASH0_DEV_API_TOKEN: ${{ secrets.DASH0_DEV_API_TOKEN }}
           DASH0_LAYER_VERSION: ${{ env.DASH0_LAYER_VERSION }}
           SERVERLESS_ACCESS_KEY: ${{ secrets.SERVERLESS_ACCESS_KEY }}
       - name: Delete PR-specific Lambda layers
+        if: ${{ !cancelled() }}
         run: |
           for layer in ${RESOURCE_PREFIX}dash0-extension-python ${RESOURCE_PREFIX}dash0-extension-node ${RESOURCE_PREFIX}dash0-extension-java ${RESOURCE_PREFIX}dash0-extension-manual; do
-            versions=$(aws lambda list-layer-versions --layer-name $layer --query 'LayerVersions[].Version' --output text 2>/dev/null || true)
+            versions=$(aws lambda list-layer-versions --layer-name "$layer" --query 'LayerVersions[].Version' --output text 2>/dev/null || true)
             for v in $versions; do
-              aws lambda delete-layer-version --layer-name $layer --version-number $v || true
+              bash "$GITHUB_WORKSPACE/.github/scripts/retry.sh" 5 10 "Delete layer $layer v$v" -- \
+                aws lambda delete-layer-version --layer-name "$layer" --version-number "$v"
             done
           done
       - name: Delete PR-specific ECR repos
+        if: ${{ !cancelled() }}
         run: |
           for repo in ${RESOURCE_PREFIX}dash0-extension-python ${RESOURCE_PREFIX}dash0-extension-node ${RESOURCE_PREFIX}dash0-extension-java; do
-            aws ecr delete-repository --repository-name $repo --force || true
+            bash "$GITHUB_WORKSPACE/.github/scripts/retry.sh" 5 10 "Delete ECR repo $repo" -- \
+              aws ecr delete-repository --repository-name "$repo" --force
           done
