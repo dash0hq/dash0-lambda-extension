@@ -10,12 +10,15 @@ import {
 } from "./utils";
 
 
-// Python 3.14+ reports out-of-memory as `Runtime.ExitError` instead of
-// `Runtime.OutOfMemory`. Older runtimes keep the `Runtime.OutOfMemory` label.
-const expectedOomExceptionType = (functionName: string): string => {
+// Python 3.14's runtime is inconsistent about out-of-memory: it reports the
+// exception as either `Runtime.OutOfMemory` or `Runtime.ExitError`. Older
+// runtimes always use `Runtime.OutOfMemory`.
+const acceptedOomExceptionTypes = (functionName: string): string[] => {
     const match = functionName.match(/python3-(\d+)/);
     const minor = match ? parseInt(match[1], 10) : 0;
-    return minor >= 14 ? 'Runtime.ExitError' : 'Runtime.OutOfMemory';
+    return minor >= 14
+        ? ['Runtime.OutOfMemory', 'Runtime.ExitError']
+        : ['Runtime.OutOfMemory'];
 };
 
 const verifySuccessInvocation = async (functionName: string, invocationEnd: boolean, traced: boolean) => {
@@ -27,8 +30,9 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
         handlerScopeName: 'opentelemetry.instrumentation.aws_lambda',
     });
 
-    const exceptionType = expectedOomExceptionType(functionName);
-    checkException(handlerSpan, exceptionType);
+    // checkException returns whichever accepted type the span actually reported,
+    // so the log check below stays consistent with this invocation.
+    const exceptionType = checkException(handlerSpan, acceptedOomExceptionTypes(functionName));
 
     const logsToBeChecked: LogToCheck[] = [
         { message: 'START RequestId: ' },
