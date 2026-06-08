@@ -92,6 +92,17 @@ pub fn extract_trigger_chain_from_json(json_val: &serde_json::Value) -> TriggerC
         return extract_kafka_chain(&json_val);
     }
 
+    // ALB / ELB: target-group events also carry "requestContext", but with an
+    // "elb" sub-key. Must be checked before the API Gateway branch, which keys
+    // off "requestContext" alone and would otherwise misclassify ALB as API GW.
+    if let Some(elb) = json_val
+        .get("requestContext")
+        .and_then(|rc| rc.get("elb"))
+        .filter(|elb| elb.is_object())
+    {
+        return extract_alb_chain(elb);
+    }
+
     // API Gateway: has "requestContext"
     if json_val.get("requestContext").is_some() {
         return extract_api_gateway_chain(&json_val);
@@ -404,6 +415,45 @@ fn extract_kafka_chain(json_val: &serde_json::Value) -> TriggerChainResult {
     TriggerChainResult {
         hops: vec![TriggerHop {
             trigger_type: trigger_type.to_string(),
+            arn,
+            name,
+            timestamp: None,
+        }],
+        truncated: false,
+    }
+}
+
+// ── ALB / ELB ─────────────────────────────────────────────────────────
+
+/// Extracts the target group name from an ALB target-group ARN.
+///
+/// `arn:aws:elasticloadbalancing:us-east-2:123:targetgroup/my-tg/abc123` -> `my-tg`
+///
+/// `extract_name_from_arn` would return the trailing random id, so target groups
+/// need their own parse: the name is the segment after `targetgroup/`.
+fn extract_target_group_name(arn: &str) -> Option<String> {
+    let parts: Vec<&str> = arn.splitn(6, ':').collect();
+    if parts.len() < 6 {
+        return None;
+    }
+    let segments: Vec<&str> = parts[5].split('/').collect();
+    if segments.len() >= 2 && segments[0] == "targetgroup" {
+        Some(segments[1].to_string())
+    } else {
+        None
+    }
+}
+
+fn extract_alb_chain(elb: &serde_json::Value) -> TriggerChainResult {
+    let arn = elb
+        .get("targetGroupArn")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let name = arn.as_deref().and_then(extract_target_group_name);
+
+    TriggerChainResult {
+        hops: vec![TriggerHop {
+            trigger_type: "aws:load_balancer".to_string(),
             arn,
             name,
             timestamp: None,
@@ -808,6 +858,57 @@ mod tests {
         assert_eq!(result.hops.len(), 1);
         assert_eq!(result.hops[0].name.as_deref(), Some("POST /orders"));
         assert!(result.hops[0].arn.is_none());
+    }
+
+    // ── ALB / ELB ─────────────────────────────────────────────────────
+
+    #[test]
+    fn alb_event_classified_as_load_balancer() {
+        let payload = r#"{
+            "requestContext": {
+                "elb": {
+                    "targetGroupArn": "arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/lambda-target/abcdef0123456789"
+                }
+            },
+            "httpMethod": "GET", "path": "/lambda",
+            "headers": {"host": "my-alb-1234567890.us-east-2.elb.amazonaws.com"},
+            "body": ""
+        }"#;
+
+        let result = extract_trigger_chain(payload);
+        assert_eq!(result.hops.len(), 1);
+        assert_eq!(result.hops[0].trigger_type, "aws:load_balancer");
+        assert_eq!(
+            result.hops[0].arn.as_deref(),
+            Some("arn:aws:elasticloadbalancing:us-east-2:123456789012:targetgroup/lambda-target/abcdef0123456789")
+        );
+        assert_eq!(result.hops[0].name.as_deref(), Some("lambda-target"));
+    }
+
+    #[test]
+    fn alb_event_not_misclassified_as_api_gateway() {
+        let payload = r#"{
+            "requestContext": {"elb": {"targetGroupArn": "arn:aws:elasticloadbalancing:us-east-2:123:targetgroup/tg/abc"}},
+            "httpMethod": "POST", "path": "/orders"
+        }"#;
+
+        let result = extract_trigger_chain(payload);
+        assert_eq!(result.hops.len(), 1);
+        assert_eq!(result.hops[0].trigger_type, "aws:load_balancer");
+    }
+
+    #[test]
+    fn alb_event_without_target_group_arn_still_load_balancer() {
+        let payload = r#"{
+            "requestContext": {"elb": {}},
+            "httpMethod": "GET", "path": "/lambda"
+        }"#;
+
+        let result = extract_trigger_chain(payload);
+        assert_eq!(result.hops.len(), 1);
+        assert_eq!(result.hops[0].trigger_type, "aws:load_balancer");
+        assert!(result.hops[0].arn.is_none());
+        assert!(result.hops[0].name.is_none());
     }
 
     // ── Edge cases ───────────────────────────────────────────────────
