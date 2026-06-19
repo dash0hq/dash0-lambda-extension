@@ -125,9 +125,10 @@ The following environment variables allow fine-grained control over secret maski
 If you prefer to set up OpenTelemetry instrumentation yourself instead of relying on the extension's auto-instrumentation, you can use the manual layer and point your OTLP exporters to the extension's local endpoint. The extension will receive the telemetry, enrich it, and forward it to Dash0.
 
 1. Add the manual layer to your Lambda function: `arn:aws:lambda:<region>:115813213817:layer:dash0-extension-manual:<version>`.
-2. Configure your OTLP trace exporter to send to `http://127.0.0.1:9009/v1/traces`.
-3. If exporting metrics, configure your OTLP metric exporter to send to `http://127.0.0.1:9009/v1/metrics`.
-4. Make sure to flush all telemetry before the Lambda invocation completes (e.g., in a response hook or before returning the response).
+2. Set `AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper`. This is **required** (see [Required](#required)) for the extension to correlate spans to invocations and enrich them (trigger, payloads, cold-start/overhead metrics). Without it, traces are discarded with `[DASH0] /v1/traces has no invocation IDs, discarding trace` unless every exported span already carries a `faas.invocation_id` attribute.
+3. Configure your OTLP trace exporter to send to `http://127.0.0.1:9009/v1/traces`.
+4. If exporting metrics, configure your OTLP metric exporter to send to `http://127.0.0.1:9009/v1/metrics`.
+5. Make sure to flush all telemetry before the Lambda invocation completes (e.g., in a response hook or before returning the response).
 
 
 ## Enrichment Attributes
