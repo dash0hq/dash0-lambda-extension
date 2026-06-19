@@ -644,6 +644,19 @@ pub fn process_trace_request(
                 for span in &mut scope_span.spans {
                     add_resource_attributes(span);
                     extract_http_body_logs(span);
+                    // Honor an explicitly set faas.invocation_id even when the span
+                    // comes from a non-Lambda instrumentation scope (e.g. a custom
+                    // ActivitySource/Tracer used for manual instrumentation). This is
+                    // used only to correlate the trace to an invocation; the
+                    // handler-span rewrites (rename, kind, reparent) below stay
+                    // limited to recognized Lambda instrumentation scopes. Without
+                    // this, a manually set faas.invocation_id is ignored and the
+                    // trace can be discarded with "no invocation IDs".
+                    if let Some(invocation_id) = extract_invocation_id(span) {
+                        if !invocation_ids.contains(&invocation_id) {
+                            invocation_ids.push(invocation_id);
+                        }
+                    }
                 }
                 continue;
             }
@@ -670,7 +683,7 @@ pub fn process_trace_request(
 
 #[cfg(test)]
 mod tests {
-    use super::{build_synthetic_trace, StatusCode};
+    use super::{build_synthetic_trace, SpanKind, StatusCode};
     use crate::state::invocation_data::StoredTrace;
     use crate::state::invocation_entry;
     use hyper::{header, Method};
@@ -987,12 +1000,48 @@ mod tests {
 
     #[test]
     #[serial]
-    fn process_trace_request_ignores_non_lambda_scopes() {
-        let invocation_id = "inv-process-6";
+    fn process_trace_request_honors_invocation_id_in_non_lambda_scope_without_rewrite() {
+        // A handler span created from a custom ActivitySource (scope
+        // "<service>.Handler") that manually sets faas.invocation_id. The scope is
+        // not a recognized Lambda instrumentation scope, but the invocation id must
+        // still be honored so the trace is correlated and kept rather than discarded.
+        let invocation_id = "8f3c1d2e-aws-request-id";
         store_event_payload(invocation_id, r#"{"test":"data"}"#);
 
-        let span = make_span_with_invocation(invocation_id);
-        let mut request = make_request_with_scope("other.instrumentation.scope", span);
+        let mut span = make_span_with_invocation(invocation_id);
+        span.name = "GET /orders".to_string();
+        span.kind = SpanKind::Server as i32;
+        let mut request = make_request_with_scope("payments-api.Handler", span);
+        let mut invocation_ids = Vec::new();
+        let mut encoded_body = Vec::new();
+
+        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+
+        // The invocation id is extracted even though the scope is not a Lambda scope.
+        assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
+
+        // ...but the span itself is left untouched: handler-span rewrites stay
+        // limited to recognized Lambda instrumentation scopes.
+        let out = &request.resource_spans[0].scope_spans[0].spans[0];
+        assert_eq!(
+            out.name, "GET /orders",
+            "non-lambda span must not be renamed"
+        );
+        assert_eq!(
+            out.kind,
+            SpanKind::Server as i32,
+            "non-lambda span kind must be preserved"
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn process_trace_request_non_lambda_span_without_invocation_id_adds_no_ids() {
+        let span = Span {
+            name: "GET /".to_string(),
+            ..Default::default()
+        };
+        let mut request = make_request_with_scope("System.Net.Http", span);
         let mut invocation_ids = Vec::new();
         let mut encoded_body = Vec::new();
 
@@ -1000,7 +1049,7 @@ mod tests {
 
         assert!(
             invocation_ids.is_empty(),
-            "invocation_ids should remain empty for non-lambda scopes"
+            "a non-lambda span without faas.invocation_id contributes no invocation ids"
         );
     }
 
