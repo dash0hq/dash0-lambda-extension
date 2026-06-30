@@ -41,7 +41,9 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Build and publish Python layer and Docker image
-        run: make python docker-python LAYER_NAME_PREFIX=${{ inputs.prefix }} ECR_REPO_PREFIX=${{ inputs.prefix }}
+        run: make python docker-python LAYER_NAME_PREFIX="$LAYER_PREFIX" ECR_REPO_PREFIX="$LAYER_PREFIX"
+        env:
+          LAYER_PREFIX: ${{ inputs.prefix }}
 
   deploy-node:
     name: Build and Publish Node.js
@@ -67,7 +69,9 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Build and publish Node.js layer and Docker image
-        run: make node docker-node LAYER_NAME_PREFIX=${{ inputs.prefix }} ECR_REPO_PREFIX=${{ inputs.prefix }}
+        run: make node docker-node LAYER_NAME_PREFIX="$LAYER_PREFIX" ECR_REPO_PREFIX="$LAYER_PREFIX"
+        env:
+          LAYER_PREFIX: ${{ inputs.prefix }}
 
   deploy-java:
     name: Build and Publish Java
@@ -90,7 +94,9 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Build and publish Java layer and Docker image
-        run: make java docker-java LAYER_NAME_PREFIX=${{ inputs.prefix }} ECR_REPO_PREFIX=${{ inputs.prefix }}
+        run: make java docker-java LAYER_NAME_PREFIX="$LAYER_PREFIX" ECR_REPO_PREFIX="$LAYER_PREFIX"
+        env:
+          LAYER_PREFIX: ${{ inputs.prefix }}
 
   deploy-manual:
     name: Build and Publish Manual
@@ -109,4 +115,6 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ inputs.region || vars.AWS_REGION }}
       - name: Build and publish Manual layer
-        run: make manual LAYER_NAME_PREFIX=${{ inputs.prefix }}
+        run: make manual LAYER_NAME_PREFIX="$LAYER_PREFIX"
+        env:
+          LAYER_PREFIX: ${{ inputs.prefix }}
