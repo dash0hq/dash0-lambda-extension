@@ -16,7 +16,8 @@ bytes = "1"
 hyper-rustls = { version = "0.27", features = ["http1", "native-tokio", "tls12", "ring"] }
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
 matchit = "0.7"
-opentelemetry-proto = { version = "0.31", features = ["trace", "logs", "metrics", "with-serde"] }
+opentelemetry-proto = { version = "0.31", features = ["trace", "logs", "metrics", "with-serde", "gen-tonic"] }
+tonic = "0.14"
 chrono = { version = "0.4", features = ["serde"] }
 prost = "0.14.1"
 serde = { version = "1", features = ["derive"] }

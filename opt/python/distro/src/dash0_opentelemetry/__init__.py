@@ -102,7 +102,7 @@ def init() -> Dict[str, Any]:
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
     from opentelemetry.sdk.trace import SpanLimits, TracerProvider
 
-    DASH0_EXTENSION_ENDPOINT = "http://127.0.0.1:9009/v1/traces"
+    DASH0_EXTENSION_ENDPOINT = "http://127.0.0.1:4318/v1/traces"
 
     traces_endpoint = os.getenv("DASH0_EXTENSION_ENDPOINT", DASH0_EXTENSION_ENDPOINT)
     dash0_token = os.getenv("DASH0_TOKEN")

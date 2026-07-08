@@ -28,6 +28,12 @@ pub const EXTENSION_NAME: &str = "dash0";
 /// Default port to listen on, overriden by DASH0_LISTENER_PORT environment variable
 pub const DEFAULT_PROXY_PORT: u16 = 9009;
 
+/// Default OpenTelemetry OTLP/HTTP port, overriden by DASH0_OTLP_HTTP_PORT environment variable
+pub const DEFAULT_OTLP_HTTP_PORT: u16 = 4318;
+
+/// Default OpenTelemetry OTLP/gRPC port, overriden by DASH0_OTLP_GRPC_PORT environment variable
+pub const DEFAULT_OTLP_GRPC_PORT: u16 = 4317;
+
 pub static LAMBDA_RUNTIME_API_VERSION: &str = "2018-06-01";
 
 /// Returns the log prefix for standard log messages
@@ -90,39 +96,18 @@ async fn main() {
             );
         }
     };
-    tracing::info!("[{}] listening on {}", crate::log_prefix(), addr);
 
-    let listener = match TcpListener::bind(addr).await {
-        Ok(listener) => listener,
-        Err(e) => {
-            tracing::error!("[{}] Failed to bind listener: {}", crate::log_prefix(), e);
-            panic!(
-                "[{}] Cannot start without bound listener",
-                crate::log_prefix()
-            );
-        }
-    };
+    // Runtime API proxy, plus OTLP/HTTP for backwards compatibility.
+    let proxy_listener = bind_listener(addr).await;
+    let server_join_handle = spawn_http1_server(proxy_listener, route::dispatch);
 
-    let server_join_handle = tokio::spawn(async move {
-        loop {
-            let (stream, _peer) = match listener.accept().await {
-                Ok(pair) => pair,
-                Err(e) => {
-                    tracing::error!("[{}] accept() failed: {}", crate::log_prefix(), e);
-                    continue;
-                }
-            };
-            let io = TokioIo::new(stream);
-            tokio::spawn(async move {
-                if let Err(e) = http1::Builder::new()
-                    .serve_connection(io, service_fn(route::dispatch))
-                    .await
-                {
-                    tracing::debug!("[{}] connection error: {}", crate::log_prefix(), e);
-                }
-            });
-        }
-    });
+    // Dedicated OTLP receivers on the default OpenTelemetry ports.
+    let otlp_http_addr = SocketAddr::from(([0, 0, 0, 0], config::endpoints::otlp_http_port()));
+    let otlp_http_listener = bind_listener(otlp_http_addr).await;
+    spawn_http1_server(otlp_http_listener, route::dispatch_otlp);
+
+    let otlp_grpc_addr = SocketAddr::from(([0, 0, 0, 0], config::endpoints::otlp_grpc_port()));
+    tokio::spawn(otlp::grpc_receiver::serve(otlp_grpc_addr));
 
     // Initialize the extension and continually get next extension event.
     tokio::task::spawn(async {
@@ -144,4 +129,54 @@ async fn main() {
             e
         );
     }
+}
+
+async fn bind_listener(addr: SocketAddr) -> TcpListener {
+    tracing::info!("[{}] listening on {}", crate::log_prefix(), addr);
+
+    match TcpListener::bind(addr).await {
+        Ok(listener) => listener,
+        Err(e) => {
+            tracing::error!(
+                "[{}] Failed to bind listener on {}: {}",
+                crate::log_prefix(),
+                addr,
+                e
+            );
+            panic!(
+                "[{}] Cannot start without bound listener",
+                crate::log_prefix()
+            );
+        }
+    }
+}
+
+fn spawn_http1_server<F, Fut>(listener: TcpListener, handler: F) -> tokio::task::JoinHandle<()>
+where
+    F: Fn(hyper::Request<hyper::body::Incoming>) -> Fut + Copy + Send + 'static,
+    Fut: std::future::Future<
+            Output = Result<hyper::Response<route::ResBody>, std::convert::Infallible>,
+        > + Send
+        + 'static,
+{
+    tokio::spawn(async move {
+        loop {
+            let (stream, _peer) = match listener.accept().await {
+                Ok(pair) => pair,
+                Err(e) => {
+                    tracing::error!("[{}] accept() failed: {}", crate::log_prefix(), e);
+                    continue;
+                }
+            };
+            let io = TokioIo::new(stream);
+            tokio::spawn(async move {
+                if let Err(e) = http1::Builder::new()
+                    .serve_connection(io, service_fn(handler))
+                    .await
+                {
+                    tracing::debug!("[{}] connection error: {}", crate::log_prefix(), e);
+                }
+            });
+        }
+    })
 }

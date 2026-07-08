@@ -1,8 +1,10 @@
 use std::time::Instant;
 
+use bytes::Bytes;
 use http_body_util::BodyExt;
 use hyper::body::Incoming;
-use hyper::{Request, Response};
+use hyper::header::HeaderMap;
+use hyper::{Method, Request, Response};
 use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
 use prost::Message;
 
@@ -10,9 +12,29 @@ use crate::route::{empty_body, ResBody};
 use crate::state::invocation_data::{store_metric, StoredMetric};
 
 pub async fn metrics(req: Request<Incoming>) -> Result<Response<ResBody>, hyper::Error> {
-    let start = Instant::now();
     let (parts, body) = req.into_parts();
     let body_bytes = body.collect().await?.to_bytes();
+
+    let path_and_query = parts
+        .uri
+        .path_and_query()
+        .map(|pq| pq.as_str().to_string())
+        .unwrap_or_else(|| "/".to_string());
+
+    handle_metrics_payload(parts.method, path_and_query, parts.headers, body_bytes);
+
+    Ok(Response::builder().status(200).body(empty_body()).unwrap())
+}
+
+/// Shared handling of an OTLP metrics payload, independent of the transport
+/// (OTLP/HTTP or OTLP/gRPC) it was received over.
+pub fn handle_metrics_payload(
+    method: Method,
+    path_and_query: String,
+    headers: HeaderMap,
+    body_bytes: Bytes,
+) {
+    let start = Instant::now();
 
     let mut encoded_body: Vec<u8> = body_bytes.to_vec();
     let mut converted_from_json = false;
@@ -59,7 +81,7 @@ pub async fn metrics(req: Request<Incoming>) -> Result<Response<ResBody>, hyper:
         }
     }
 
-    let mut headers = parts.headers;
+    let mut headers = headers;
     if converted_from_json {
         headers.insert(
             hyper::header::CONTENT_TYPE,
@@ -68,12 +90,8 @@ pub async fn metrics(req: Request<Incoming>) -> Result<Response<ResBody>, hyper:
     }
 
     store_metric(StoredMetric {
-        method: parts.method,
-        path_and_query: parts
-            .uri
-            .path_and_query()
-            .map(|pq| pq.as_str().to_string())
-            .unwrap_or_else(|| "/".to_string()),
+        method,
+        path_and_query,
         headers,
         body: encoded_body,
     });
@@ -83,5 +101,4 @@ pub async fn metrics(req: Request<Incoming>) -> Result<Response<ResBody>, hyper:
         crate::log_prefix(),
         start.elapsed().as_millis(),
     );
-    Ok(Response::builder().status(200).body(empty_body()).unwrap())
 }
