@@ -125,11 +125,11 @@ The following environment variables allow fine-grained control over secret maski
 If you prefer to set up OpenTelemetry instrumentation yourself instead of relying on the extension's auto-instrumentation, you can use the manual layer and point your OTLP exporters to the extension's local endpoint. The extension will receive the telemetry, enrich it, and forward it to Dash0.
 
 1. Add the manual layer to your Lambda function: `arn:aws:lambda:<region>:115813213817:layer:dash0-extension-manual:<version>`.
-2. Configure your OTLP trace exporter to send to `http://127.0.0.1:4318/v1/traces` (OTLP/HTTP) or `http://127.0.0.1:4317` (OTLP/gRPC).
-3. If exporting metrics, configure your OTLP metric exporter to send to `http://127.0.0.1:4318/v1/metrics` (OTLP/HTTP) or `http://127.0.0.1:4317` (OTLP/gRPC).
+2. Configure your OTLP trace exporter to send to `http://127.0.0.1:4318/v1/traces` (OTLP/HTTP).
+3. If exporting metrics, configure your OTLP metric exporter to send to `http://127.0.0.1:4318/v1/metrics` (OTLP/HTTP).
 4. Make sure to flush all telemetry before the Lambda invocation completes (e.g., in a response hook or before returning the response).
 
-The extension accepts OTLP on the default OpenTelemetry ports: `4318` for OTLP/HTTP and `4317` for OTLP/gRPC (overridable via the `DASH0_OTLP_HTTP_PORT` and `DASH0_OTLP_GRPC_PORT` environment variables). For backwards compatibility, OTLP/HTTP is also still accepted on the extension's proxy port (`9009`).
+The extension accepts OTLP over HTTP on the default OpenTelemetry HTTP port `4318` (overridable via the `DASH0_OTLP_HTTP_PORT` environment variable). OTLP/gRPC is not supported. For backwards compatibility, OTLP/HTTP is also still accepted on the extension's proxy port (`9009`).
 
 
 ## Enrichment Attributes

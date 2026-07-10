@@ -328,31 +328,25 @@ class ManualStack extends cdk.NestedStack {
     });
     for (const runtime of runtimes) {
       const runtimeName = runtime.name.replace(/\./g, '-');
-      // One function per OTLP protocol: 'http' exports to the default
-      // OTLP/HTTP port (4318), 'grpc' to the default OTLP/gRPC port (4317).
-      for (const otlpProtocol of ['http', 'grpc']) {
-        const nameSuffix = otlpProtocol === 'http' ? '' : `-${otlpProtocol}`;
-        new lambda.Function(this, `manual-instrumentation${nameSuffix}-${runtimeName}`, {
-          functionName: `${props.prefix}manual-instrumentation${nameSuffix}-${runtimeName}`,
-          runtime,
-          memorySize: 512,
-          handler: 'index.hello',
-          architecture: lambda.Architecture.X86_64,
-          timeout: cdk.Duration.seconds(10),
-          code,
-          layers: [props.layer],
-          role: props.role,
-          environment: {
-            AWS_LAMBDA_EXEC_WRAPPER: "/opt/wrapper",
-            DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
-            DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
-            DASH0_EXTENSION_LOG_LEVEL: "info",
-            OTLP_PROTOCOL: otlpProtocol,
-          },
-          logGroup: props.logGroup,
-          loggingFormat: lambda.LoggingFormat.TEXT,
-        });
-      }
+      new lambda.Function(this, `manual-instrumentation-${runtimeName}`, {
+        functionName: `${props.prefix}manual-instrumentation-${runtimeName}`,
+        runtime,
+        memorySize: 512,
+        handler: 'index.hello',
+        architecture: lambda.Architecture.X86_64,
+        timeout: cdk.Duration.seconds(10),
+        code,
+        layers: [props.layer],
+        role: props.role,
+        environment: {
+          AWS_LAMBDA_EXEC_WRAPPER: "/opt/wrapper",
+          DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
+          DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
+          DASH0_EXTENSION_LOG_LEVEL: "info",
+        },
+        logGroup: props.logGroup,
+        loggingFormat: lambda.LoggingFormat.TEXT,
+      });
     }
   }
 }

@@ -31,9 +31,6 @@ pub const DEFAULT_PROXY_PORT: u16 = 9009;
 /// Default OpenTelemetry OTLP/HTTP port, overriden by DASH0_OTLP_HTTP_PORT environment variable
 pub const DEFAULT_OTLP_HTTP_PORT: u16 = 4318;
 
-/// Default OpenTelemetry OTLP/gRPC port, overriden by DASH0_OTLP_GRPC_PORT environment variable
-pub const DEFAULT_OTLP_GRPC_PORT: u16 = 4317;
-
 pub static LAMBDA_RUNTIME_API_VERSION: &str = "2018-06-01";
 
 /// Returns the log prefix for standard log messages
@@ -101,13 +98,10 @@ async fn main() {
     let proxy_listener = bind_listener(addr).await;
     let server_join_handle = spawn_http1_server(proxy_listener, route::dispatch);
 
-    // Dedicated OTLP receivers on the default OpenTelemetry ports.
+    // Dedicated OTLP/HTTP receiver on the default OpenTelemetry HTTP port.
     let otlp_http_addr = SocketAddr::from(([0, 0, 0, 0], config::endpoints::otlp_http_port()));
     let otlp_http_listener = bind_listener(otlp_http_addr).await;
     spawn_http1_server(otlp_http_listener, route::dispatch_otlp);
-
-    let otlp_grpc_addr = SocketAddr::from(([0, 0, 0, 0], config::endpoints::otlp_grpc_port()));
-    tokio::spawn(otlp::grpc_receiver::serve(otlp_grpc_addr));
 
     // Initialize the extension and continually get next extension event.
     tokio::task::spawn(async {

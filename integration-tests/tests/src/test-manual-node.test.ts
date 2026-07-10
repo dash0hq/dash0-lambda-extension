@@ -47,21 +47,15 @@ const verifyManualInstrumentation = async (functionName: string) => {
 
 describe.concurrent('Manual instrumentation Lambda', () => {
     const runtimes = NODE_RUNTIMES;
-    // 'http' exports OTLP to the default OTLP/HTTP port (4318),
-    // 'grpc' to the default OTLP/gRPC port (4317).
-    const otlpProtocols = ['http', 'grpc'];
     for (const runtime of runtimes) {
-        for (const otlpProtocol of otlpProtocols) {
-            const nameSuffix = otlpProtocol === 'http' ? '' : `-${otlpProtocol}`;
-            const functionName = `${RESOURCE_PREFIX}manual-instrumentation${nameSuffix}-${runtime}`
-            it(
-                `invokes ${functionName} and receives trace (OTLP via ${otlpProtocol})`,
-                async () => {
-                    console.log(`Starting test for ${functionName}`, new Date().toISOString());
-                    await verifyManualInstrumentation(functionName);
-                },
-                TEST_TIMEOUT_MS
-            );
-        }
+        const functionName = `${RESOURCE_PREFIX}manual-instrumentation-${runtime}`
+        it(
+            `invokes ${functionName} and receives trace`,
+            async () => {
+                console.log(`Starting test for ${functionName}`, new Date().toISOString());
+                await verifyManualInstrumentation(functionName);
+            },
+            TEST_TIMEOUT_MS
+        );
     }
 });

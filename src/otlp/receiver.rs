@@ -1,10 +1,8 @@
 use std::time::Instant;
 
-use bytes::Bytes;
 use http_body_util::BodyExt;
 use hyper::body::Incoming;
-use hyper::header::HeaderMap;
-use hyper::{Method, Request, Response};
+use hyper::{Request, Response};
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 
@@ -14,29 +12,9 @@ use crate::state::invocation_data::StoredTrace;
 use crate::state::invocation_entry;
 
 pub async fn traces(req: Request<Incoming>) -> Result<Response<ResBody>, hyper::Error> {
+    let start = Instant::now();
     let (parts, body) = req.into_parts();
     let body_bytes = body.collect().await?.to_bytes();
-
-    let path_and_query = parts
-        .uri
-        .path_and_query()
-        .map(|pq| pq.as_str().to_string())
-        .unwrap_or_else(|| "/".to_string());
-
-    handle_traces_payload(parts.method, path_and_query, parts.headers, body_bytes);
-
-    Ok(Response::builder().status(200).body(empty_body()).unwrap())
-}
-
-/// Shared handling of an OTLP traces payload, independent of the transport
-/// (OTLP/HTTP or OTLP/gRPC) it was received over.
-pub fn handle_traces_payload(
-    method: Method,
-    path_and_query: String,
-    headers: HeaderMap,
-    body_bytes: Bytes,
-) {
-    let start = Instant::now();
 
     // Try to decode and add event payload to server span from AWS Lambda instrumentation
     let mut encoded_body: Vec<u8> = body_bytes.to_vec();
@@ -52,7 +30,7 @@ pub fn handle_traces_payload(
     match ExportTraceServiceRequest::decode(body_bytes.as_ref()) {
         Ok(mut decoded) => {
             if drop_duplicate_java_instrumenations(&decoded) {
-                return;
+                return Ok(Response::builder().status(200).body(empty_body()).unwrap());
             }
 
             process_trace_request(&mut decoded, &mut invocation_ids, &mut encoded_body);
@@ -106,7 +84,7 @@ pub fn handle_traces_payload(
     }
 
     // If we converted from JSON to protobuf, update the Content-Type header
-    let mut headers = headers;
+    let mut headers = parts.headers;
     if converted_from_json {
         headers.insert(
             hyper::header::CONTENT_TYPE,
@@ -131,8 +109,12 @@ pub fn handle_traces_payload(
         invocation_entry::store_trace_by_id(
             &invocation_id,
             StoredTrace {
-                method,
-                path_and_query,
+                method: parts.method,
+                path_and_query: parts
+                    .uri
+                    .path_and_query()
+                    .map(|pq| pq.as_str().to_string())
+                    .unwrap_or_else(|| "/".to_string()),
                 headers,
                 body: encoded_body,
                 invocation_ids,
@@ -145,4 +127,5 @@ pub fn handle_traces_payload(
         crate::log_prefix(),
         start.elapsed().as_millis(),
     );
+    Ok(Response::builder().status(200).body(empty_body()).unwrap())
 }
