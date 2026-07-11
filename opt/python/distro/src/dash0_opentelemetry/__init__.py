@@ -124,6 +124,11 @@ def init() -> Dict[str, Any]:
                 endpoint=traces_endpoint,
                 headers={"Authorization": f"Bearer {dash0_token}"},
             ),
+            # The default 5s schedule delay races against Lambda killing the
+            # runtime on timeout, losing spans that are still queued. Export
+            # aggressively: the endpoint is the extension on loopback, and the
+            # Java distro batches equally tightly (otel.bsp.schedule.delay=10ms).
+            schedule_delay_millis=int(os.getenv("OTEL_BSP_SCHEDULE_DELAY", "10")),
         )
     )
 
