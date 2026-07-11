@@ -30,6 +30,8 @@ pub async fn telemetry(req: Request<Incoming>) -> Result<Response<ResBody>, hype
         body_text
     );
 
+    let mut saw_runtime_done = false;
+
     if let Ok(mut logs) =
         serde_json::from_str::<Vec<crate::state::invocation_data::TelemetryLog>>(&body_text)
     {
@@ -37,16 +39,12 @@ pub async fn telemetry(req: Request<Incoming>) -> Result<Response<ResBody>, hype
 
         for log in &logs {
             if log.r#type == "platform.runtimeDone" {
+                saw_runtime_done = true;
                 if let Some(id) = &log.invocation_id {
                     let is_error = error_invocation_ids.iter().any(|(eid, _)| eid == id);
                     if !is_error {
                         create_supplementary_spans(id, true);
                     }
-                }
-                if let Some(notifier) = crate::state::invocation_data::take_runtime_done_notifier()
-                {
-                    tracing::info!("[{}] Signaled platform.runtimeDone", crate::log_prefix());
-                    let _ = notifier.send(());
                 }
             }
 
@@ -104,6 +102,17 @@ pub async fn telemetry(req: Request<Incoming>) -> Result<Response<ResBody>, hype
             send_traces(traces_to_send).await;
         }
         flush_telemetry_logs(None).await;
+    }
+
+    // Signal platform.runtimeDone only after error traces have been built and
+    // sent. Signaling earlier lets the send-on-invocation-end flush task drain
+    // the stored traces concurrently, so build_synthetic_trace can no longer
+    // recover the invocation's real trace id and correlation is lost.
+    if saw_runtime_done {
+        if let Some(notifier) = crate::state::invocation_data::take_runtime_done_notifier() {
+            tracing::info!("[{}] Signaled platform.runtimeDone", crate::log_prefix());
+            let _ = notifier.send(());
+        }
     }
 
     Ok(Response::builder().status(200).body(empty_body()).unwrap())
