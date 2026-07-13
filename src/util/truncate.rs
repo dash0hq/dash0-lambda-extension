@@ -41,45 +41,66 @@ fn find_json_strings(json: &[u8]) -> Vec<(usize, usize)> {
     strings
 }
 
+/// A string literal directly followed by ':' (ignoring whitespace) is an
+/// object key — replacing those would destroy field names and collapse
+/// distinct keys into duplicate "[truncated]" entries.
+fn is_object_key(json: &[u8], content_end: usize) -> bool {
+    let mut i = content_end + 1; // skip the closing quote
+    while i < json.len() && json[i].is_ascii_whitespace() {
+        i += 1;
+    }
+    i < json.len() && json[i] == b':'
+}
+
 /// Truncate long JSON string values directly in the raw text — no parsing needed.
-/// Scans for all string literals once, then replaces them with "[truncated]"
-/// from longest to shortest until the result fits within max_size.
+/// Picks the longest values first until the projected size fits within
+/// max_size, then rebuilds the payload in a single pass with each picked
+/// value replaced by "[truncated]". Object keys are never replaced.
 fn truncate_json_strings(json: &str, max_size: usize) -> String {
-    let mut strings = find_json_strings(json.as_bytes());
-    // Sort longest first
-    strings.sort_by(|(s1, e1), (s2, e2)| (e2 - s2).cmp(&(e1 - s1)));
+    let bytes = json.as_bytes();
+    let marker_len = TRUNCATED_MARKER.len();
+    let mut candidates: Vec<(usize, usize)> = find_json_strings(bytes)
+        .into_iter()
+        .filter(|&(start, end)| end - start > marker_len && !is_object_key(bytes, end))
+        .collect();
 
-    let marker = TRUNCATED_MARKER.as_bytes();
-    let mut result = json.as_bytes().to_vec();
-    let mut current_len = result.len();
-
-    for i in 0..strings.len() {
-        if current_len <= max_size {
-            break;
-        }
-
-        let (content_start, content_end) = strings[i];
-        let content_len = content_end - content_start;
-        if content_len <= marker.len() {
-            continue;
-        }
-
-        // Splice: replace content_start..content_end with the marker
-        let saved = content_len - marker.len();
-        result.splice(content_start..content_end, marker.iter().copied());
-        current_len -= saved;
-
-        // All positions after the splice point shift left by `saved` bytes
-        for j in 0..strings.len() {
-            if j != i && strings[j].0 > content_start {
-                strings[j].0 -= saved;
-                strings[j].1 -= saved;
-            }
-        }
+    // If replacing every candidate still can't fit, skip straight to plain
+    // truncation instead of doing all that replacement work for nothing.
+    let max_savings: usize = candidates
+        .iter()
+        .map(|&(start, end)| (end - start) - marker_len)
+        .sum();
+    if json.len() - max_savings > max_size {
+        return truncate_plain(json, max_size);
     }
 
-    // If still too large after all string truncations, fall back to plain truncation
-    let result_str = String::from_utf8_lossy(&result).into_owned();
+    // Longest first, pick until the projected size fits
+    candidates.sort_by_key(|&(start, end)| std::cmp::Reverse(end - start));
+    let mut projected = json.len();
+    let mut picked = Vec::new();
+    for &(start, end) in &candidates {
+        if projected <= max_size {
+            break;
+        }
+        projected -= (end - start) - marker_len;
+        picked.push((start, end));
+    }
+
+    // Rebuild in one pass, in document order
+    picked.sort_unstable();
+    let mut result = Vec::with_capacity(projected);
+    let mut pos = 0;
+    for &(start, end) in &picked {
+        result.extend_from_slice(&bytes[pos..start]);
+        result.extend_from_slice(TRUNCATED_MARKER.as_bytes());
+        pos = end;
+    }
+    result.extend_from_slice(&bytes[pos..]);
+
+    // Replaced ranges begin and end at ASCII quotes, so the buffer is still
+    // valid UTF-8
+    let result_str =
+        String::from_utf8(result).unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned());
     if result_str.len() <= max_size {
         result_str
     } else {
@@ -284,6 +305,56 @@ mod tests {
         let result = process_payload(&payload);
 
         assert!(result.len() <= 1024);
+
+        std::env::remove_var("DASH0_MAX_EVENT_PAYLOAD");
+    }
+
+    #[test]
+    #[serial]
+    fn process_payload_never_truncates_object_keys() {
+        std::env::set_var("DASH0_MAX_EVENT_PAYLOAD", "1");
+
+        // Both keys are longer than the marker; only values may be replaced
+        let long_key_a = "a".repeat(100);
+        let long_key_b = "b".repeat(100);
+        let payload = format!(
+            r#"{{"{}":"{}","{}":"{}"}}"#,
+            long_key_a,
+            "x".repeat(1000),
+            long_key_b,
+            "y".repeat(1000)
+        );
+
+        let result = process_payload(&payload);
+
+        assert!(result.len() <= 1024);
+        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed[&long_key_a], "[truncated]");
+        assert_eq!(parsed[&long_key_b], "[truncated]");
+
+        std::env::remove_var("DASH0_MAX_EVENT_PAYLOAD");
+    }
+
+    #[test]
+    #[serial]
+    fn process_payload_handles_many_small_strings_quickly() {
+        std::env::set_var("DASH0_MAX_EVENT_PAYLOAD", "1");
+
+        // 50k strings of 30 chars (~1.6MB): replacing all of them can't reach
+        // the limit, so the feasibility pre-check must skip straight to plain
+        // truncation. Before that check this case took >10 seconds.
+        let item = format!("\"{}\"", "x".repeat(30));
+        let payload = format!("[{}]", vec![item; 50_000].join(","));
+
+        let start = std::time::Instant::now();
+        let result = process_payload(&payload);
+
+        assert!(result.len() <= 1024);
+        assert!(
+            start.elapsed() < std::time::Duration::from_secs(5),
+            "truncation took {:?}",
+            start.elapsed()
+        );
 
         std::env::remove_var("DASH0_MAX_EVENT_PAYLOAD");
     }
