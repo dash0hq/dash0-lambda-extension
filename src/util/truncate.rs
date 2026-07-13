@@ -213,6 +213,83 @@ mod tests {
 
     #[test]
     #[serial]
+    fn process_payload_masks_before_truncation() {
+        std::env::set_var("DASH0_MAX_EVENT_PAYLOAD", "1");
+
+        // The huge value sits under a masked key — masking shrinks it to "****"
+        // before the size check, so nothing gets truncated
+        let payload = format!(r#"{{"password":"{}","data":"ok"}}"#, "s".repeat(2000));
+
+        let result = process_payload(&payload);
+
+        assert!(result.len() <= 1024);
+        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["password"], "****");
+        assert_eq!(parsed["data"], "ok");
+        assert!(!result.contains("[truncated]"));
+
+        std::env::remove_var("DASH0_MAX_EVENT_PAYLOAD");
+    }
+
+    #[test]
+    #[serial]
+    fn process_payload_masks_and_truncates_when_still_over_limit() {
+        std::env::set_var("DASH0_MAX_EVENT_PAYLOAD", "1");
+
+        let payload = format!(
+            r#"{{"api_token":"{}","data":"{}"}}"#,
+            "t".repeat(500),
+            "d".repeat(2000)
+        );
+
+        let result = process_payload(&payload);
+
+        assert!(result.len() <= 1024);
+        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["api_token"], "****");
+        assert_eq!(parsed["data"], "[truncated]");
+
+        std::env::remove_var("DASH0_MAX_EVENT_PAYLOAD");
+    }
+
+    #[test]
+    #[serial]
+    fn process_payload_handles_escaped_quotes() {
+        std::env::set_var("DASH0_MAX_EVENT_PAYLOAD", "1");
+
+        let payload = format!(
+            r#"{{"quoted":"he said \"hi\" to me","big":"{}"}}"#,
+            "x".repeat(2000)
+        );
+
+        let result = process_payload(&payload);
+
+        assert!(result.len() <= 1024);
+        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["quoted"], "he said \"hi\" to me");
+        assert_eq!(parsed["big"], "[truncated]");
+
+        std::env::remove_var("DASH0_MAX_EVENT_PAYLOAD");
+    }
+
+    #[test]
+    #[serial]
+    fn process_payload_falls_back_to_plain_truncation_without_long_strings() {
+        std::env::set_var("DASH0_MAX_EVENT_PAYLOAD", "1");
+
+        // No string values to shrink — a big array of numbers can only be
+        // plain-truncated
+        let payload = format!("[{}1]", "1,".repeat(2000));
+
+        let result = process_payload(&payload);
+
+        assert!(result.len() <= 1024);
+
+        std::env::remove_var("DASH0_MAX_EVENT_PAYLOAD");
+    }
+
+    #[test]
+    #[serial]
     fn process_payload_only_truncates_enough_to_fit() {
         std::env::set_var("DASH0_MAX_EVENT_PAYLOAD", "1");
 
