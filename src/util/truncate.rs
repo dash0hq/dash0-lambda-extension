@@ -349,12 +349,40 @@ mod tests {
         let start = std::time::Instant::now();
         let result = process_payload(&payload);
 
-        assert!(result.len() <= 1024);
+        // Infeasible for JSON-aware truncation: the result must be an exact
+        // prefix byte cut (the integration test relies on this)
+        assert_eq!(result, payload[..1024]);
         assert!(
             start.elapsed() < std::time::Duration::from_secs(5),
             "truncation took {:?}",
             start.elapsed()
         );
+
+        std::env::remove_var("DASH0_MAX_EVENT_PAYLOAD");
+    }
+
+    #[test]
+    #[serial]
+    fn process_payload_replaces_all_strings_when_that_just_fits() {
+        std::env::set_var("DASH0_MAX_EVENT_PAYLOAD", "1");
+
+        // 60 strings of 900 bytes (~54KB): replacing all of them leaves
+        // ~870 bytes — just under the 1KB limit, so truncation is feasible
+        // only if every single string is picked (maximum-replacement path)
+        let item = format!("\"{}\"", "z".repeat(900));
+        let payload = format!(
+            "{{\"items\":[{}],\"statusCode\":200}}",
+            vec![item; 60].join(",")
+        );
+
+        let result = process_payload(&payload);
+
+        assert!(result.len() <= 1024);
+        let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["statusCode"], 200);
+        let items = parsed["items"].as_array().unwrap();
+        assert_eq!(items.len(), 60);
+        assert!(items.iter().all(|v| v == "[truncated]"));
 
         std::env::remove_var("DASH0_MAX_EVENT_PAYLOAD");
     }

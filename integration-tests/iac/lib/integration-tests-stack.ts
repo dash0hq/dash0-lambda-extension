@@ -189,7 +189,9 @@ class PythonStack extends cdk.NestedStack {
     new lambda.Function(this, 'payload-truncation', {
       functionName: `${props.prefix}payload-truncation`,
       runtime: lambda.Runtime.PYTHON_3_13,
-      memorySize: 128,
+      // 256MB: the worst-case test sends a ~3.3MB event of 100k strings,
+      // which the Python runtime parses into memory alongside the distro
+      memorySize: 256,
       handler: 'payload_truncation.handler',
       architecture: lambda.Architecture.X86_64,
       timeout: cdk.Duration.seconds(10),
