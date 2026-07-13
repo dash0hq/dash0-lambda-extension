@@ -16,7 +16,7 @@ from opentelemetry.sdk.environment_variables import (
 
 from dash0_opentelemetry import logger
 
-DEFAULT_MAX_ENTRY_SIZE = 2 * 1024 * 1024  # 2 MiB
+DEFAULT_MAX_ENTRY_SIZE = 4 * 1024
 
 T = TypeVar("T")
 

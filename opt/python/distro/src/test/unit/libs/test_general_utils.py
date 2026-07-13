@@ -24,7 +24,7 @@ def test_get_max_size_both_env_vars_are_set(monkeypatch):
 
 
 def test_get_max_size_get_default_value():
-    assert get_max_size() == 2097152
+    assert get_max_size() == 4096
 
 
 @pytest.mark.parametrize(

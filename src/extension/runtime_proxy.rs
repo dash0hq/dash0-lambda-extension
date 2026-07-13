@@ -15,7 +15,6 @@ use hyper::HeaderMap;
 use crate::config::endpoints;
 use crate::config::is_auto_instrumented_disabled;
 use crate::otlp::log_mutations::build_payload_log;
-use crate::otlp::masking::mask_json_string;
 use crate::otlp::span_mutations::{
     apply_return_value_error_to_stored_traces, build_synthetic_trace,
 };
@@ -23,6 +22,7 @@ use crate::route::{empty_body, full_body, streaming_body, ReqBody, ResBody};
 use crate::state::invocation_data::store_current_invocation_id;
 use crate::state::invocation_entry;
 use crate::util::parsers::extract_invocation_id_from_path;
+use crate::util::truncate::process_payload;
 
 static HTTP_CLIENT: Lazy<Client<HttpConnector, ReqBody>> =
     Lazy::new(|| Client::builder(TokioExecutor::new()).build_http());
@@ -200,7 +200,7 @@ pub async fn invocation_response_proxy(
     let (parts, body) = req.into_parts();
     let body_bytes = body.collect().await?.to_bytes();
 
-    let return_payload = mask_json_string(&String::from_utf8_lossy(&body_bytes));
+    let return_payload = process_payload(&String::from_utf8_lossy(&body_bytes));
     let res = forward_to_runtime_api(parts, body_bytes).await;
     if let Some(id) = invocation_id {
         if let Some(log) = build_payload_log(
@@ -316,7 +316,7 @@ async fn validate_and_mangle_next_event(
         }
     };
 
-    let payload = mask_json_string(&String::from_utf8_lossy(&body_bytes));
+    let payload = process_payload(&String::from_utf8_lossy(&body_bytes));
 
     let event_log = build_payload_log(
         &payload,
