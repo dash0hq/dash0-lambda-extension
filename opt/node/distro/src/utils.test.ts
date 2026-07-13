@@ -29,13 +29,13 @@ describe('getSpanAttributeMaxLength', () => {
 
     it('when no env. vars are set, get default value', () => {
       const size = getSpanAttributeMaxLength();
-      expect(size).toEqual(2097152);
+      expect(size).toEqual(4096);
     });
 
     it('when OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT is set to NaN will return default value', () => {
       process.env.OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT = 'a';
       const size = getSpanAttributeMaxLength();
-      expect(size).toEqual(2097152);
+      expect(size).toEqual(4096);
     });
   });
 });
