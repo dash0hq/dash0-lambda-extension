@@ -2,9 +2,9 @@ import { describe, it } from 'vitest';
 import { TEST_TIMEOUT_MS } from './config';
 import { checkLogs, invokeFunction, LogToCheck, RESOURCE_PREFIX } from './utils';
 
-// Must match the extension's DASH0_MAX_EVENT_PAYLOAD default (20KB); the
+// Must match the extension's DASH0_MAX_EVENT_PAYLOAD default (4KB); the
 // truncation-test function does not override it.
-const MAX_PAYLOAD_BYTES = 20 * 1024;
+const MAX_PAYLOAD_BYTES = 4 * 1024;
 
 describe.concurrent('Payload truncation', () => {
     // Both the event and the return value exceed the default limit, so the
@@ -55,10 +55,10 @@ describe.concurrent('Payload truncation', () => {
     // which stalled the runtime proxy for tens of seconds (blowing the
     // function timeout) before truncation was made single-pass:
     // - Event: ~3.3MB of 100k short strings. Replacing every string can't
-    //   reach the 20KB limit, so the extension must detect infeasibility and
+    //   reach the 4KB limit, so the extension must detect infeasibility and
     //   fall back to a plain byte cut of the payload.
-    // - Return value: ~5MB of 1400 long strings where replacing nearly all of
-    //   them lands just under the limit — the maximum number of replacements
+    // - Return value: ~5MB of 280 long strings where replacing all of them
+    //   lands just under the limit — the maximum number of replacements
     //   JSON-aware truncation can ever perform.
     // The invocation completing at all (within the 10s function timeout) is
     // the performance assertion.
