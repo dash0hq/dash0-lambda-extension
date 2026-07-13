@@ -182,6 +182,30 @@ class PythonStack extends cdk.NestedStack {
       });
     }
 
+    // Payload truncation test lambda. Truncation happens in the extension's
+    // runtime proxy and is runtime-agnostic, so a single runtime/architecture
+    // is enough. No DASH0_MASK_RULES override: the default masking rules must
+    // apply so the test can verify masking runs before truncation.
+    new lambda.Function(this, 'payload-truncation', {
+      functionName: `${props.prefix}payload-truncation`,
+      runtime: lambda.Runtime.PYTHON_3_13,
+      memorySize: 128,
+      handler: 'payload_truncation.handler',
+      architecture: lambda.Architecture.X86_64,
+      timeout: cdk.Duration.seconds(10),
+      code: pythonCode,
+      layers: [props.layer],
+      role: props.role,
+      environment: {
+        AWS_LAMBDA_EXEC_WRAPPER: '/opt/wrapper',
+        DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
+        DASH0_ENDPOINT: 'https://ingress.eu-west-1.aws.dash0-dev.com:4318',
+        DASH0_EXTENSION_LOG_LEVEL: 'info',
+      },
+      logGroup: props.logGroup,
+      loggingFormat: lambda.LoggingFormat.TEXT,
+    });
+
     // API Gateway lambdas that always return 500
     for (const runtime of runtimes) {
       const runtimeName = runtime.name.replace(/\./g, '-');
