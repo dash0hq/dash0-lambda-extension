@@ -99,8 +99,8 @@ fn truncate_json_strings(json: &str, max_size: usize) -> String {
 
     // Replaced ranges begin and end at ASCII quotes, so the buffer is still
     // valid UTF-8
-    let result_str =
-        String::from_utf8(result).unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned());
+    let result_str = String::from_utf8(result)
+        .unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned());
     if result_str.len() <= max_size {
         result_str
     } else {
