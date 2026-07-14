@@ -5,6 +5,7 @@ An extension for capturing observability data from AWS Lambda invocations and sh
 ## Table of Contents
 
 - [Layer ARNs](#layer-arns)
+- [Supported Regions](#supported-regions)
 - [Configuration](#configuration)
   - [Required](#required)
   - [Optional](#optional)
@@ -28,6 +29,32 @@ This extension has five main functionalities:
 ## Layer ARNs
 
 See the release page for the latest ARNs of the extension layers for each runtime.
+
+
+## Supported Regions
+
+The extension layers are published to the following AWS regions:
+
+| Region | Location |
+|---|---|
+| `us-east-1` | US East (N. Virginia) |
+| `us-east-2` | US East (Ohio) |
+| `us-west-1` | US West (N. California) |
+| `us-west-2` | US West (Oregon) |
+| `ap-south-1` | Asia Pacific (Mumbai) |
+| `ap-northeast-1` | Asia Pacific (Tokyo) |
+| `ap-northeast-2` | Asia Pacific (Seoul) |
+| `ap-northeast-3` | Asia Pacific (Osaka) |
+| `ap-southeast-1` | Asia Pacific (Singapore) |
+| `ap-southeast-2` | Asia Pacific (Sydney) |
+| `ca-central-1` | Canada (Central) |
+| `eu-central-1` | Europe (Frankfurt) |
+| `eu-west-1` | Europe (Ireland) |
+| `eu-west-2` | Europe (London) |
+| `eu-west-3` | Europe (Paris) |
+| `eu-north-1` | Europe (Stockholm) |
+| `il-central-1` | Israel (Tel Aviv) |
+| `sa-east-1` | South America (São Paulo) |
 
 
 ## Configuration
