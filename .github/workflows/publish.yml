@@ -20,8 +20,23 @@ permissions:
   contents: read
 
 jobs:
+  backfill:
+    if: inputs.environment == 'prod-integration' && inputs.region != 'eu-west-1'
+    name: Backfill layer versions
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ inputs.region }}
+      - name: Backfill layer version counters
+        run: tools/backfill-layer-versions.sh eu-west-1 ${{ inputs.region }}
+
   deploy-python:
     name: Build and Publish Python
+    needs: backfill
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     steps:
@@ -47,6 +62,7 @@ jobs:
 
   deploy-node:
     name: Build and Publish Node.js
+    needs: backfill
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     steps:
@@ -75,6 +91,7 @@ jobs:
 
   deploy-java:
     name: Build and Publish Java
+    needs: backfill
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     steps:
@@ -100,6 +117,7 @@ jobs:
 
   deploy-manual:
     name: Build and Publish Manual
+    needs: backfill
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     steps:
