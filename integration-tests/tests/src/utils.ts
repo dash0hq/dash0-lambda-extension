@@ -73,7 +73,7 @@ export const getRequestPayload = (invocationId: string) => {
             },
         ],
         timeRange: {
-            from: new Date(now - 5 * 60_000).toISOString(),
+            from: new Date(now - 20 * 60_000).toISOString(),
             to: new Date(now + 5 * 60_000).toISOString(),
         },
         sampling: { mode: 'adaptive' },
@@ -154,7 +154,7 @@ export const checkHttpSpan = async ({
                         },
                     ],
                     timeRange: {
-                        from: new Date(now - 10 * 60_000).toISOString(),
+                        from: new Date(now - 20 * 60_000).toISOString(),
                         to: new Date(now + 10 * 60_000).toISOString(),
                     },
                     sampling: {mode: 'adaptive'},
@@ -507,7 +507,7 @@ export const checkMetrics = async ({
             try {
                 const params = new URLSearchParams({
                     dataset: DASH0_LAMBDA_TESTS_DATASET,
-                    start: 'now-10m',
+                    start: 'now-20m',
                     end: 'now',
                     step: '1m',
                     query: `{otel_metric_name = "${metricName}", otel_metric_type = "histogram", service_name = "${functionName}"}`,
