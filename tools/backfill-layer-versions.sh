@@ -78,7 +78,8 @@ max_version() {
     echo "${out}" >&2
     return 1
   fi
-  sed 's/^None$/0/' <<< "${out}"
+  # Extract first non-empty line and replace None with 0
+  echo "${out}" | grep -v '^None$' | grep . | head -1 | sed 's/^None$/0/'
 }
 
 # All existing versions of a layer in a region, oldest-first, space-separated
