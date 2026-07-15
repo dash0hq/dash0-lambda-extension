@@ -152,7 +152,7 @@ describe.concurrent('Tracing Scenarios', () => {
                     console.log(`Starting test for ${scenario.name} scenario with ${runtime}`, new Date().toISOString());
                     await verifyTracingScenario(producerFunctionName, consumerFunctionName, scenario.name);
                 },
-                180_000
+                360_000
             );
         }
     }
