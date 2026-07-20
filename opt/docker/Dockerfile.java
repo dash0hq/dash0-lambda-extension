@@ -15,7 +15,8 @@
 #   # First build the binaries and Java distro
 #   make build/dash0_x86_64 build/dash0_aarch64
 #   cd opt/java/opentelemetry-java-distro && ./gradlew -Pversion=1.0.0-SNAPSHOT assemble -x javadoc
-#   # Then build the Docker image
+#   # Then write the git hash and build the Docker image
+#   git rev-parse HEAD > build/dash0_git_hash
 #   docker build -f opt/docker/Dockerfile.java -t dash0/extension-java:latest .
 
 FROM scratch
@@ -29,6 +30,8 @@ COPY opt/entrypoint /opt/extensions/dash0
 
 # Copy shared script and wrapper script
 COPY opt/shared.sh /opt/shared.sh
+# Bake in the git hash so the extension reports faas.extension.git_hash (read by opt/shared.sh)
+COPY build/dash0_git_hash /opt/dash0_git_hash
 COPY opt/java/wrapper /opt/wrapper
 
 # Copy Java agent JAR (built locally from opt/java/opentelemetry-java-distro)

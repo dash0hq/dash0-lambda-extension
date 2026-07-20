@@ -237,6 +237,7 @@ docker-python: build/dash0_x86_64 build/dash0_aarch64 build/python ensure-buildx
 	@echo "Logging in to ECR..."
 	@aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(ECR_REGISTRY)
 	@echo "Building and pushing multi-platform Docker image $(DOCKER_IMAGE_PYTHON):$(VERSION)"
+	@git rev-parse HEAD > build/dash0_git_hash
 	@docker buildx build --builder $(BUILDX_BUILDER) --platform linux/amd64,linux/arm64 \
 		-f opt/docker/Dockerfile.python -t $(DOCKER_IMAGE_PYTHON):$(VERSION) --push .
 	@echo ""
@@ -256,6 +257,7 @@ docker-node: build/dash0_x86_64 build/dash0_aarch64 ensure-buildx
 	@echo "Logging in to ECR..."
 	@aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(ECR_REGISTRY)
 	@echo "Building and pushing multi-platform Docker image $(DOCKER_IMAGE_NODE):$(VERSION)"
+	@git rev-parse HEAD > build/dash0_git_hash
 	@docker buildx build --builder $(BUILDX_BUILDER) --platform linux/amd64,linux/arm64 \
 		-f opt/docker/Dockerfile.node -t $(DOCKER_IMAGE_NODE):$(VERSION) --push .
 	@echo ""
@@ -272,6 +274,7 @@ docker-java: build/dash0_x86_64 build/dash0_aarch64 $(JAVA_DISTRO_JAR) ensure-bu
 	@echo "Logging in to ECR..."
 	@aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(ECR_REGISTRY)
 	@echo "Building and pushing multi-platform Docker image $(DOCKER_IMAGE_JAVA):$(VERSION)"
+	@git rev-parse HEAD > build/dash0_git_hash
 	@docker buildx build --builder $(BUILDX_BUILDER) --platform linux/amd64,linux/arm64 \
 		-f opt/docker/Dockerfile.java -t $(DOCKER_IMAGE_JAVA):$(VERSION) --push .
 	@echo ""
