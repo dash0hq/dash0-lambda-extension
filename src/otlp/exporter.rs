@@ -1,6 +1,9 @@
+use std::io::Write;
 use std::time::Duration;
 
 use bytes::Bytes;
+use flate2::write::GzEncoder;
+use flate2::Compression;
 use http_body_util::Full;
 use hyper::{header, Request, Uri};
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
@@ -217,6 +220,8 @@ fn _build_otlp_request(
         .build()
         .map_err(|err| format!("Failed building URI: {}", err))?;
 
+    let body = gzip(&body).map_err(|err| format!("Failed to gzip request body: {}", err))?;
+
     let mut builder = Request::builder().method(method).uri(target_uri);
 
     if let Some(headers) = builder.headers_mut() {
@@ -231,6 +236,11 @@ fn _build_otlp_request(
         headers.insert(
             header::CONTENT_TYPE,
             header::HeaderValue::from_static("application/x-protobuf"),
+        );
+
+        headers.insert(
+            header::CONTENT_ENCODING,
+            header::HeaderValue::from_static("gzip"),
         );
 
         if let Some(token) = crate::config::get_dash0_token() {
@@ -346,6 +356,12 @@ async fn send_request(
     }
 
     Err(())
+}
+
+fn gzip(body: &[u8]) -> std::io::Result<Vec<u8>> {
+    let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+    encoder.write_all(body)?;
+    encoder.finish()
 }
 
 fn add_env_vars(resource_spans: &mut [opentelemetry_proto::tonic::trace::v1::ResourceSpans]) {
@@ -504,6 +520,23 @@ mod tests {
         let resource_spans = combine_test_traces(&traces);
 
         assert!(resource_spans.is_empty());
+    }
+
+    #[test]
+    fn test_gzip_round_trip() {
+        use flate2::read::GzDecoder;
+        use std::io::Read;
+
+        let original = b"hello otlp payload, repeated repeated repeated repeated".to_vec();
+        let compressed = gzip(&original).expect("gzip should succeed");
+
+        let mut decoder = GzDecoder::new(&compressed[..]);
+        let mut decompressed = Vec::new();
+        decoder
+            .read_to_end(&mut decompressed)
+            .expect("gunzip should succeed");
+
+        assert_eq!(decompressed, original);
     }
 
     #[test]
