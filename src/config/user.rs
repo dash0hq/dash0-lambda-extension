@@ -49,6 +49,20 @@ pub fn request_retries() -> usize {
     }
 }
 
+/// Whether OTLP request bodies should be gzip-compressed before export.
+/// Controlled by DASH0_COMPRESSION, accepting `gzip` or `none`; defaults to `gzip`.
+///
+/// Intentionally uses a DASH0_-prefixed variable rather than
+/// OTEL_EXPORTER_OTLP_COMPRESSION: Lambda env vars are shared with the function
+/// runtime, so the in-function SDK would read the same variable and start
+/// compressing its exports to the extension, which our receiver does not decode.
+pub fn is_compression_enabled() -> bool {
+    match std::env::var("DASH0_COMPRESSION") {
+        Ok(val) => !val.eq_ignore_ascii_case("none"),
+        Err(_) => true,
+    }
+}
+
 pub fn is_create_payload_log_records() -> bool {
     match std::env::var("DASH0_CREATE_PAYLOAD_LOG_RECORDS") {
         Ok(val) => matches!(
@@ -115,11 +129,38 @@ pub fn is_telemetry_traces_disabled() -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        is_auto_instrumented_disabled, is_send_on_invocation_end,
+        is_auto_instrumented_disabled, is_compression_enabled, is_send_on_invocation_end,
         is_telemetry_log_collection_disabled, is_telemetry_metrics_disabled,
         is_telemetry_traces_disabled, max_event_payload_size,
     };
     use serial_test::serial;
+
+    #[test]
+    #[serial]
+    fn compression_enabled_by_default() {
+        std::env::remove_var("DASH0_COMPRESSION");
+        assert!(is_compression_enabled());
+    }
+
+    #[test]
+    #[serial]
+    fn compression_enabled_for_gzip_value() {
+        for val in ["gzip", "GZIP", "Gzip", "anything-else"] {
+            std::env::set_var("DASH0_COMPRESSION", val);
+            assert!(is_compression_enabled(), "value {}", val);
+        }
+        std::env::remove_var("DASH0_COMPRESSION");
+    }
+
+    #[test]
+    #[serial]
+    fn compression_disabled_for_none_value() {
+        for val in ["none", "NONE", "None"] {
+            std::env::set_var("DASH0_COMPRESSION", val);
+            assert!(!is_compression_enabled(), "value {}", val);
+        }
+        std::env::remove_var("DASH0_COMPRESSION");
+    }
 
     #[test]
     #[serial]
