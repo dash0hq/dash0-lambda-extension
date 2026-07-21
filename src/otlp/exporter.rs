@@ -1,6 +1,9 @@
+use std::io::Write;
 use std::time::Duration;
 
 use bytes::Bytes;
+use flate2::write::GzEncoder;
+use flate2::Compression;
 use http_body_util::Full;
 use hyper::{header, Request, Uri};
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
@@ -206,6 +209,7 @@ fn _build_otlp_request(
     path: &str,
     method: hyper::Method,
     body: Vec<u8>,
+    gzip_encoded: bool,
 ) -> Result<Request<ReqBody>, String> {
     let (scheme, authority) =
         parse_otlp_endpoint().ok_or_else(|| "Failed to parse OTLP endpoint".to_string())?;
@@ -232,6 +236,13 @@ fn _build_otlp_request(
             header::CONTENT_TYPE,
             header::HeaderValue::from_static("application/x-protobuf"),
         );
+
+        if gzip_encoded {
+            headers.insert(
+                header::CONTENT_ENCODING,
+                header::HeaderValue::from_static("gzip"),
+            );
+        }
 
         if let Some(token) = crate::config::get_dash0_token() {
             if !token.is_empty() {
@@ -271,10 +282,30 @@ async fn send_request(
         return Ok(());
     }
 
+    // Compress once, before the retry loop: re-gzipping the identical payload on
+    // every attempt would waste CPU during the post-invocation flush window.
+    let gzip_encoded = crate::config::is_compression_enabled();
+    let body = if gzip_encoded {
+        match gzip(&body) {
+            Ok(compressed) => compressed,
+            Err(err) => {
+                tracing::error!(
+                    "[{}] Failed to gzip {} body: {}",
+                    crate::log_prefix(),
+                    item_type,
+                    err
+                );
+                return Err(());
+            }
+        }
+    } else {
+        body
+    };
+
     let max_attempts = request_retries() + 1;
 
     for attempt in 1..=max_attempts {
-        let req = match _build_otlp_request(path, method.clone(), body.clone()) {
+        let req = match _build_otlp_request(path, method.clone(), body.clone(), gzip_encoded) {
             Ok(req) => req,
             Err(err) => {
                 tracing::error!(
@@ -346,6 +377,15 @@ async fn send_request(
     }
 
     Err(())
+}
+
+fn gzip(body: &[u8]) -> std::io::Result<Vec<u8>> {
+    // Level 3 keeps most of the size win for protobuf payloads at noticeably
+    // less CPU than the default (6); CPU is the scarcer resource during the
+    // post-invocation flush window.
+    let mut encoder = GzEncoder::new(Vec::new(), Compression::new(3));
+    encoder.write_all(body)?;
+    encoder.finish()
 }
 
 fn add_env_vars(resource_spans: &mut [opentelemetry_proto::tonic::trace::v1::ResourceSpans]) {
@@ -504,6 +544,81 @@ mod tests {
         let resource_spans = combine_test_traces(&traces);
 
         assert!(resource_spans.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_build_otlp_request_gzip_wiring() {
+        use flate2::read::GzDecoder;
+        use http_body_util::BodyExt;
+        use std::io::Read;
+
+        std::env::set_var("DASH0_ENDPOINT", "https://example.com:443/v1/traces");
+
+        let original = ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans::default()],
+        }
+        .encode_to_vec();
+        let compressed = gzip(&original).expect("gzip should succeed");
+
+        let req = _build_otlp_request("/v1/traces", Method::POST, compressed.clone(), true)
+            .expect("request should build");
+
+        // (a) Content-Encoding: gzip is set
+        assert_eq!(
+            req.headers()
+                .get(header::CONTENT_ENCODING)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "gzip"
+        );
+        // (b) Content-Length matches the compressed body length
+        assert_eq!(
+            req.headers()
+                .get(header::CONTENT_LENGTH)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            compressed.len().to_string()
+        );
+
+        // (c) The body is sent verbatim and gunzips back to the original protobuf.
+        // Also guards against reordering the gzip call relative to header setup.
+        let body_bytes = req.into_body().collect().await.unwrap().to_bytes();
+        assert_eq!(body_bytes.as_ref(), compressed.as_slice());
+        let mut decoder = GzDecoder::new(&body_bytes[..]);
+        let mut decompressed = Vec::new();
+        decoder.read_to_end(&mut decompressed).unwrap();
+        assert_eq!(decompressed, original);
+    }
+
+    #[tokio::test]
+    async fn test_build_otlp_request_without_gzip() {
+        use http_body_util::BodyExt;
+
+        std::env::set_var("DASH0_ENDPOINT", "https://example.com:443/v1/traces");
+
+        let body = ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans::default()],
+        }
+        .encode_to_vec();
+
+        let req = _build_otlp_request("/v1/traces", Method::POST, body.clone(), false)
+            .expect("request should build");
+
+        // No Content-Encoding header when compression is disabled
+        assert!(req.headers().get(header::CONTENT_ENCODING).is_none());
+        // Content-Length matches the raw body, which is sent verbatim
+        assert_eq!(
+            req.headers()
+                .get(header::CONTENT_LENGTH)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            body.len().to_string()
+        );
+        let body_bytes = req.into_body().collect().await.unwrap().to_bytes();
+        assert_eq!(body_bytes.as_ref(), body.as_slice());
     }
 
     #[test]

@@ -27,6 +27,29 @@ export const getAttributesMap = (attributes: Array<{ key: string, value: any }>)
     return attrMap;
 }
 
+// Unwraps an OTLP AnyValue into a plain JS value.
+const otlpValueToJs = (value: any): any => {
+    if (value == null) return undefined;
+    if ('stringValue' in value) return value.stringValue;
+    if ('boolValue' in value) return value.boolValue;
+    if ('intValue' in value) return Number(value.intValue);
+    if ('doubleValue' in value) return value.doubleValue;
+    if ('arrayValue' in value) return (value.arrayValue?.values ?? []).map(otlpValueToJs);
+    if ('kvlistValue' in value) return attributesToObject(value.kvlistValue?.values ?? []);
+    return undefined;
+}
+
+// Reconstructs a plain object from a log record's attributes. The backend
+// parses JSON logs into attributes and empties the body, so JSON log content
+// is asserted against the attributes rather than the (now empty) body.
+export const attributesToObject = (attributes: Array<{ key: string, value: any }>): Record<string, any> => {
+    const obj: Record<string, any> = {};
+    for (const attr of attributes) {
+        obj[attr.key] = otlpValueToJs(attr.value);
+    }
+    return obj;
+}
+
 export const findHandlerSpan = (spanPayload: any, scopeName: string): { span: any; resource: any } => {
     for (const rs of spanPayload.resourceSpans) {
         for (const ss of rs.scopeSpans) {
@@ -213,7 +236,13 @@ export const checkLogs = async ({
                 for (const logToCheck of logsToBeChecked) {
                     if (logToCheck.isJson) {
                         try {
-                            const actual = JSON.parse(logRecord.body.stringValue);
+                            const bodyStr = logRecord.body?.stringValue ?? "";
+                            // The backend parses JSON logs into attributes and empties
+                            // the body, so fall back to the attributes when the body is
+                            // empty (dash0_payload logs still carry the JSON in the body).
+                            const actual = bodyStr !== ""
+                                ? JSON.parse(bodyStr)
+                                : attributesToObject(logRecord.attributes ?? []);
                             const expected = JSON.parse(logToCheck.message);
                             matched = deepPartialMatch(actual, expected);
                         } catch {
