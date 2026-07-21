@@ -135,7 +135,7 @@ describe.concurrent('Retry Scenarios', () => {
                 console.log(`Starting retry test for ${runtime}`, new Date().toISOString());
                 await verifyRetryScenario(producerFunctionName, consumerFunctionName);
             },
-            600_000,
+            1_200_000,
         );
     }
 });

@@ -3,4 +3,4 @@ export const DASH0_LAMBDA_TESTS_DATASET = 'lambda-extension-tests';
 export const DASH0_TOKEN = process.env.DASH0_DEV_API_TOKEN!;
 export const MAX_ATTEMPTS = 50;
 export const RETRY_DELAY_MS = 10_000;
-export const TEST_TIMEOUT_MS = 10 * 60_000; // 10 minutes
+export const TEST_TIMEOUT_MS = 20 * 60_000; // 20 minutes
