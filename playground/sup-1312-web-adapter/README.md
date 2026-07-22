@@ -15,7 +15,8 @@ Function URL) so every state — both baselines, the conflict, the repro of the
 customer's error, and two candidate fixes — can be exercised side by side.
 
 Diagrams of the proxy chains (working, broken, and fixed):
-[proxy-chains.md](proxy-chains.md).
+[proxy-chains.md](proxy-chains.md). Customer-facing migration guide comparing
+the two integration options: [migration-options.md](migration-options.md).
 
 ## Why the conflict exists (mechanics)
 
