@@ -94,7 +94,6 @@ flowchart LR
   classDef aws fill:#e2e5ec,stroke:#8a8fa3,color:#23272f;
   classDef bad fill:#f7e4e2,stroke:#b3423a,color:#5a201b;
   class EXT dash0; class LWA lwa; class APP,API aws; class BIN bad;
-  linkStyle 2,3 stroke:#b3423a;
 ```
 
 ### The key that unlocks both options
@@ -142,7 +141,6 @@ flowchart LR
   classDef aws fill:#e2e5ec,stroke:#8a8fa3,color:#23272f;
   classDef cloud fill:#e7efe7,stroke:#2e7d4f,color:#1d3a29;
   class EXT dash0; class LWA lwa; class APP,API aws; class D0 cloud;
-  linkStyle 0,3,4 stroke:#2e7d4f;
 ```
 
 ### Changes, old → new
@@ -214,7 +212,6 @@ flowchart LR
   classDef aws fill:#e2e5ec,stroke:#8a8fa3,color:#23272f;
   classDef cloud fill:#e7efe7,stroke:#2e7d4f,color:#1d3a29;
   class EXT dash0; class LWA lwa; class APP,API aws; class D0 cloud;
-  linkStyle 0,3,4 stroke:#2e7d4f;
 ```
 
 The chained wrapper is a one-liner shipped as a tiny layer (or in the function

@@ -92,7 +92,6 @@ flowchart LR
   classDef aws fill:#e2e5ec,stroke:#8a8fa3,color:#23272f;
   classDef bad fill:#f7e4e2,stroke:#b3423a,color:#5a201b;
   class EXT dash0; class LWA lwa; class APP,API aws; class BIN bad;
-  linkStyle 2,3 stroke:#b3423a;
 ```
 
 ## Scenarios 08/09 — the fix: `AWS_LWA_LAMBDA_RUNTIME_API_PROXY=127.0.0.1:9009` ✅
@@ -130,5 +129,4 @@ flowchart LR
   classDef aws fill:#e2e5ec,stroke:#8a8fa3,color:#23272f;
   classDef cloud fill:#e7efe7,stroke:#2e7d4f,color:#1d3a29;
   class EXT dash0; class LWA lwa; class APP,API aws; class D0 cloud;
-  linkStyle 0,3,4 stroke:#2e7d4f;
 ```
