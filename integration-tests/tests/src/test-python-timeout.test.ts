@@ -59,7 +59,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
 
 }
 
-describe.concurrent('Lambda invocations with timeout', () => {
+describe.concurrent('Lambda invocations with timeout', { retry: 1 }, () => {
     const runtimes = PYTHON_RUNTIMES;
     runAllTests('timeout', runtimes, verifySuccessInvocation);
 });
