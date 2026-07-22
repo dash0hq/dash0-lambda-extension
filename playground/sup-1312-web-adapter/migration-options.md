@@ -428,6 +428,68 @@ flowchart TB
   class R9,O9 dash0; class S9,E9,C9 app;
 ```
 
+### Propagation: what if the caller uses W3C `traceparent` (no X-Ray)?
+
+First, an important clarification: the `xray-lambda` propagator does **not**
+require using AWS X-Ray. Function URLs / ALB / API Gateway add an
+`x-amzn-trace-id` header to every request (with `Sampled=0` when X-Ray tracing
+is off), and Lambda provides the same context to the extension. The propagator
+merely *reads that ambient header* — nothing is ever sent to X-Ray. It is the
+shared trace ID that lets app spans and the extension's invocation spans meet
+in one trace.
+
+The catch is **extraction precedence** when a caller *also* sends a W3C
+`traceparent`. Both headers are then present on the request, and whichever
+propagator extracts last wins. Verified against the live playground
+(requests sent with a fixed `traceparent`):
+
+| | Caller's W3C trace continued? | Correlated with invocation span? |
+|---|---|---|
+| **09** — app SDK, default propagators (`tracecontext, baggage`) | ✅ **yes** — app spans joined the caller's trace, 8/8 requests | ❌ separate traces (extension links still connect them) |
+| **08** — Dash0 distro (order: `tracecontext, baggage, xray-lambda`) | ❌ **no** — the X-Ray context won; the caller's trace ID appeared in 0 spans | ✅ yes |
+
+```mermaid
+flowchart TB
+  REQ["incoming request<br/>traceparent (caller) + x-amzn-trace-id (platform)"]
+  subgraph P9["09 · SDK defaults: tracecontext, baggage"]
+    E9["tracecontext extracts traceparent<br/>x-amzn-trace-id ignored"]
+    R9["app spans join the CALLER's trace ✅<br/>invocation span in its own trace"]
+    E9 --> R9
+  end
+  subgraph P8["08 · distro: tracecontext, baggage, xray-lambda"]
+    E8["tracecontext extracts traceparent…<br/>then xray-lambda extracts x-amzn-trace-id<br/>→ overwrites (runs last)"]
+    R8["app spans join the X-RAY trace<br/>correlated with invocation span ✅<br/>caller's trace broken at the Lambda hop ❌"]
+    E8 --> R8
+  end
+  REQ --> P9
+  REQ --> P8
+  classDef ok fill:#e7efe7,stroke:#2e7d4f,color:#1d3a29;
+  classDef warn fill:#f7e4e2,stroke:#b3423a,color:#5a201b;
+  classDef neu fill:#e2e5ec,stroke:#8a8fa3,color:#23272f;
+  class REQ,E9,E8 neu; class R9 ok; class R8 warn;
+```
+
+**Practical guidance:**
+
+- **W3C-only customer, Option A (09): nothing breaks.** Their cross-service
+  W3C propagation keeps working exactly as before — verified. They simply
+  don't get same-trace stitching with the invocation span.
+- **If they add the `xray-lambda` propagator in Option A**, order matters —
+  put it *first* so `tracecontext` extracts last and the caller's
+  `traceparent` keeps precedence:
+  `propagators: [new AWSXRayLambdaPropagator(), new W3CTraceContextPropagator(), new W3CBaggagePropagator()]`.
+  Result: traced callers keep their W3C trace; *untraced* callers fall back to
+  the X-Ray context and get invocation-span correlation.
+- **Option B (08) has this precedence inverted today** — the distro hardcodes
+  `xray-lambda` last, so for W3C-tracing callers the trace breaks at the
+  Lambda hop. Fine for edge/entry-point functions (no upstream trace), wrong
+  for mid-chain services. → **Product fix:** the distro should extract
+  `tracecontext` with precedence over X-Ray (or honor `OTEL_PROPAGATORS`
+  ordering, which it currently ignores).
+- Related nit: the extension's link extractor prefers `x-amzn-trace-id` over
+  `traceparent` when linking the invocation span to the caller's context —
+  should prefer `traceparent` for the same reason.
+
 ### Mechanics side by side
 
 | | **08 — auto-instrumentation** | **09 — in-app SDK** |
