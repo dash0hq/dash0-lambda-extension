@@ -13,13 +13,14 @@
 # The version counter never resets, even when versions are deleted. So for
 # each layer this script reads the highest version N from the source region,
 # then publishes dummy versions (a minimal placeholder zip) in the target
-# region — deleting each one immediately — until the counter reaches N.
+# region — leaving each dummy in place — until the counter reaches N.
 # The next real deploy then produces version N+1 in the new region and in
 # all existing regions alike.
 #
 # Notes:
-#   - Dummy versions are deleted right after publishing; only the counter
-#     moves. Any real versions already present in the target keep their zips.
+#   - Dummy versions are left in place (deletion requires extra permissions);
+#     they occupy version numbers but are never made public. Delete them
+#     manually later if desired. Any real versions already present keep their zips.
 #   - If the target counter is already ahead of the source (possible when
 #     versions were published *and deleted* there before — the counter is
 #     not observable via the API), alignment is impossible and the layer is
@@ -59,11 +60,11 @@ workdir="$(mktemp -d)"
 trap 'rm -rf "${workdir}"' EXIT
 
 dummy_zip="${workdir}/dummy-layer.zip"
-echo "Placeholder to align Lambda layer version numbering across regions. Deleted immediately after publishing." \
+echo "Placeholder to align Lambda layer version numbering across regions. Safe to delete." \
   > "${workdir}/README-dummy.txt"
 (cd "${workdir}" && zip -q "${dummy_zip}" README-dummy.txt)
 
-dummy_description="Placeholder to align layer version numbering across regions - deleted immediately"
+dummy_description="Placeholder to align layer version numbering across regions - safe to delete"
 
 # Highest version of a layer in a region ("0" if the layer does not exist).
 # list-layer-versions returns versions newest-first.
@@ -135,8 +136,8 @@ for layer in "${layers[@]}"; do
 
   to_publish=$(( source_max - target_listed_max ))
   if "${dry_run}"; then
-    echo "dry-run: would publish+delete ${to_publish} dummy version(s) ($((target_listed_max + 1))..${source_max} expected)"
-    summary+=("${layer}: dry-run, would publish+delete ${to_publish} dummy version(s) to reach ${source_max}")
+    echo "dry-run: would publish ${to_publish} dummy version(s) ($((target_listed_max + 1))..${source_max} expected)"
+    summary+=("${layer}: dry-run, would publish ${to_publish} dummy version(s) to reach ${source_max}")
     continue
   fi
 
@@ -147,12 +148,6 @@ for layer in "${layers[@]}"; do
       --zip-file "fileb://${dummy_zip}" \
       --description "${dummy_description}" \
       --query Version --output text --no-cli-pager)"
-    if ! aws lambda delete-layer-version --layer-name "${layer}" --region "${target_region}" \
-        --version-number "${v}" --no-cli-pager; then
-      echo "error: failed to delete dummy version ${v} of '${layer}' in ${target_region};" \
-        "delete it manually before re-running" >&2
-      exit 1
-    fi
     if [ "${v}" -gt "${source_max}" ]; then
       # The target's hidden counter was already at/above source_max (versions
       # published and deleted there before). The counter only moves forward,
@@ -162,7 +157,7 @@ for layer in "${layers[@]}"; do
       break
     fi
     published=$(( published + 1 ))
-    echo "[${layer}] published+deleted dummy version ${v}/${source_max}"
+    echo "[${layer}] published dummy version ${v}/${source_max} (left in place; delete manually if desired)"
     if [ "${v}" -eq "${source_max}" ]; then
       break
     fi
@@ -172,7 +167,7 @@ for layer in "${layers[@]}"; do
     failed_layers+=("${layer}")
     summary+=("${layer}: FAILED (target counter ahead of ${source_max})")
   else
-    summary+=("${layer}: aligned at ${source_max} (${published} dummy version(s) published+deleted)")
+    summary+=("${layer}: aligned at ${source_max} (${published} dummy version(s) published, left in place)")
   fi
 done
 
