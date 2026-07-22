@@ -62,14 +62,19 @@ which is what the manual-instrumentation path in the main README uses.
 
 ## Scenarios
 
-| # | Function | Wrapper | Layers | In-app SDK | Expectation |
+The **Result** column reflects the deployed test run on 2026-07-22
+(eu-west-1, dash0-dev, dataset `raphael-web-adapter`, Dash0 node layer v5,
+LWA layer v28) — details in [Findings](#findings-tested-2026-07-22).
+
+| # | Function | Wrapper | Layers | In-app SDK | Result |
 |---|----------|---------|--------|-----------|-------------|
-| 01 | `sup1312-01-adapter-baseline` | `/opt/bootstrap` | LWA | no | Baseline: web app works, no telemetry |
-| 02 | `sup1312-02-dash0-baseline` | `/opt/wrapper` | Dash0 | no | Baseline: extension works as documented (plain handler) |
-| 03 | `sup1312-03-chained` | `/opt/dash0-adapter-wrapper` | Dash0 + LWA + chained | no | **Happy path**: web app served by LWA, traced by Dash0 auto-instrumentation |
-| 04 | `sup1312-04-chained-app-sdk` | `/opt/dash0-adapter-wrapper` | Dash0 + LWA + chained | yes | **Starling repro**: `Attempted duplicate registration of ...` in logs; app SDK loses, distro owns tracing |
-| 05 | `sup1312-05-app-sdk-via-proxy` | `/opt/dash0-adapter-wrapper` + `DASH0_DISABLE_AUTO_INSTRUMENTATION=true` | Dash0 + LWA + chained | yes → `127.0.0.1:9009` | **Fix candidate A**: app SDK is the only tracer, exports through the extension; extension keeps Runtime API proxy (payloads, invocation context, logs) |
-| 06 | `sup1312-06-no-dash0-wrapper` | `/opt/bootstrap` | Dash0 + LWA | yes → `127.0.0.1:9009` | **Fix candidate B** ("logs-only" model from the ticket): Dash0 wrapper never runs; extension collects logs via Telemetry API; app SDK exports to the extension's OTLP receiver |
+| 01 | `sup1312-01-adapter-baseline` | `/opt/bootstrap` | LWA | no | ✅ Baseline: web app works |
+| 02 | `sup1312-02-dash0-baseline` | `/opt/wrapper` | Dash0 | no | ✅ Baseline: full traces in Dash0 (invocation + handler + client spans) |
+| 03 | `sup1312-03-chained` | `/opt/dash0-adapter-wrapper` | Dash0 + LWA + chained | no | ⚠️ App runs; distro loads & exports, but the extension **discards all app spans** (`/v1/traces has no invocation IDs`); only telemetry-derived invocation spans arrive |
+| 04 | `sup1312-04-chained-app-sdk` | `/opt/dash0-adapter-wrapper` | Dash0 + LWA + chained | yes | ✅ **Starling repro**: `@opentelemetry/api: Attempted duplicate registration of API: context` in CloudWatch; app keeps serving, in-app SDK is inert |
+| 05 | `sup1312-05-app-sdk-via-proxy` | `/opt/dash0-adapter-wrapper` + `DASH0_DISABLE_AUTO_INSTRUMENTATION=true` | Dash0 + LWA + chained | yes → `127.0.0.1:9009` | ❌ No duplicate registration, but all app spans **discarded** by the extension (same root cause as 03) |
+| 06 | `sup1312-06-no-dash0-wrapper` | `/opt/bootstrap` | Dash0 + LWA | yes → `127.0.0.1:9009` | ❌ Same as 05: extension OTLP receiver discards everything (42/42 exports) |
+| 07 | `sup1312-07-app-sdk-direct` | `/opt/bootstrap` | Dash0 + LWA | yes → Dash0 ingress directly | ✅ **Works**: full app traces in Dash0 (server + express + client spans, every request), plus extension invocation spans/metrics |
 
 All functions run the same bundle: `server.js` (Express; started via `run.sh`
 for LWA scenarios), `handler.js` (plain handler for scenario 02), and `otel.js`
@@ -88,6 +93,7 @@ npm install
 export DASH0_TOKEN=...                # or DASH0_DEV_API_TOKEN
 # optional overrides:
 # export DASH0_ENDPOINT=https://ingress.eu-west-1.aws.dash0.com:4318   # default is dash0-dev
+# export DASH0_DATASET=raphael-web-adapter                            # adds Dash0-Dataset routing
 # export DASH0_NODE_LAYER_ARN=arn:aws:lambda:eu-west-1:115813213817:layer:dash0-extension-node:5
 # export LWA_LAYER_ARN=arn:aws:lambda:eu-west-1:753240598075:layer:LambdaAdapterLayerX86:28
 # export RESOURCE_PREFIX=sup1312-     # default
@@ -118,43 +124,98 @@ Then check:
   Compare spans (server/client spans, invocation spans, payload log records)
   and log correlation across scenarios 02, 03, 05, 06.
 
-## Open questions this playground is meant to answer
+## Findings (tested 2026-07-22)
 
-1. Does the chained wrapper (03) give full Dash0 functionality — invocation
-   spans, payload capture, log/trace correlation — when the LWA is the runtime
-   client talking through the Dash0 Runtime API proxy? (The LWA polls
-   `/runtime/invocation/next` in a tight loop; per-request the extension sees
-   the HTTP event and response as usual.)
-2. In 05, do the app-SDK spans and the extension's invocation context line up
-   (same trace), or do we get parallel traces? Does
-   `DASH0_DISABLE_AUTO_INSTRUMENTATION=true` still produce synthetic spans that
-   duplicate the app SDK's server spans (would `DASH0_DISABLE_TELEMETRY_TRACES`
-   be the better switch here)?
-3. In 06 (no Dash0 wrapper at all), does the extension's OTLP receiver on
-   `127.0.0.1:9009` fully work without the Runtime API proxy in the path —
-   enrichment, `faas.invocation_id`, correlation with collected logs?
-4. Flushing: the web app is long-lived inside the sandbox; spans are exported
-   with `SimpleSpanProcessor` immediately, but after the LWA posts the response
-   the sandbox may freeze before the exporter's HTTP call completes. Do spans
-   arrive reliably, or do we need a flush hook (e.g. LWA's
-   `AWS_LWA_PASS_THROUGH_PATH`-style hook or an Express middleware that awaits
-   `forceFlush` before responding)?
-5. Layer file collisions: none expected (Dash0: `/opt/wrapper`, `/opt/shared.sh`,
-   `/opt/init.mjs`, `/opt/extensions/dash0`; LWA: `/opt/bootstrap`,
-   `/opt/extensions/lambda-adapter`) — verify at runtime.
+### 1. The Runtime API proxy can never see LWA traffic — by LWA's architecture
 
-## Outcome options for the ticket
+LWA's `/opt/bootstrap` is literally:
 
-- If **03** works end to end: Dash0 can officially document a chained wrapper —
-  or ship one in the layer (e.g. `/opt/wrapper-web-adapter`) so customers set a
-  single supported value.
-- If the customer keeps their own OTel SDK: **05** (extension keeps the runtime
-  proxy, `DASH0_DISABLE_AUTO_INSTRUMENTATION=true`) or **06** (logs-only model,
-  no Dash0 wrapper) — the deciding factor is which one preserves correlation
-  and enrichment, i.e. open questions 2 and 3.
-- Either way the guidance for the duplicate-registration error is: exactly one
-  SDK may own the process globals — disable Dash0 auto-instrumentation or
-  remove the in-app SDK init.
+```bash
+#!/bin/bash
+exec -- "${LAMBDA_TASK_ROOT}/${_HANDLER}"
+```
+
+It only turns the runtime process into the web app. The actual Lambda↔HTTP
+translation runs in **LWA's external extension process**
+(`/opt/extensions/lambda-adapter`), which Lambda starts with the *original*
+environment — `AWS_LAMBDA_RUNTIME_API=127.0.0.1:9001`. Exec wrappers cannot
+modify extension processes, so Dash0's `AWS_LAMBDA_RUNTIME_API=127.0.0.1:9009`
+rewrite never reaches the process that polls `/runtime/invocation/next`
+(verified: `Got invocation next` appears only in scenario 02's logs).
+Consequences with LWA, regardless of wrapper chaining:
+
+- No runtime-proxy features: no event/response payload capture, no
+  request-scoped enrichment from the proxy.
+- `CURRENT_INVOCATION_ID` in the extension is never set.
+
+The chained wrapper *does* correctly deliver everything env-based: `OTEL_*`
+setup and `NODE_OPTIONS --import /opt/init.mjs` (the distro demonstrably loads
+and instruments inside the web app process).
+
+### 2. The extension discards all OTLP received from an LWA-served app
+
+`src/otlp/receiver.rs` associates incoming `/v1/traces` payloads with an
+invocation: span attribute `faas.invocation_id` (only set by the lambda handler
+instrumentation, which is inert under LWA — `No handler file was able to
+resolved ... /var/task/run`) or fallback `get_current_invocation_id()` (never
+set, see finding 1). Neither exists → `"/v1/traces has no invocation IDs,
+discarding trace"` → **every app span is dropped** (42/42 exports in scenarios
+05/06, 6/6 batches in 03). This kills both the auto-instrumentation path (03)
+and the "app SDK → local extension receiver" path (05, 06).
+
+### 3. The duplicate-registration error is reproduced and understood
+
+Scenario 04 logs the customer's exact error
+(`Attempted duplicate registration of API: context`). It is a diag error, not
+a crash: whichever SDK registers first (the distro, loaded via NODE_OPTIONS
+before app code) owns the process globals; the in-app SDK's registration is
+ignored. Guidance stands: exactly one SDK per process — set
+`DASH0_DISABLE_AUTO_INSTRUMENTATION=true` (or don't chain the wrapper) when the
+app has its own SDK.
+
+### 4. What works today: in-app SDK exporting directly to the Dash0 ingress
+
+Scenario 07 (`APP_OTEL_EXPORT_MODE=direct`: OTLP HTTP straight to
+`DASH0_ENDPOINT` with `Authorization` + `Dash0-Dataset` headers) delivers
+complete app traces — `GET /downstream` server spans, express middleware
+spans, outbound client spans — for every request, alongside the extension's
+telemetry-derived invocation spans and FaaS metrics. Caveats:
+
+- App traces and the extension's invocation spans have different trace IDs
+  (no correlation without propagation into the event).
+- Spans export synchronously per request (SimpleSpanProcessor); at higher
+  rates a batch processor + response-hook flush would be needed.
+
+### 5. Side observation: extension log shipping reported 200 but no logs queryable
+
+In all scenarios the extension logs `Sent logs (count=N) ... status=200 OK`,
+and FaaS **metrics** for the same functions arrive in the dataset — but
+`/api/logs` (and `SELECT count(*) FROM logs` over 30 days) returns zero records
+in dataset `raphael-web-adapter`. Needs a separate look (ingestion drop? log
+pipeline vs dataset header? dev-environment quirk?). Until explained, the
+"logs-only mode" recommendation is on shaky ground.
+
+## Proposed fixes
+
+**Product fix (extension), enables scenarios 05/06 and mostly 03:** in
+`receiver.rs`, when a trace has no invocation IDs, fall back to
+`get_last_seen_invocation_start()` — it is populated from Telemetry API
+`platform.start` events (`log_processing.rs`), which *do* flow in LWA
+scenarios — instead of discarding. Optionally forward spans un-associated as a
+last resort rather than dropping them.
+
+**Customer guidance today (Starling):**
+
+1. Keep `AWS_LAMBDA_EXEC_WRAPPER=/opt/bootstrap` (Web Adapter). Do not chain.
+2. Keep their in-app OTel SDK as the only tracer (no duplicate registration).
+3. Point its exporter directly at the Dash0 ingress
+   (`https://ingress...dash0.com:4318/v1/traces` + `Authorization: Bearer` +
+   `Dash0-Dataset` headers) — scenario 07.
+4. Keep the Dash0 layer attached for FaaS metrics and invocation spans
+   (log delivery pending finding 5).
+5. Once the extension fallback ships, they can switch the exporter to
+   `http://127.0.0.1:9009` (scenario 06) to get local, non-blocking-ish export
+   plus extension enrichment.
 
 ## Cleanup
 

@@ -87,11 +87,14 @@ export class PlaygroundStack extends cdk.Stack {
       retention: logs.RetentionDays.ONE_WEEK,
     });
 
-    const dash0Env = {
+    const dash0Env: Record<string, string> = {
       DASH0_TOKEN: dash0Token,
       DASH0_ENDPOINT: dash0Endpoint,
       DASH0_EXTENSION_LOG_LEVEL: process.env.DASH0_EXTENSION_LOG_LEVEL ?? 'info',
     };
+    if (process.env.DASH0_DATASET) {
+      dash0Env.DASH0_DATASET = process.env.DASH0_DATASET;
+    }
 
     const scenarios: Array<{
       name: string;
@@ -178,6 +181,22 @@ export class PlaygroundStack extends cdk.Stack {
           AWS_LAMBDA_EXEC_WRAPPER: '/opt/bootstrap',
           INIT_APP_OTEL: 'true',
           OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9009',
+          ...dash0Env,
+        },
+      },
+      {
+        // Proposed resolution C ("Model A" from the ticket): the in-app SDK
+        // exports straight to the Dash0 ingress over the internet, bypassing
+        // the extension for traces. The Dash0 layer stays attached for logs,
+        // metrics, and telemetry-derived invocation spans.
+        name: '07-app-sdk-direct',
+        description: 'Web Adapter wrapper only; in-app SDK exports directly to the Dash0 ingress',
+        handler: 'run.sh',
+        layers: [dash0Layer, lwaLayer],
+        environment: {
+          AWS_LAMBDA_EXEC_WRAPPER: '/opt/bootstrap',
+          INIT_APP_OTEL: 'true',
+          APP_OTEL_EXPORT_MODE: 'direct',
           ...dash0Env,
         },
       },

@@ -25,10 +25,24 @@ diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.WARN);
 
 console.log('[app-otel] initializing in-app OpenTelemetry SDK');
 
+// APP_OTEL_EXPORT_MODE=direct sends spans straight to the Dash0 ingress
+// (bypassing the extension), reusing the extension's DASH0_* configuration.
+// Default: honor the standard OTEL_EXPORTER_OTLP_* environment variables
+// (e.g. pointing to the extension's local receiver on 127.0.0.1:9009).
+const exporterConfig = {};
+if ((process.env.APP_OTEL_EXPORT_MODE || '').toLowerCase() === 'direct') {
+  exporterConfig.url = `${process.env.DASH0_ENDPOINT}/v1/traces`;
+  exporterConfig.headers = { Authorization: `Bearer ${process.env.DASH0_TOKEN}` };
+  if (process.env.DASH0_DATASET) {
+    exporterConfig.headers['Dash0-Dataset'] = process.env.DASH0_DATASET;
+  }
+  console.log(`[app-otel] exporting directly to ${exporterConfig.url}`);
+}
+
 const sdk = new NodeSDK({
   // SimpleSpanProcessor exports every span immediately - important in Lambda,
   // where a batch processor may not get to flush before the sandbox freezes.
-  spanProcessors: [new SimpleSpanProcessor(new OTLPTraceExporter())],
+  spanProcessors: [new SimpleSpanProcessor(new OTLPTraceExporter(exporterConfig))],
   instrumentations: [new HttpInstrumentation(), new ExpressInstrumentation()],
 });
 
