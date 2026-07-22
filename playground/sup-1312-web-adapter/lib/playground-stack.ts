@@ -200,6 +200,39 @@ export class PlaygroundStack extends cdk.Stack {
           ...dash0Env,
         },
       },
+      {
+        // Scenario 03 + AWS_LWA_LAMBDA_RUNTIME_API_PROXY: the Web Adapter's
+        // own knob for runtime-api-proxy extensions. Its extension process
+        // polls the Runtime API through the Dash0 proxy, so the extension
+        // regains the invocation context that scenario 03 was missing, while
+        // the chained wrapper still injects the Dash0 auto-instrumentation.
+        name: '08-lwa-proxy-chained',
+        description: 'Chained wrapper + AWS_LWA_LAMBDA_RUNTIME_API_PROXY -> Dash0 auto-instrumentation full path',
+        handler: 'run.sh',
+        layers: [dash0Layer, lwaLayer, chainedWrapperLayer],
+        environment: {
+          AWS_LAMBDA_EXEC_WRAPPER: '/opt/dash0-adapter-wrapper',
+          AWS_LWA_LAMBDA_RUNTIME_API_PROXY: '127.0.0.1:9009',
+          ...dash0Env,
+        },
+      },
+      {
+        // Scenario 06 + AWS_LWA_LAMBDA_RUNTIME_API_PROXY: no wrapper chaining
+        // at all. The app's own SDK exports to the extension's local OTLP
+        // receiver, and the LWA polls through the Dash0 proxy so those spans
+        // can be associated with invocations.
+        name: '09-lwa-proxy-app-sdk',
+        description: 'No chaining; AWS_LWA_LAMBDA_RUNTIME_API_PROXY + in-app SDK -> extension OTLP',
+        handler: 'run.sh',
+        layers: [dash0Layer, lwaLayer],
+        environment: {
+          AWS_LAMBDA_EXEC_WRAPPER: '/opt/bootstrap',
+          AWS_LWA_LAMBDA_RUNTIME_API_PROXY: '127.0.0.1:9009',
+          INIT_APP_OTEL: 'true',
+          OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9009',
+          ...dash0Env,
+        },
+      },
     ];
 
     for (const scenario of scenarios) {
