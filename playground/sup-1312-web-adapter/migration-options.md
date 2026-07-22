@@ -274,3 +274,172 @@ playground deploys.
 200 OK but records were not queryable in the test dataset — do not promise log
 delivery until that is resolved (see README finding 6). Traces and FaaS metrics
 are verified working in both options.
+
+---
+
+## Deep dive: scenario 08 vs 09 mechanics
+
+Both scenarios share the same invocation plumbing (LWA polls through the Dash0
+proxy via `AWS_LWA_LAMBDA_RUNTIME_API_PROXY`). They differ in **how the tracer
+gets into the app process**, **when spans are exported**, and **what the
+resulting trace looks like**.
+
+### Cold start: how the tracer gets into the process
+
+**Scenario 08** — the chained wrapper injects the Dash0 distro before any app
+code runs:
+
+```mermaid
+flowchart TB
+  L["Lambda starts the runtime process<br/>(AWS_LAMBDA_EXEC_WRAPPER)"]
+  CW["/opt/dash0-adapter-wrapper<br/>(chained-wrapper layer)"]
+  DW["/opt/wrapper — Dash0<br/>sets OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES<br/>OTEL_PROPAGATORS = tracecontext, baggage, xray-lambda<br/>NODE_OPTIONS = --import /opt/init.mjs"]
+  LB["exec /opt/bootstrap — LWA<br/>one line: exec run.sh"]
+  RS["run.sh → node server.js"]
+  N["Dash0 distro loads FIRST via NODE_OPTIONS<br/>registers the global tracer, patches http/express<br/>exporter: OTLP → 127.0.0.1:9009, BatchSpanProcessor"]
+  A["app code runs (no OTel code in it)"]
+  L --> CW --> DW --> LB --> RS --> N --> A
+  classDef dash0 fill:#f3ddb0,stroke:#b07818,color:#3a2f14;
+  classDef lwa fill:#c8e6e4,stroke:#14787a,color:#0d3536;
+  classDef aws fill:#e2e5ec,stroke:#8a8fa3,color:#23272f;
+  class CW,DW,N dash0; class LB lwa; class L,RS,A aws;
+```
+
+**Scenario 09** — no wrapper chaining; the app initializes its own SDK as it
+does today:
+
+```mermaid
+flowchart TB
+  L["Lambda starts the runtime process<br/>(AWS_LAMBDA_EXEC_WRAPPER)"]
+  LB["/opt/bootstrap — LWA<br/>one line: exec run.sh"]
+  RS["run.sh → node server.js"]
+  N["app requires its own otel setup<br/>NodeSDK registers the global tracer<br/>exporter: OTLP → 127.0.0.1:9009, SimpleSpanProcessor<br/>propagators: tracecontext, baggage (default)"]
+  A["app code runs"]
+  L --> LB --> RS --> N --> A
+  classDef lwa fill:#c8e6e4,stroke:#14787a,color:#0d3536;
+  classDef app fill:#e8ecf5,stroke:#5b6ea3,color:#1d2740;
+  classDef aws fill:#e2e5ec,stroke:#8a8fa3,color:#23272f;
+  class LB lwa; class N app; class L,RS,A aws;
+```
+
+The one-registration rule is satisfied differently: in 08 the distro registers
+first and is the *only* SDK (the app must not init one); in 09 the app SDK
+registers first and is the only SDK (no `NODE_OPTIONS` injection happens).
+
+### One warm request, end to end
+
+**Scenario 08** — spans are batched by the distro and typically leave the
+process on a *later* thaw:
+
+```mermaid
+sequenceDiagram
+  participant LWA as LWA extension
+  participant EXT as Dash0 ext :9009
+  participant API as Runtime API :9001
+  participant APP as web app :8080 (distro)
+  LWA->>EXT: GET /invocation/next
+  EXT->>API: pass-through
+  API-->>EXT: event, requestId = A
+  Note over EXT: current invocation = A, event payload captured
+  EXT-->>LWA: event A
+  LWA->>APP: HTTP GET /downstream, header x-amzn-trace-id
+  Note over APP: distro extracts x-amzn-trace-id (xray-lambda propagator)<br/>server span + express span + outbound client span<br/>spans buffered in BatchSpanProcessor
+  APP-->>LWA: 200 response
+  LWA->>EXT: POST /invocation/A/response
+  EXT->>API: pass-through
+  Note over EXT: invocation span for A built and exported
+  Note over APP,EXT: up to 5 s later, usually during invocation B
+  APP->>EXT: POST /v1/traces, batch of spans
+  Note over EXT: associated (current invocation set), enriched,<br/>exported to the Dash0 ingress
+```
+
+**Scenario 09** — `SimpleSpanProcessor` exports each span the moment it ends,
+mostly inside the same invocation window:
+
+```mermaid
+sequenceDiagram
+  participant LWA as LWA extension
+  participant EXT as Dash0 ext :9009
+  participant API as Runtime API :9001
+  participant APP as web app :8080 (app SDK)
+  LWA->>EXT: GET /invocation/next
+  EXT->>API: pass-through
+  API-->>EXT: event, requestId = A
+  Note over EXT: current invocation = A
+  EXT-->>LWA: event A
+  LWA->>APP: HTTP GET /downstream, header x-amzn-trace-id
+  Note over APP: default propagators ignore x-amzn-trace-id<br/>server span starts a NEW trace
+  APP->>EXT: POST /v1/traces, client span (ends mid-request)
+  APP-->>LWA: 200 response
+  APP->>EXT: POST /v1/traces, server + express spans (end with response)
+  LWA->>EXT: POST /invocation/A/response
+  EXT->>API: pass-through
+  Note over EXT: invocation span for A built and exported<br/>app spans associated + exported
+```
+
+### What lands in Dash0: trace shapes
+
+**Scenario 08 — one correlated trace per request** (verified 21/22). The
+distro's `xray-lambda` propagator stitches app spans into the same trace as the
+extension's invocation span. Known polish item: the server span's parent is the
+X-Ray segment (not exported), so the tree shows one missing hop.
+
+```mermaid
+flowchart TB
+  subgraph TR8["trace amB1…  — one trace"]
+    R8["invocation span — dash0.lambda-extension"]
+    O8["aws.lambda.overhead"]
+    G8(["X-Ray segment — parent not exported"])
+    S8["GET /downstream — server span (distro)"]
+    E8["express handler span"]
+    C8["GET checkip.amazonaws.com — client span"]
+    R8 --> O8
+    G8 -.-> S8
+    S8 --> E8
+    S8 --> C8
+  end
+  classDef dash0 fill:#f3ddb0,stroke:#b07818,color:#3a2f14;
+  classDef app fill:#e8ecf5,stroke:#5b6ea3,color:#1d2740;
+  classDef gap fill:#f1f2f5,stroke:#8a8fa3,color:#5b6270,stroke-dasharray:4;
+  class R8,O8 dash0; class S8,E8,C8 app; class G8 gap;
+```
+
+**Scenario 09 — two parallel traces per request** (as deployed, without the
+X-Ray propagator in the app SDK). Both are complete; they are just not stitched
+together. Adding `@opentelemetry/propagator-aws-xray-lambda` to the app SDK
+should merge them into the 08 shape.
+
+```mermaid
+flowchart TB
+  subgraph TRX["trace amBo…  — extension"]
+    R9["invocation span — dash0.lambda-extension"]
+    O9["aws.lambda.overhead"]
+    R9 --> O9
+  end
+  subgraph TRY["trace 71c2…  — app SDK"]
+    S9["GET /downstream — server span"]
+    E9["express handler span"]
+    C9["GET checkip.amazonaws.com — client span"]
+    S9 --> E9
+    S9 --> C9
+  end
+  classDef dash0 fill:#f3ddb0,stroke:#b07818,color:#3a2f14;
+  classDef app fill:#e8ecf5,stroke:#5b6ea3,color:#1d2740;
+  class R9,O9 dash0; class S9,E9,C9 app;
+```
+
+### Mechanics side by side
+
+| | **08 — auto-instrumentation** | **09 — in-app SDK** |
+|---|---|---|
+| Tracer enters the process via | `NODE_OPTIONS --import /opt/init.mjs` (chained wrapper) | app's own `require('./otel')` |
+| Global registration order | distro first, nothing else allowed | app SDK first, nothing else present |
+| Span processor | `BatchSpanProcessor` (max 5 s delay, distro default) | app's choice — `SimpleSpanProcessor` tested |
+| Export timing | batches, often during the *next* invocation | per span, mostly within the same invocation |
+| Export target | `127.0.0.1:9009` (distro default) | `127.0.0.1:9009` (one-line app change) |
+| Propagators | `tracecontext, baggage, xray-lambda` (set by wrapper) | SDK defaults (`tracecontext, baggage`) unless extended |
+| Trace correlation with invocation span | ✅ built-in (21/22 verified) | ❌ as deployed; ✅ expected with the X-Ray propagator |
+| `OTEL_SERVICE_NAME`, resource attrs | set by the Dash0 wrapper | app/function config |
+| Instrumentation coverage | distro's full set (http, express, aws-sdk, pg, redis, …) | whatever the app installs |
+| Risk if the other tracer sneaks in | app SDK init → duplicate-registration error | chained wrapper added → same error, reversed |
+| Spans at risk of arriving late | last batch before a long idle | spans that end after the response is posted |
