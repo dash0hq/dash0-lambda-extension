@@ -1,0 +1,15 @@
+{
+  "name": "sup-1312-playground-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Express app used by the SUP-1312 Web Adapter / Dash0 extension playground",
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.221.0",
+    "@opentelemetry/instrumentation-express": "^0.68.0",
+    "@opentelemetry/instrumentation-http": "^0.221.0",
+    "@opentelemetry/sdk-node": "^0.221.0",
+    "@opentelemetry/sdk-trace-base": "^2.5.0",
+    "express": "^4.21.2"
+  }
+}

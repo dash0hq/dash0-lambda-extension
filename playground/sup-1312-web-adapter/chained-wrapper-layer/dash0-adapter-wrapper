@@ -1,0 +1,40 @@
+#!/bin/bash
+# Chained AWS_LAMBDA_EXEC_WRAPPER combining the Dash0 Lambda extension with the
+# AWS Lambda Web Adapter (SUP-1312).
+#
+# AWS_LAMBDA_EXEC_WRAPPER has a single slot:
+#   - the Web Adapter wants  AWS_LAMBDA_EXEC_WRAPPER=/opt/bootstrap
+#   - the Dash0 layer wants  AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper
+#
+# This script occupies the slot itself and chains the two. Lambda invokes it as
+#   /opt/dash0-adapter-wrapper <original-runtime-command...>
+#
+# Dash0's /opt/wrapper sets up the environment and then `exec`s its arguments:
+#   - AWS_LAMBDA_RUNTIME_API=127.0.0.1:9009 (the extension's Runtime API proxy)
+#   - OTEL_* resource attributes, service name, propagators
+#   - NODE_OPTIONS="--import /opt/init.mjs" (Node auto-instrumentation), unless
+#     DASH0_DISABLE_AUTO_INSTRUMENTATION or DASH0_DISABLE_TELEMETRY_TRACES is set
+#
+# By passing /opt/bootstrap (the Web Adapter) to /opt/wrapper instead of the
+# original runtime command, the adapter:
+#   1. polls the Runtime API through the Dash0 proxy (the extension sees every
+#      invocation: payloads, timings, synthetic spans, log correlation), and
+#   2. starts the web app (the function handler, e.g. run.sh) with the
+#      instrumented environment, so NODE_OPTIONS auto-instruments the app.
+
+if [ -x /opt/wrapper ] && [ -x /opt/bootstrap ]; then
+  exec /opt/wrapper /opt/bootstrap "$@"
+fi
+
+if [ -x /opt/bootstrap ]; then
+  echo "dash0-adapter-wrapper: /opt/wrapper not found (Dash0 layer not attached?) - starting Web Adapter only" >&2
+  exec /opt/bootstrap "$@"
+fi
+
+if [ -x /opt/wrapper ]; then
+  echo "dash0-adapter-wrapper: /opt/bootstrap not found (Web Adapter layer not attached?) - starting Dash0 wrapper only" >&2
+  exec /opt/wrapper "$@"
+fi
+
+echo "dash0-adapter-wrapper: neither /opt/wrapper nor /opt/bootstrap found - running unmodified runtime command" >&2
+exec "$@"
