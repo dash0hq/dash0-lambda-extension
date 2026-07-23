@@ -67,19 +67,23 @@ jobs:
             echo "${layer}_version=${version}" >> "$GITHUB_OUTPUT"
           done
 
-      - name: Determine next tag
+      - name: Determine tag from layer version
         id: tag
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          latest=$(gh release list --limit 1 --json tagName --jq '.[0].tagName // empty')
-          if [ -z "$latest" ]; then
-            next="v1"
-          else
-            num=${latest#v}
-            next="v$(( num + 1 ))"
+          PYTHON="${{ steps.layers.outputs.python_version }}"
+          NODE="${{ steps.layers.outputs.node_version }}"
+          JAVA="${{ steps.layers.outputs.java_version }}"
+          MANUAL="${{ steps.layers.outputs.manual_version }}"
+
+          # The release tag must equal the published layer version. That only has
+          # a single meaning when all four layers are aligned; if they have
+          # drifted, fail loudly instead of silently picking one.
+          if [ "$PYTHON" != "$NODE" ] || [ "$PYTHON" != "$JAVA" ] || [ "$PYTHON" != "$MANUAL" ]; then
+            echo "error: layer versions have drifted (python=$PYTHON node=$NODE java=$JAVA manual=$MANUAL); refusing to tag" >&2
+            exit 1
           fi
-          echo "tag=${next}" >> "$GITHUB_OUTPUT"
+
+          echo "tag=v${PYTHON}" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
         env:

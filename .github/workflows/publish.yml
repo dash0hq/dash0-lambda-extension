@@ -21,7 +21,10 @@ permissions:
 
 jobs:
   backfill:
-    if: inputs.environment == 'prod-integration' && inputs.region != 'eu-west-1'
+    # Disabled: the backfill races eu-west-1's parallel deploy and drifts version
+    # counters (notably the fast, Docker-less manual layer). Re-enable only once
+    # it aligns to a pre-deploy snapshot instead of reading eu-west-1 live.
+    if: false
     name: Backfill layer versions
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
