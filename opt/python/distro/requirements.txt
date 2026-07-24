@@ -11,7 +11,7 @@ opentelemetry-instrumentation==0.64b0
 opentelemetry-propagator-aws-xray==1.0.2
 opentelemetry-instrumentation-asgi==0.64b0
 opentelemetry-instrumentation-aws-lambda==0.64b0
-opentelemetry-instrumentation-botocore @ git+https://github.com/mosheshaham-dash0/opentelemetry-python-contrib.git@12ca78bce4cd95f17b8d7ac5a0878635b59ad870#subdirectory=instrumentation/opentelemetry-instrumentation-botocore
+opentelemetry-instrumentation-botocore @ git+https://github.com/mosheshaham-dash0/opentelemetry-python-contrib.git@62b69093d2dff725d49836f40570f45f095f30af#subdirectory=instrumentation/opentelemetry-instrumentation-botocore
 opentelemetry-instrumentation-boto3sqs==0.64b0
 opentelemetry-instrumentation-fastapi==0.64b0
 opentelemetry-instrumentation-flask==0.64b0
