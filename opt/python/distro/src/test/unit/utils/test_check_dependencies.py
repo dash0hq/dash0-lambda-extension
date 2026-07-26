@@ -130,6 +130,31 @@ class TestCheckDependencyConflicts:
             mock_dists.return_value = [_mock_dist("asgiref", "4.0.0")]
             assert check_dependency_conflicts(req_file) is True
 
+    def test_disabled_via_env_var(self, tmp_path, monkeypatch):
+        """The check is skipped entirely when the kill switch is set."""
+        req_file = _write_requirements(tmp_path, ["protobuf>=4.0,<5.0"])
+        monkeypatch.setenv("DASH0_DISABLE_DEPENDENCY_CHECK", "true")
+        with patch("dash0_opentelemetry.utils.check_dependencies.distributions") as mock_dists:
+            mock_dists.return_value = [_mock_dist("protobuf", "5.28.0")]
+            assert check_dependency_conflicts(req_file) is False
+            mock_dists.assert_not_called()
+
+    def test_disabled_via_env_var_is_case_insensitive(self, tmp_path, monkeypatch):
+        req_file = _write_requirements(tmp_path, ["protobuf>=4.0,<5.0"])
+        monkeypatch.setenv("DASH0_DISABLE_DEPENDENCY_CHECK", "TRUE")
+        with patch("dash0_opentelemetry.utils.check_dependencies.distributions") as mock_dists:
+            mock_dists.return_value = [_mock_dist("protobuf", "5.28.0")]
+            assert check_dependency_conflicts(req_file) is False
+
+    @pytest.mark.parametrize("value", ["", "false", "1", "yes"])
+    def test_check_runs_unless_env_var_is_true(self, tmp_path, monkeypatch, value):
+        """Only the literal value 'true' disables the check."""
+        req_file = _write_requirements(tmp_path, ["protobuf>=4.0,<5.0"])
+        monkeypatch.setenv("DASH0_DISABLE_DEPENDENCY_CHECK", value)
+        with patch("dash0_opentelemetry.utils.check_dependencies.distributions") as mock_dists:
+            mock_dists.return_value = [_mock_dist("protobuf", "5.28.0")]
+            assert check_dependency_conflicts(req_file) is True
+
     def test_git_url_requirement_skipped(self, tmp_path):
         """Git URL requirements (with @) should still be parseable by Requirement."""
         req_file = _write_requirements(tmp_path, [

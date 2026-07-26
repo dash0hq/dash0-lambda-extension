@@ -1,8 +1,11 @@
 import logging
+import os
 from importlib.metadata import distributions, requires, version
 from packaging.requirements import Requirement
 
 logger = logging.getLogger(__name__)
+
+DISABLE_DEPENDENCY_CHECK_ENV_VAR = "DASH0_DISABLE_DEPENDENCY_CHECK"
 
 
 def check_dependency_conflicts(requirements_file):
@@ -11,8 +14,16 @@ def check_dependency_conflicts(requirements_file):
     Reads the top-level requirements from a file, then recursively checks
     sub-dependencies using importlib.metadata.
 
-    Returns True if conflicts were found, False otherwise.
+    Returns True if conflicts were found, False otherwise. Always returns False
+    when the check is disabled via DASH0_DISABLE_DEPENDENCY_CHECK=true.
     """
+    if os.environ.get(DISABLE_DEPENDENCY_CHECK_ENV_VAR, "").lower() == "true":
+        logger.debug(
+            "Skipping the dependency conflict check, it is disabled via the '%s' environment variable",
+            DISABLE_DEPENDENCY_CHECK_ENV_VAR,
+        )
+        return False
+
     # Build a map of installed packages and their versions once
     installed = {dist.metadata["Name"].lower(): dist.metadata["Version"] for dist in distributions()}
 

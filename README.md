@@ -97,6 +97,8 @@ The extension layers are published to the following AWS regions:
 
 * `DASH0_XRAY_TRACES_ENABLED` - When set to `true`, the extension preserves the original X-Ray trace context instead of creating supplementary spans. Use this when AWS X-Ray active tracing is enabled on the Lambda function. Default: `false`.
 
+* `DASH0_DISABLE_DEPENDENCY_CHECK` - Python only. On startup, the Python distribution checks whether its own dependencies conflict with the versions installed in the function, and skips loading the auto-instrumentation if they do. When set to `true`, that check is skipped and the distribution loads regardless. Use this if the check reports a false positive; note that a real conflict may cause the function to fail at runtime. Default: `false`.
+
 ### Secret Masking
 
 The extension automatically masks sensitive data in traces payloads. By default, any JSON key matching these patterns (case-insensitive) will have its value replaced with `****`:

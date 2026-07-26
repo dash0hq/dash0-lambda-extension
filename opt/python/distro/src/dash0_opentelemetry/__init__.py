@@ -159,7 +159,12 @@ tracer_provider = None
 DISTRO_REQUIREMENTS = os.path.join(os.path.dirname(__file__), "requirements.txt")
 conflict_found = check_dependency_conflicts(DISTRO_REQUIREMENTS)
 
-if not conflict_found:
+if conflict_found:
+    logger.warning(
+        "Not loading the Dash0 OpenTelemetry distribution due to a dependency conflict. "
+        "Set DASH0_DISABLE_DEPENDENCY_CHECK=true to skip this check and load the distribution anyway."
+    )
+else:
     init_data = init()
     tracer_provider = init_data.get("tracer_provider")
 
