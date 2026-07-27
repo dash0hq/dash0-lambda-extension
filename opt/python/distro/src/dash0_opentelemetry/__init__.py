@@ -162,7 +162,7 @@ conflict_found = check_dependency_conflicts(DISTRO_REQUIREMENTS)
 if conflict_found:
     logger.warning(
         "Not loading the Dash0 OpenTelemetry distribution due to a dependency conflict. "
-        "Set DASH0_DISABLE_DEPENDENCY_CHECK=true to skip this check and load the distribution anyway."
+        "Set DASH0_DISABLE_PYTHON_DEPENDENCY_CHECK=true to skip this check and load the distribution anyway."
     )
 else:
     init_data = init()

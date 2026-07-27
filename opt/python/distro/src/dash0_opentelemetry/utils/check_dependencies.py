@@ -5,7 +5,7 @@ from packaging.requirements import Requirement
 
 logger = logging.getLogger(__name__)
 
-DISABLE_DEPENDENCY_CHECK_ENV_VAR = "DASH0_DISABLE_DEPENDENCY_CHECK"
+DISABLE_DEPENDENCY_CHECK_ENV_VAR = "DASH0_DISABLE_PYTHON_DEPENDENCY_CHECK"
 
 
 def check_dependency_conflicts(requirements_file):
@@ -15,7 +15,7 @@ def check_dependency_conflicts(requirements_file):
     sub-dependencies using importlib.metadata.
 
     Returns True if conflicts were found, False otherwise. Always returns False
-    when the check is disabled via DASH0_DISABLE_DEPENDENCY_CHECK=true.
+    when the check is disabled via DASH0_DISABLE_PYTHON_DEPENDENCY_CHECK=true.
     """
     if os.environ.get(DISABLE_DEPENDENCY_CHECK_ENV_VAR, "").lower() == "true":
         logger.debug(
