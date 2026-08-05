@@ -57,7 +57,7 @@ All options are set under `custom.dash0` in your `serverless.yml`.
 
 | Option | Type | Description |
 | --- | --- | --- |
-| `endpoint` | `string` | Dash0 OTLP/HTTP ingestion endpoint. Find it in the Dash0 app under **Settings → Endpoints → OTLP via HTTP → Endpoint**. |
+| `endpoint` | `string` | Dash0 OTLP ingestion endpoint. Find it in the Dash0 app under **Settings → Endpoints → OTLP via HTTP → Endpoint**. |
 | `layerVersion` | `number` or `"latest"` | Layer version to use. A specific version number, or `"latest"` to use the version bundled with the plugin. |
 | `token` | `string` | Dash0 API token. Required unless `tokenSecretArn` is provided. |
 | `tokenSecretArn` | `string` | ARN of an AWS Secrets Manager secret containing the Dash0 API token. Required unless `token` is provided. If both are set, both environment variables will be added. |
