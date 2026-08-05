@@ -22,7 +22,7 @@ plugins:
 
 custom:
   dash0:
-    endpoint: https://ingress.<your-environment>.dash0.com:4318  # Settings → Endpoints → OTLP via HTTP → Endpoint
+    endpoint: https://ingress.eu-west-1.aws.dash0.com:4318
     token: ${env:DASH0_TOKEN}
     layerVersion: latest
 
