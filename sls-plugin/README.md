@@ -22,7 +22,7 @@ plugins:
 
 custom:
   dash0:
-    endpoint: https://ingress.eu-west-1.aws.dash0.com:4318
+    endpoint: https://ingress.<your-environment>.dash0.com:4318  # e.g. https://ingress.eu-west-1.aws.dash0.com:4318
     token: ${env:DASH0_TOKEN}
     layerVersion: latest
 
