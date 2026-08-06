@@ -8,6 +8,7 @@ on:
 permissions:
   id-token: write
   contents: write
+  pull-requests: write
 
 jobs:
   build:
@@ -114,3 +115,39 @@ jobs:
             --title "${{ steps.tag.outputs.tag }}" \
             --notes-file /tmp/release-notes.md \
             --generate-notes
+
+      # Keep the sls-plugin's bundled "latest" versions in sync with what was just published.
+      # Opens a PR (rather than pushing to master) so the change is reviewed before it ships.
+      - name: Sync bundled versions.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NODE="${{ steps.layers.outputs.node_version }}"
+          PYTHON="${{ steps.layers.outputs.python_version }}"
+          JAVA="${{ steps.layers.outputs.java_version }}"
+
+          cat > sls-plugin/src/versions.json <<EOF
+          {
+            "dash0-extension-node": ${NODE},
+            "dash0-extension-python": ${PYTHON},
+            "dash0-extension-java": ${JAVA}
+          }
+          EOF
+
+          if git diff --quiet -- sls-plugin/src/versions.json; then
+            echo "versions.json already current; nothing to do."
+            exit 0
+          fi
+
+          branch="chore/sync-layer-versions-${{ steps.tag.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add sls-plugin/src/versions.json
+          git commit -m "chore: sync bundled 'latest' layer versions to ${{ steps.tag.outputs.tag }}"
+          git push origin "$branch"
+          gh pr create \
+            --base master \
+            --head "$branch" \
+            --title "chore: sync bundled 'latest' layer versions to ${{ steps.tag.outputs.tag }}" \
+            --body "Automated sync of \`sls-plugin/src/versions.json\` to the layer versions published in ${{ steps.tag.outputs.tag }} (node=${NODE}, python=${PYTHON}, java=${JAVA})."
