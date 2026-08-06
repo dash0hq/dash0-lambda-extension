@@ -14,13 +14,15 @@ npm install --save-dev @dash0/serverless-dash0
 
 Add the plugin to your `serverless.yml` and configure the `custom.dash0` section:
 
+> **Where to find your endpoint:** In the Dash0 app, go to **Settings → Endpoints → OTLP via HTTP** and copy the value from the **Endpoint** field.
+
 ```yaml
 plugins:
   - "@dash0/serverless-dash0"
 
 custom:
   dash0:
-    endpoint: https://ingress.eu-west-1.aws.dash0.com:4318
+    endpoint: https://ingress.<your-environment>.dash0.com:4318  # e.g. https://ingress.eu-west-1.aws.dash0.com:4318
     token: ${env:DASH0_TOKEN}
     layerVersion: latest
 
@@ -55,7 +57,7 @@ All options are set under `custom.dash0` in your `serverless.yml`.
 
 | Option | Type | Description |
 | --- | --- | --- |
-| `endpoint` | `string` | Dash0 OTLP ingestion endpoint. |
+| `endpoint` | `string` | Dash0 OTLP ingestion endpoint. Find it in the Dash0 app under **Settings → Endpoints → OTLP via HTTP → Endpoint**. |
 | `layerVersion` | `number` or `"latest"` | Layer version to use. A specific version number, or `"latest"` to use the version bundled with the plugin. |
 | `token` | `string` | Dash0 API token. Required unless `tokenSecretArn` is provided. |
 | `tokenSecretArn` | `string` | ARN of an AWS Secrets Manager secret containing the Dash0 API token. Required unless `token` is provided. If both are set, both environment variables will be added. |
