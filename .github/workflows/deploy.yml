@@ -8,6 +8,7 @@ on:
 permissions:
   id-token: write
   contents: write
+  pull-requests: write
 
 jobs:
   build:
@@ -48,6 +49,11 @@ jobs:
     needs: deploy-prod
     runs-on: ubuntu-latest
     environment: prod-integration
+    outputs:
+      node_version: ${{ steps.layers.outputs.node_version }}
+      python_version: ${{ steps.layers.outputs.python_version }}
+      java_version: ${{ steps.layers.outputs.java_version }}
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
 
@@ -114,3 +120,58 @@ jobs:
             --title "${{ steps.tag.outputs.tag }}" \
             --notes-file /tmp/release-notes.md \
             --generate-notes
+
+  # Keep the sls-plugin's bundled "latest" versions in sync with what was just published.
+  # Runs as its own job so a failure here never fails the release, and can be re-run on its
+  # own (the release/tag already exists, so re-running create-release is not an option).
+  # Opens a PR (rather than pushing to master) so the change is reviewed before it ships.
+  sync-plugin-versions:
+    if: github.event_name == 'workflow_dispatch'
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Sync bundled versions.json, bump plugin version, and open PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NODE: ${{ needs.create-release.outputs.node_version }}
+          PYTHON: ${{ needs.create-release.outputs.python_version }}
+          JAVA: ${{ needs.create-release.outputs.java_version }}
+          TAG: ${{ needs.create-release.outputs.tag }}
+        run: |
+          # Merge onto the existing file so keys we don't manage here (e.g.
+          # dash0-extension-manual or a future runtime) are preserved rather than dropped.
+          tmp=$(mktemp)
+          jq --argjson node "$NODE" --argjson python "$PYTHON" --argjson java "$JAVA" '
+            .["dash0-extension-node"]   = $node
+            | .["dash0-extension-python"] = $python
+            | .["dash0-extension-java"]   = $java
+          ' sls-plugin/src/versions.json > "$tmp" && mv "$tmp" sls-plugin/src/versions.json
+
+          if git diff --quiet -- sls-plugin/src/versions.json; then
+            echo "versions.json already current; nothing to do."
+            exit 0
+          fi
+
+          # dist/versions.json is baked in at build time, so consumers on
+          # layerVersion: latest only see new numbers after a republish. Bump the
+          # patch version here so merging this PR triggers Publish SLS Plugin.
+          # --no-git-tag-version is dirty-tree safe and updates the lockfile too.
+          ( cd sls-plugin && npm version patch --no-git-tag-version )
+          new_plugin_version=$(jq -r .version sls-plugin/package.json)
+
+          branch="chore/sync-layer-versions-${TAG}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add sls-plugin/src/versions.json sls-plugin/package.json sls-plugin/package-lock.json
+          git commit -m "chore: sync 'latest' layer versions to ${TAG}, bump plugin to v${new_plugin_version}"
+          git push origin "$branch"
+          gh pr create \
+            --base master \
+            --head "$branch" \
+            --title "chore: sync 'latest' layer versions to ${TAG} (plugin v${new_plugin_version})" \
+            --body "Automated after ${TAG}: syncs \`sls-plugin/src/versions.json\` to node=${NODE}, python=${PYTHON}, java=${JAVA} and bumps the plugin to v${new_plugin_version}. Merging republishes \`@dash0/serverless-dash0\` to npm so consumers on \`layerVersion: latest\` resolve the new versions."

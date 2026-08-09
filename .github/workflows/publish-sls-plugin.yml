@@ -2,6 +2,12 @@ name: Publish SLS Plugin
 
 on:
   workflow_dispatch:
+  push:
+    branches: [master]
+    paths: ['sls-plugin/package.json']
+
+concurrency:
+  group: publish-sls-plugin
 
 permissions:
   contents: write
@@ -16,6 +22,8 @@ jobs:
     if: github.ref == 'refs/heads/master'
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # need all tags present for the release-tag push below
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -23,28 +31,37 @@ jobs:
       - name: Read version from package.json
         id: version
         working-directory: sls-plugin
+        run: echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+      - name: Skip if this version is already on npm
+        id: check
         run: |
-          version=$(node -p "require('./package.json').version")
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-      - name: Fail if tag already exists
-        run: |
-          if git rev-parse "sls-plugin-v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
-            echo "Tag sls-plugin-v${{ steps.version.outputs.version }} already exists — bump the version in sls-plugin/package.json via a PR first."
-            exit 1
+          # The registry is what actually rejects a duplicate publish, so gate on it
+          # rather than on a git tag (the path trigger fires on any package.json edit).
+          remote=$(npm view @dash0/serverless-dash0 version 2>/dev/null || echo none)
+          if [ "${{ steps.version.outputs.version }}" = "$remote" ]; then
+            echo "Version ${{ steps.version.outputs.version }} already published; skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
       - name: Install dependencies
+        if: steps.check.outputs.skip == 'false'
         working-directory: sls-plugin
         run: npm ci
       - name: Run tests
+        if: steps.check.outputs.skip == 'false'
         working-directory: sls-plugin
         run: npm test
       - name: Build
+        if: steps.check.outputs.skip == 'false'
         working-directory: sls-plugin
         run: npm run build
       - name: Publish to npm
+        if: steps.check.outputs.skip == 'false'
         working-directory: sls-plugin
         run: npm publish --access public
       - name: Tag release
+        if: steps.check.outputs.skip == 'false'
         run: |
           git tag "sls-plugin-v${{ steps.version.outputs.version }}"
           git push origin "sls-plugin-v${{ steps.version.outputs.version }}"
