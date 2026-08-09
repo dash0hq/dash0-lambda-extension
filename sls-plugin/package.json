@@ -1,6 +1,6 @@
 {
   "name": "@dash0/serverless-dash0",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Serverless Framework plugin to automatically add Dash0 Lambda tracing layers and configuration",
   "repository": {
     "type": "git",
