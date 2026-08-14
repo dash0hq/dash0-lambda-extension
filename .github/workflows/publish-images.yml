@@ -1,0 +1,70 @@
+name: Publish Public Images
+
+# Publishes the extension container images to the ECR Public registry, so that
+# the `COPY --from=public.ecr.aws/<alias>/extension-<runtime>` line documented in
+# the README resolves for customers with no AWS credentials.
+#
+# This is deliberately NOT part of publish.yml. Lambda layers are regional and
+# publish.yml runs once per region; ECR Public is a single global registry, so
+# running this per region would push the same multi-arch image 18 times and race
+# 18 jobs on the same `:latest` tag.
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish:
+    name: Build and Publish ${{ matrix.runtime }} Image
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    strategy:
+      # One runtime failing should not strand the other two half-published.
+      fail-fast: false
+      matrix:
+        runtime: [python, node, java]
+    steps:
+      # Fail fast, before the build spends any time. There is deliberately no
+      # default alias: dev and prod publish to separate registries, and silently
+      # sharing one would let a dev push overwrite the :latest tag customers pull.
+      - name: Verify the registry alias is configured
+        env:
+          ECR_PUBLIC_ALIAS: ${{ vars.ECR_PUBLIC_ALIAS }}
+        run: |
+          if [ -z "$ECR_PUBLIC_ALIAS" ]; then
+            echo "::error::ECR_PUBLIC_ALIAS is not set for the '${{ inputs.environment }}' environment. Set it to that account's ECR Public registry alias (see: aws ecr-public describe-registries --region us-east-1)."
+            exit 1
+          fi
+          echo "Publishing to public.ecr.aws/$ECR_PUBLIC_ALIAS"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/download-artifact@v4
+        with:
+          name: rust-binaries
+          path: build
+      - name: Ensure binaries are executable and fresh
+        run: chmod +x build/dash0_x86_64 build/dash0_aarch64 && touch build/dash0_x86_64 build/dash0_aarch64
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          # ECR Public's control plane is only reachable in us-east-1. The
+          # registry itself is global, so this is not a deployment region and
+          # must not be driven off the region matrix.
+          aws-region: us-east-1
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and push public image
+        run: make docker-${{ matrix.runtime }} ECR_PUBLIC=true
+        env:
+          ECR_PUBLIC_ALIAS: ${{ vars.ECR_PUBLIC_ALIAS }}

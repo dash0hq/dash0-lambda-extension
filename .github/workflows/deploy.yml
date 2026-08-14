@@ -24,6 +24,16 @@ jobs:
     with:
       environment: dev-integration
       region: ${{ matrix.region }}
+      # Container images are published globally by publish-images-dev below.
+      publish_images: false
+    secrets: inherit
+
+  publish-images-dev:
+    if: github.event_name == 'push'
+    needs: deploy-dev
+    uses: ./.github/workflows/publish-images.yml
+    with:
+      environment: dev-integration
     secrets: inherit
 
   deploy-prod:
@@ -36,6 +46,19 @@ jobs:
     with:
       environment: prod-integration
       region: ${{ matrix.region }}
+      # Container images are published globally by publish-images.yml below.
+      publish_images: false
+    secrets: inherit
+
+  # Released images are public and global: one push, not one per region. Gated on
+  # deploy-prod because the images carry only a :latest tag, so a partial layer
+  # rollout must not leave new public images live with no older tag to fall back to.
+  publish-images:
+    if: github.event_name == 'workflow_dispatch'
+    needs: deploy-prod
+    uses: ./.github/workflows/publish-images.yml
+    with:
+      environment: prod-integration
     secrets: inherit
 
   sanity-checks:

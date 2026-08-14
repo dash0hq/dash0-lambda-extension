@@ -1,4 +1,4 @@
-ARG EXTENSION_IMAGE=dash0/extension-node:latest
+ARG EXTENSION_IMAGE=public.ecr.aws/dash0/extension-node:latest
 
 FROM ${EXTENSION_IMAGE} AS extension
 

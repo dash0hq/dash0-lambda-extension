@@ -4,7 +4,7 @@
 # multi-stage builds for containerized Lambda functions:
 #
 #   FROM public.ecr.aws/lambda/java:21
-#   COPY --from=dash0/extension-java:latest /opt /opt
+#   COPY --from=public.ecr.aws/dash0/extension-java:latest /opt /opt
 #   ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper
 #   ...
 #
