@@ -44,8 +44,9 @@ ifeq ($(ECR_PUBLIC),true)
   ifeq ($(strip $(ECR_PUBLIC_ALIAS)),)
     $(error ECR_PUBLIC=true requires ECR_PUBLIC_ALIAS: the ECR Public registry alias for this account, as shown by `aws ecr-public describe-registries`)
   endif
-  # public.ecr.aws/dash0/extension-python — the registry alias already says
-  # "dash0", so the repository name drops the prefix the private repos carry.
+  # e.g. public.ecr.aws/dash0-integrations/extension-python — the registry alias
+  # already carries the org name, so the repository name drops the "dash0-"
+  # prefix that the private repos use.
   DOCKER_REGISTRY := public.ecr.aws/$(ECR_PUBLIC_ALIAS)
   ECR_REPO_PYTHON ?= $(ECR_REPO_PREFIX)extension-python
   ECR_REPO_NODE ?= $(ECR_REPO_PREFIX)extension-node

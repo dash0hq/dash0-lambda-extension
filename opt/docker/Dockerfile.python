@@ -4,7 +4,7 @@
 # multi-stage builds for containerized Lambda functions:
 #
 #   FROM public.ecr.aws/lambda/python:3.12
-#   COPY --from=public.ecr.aws/dash0/extension-python:latest /opt /opt
+#   COPY --from=public.ecr.aws/dash0-integrations/extension-python:latest /opt /opt
 #   ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper
 #   ...
 #

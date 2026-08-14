@@ -239,9 +239,9 @@ For containerized Lambda functions, use the provided Docker images in a multi-st
 
 | Runtime | Image |
 |---|---|
-| Node.js | `public.ecr.aws/dash0/extension-node` |
-| Python  | `public.ecr.aws/dash0/extension-python` |
-| Java    | `public.ecr.aws/dash0/extension-java` |
+| Node.js | `public.ecr.aws/dash0-integrations/extension-node` |
+| Python  | `public.ecr.aws/dash0-integrations/extension-python` |
+| Java    | `public.ecr.aws/dash0-integrations/extension-java` |
 
 All three are multi-arch (`linux/amd64` and `linux/arm64`) and can be pulled anonymously — no `docker login` required. The registry host is part of the image reference: an unqualified name like `dash0/extension-python` resolves to Docker Hub, not to this registry, so always copy the full `public.ecr.aws/...` reference.
 
@@ -251,7 +251,7 @@ All three are multi-arch (`linux/amd64` and `linux/arm64`) and can be pulled ano
 FROM public.ecr.aws/lambda/nodejs:20
 
 # Copy extension from Dash0 image
-COPY --from=public.ecr.aws/dash0/extension-node:latest /opt /opt
+COPY --from=public.ecr.aws/dash0-integrations/extension-node:latest /opt /opt
 
 # Enable tracing
 ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper
@@ -269,7 +269,7 @@ CMD ["index.handler"]
 FROM public.ecr.aws/lambda/python:3.12
 
 # Copy extension from Dash0 image
-COPY --from=public.ecr.aws/dash0/extension-python:latest /opt /opt
+COPY --from=public.ecr.aws/dash0-integrations/extension-python:latest /opt /opt
 
 # Enable tracing
 ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper
@@ -287,7 +287,7 @@ CMD ["app.handler"]
 FROM public.ecr.aws/lambda/java:21
 
 # Copy extension from Dash0 image
-COPY --from=public.ecr.aws/dash0/extension-java:latest /opt /opt
+COPY --from=public.ecr.aws/dash0-integrations/extension-java:latest /opt /opt
 
 # Enable tracing
 ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper
