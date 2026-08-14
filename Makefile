@@ -16,16 +16,57 @@ PYTHON_DEPS_IMAGE := dash0-python-deps
 LAYER_DESCRIPTION := Send traces, metrics, and logs from AWS Lambda to Dash0. Built on OpenTelemetry and AWS Lambda Extensions API.
 
 # Docker/ECR image settings
+#
+# Two registries are supported:
+#
+#   * Private ECR (the default). Regional and account-scoped, so a pull needs an
+#     `aws ecr get-login-password` first. Used for PR and dev builds, which are
+#     throwaway and must not be world-readable.
+#
+#   * ECR Public (ECR_PUBLIC=true). A single global registry that anyone can pull
+#     from anonymously. Released extension images go here, because the documented
+#     `COPY --from=public.ecr.aws/...` in a customer's Dockerfile has to resolve
+#     without any AWS credentials. Note that ECR Public is NOT regional: its
+#     control plane lives only in us-east-1 and the registry is global, so images
+#     are pushed exactly once rather than once per deployment region.
 AWS_ACCOUNT_ID := $(shell aws sts get-caller-identity --query Account --output text)
 AWS_REGION ?= $(shell aws configure get region)
 ECR_REGISTRY := $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
 ECR_REPO_PREFIX ?=
-ECR_REPO_PYTHON ?= $(ECR_REPO_PREFIX)dash0-extension-python
-ECR_REPO_NODE ?= $(ECR_REPO_PREFIX)dash0-extension-node
-ECR_REPO_JAVA ?= $(ECR_REPO_PREFIX)dash0-extension-java
-DOCKER_IMAGE_PYTHON := $(ECR_REGISTRY)/$(ECR_REPO_PYTHON)
-DOCKER_IMAGE_NODE := $(ECR_REGISTRY)/$(ECR_REPO_NODE)
-DOCKER_IMAGE_JAVA := $(ECR_REGISTRY)/$(ECR_REPO_JAVA)
+ECR_PUBLIC ?= false
+# Deliberately has no default. Each account publishes under its own registry
+# alias, and a shared default would let a dev build overwrite the :latest tag
+# customers pull from the released repositories.
+ECR_PUBLIC_ALIAS ?=
+ECR_PUBLIC_REGION := us-east-1
+
+ifeq ($(ECR_PUBLIC),true)
+  ifeq ($(strip $(ECR_PUBLIC_ALIAS)),)
+    $(error ECR_PUBLIC=true requires ECR_PUBLIC_ALIAS: the ECR Public registry alias for this account, as shown by `aws ecr-public describe-registries`)
+  endif
+  # e.g. public.ecr.aws/dash0-integrations/extension-python — the registry alias
+  # already carries the org name, so the repository name drops the "dash0-"
+  # prefix that the private repos use.
+  DOCKER_REGISTRY := public.ecr.aws/$(ECR_PUBLIC_ALIAS)
+  ECR_REPO_PYTHON ?= $(ECR_REPO_PREFIX)extension-python
+  ECR_REPO_NODE ?= $(ECR_REPO_PREFIX)extension-node
+  ECR_REPO_JAVA ?= $(ECR_REPO_PREFIX)extension-java
+  ECR_CLI := aws ecr-public --region $(ECR_PUBLIC_REGION)
+  ECR_LOGIN := aws ecr-public get-login-password --region $(ECR_PUBLIC_REGION)
+  ECR_LOGIN_REGISTRY := public.ecr.aws
+else
+  DOCKER_REGISTRY := $(ECR_REGISTRY)
+  ECR_REPO_PYTHON ?= $(ECR_REPO_PREFIX)dash0-extension-python
+  ECR_REPO_NODE ?= $(ECR_REPO_PREFIX)dash0-extension-node
+  ECR_REPO_JAVA ?= $(ECR_REPO_PREFIX)dash0-extension-java
+  ECR_CLI := aws ecr --region $(AWS_REGION)
+  ECR_LOGIN := aws ecr get-login-password --region $(AWS_REGION)
+  ECR_LOGIN_REGISTRY := $(ECR_REGISTRY)
+endif
+
+DOCKER_IMAGE_PYTHON := $(DOCKER_REGISTRY)/$(ECR_REPO_PYTHON)
+DOCKER_IMAGE_NODE := $(DOCKER_REGISTRY)/$(ECR_REPO_NODE)
+DOCKER_IMAGE_JAVA := $(DOCKER_REGISTRY)/$(ECR_REPO_JAVA)
 VERSION ?= latest
 
 #-- current-condition vars
@@ -231,11 +272,11 @@ ensure-buildx:
 # Build and push Docker image for Python extension to ECR
 # Usage: make docker-python VERSION=1.0.0
 docker-python: build/dash0_x86_64 build/dash0_aarch64 build/python ensure-buildx
-	@echo "Creating ECR repository $(ECR_REPO_PYTHON) if it doesn't exist..."
-	@aws ecr describe-repositories --repository-names $(ECR_REPO_PYTHON) 2>/dev/null || \
-		aws ecr create-repository --repository-name $(ECR_REPO_PYTHON) --no-cli-pager
-	@echo "Logging in to ECR..."
-	@aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(ECR_REGISTRY)
+	@echo "Creating repository $(ECR_REPO_PYTHON) on $(ECR_LOGIN_REGISTRY) if it doesn't exist..."
+	@$(ECR_CLI) describe-repositories --repository-names $(ECR_REPO_PYTHON) >/dev/null 2>&1 || \
+		$(ECR_CLI) create-repository --repository-name $(ECR_REPO_PYTHON) --no-cli-pager
+	@echo "Logging in to $(ECR_LOGIN_REGISTRY)..."
+	@$(ECR_LOGIN) | docker login --username AWS --password-stdin $(ECR_LOGIN_REGISTRY)
 	@echo "Building and pushing multi-platform Docker image $(DOCKER_IMAGE_PYTHON):$(VERSION)"
 	@git rev-parse HEAD > build/dash0_git_hash
 	@docker buildx build --builder $(BUILDX_BUILDER) --platform linux/amd64,linux/arm64 \
@@ -251,11 +292,11 @@ docker-node: build/dash0_x86_64 build/dash0_aarch64 ensure-buildx
 	@echo "Building Node.js SDK..."
 	@bash opt/node/scripts/build-aws-sdk-tarball.sh
 	@cd opt/node && npm install && npm run build
-	@echo "Creating ECR repository $(ECR_REPO_NODE) if it doesn't exist..."
-	@aws ecr describe-repositories --repository-names $(ECR_REPO_NODE) 2>/dev/null || \
-		aws ecr create-repository --repository-name $(ECR_REPO_NODE) --no-cli-pager
-	@echo "Logging in to ECR..."
-	@aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(ECR_REGISTRY)
+	@echo "Creating repository $(ECR_REPO_NODE) on $(ECR_LOGIN_REGISTRY) if it doesn't exist..."
+	@$(ECR_CLI) describe-repositories --repository-names $(ECR_REPO_NODE) >/dev/null 2>&1 || \
+		$(ECR_CLI) create-repository --repository-name $(ECR_REPO_NODE) --no-cli-pager
+	@echo "Logging in to $(ECR_LOGIN_REGISTRY)..."
+	@$(ECR_LOGIN) | docker login --username AWS --password-stdin $(ECR_LOGIN_REGISTRY)
 	@echo "Building and pushing multi-platform Docker image $(DOCKER_IMAGE_NODE):$(VERSION)"
 	@git rev-parse HEAD > build/dash0_git_hash
 	@docker buildx build --builder $(BUILDX_BUILDER) --platform linux/amd64,linux/arm64 \
@@ -268,11 +309,11 @@ docker-node: build/dash0_x86_64 build/dash0_aarch64 ensure-buildx
 # Build and push Docker image for Java extension to ECR
 # Usage: make docker-java VERSION=1.0.0
 docker-java: build/dash0_x86_64 build/dash0_aarch64 $(JAVA_DISTRO_JAR) ensure-buildx
-	@echo "Creating ECR repository $(ECR_REPO_JAVA) if it doesn't exist..."
-	@aws ecr describe-repositories --repository-names $(ECR_REPO_JAVA) 2>/dev/null || \
-		aws ecr create-repository --repository-name $(ECR_REPO_JAVA) --no-cli-pager
-	@echo "Logging in to ECR..."
-	@aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(ECR_REGISTRY)
+	@echo "Creating repository $(ECR_REPO_JAVA) on $(ECR_LOGIN_REGISTRY) if it doesn't exist..."
+	@$(ECR_CLI) describe-repositories --repository-names $(ECR_REPO_JAVA) >/dev/null 2>&1 || \
+		$(ECR_CLI) create-repository --repository-name $(ECR_REPO_JAVA) --no-cli-pager
+	@echo "Logging in to $(ECR_LOGIN_REGISTRY)..."
+	@$(ECR_LOGIN) | docker login --username AWS --password-stdin $(ECR_LOGIN_REGISTRY)
 	@echo "Building and pushing multi-platform Docker image $(DOCKER_IMAGE_JAVA):$(VERSION)"
 	@git rev-parse HEAD > build/dash0_git_hash
 	@docker buildx build --builder $(BUILDX_BUILDER) --platform linux/amd64,linux/arm64 \
