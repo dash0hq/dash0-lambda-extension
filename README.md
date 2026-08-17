@@ -243,7 +243,7 @@ For containerized Lambda functions, use the provided Docker images in a multi-st
 FROM public.ecr.aws/lambda/nodejs:20
 
 # Copy extension from Dash0 image
-COPY --from=dash0/extension-node:latest /opt /opt
+COPY --from=public.ecr.aws/r1r2x3i6/extension-node:latest /opt /opt
 
 # Enable tracing
 ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper
@@ -261,7 +261,7 @@ CMD ["index.handler"]
 FROM public.ecr.aws/lambda/python:3.12
 
 # Copy extension from Dash0 image
-COPY --from=dash0/extension-python:latest /opt /opt
+COPY --from=public.ecr.aws/r1r2x3i6/extension-python:latest /opt /opt
 
 # Enable tracing
 ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper
@@ -279,7 +279,7 @@ CMD ["app.handler"]
 FROM public.ecr.aws/lambda/java:21
 
 # Copy extension from Dash0 image
-COPY --from=dash0/extension-java:latest /opt /opt
+COPY --from=public.ecr.aws/r1r2x3i6/extension-java:latest /opt /opt
 
 # Enable tracing
 ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper
