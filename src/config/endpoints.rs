@@ -16,6 +16,17 @@ pub fn extension_port() -> u16 {
         .unwrap_or(crate::DEFAULT_PROXY_PORT)
 }
 
+/// Get the OTLP/HTTP receiver port from environment variable or use the
+/// default OpenTelemetry HTTP port (4318)
+pub fn otlp_http_port() -> u16 {
+    use std::env::var;
+
+    var("DASH0_OTLP_HTTP_PORT")
+        .ok()
+        .and_then(|v| v.parse::<u16>().ok())
+        .unwrap_or(crate::DEFAULT_OTLP_HTTP_PORT)
+}
+
 /// Latch in the API endpoints defined in ENV variables
 ///
 #[allow(dead_code)]

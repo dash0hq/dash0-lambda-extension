@@ -16,8 +16,9 @@ const resource = resourceFromAttributes({
   [ATTR_SERVICE_NAME]: process.env.AWS_LAMBDA_FUNCTION_NAME || 'lambda-metrics',
 });
 
+// The extension accepts OTLP/HTTP on the default OpenTelemetry HTTP port (4318).
 const exporter = new OTLPTraceExporter({
-  url: `http://127.0.0.1:9009/v1/traces`,
+  url: `http://127.0.0.1:4318/v1/traces`,
 });
 
 const provider = new NodeTracerProvider({
@@ -29,7 +30,7 @@ provider.register();
 
 // Metrics setup
 const metricExporter = new OTLPMetricExporter({
-  url: `http://127.0.0.1:9009/v1/metrics`,
+  url: `http://127.0.0.1:4318/v1/metrics`,
   headers: {
     Authorization: `Bearer ${process.env.DASH0_TOKEN}`,
   },
