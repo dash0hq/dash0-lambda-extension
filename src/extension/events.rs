@@ -49,26 +49,30 @@ fn handle_invoke_event(json: &serde_json::Value) {
             .and_then(|t| t.get("value"))
             .and_then(|v| v.as_str())
         {
-            if let Some((trace_id_bytes, parent_span_id_bytes, sampled)) =
-                crate::otlp::span_link_extractor::parse_amzn_trace_id(trace_value)
-            {
-                let trace_id = hex::encode(&trace_id_bytes);
-                let parent_span_id = hex::encode(&parent_span_id_bytes);
-                let span_id = hex::encode(get_span_id_from_invocation_id(request_id));
-                let root_span_id = hex::encode(generate_random_span_id());
-                let parent_span_id = if !sampled && !crate::config::user::is_xray_traces_enabled() {
-                    String::new()
-                } else {
-                    parent_span_id
-                };
-                state::invocation_entry::update(request_id, |entry| {
-                    entry.trace_id = Some(trace_id);
-                    entry.span_id.get_or_insert(span_id);
-                    entry.root_span_id.get_or_insert(root_span_id);
-                    entry.parent_span_id = Some(parent_span_id);
+            let parsed = crate::otlp::span_link_extractor::parse_amzn_trace_id(trace_value);
+            // Store the raw header even when it cannot be parsed, so the root span still
+            // carries it for debugging.
+            state::invocation_entry::update(request_id, |entry| {
+                entry.x_amzn_trace_id = Some(trace_value.to_string());
+                if let Some((trace_id_bytes, parent_span_id_bytes, sampled)) = parsed {
+                    let parent_span_id = hex::encode(&parent_span_id_bytes);
+                    entry.trace_id = Some(hex::encode(&trace_id_bytes));
+                    entry.span_id.get_or_insert_with(|| {
+                        hex::encode(get_span_id_from_invocation_id(request_id))
+                    });
+                    entry
+                        .root_span_id
+                        .get_or_insert_with(|| hex::encode(generate_random_span_id()));
+                    entry.parent_span_id = Some(
+                        if !sampled && !crate::config::user::is_xray_traces_enabled() {
+                            String::new()
+                        } else {
+                            parent_span_id
+                        },
+                    );
                     entry.sampled = sampled;
-                });
-            }
+                }
+            });
             tracing::info!(
                 "[{}] Parsed trace context from _X_AMZN_TRACE_ID: {}",
                 crate::log_prefix_with("Extension"),

@@ -23,6 +23,7 @@ pub const DASH0_FAAS_TRIGGER_ARN: &str = "dash0.faas.trigger_arn";
 pub const DASH0_FAAS_EVENT_BRIDGE_SOURCE: &str = "dash0.faas.event_bridge_source";
 pub const DASH0_FAAS_EVENT_BRIDGE_DETAIL_TYPE: &str = "dash0.faas.event_bridge_detail_type";
 pub const DASH0_FAAS_PAYLOAD_TYPE: &str = "dash0.faas.payload_type";
+pub const DASH0_FAAS_X_AMZN_TRACE_ID: &str = "dash0.faas.x_amzn_trace_id";
 
 // Dash0 trigger chain attributes
 pub const DASH0_TRIGGER_CHAIN_DEPTH: &str = "dash0.trigger.chain.depth";
