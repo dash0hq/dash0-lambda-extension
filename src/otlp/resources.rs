@@ -72,12 +72,22 @@ pub fn get_resources_attributes() -> Vec<KeyValue> {
     }
 
     // OTEL_SERVICE_NAME wins over a service.name resource attribute, per spec.
-    let service_name = read_configured_env("OTEL_SERVICE_NAME")
-        .or_else(|| try_read_env_from_file("OTEL_SERVICE_NAME"));
+    // But `opt/shared.sh` writes a fallback OTEL_SERVICE_NAME=$AWS_LAMBDA_FUNCTION_NAME
+    // into the file whenever the user hasn't set it directly, so a file-sourced
+    // value here isn't necessarily an explicit override -- only fall back to it
+    // when no service.name has already been merged in from OTEL_RESOURCE_ATTRIBUTES.
+    let has_service_name_attribute = attributes.iter().any(|(key, _)| key == SERVICE_NAME);
+    let service_name = read_configured_env("OTEL_SERVICE_NAME").or_else(|| {
+        if has_service_name_attribute {
+            None
+        } else {
+            try_read_env_from_file("OTEL_SERVICE_NAME")
+        }
+    });
     match service_name {
         Some(name) => set_attribute(&mut attributes, SERVICE_NAME, name),
         None => {
-            if !attributes.iter().any(|(key, _)| key == SERVICE_NAME) {
+            if !has_service_name_attribute {
                 set_attribute(&mut attributes, SERVICE_NAME, "unknown_service".to_string());
             }
         }
@@ -312,6 +322,37 @@ deployment.environment.name=preview,service.namespace=slfinrtl";
             without_service_name_env
                 .get("service.name")
                 .map(String::as_str),
+            Some("from-attributes")
+        );
+    }
+
+    // `opt/shared.sh` always writes OTEL_SERVICE_NAME into the file -- either the
+    // user's own value, or (when the user never set it) a fallback to
+    // $AWS_LAMBDA_FUNCTION_NAME. That fallback must not clobber a service.name the
+    // user configured via OTEL_RESOURCE_ATTRIBUTES instead of OTEL_SERVICE_NAME.
+    #[test]
+    #[serial_test::serial]
+    fn test_file_service_name_fallback_does_not_override_configured_resource_attribute() {
+        std::env::remove_var("OTEL_SERVICE_NAME");
+        std::env::set_var("OTEL_RESOURCE_ATTRIBUTES", "service.name=from-attributes");
+        std::fs::write(
+            "/tmp/dash0_env_vars",
+            json!({
+                "OTEL_RESOURCE_ATTRIBUTES": WRAPPER_ATTRS,
+                // shared.sh's fallback -- the user never configured this directly.
+                "OTEL_SERVICE_NAME": "repro-fn"
+            })
+            .to_string(),
+        )
+        .expect("Failed to write mock file");
+
+        let attributes = attributes_map();
+
+        std::env::remove_var("OTEL_RESOURCE_ATTRIBUTES");
+        std::fs::remove_file("/tmp/dash0_env_vars").expect("Failed to cleanup mock file");
+
+        assert_eq!(
+            attributes.get("service.name").map(String::as_str),
             Some("from-attributes")
         );
     }
