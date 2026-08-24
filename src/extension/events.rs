@@ -49,26 +49,30 @@ fn handle_invoke_event(json: &serde_json::Value) {
             .and_then(|t| t.get("value"))
             .and_then(|v| v.as_str())
         {
-            if let Some((trace_id_bytes, parent_span_id_bytes, sampled)) =
-                crate::otlp::span_link_extractor::parse_amzn_trace_id(trace_value)
-            {
-                let trace_id = hex::encode(&trace_id_bytes);
-                let parent_span_id = hex::encode(&parent_span_id_bytes);
-                let span_id = hex::encode(get_span_id_from_invocation_id(request_id));
-                let root_span_id = hex::encode(generate_random_span_id());
-                let parent_span_id = if !sampled && !crate::config::user::is_xray_traces_enabled() {
-                    String::new()
-                } else {
-                    parent_span_id
-                };
-                state::invocation_entry::update(request_id, |entry| {
-                    entry.trace_id = Some(trace_id);
-                    entry.span_id.get_or_insert(span_id);
-                    entry.root_span_id.get_or_insert(root_span_id);
-                    entry.parent_span_id = Some(parent_span_id);
+            let parsed = crate::otlp::span_link_extractor::parse_amzn_trace_id(trace_value);
+            // Store the raw header even when it cannot be parsed, so the root span still
+            // carries it for debugging.
+            state::invocation_entry::update(request_id, |entry| {
+                entry.x_amzn_trace_id = Some(trace_value.to_string());
+                if let Some((trace_id_bytes, parent_span_id_bytes, sampled)) = parsed {
+                    let parent_span_id = hex::encode(&parent_span_id_bytes);
+                    entry.trace_id = Some(hex::encode(&trace_id_bytes));
+                    entry.span_id.get_or_insert_with(|| {
+                        hex::encode(get_span_id_from_invocation_id(request_id))
+                    });
+                    entry
+                        .root_span_id
+                        .get_or_insert_with(|| hex::encode(generate_random_span_id()));
+                    entry.parent_span_id = Some(
+                        if !sampled && !crate::config::user::is_xray_traces_enabled() {
+                            String::new()
+                        } else {
+                            parent_span_id
+                        },
+                    );
                     entry.sampled = sampled;
-                });
-            }
+                }
+            });
             tracing::info!(
                 "[{}] Parsed trace context from _X_AMZN_TRACE_ID: {}",
                 crate::log_prefix_with("Extension"),
@@ -230,5 +234,62 @@ pub async fn get_next() {
                 err
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serial_test::serial;
+
+    fn invoke_event(request_id: &str, tracing_value: &str) -> serde_json::Value {
+        serde_json::json!({
+            "eventType": "INVOKE",
+            "requestId": request_id,
+            "tracing": { "value": tracing_value },
+        })
+    }
+
+    #[test]
+    #[serial]
+    fn handle_invoke_event_parses_valid_trace_context_and_stores_raw_header() {
+        let request_id = "events-test-valid";
+        state::invocation_entry::remove(request_id);
+
+        let raw = "Root=1-698f814c-7708a2b018bc2cc4726a6288;Parent=f21a582b8b8134b9;Sampled=1";
+        handle_invoke_event(&invoke_event(request_id, raw));
+
+        let entry = state::invocation_entry::get(request_id).expect("entry should be created");
+        state::invocation_entry::remove(request_id);
+
+        assert_eq!(entry.x_amzn_trace_id.as_deref(), Some(raw));
+        assert_eq!(
+            entry.trace_id.as_deref(),
+            Some("698f814c7708a2b018bc2cc4726a6288")
+        );
+        assert_eq!(entry.parent_span_id.as_deref(), Some("f21a582b8b8134b9"));
+        assert!(entry.span_id.is_some());
+        assert!(entry.root_span_id.is_some());
+        assert!(entry.sampled);
+    }
+
+    #[test]
+    #[serial]
+    fn handle_invoke_event_stores_raw_header_even_when_unparseable() {
+        let request_id = "events-test-unparseable";
+        state::invocation_entry::remove(request_id);
+
+        let raw = "not-a-valid-x-amzn-trace-id-header";
+        handle_invoke_event(&invoke_event(request_id, raw));
+
+        let entry = state::invocation_entry::get(request_id).expect("entry should be created");
+        state::invocation_entry::remove(request_id);
+
+        assert_eq!(entry.x_amzn_trace_id.as_deref(), Some(raw));
+        assert_eq!(entry.trace_id, None);
+        assert_eq!(entry.span_id, None);
+        assert_eq!(entry.root_span_id, None);
+        assert_eq!(entry.parent_span_id, None);
+        assert!(!entry.sampled);
     }
 }

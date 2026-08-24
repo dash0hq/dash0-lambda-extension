@@ -70,6 +70,14 @@ fn create_root_span(
             }),
         });
     }
+    if let Some(x_amzn_trace_id) = data.x_amzn_trace_id.as_deref() {
+        attrs.push(KeyValue {
+            key: crate::otlp::attributes::DASH0_FAAS_X_AMZN_TRACE_ID.to_string(),
+            value: Some(AnyValue {
+                value: Some(Value::StringValue(x_amzn_trace_id.to_string())),
+            }),
+        });
+    }
     attrs.extend(data.handler_attributes.clone());
 
     Some(Span {
@@ -274,6 +282,7 @@ mod tests {
             entry.root_span_id = Some(root_span_id_hex.clone());
             entry.parent_span_id = Some(parent_span_id_hex.clone());
             entry.sampled = true;
+            entry.x_amzn_trace_id = Some("Root=1-abc;Parent=def;Sampled=1".to_string());
             entry.start_time = 1_000.0; // 1 second in ms
             entry.billed_duration = 500.0; // 500ms
             entry.init_duration = 150.0;
@@ -325,6 +334,17 @@ mod tests {
             });
         assert_eq!(init_dur, Some(150.0));
 
+        let x_amzn = span
+            .attributes
+            .iter()
+            .find(|kv| kv.key == "dash0.faas.x_amzn_trace_id")
+            .and_then(|kv| kv.value.as_ref())
+            .and_then(|v| match &v.value {
+                Some(Value::StringValue(s)) => Some(s.as_str()),
+                _ => None,
+            });
+        assert_eq!(x_amzn, Some("Root=1-abc;Parent=def;Sampled=1"));
+
         // --- Init span ---
         let spans = &decoded.resource_spans[0].scope_spans[0].spans;
         assert_eq!(spans.len(), 2);
@@ -351,11 +371,14 @@ mod tests {
         assert_eq!(init_inv_attr, Some(invocation_id));
 
         // Init span should NOT have telemetry attributes
-        assert!(init_span
+        assert!(!init_span
             .attributes
             .iter()
-            .find(|kv| kv.key == "faas.init_duration")
-            .is_none());
+            .any(|kv| kv.key == "faas.init_duration"));
+        assert!(!init_span
+            .attributes
+            .iter()
+            .any(|kv| kv.key == "dash0.faas.x_amzn_trace_id"));
     }
 
     #[test]
