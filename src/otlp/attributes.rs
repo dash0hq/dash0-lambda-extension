@@ -16,6 +16,22 @@ pub const EXCEPTION_STACKTRACE: &str = "exception.stacktrace";
 // HTTP attributes
 pub const HTTP_REQUEST_BODY: &str = "http.request.body";
 pub const HTTP_RESPONSE_BODY: &str = "http.response.body";
+pub const HTTP_REQUEST_METHOD: &str = "http.request.method";
+pub const HTTP_ROUTE: &str = "http.route";
+pub const HTTP_RESPONSE_STATUS_CODE: &str = "http.response.status_code";
+pub const URL_PATH: &str = "url.path";
+pub const URL_SCHEME: &str = "url.scheme";
+pub const URL_QUERY: &str = "url.query";
+pub const SERVER_ADDRESS: &str = "server.address";
+pub const SERVER_PORT: &str = "server.port";
+pub const CLIENT_ADDRESS: &str = "client.address";
+pub const NETWORK_PROTOCOL_VERSION: &str = "network.protocol.version";
+pub fn http_request_header(name: &str) -> String {
+    format!("http.request.header.{}", name)
+}
+pub fn http_response_header(name: &str) -> String {
+    format!("http.response.header.{}", name)
+}
 
 // Dash0-specific attributes
 pub const DASH0_FAAS_RECORD_COUNT: &str = "dash0.faas.record_count";
