@@ -45,17 +45,25 @@ pub fn build_synthetic_trace(
     let mut attributes = crate::otlp::span_creation::get_span_attributes(invocation_id);
 
     let mut sqs_links = Vec::new();
+    let mut span_name = "handler".to_string();
     if let Some(event_payload) = invocation_entry::get_event_payload(invocation_id) {
         // Extract span links before consuming event_payload
         sqs_links = extract_span_links(&event_payload);
 
         attributes.extend(extract_span_attributes_from_event(&event_payload));
+        maybe_rename_for_api_gateway(&mut span_name, &event_payload);
     } else {
         tracing::warn!(
             "[{}] No stored event payload found for invocation id {}",
             crate::log_prefix(),
             invocation_id
         );
+    }
+
+    if let Some(return_value) = return_value {
+        if is_api_gateway_invocation(invocation_id) {
+            attributes.extend(extract_api_gateway_response_attributes(return_value));
+        }
     }
 
     let exception_result = create_exception_event(error_type, return_value, now_nanos);
@@ -75,7 +83,7 @@ pub fn build_synthetic_trace(
         trace_id,
         span_id,
         parent_span_id,
-        name: "handler".to_string(),
+        name: span_name,
         kind: SpanKind::Internal as i32,
         start_time_unix_nano: start_nanos,
         end_time_unix_nano: now_nanos,
@@ -425,9 +433,98 @@ fn extract_span_attributes_from_event(event_payload: &str) -> Vec<KeyValue> {
         attributes.extend(crate::otlp::trigger_chain::trigger_chain_to_attributes(
             &chain_result,
         ));
+
+        attributes.extend(extract_api_gateway_attributes(&json_val));
     }
 
     attributes
+}
+
+/// HTTP semconv attributes for API Gateway v1/v2 proxy integration events.
+/// Request attributes are populated unconditionally (no PII risk); headers
+/// and the query string are opt-in via `DASH0_API_GATEWAY_*` env vars.
+fn extract_api_gateway_attributes(json_val: &serde_json::Value) -> Vec<KeyValue> {
+    use crate::otlp::attributes::http_request_header;
+    use crate::otlp::http_attributes::*;
+
+    let version = match detect_api_gateway_event(json_val) {
+        Some(version) => version,
+        None => return Vec::new(),
+    };
+
+    let mut attrs = extract_request_attributes(json_val, &version);
+
+    if crate::config::user::is_api_gateway_query_string_capture_enabled() {
+        if let Some(kv) = extract_query_string_attribute(json_val, &version) {
+            attrs.push(kv);
+        }
+    }
+
+    attrs.extend(extract_header_attributes(
+        json_val.get("headers"),
+        &crate::config::user::api_gateway_request_headers_to_capture(),
+        http_request_header,
+    ));
+
+    attrs
+}
+
+/// Whether the invocation's original event was an API Gateway v1/v2 proxy
+/// integration event. Used to gate response-side HTTP attributes, since a
+/// `statusCode` field in the return value alone doesn't imply an HTTP
+/// response — other trigger types can happen to return one too.
+fn is_api_gateway_invocation(invocation_id: &str) -> bool {
+    let event_payload = match invocation_entry::get_event_payload(invocation_id) {
+        Some(payload) => payload,
+        None => return false,
+    };
+    let json_val: serde_json::Value = match serde_json::from_str(&event_payload) {
+        Ok(v) => v,
+        Err(_) => return false,
+    };
+    crate::otlp::http_attributes::detect_api_gateway_event(&json_val).is_some()
+}
+
+/// HTTP semconv attributes extracted from a Lambda return payload:
+/// `http.response.status_code` unconditionally when present, response
+/// headers only when `DASH0_API_GATEWAY_RESPONSE_HEADERS_TO_CAPTURE` is set.
+fn extract_api_gateway_response_attributes(return_value: &str) -> Vec<KeyValue> {
+    use crate::otlp::attributes::http_response_header;
+    use crate::otlp::http_attributes::*;
+
+    let json_val: serde_json::Value = match serde_json::from_str(return_value) {
+        Ok(v) => v,
+        Err(_) => return Vec::new(),
+    };
+
+    let mut attrs: Vec<KeyValue> = extract_response_status_code_attribute(&json_val)
+        .into_iter()
+        .collect();
+
+    attrs.extend(extract_header_attributes(
+        json_val.get("headers"),
+        &crate::config::user::api_gateway_response_headers_to_capture(),
+        http_response_header,
+    ));
+
+    attrs
+}
+
+/// Overrides the span name to `<METHOD> <route>` for an API Gateway event,
+/// when `DASH0_ENABLE_API_GATEWAY_SPAN_NAME` is set. No-op otherwise.
+fn maybe_rename_for_api_gateway(span_name: &mut String, event_payload: &str) {
+    if !crate::config::user::is_api_gateway_span_name_enabled() {
+        return;
+    }
+    let json_val: serde_json::Value = match serde_json::from_str(event_payload) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+    if let Some(version) = crate::otlp::http_attributes::detect_api_gateway_event(&json_val) {
+        if let Some(name) = crate::otlp::http_attributes::extract_span_name(&json_val, &version) {
+            *span_name = name;
+        }
+    }
 }
 
 fn add_event_payload_to_span(span: &mut Span, invocation_id: &str) {
@@ -445,6 +542,7 @@ fn add_event_payload_to_span(span: &mut Span, invocation_id: &str) {
 
         span.attributes
             .extend(extract_span_attributes_from_event(&event_payload));
+        maybe_rename_for_api_gateway(&mut span.name, &event_payload);
     } else {
         tracing::warn!(
             "[{}] No stored event payload found for invocation id {}",
@@ -470,8 +568,10 @@ fn reparent_to_root_span(span: &mut Span, invocation_id: &str) {
     }
 }
 
-/// For traced invocations: if the Lambda returned a payload with `statusCode >= 400`,
-/// mark the handler span as an error and attach an exception event.
+/// For traced invocations: adds `http.response.status_code` (and, if
+/// configured, response headers) to the handler span for any Lambda proxy
+/// return payload, and additionally marks the span as an error with an
+/// exception event when `statusCode >= 400`.
 /// Called from the response proxy after the return value is captured.
 pub fn apply_return_value_error_to_stored_traces(invocation_id: &str, return_value: &str) {
     let json_val = match serde_json::from_str::<serde_json::Value>(return_value) {
@@ -480,8 +580,17 @@ pub fn apply_return_value_error_to_stored_traces(invocation_id: &str, return_val
     };
 
     let status_code = match json_val.get("statusCode").and_then(|v| v.as_i64()) {
-        Some(code) if code >= 400 => code,
-        _ => return,
+        Some(code) => code,
+        None => return,
+    };
+    // Only API Gateway-triggered invocations get http.response.status_code /
+    // response headers — a `statusCode` field in the return value alone
+    // doesn't mean this was an HTTP response (e.g. SQS/EventBridge consumers
+    // in this codebase's own test fixtures happen to return one too).
+    let response_attributes = if is_api_gateway_invocation(invocation_id) {
+        extract_api_gateway_response_attributes(return_value)
+    } else {
+        Vec::new()
     };
 
     let mut handler_span_data: Option<(Vec<KeyValue>, Option<Status>)> = None;
@@ -500,11 +609,13 @@ pub fn apply_return_value_error_to_stored_traces(invocation_id: &str, return_val
                             continue;
                         }
                         for span in &mut scope_span.spans {
-                            if apply_status_code_error(span, &json_val, status_code) {
-                                handler_span_data =
-                                    Some((span.attributes.clone(), span.status.clone()));
-                                modified = true;
+                            span.attributes.extend(response_attributes.clone());
+                            if status_code >= 400 {
+                                apply_status_code_error(span, &json_val, status_code);
                             }
+                            handler_span_data =
+                                Some((span.attributes.clone(), span.status.clone()));
+                            modified = true;
                         }
                     }
                 }
@@ -552,11 +663,7 @@ fn extract_error_message_from_status_code(
         })
 }
 
-fn apply_status_code_error(
-    span: &mut Span,
-    json_val: &serde_json::Value,
-    status_code: i64,
-) -> bool {
+fn apply_status_code_error(span: &mut Span, json_val: &serde_json::Value, status_code: i64) {
     let message = extract_error_message_from_status_code(json_val, status_code);
 
     span.status = Some(Status {
@@ -590,8 +697,6 @@ fn apply_status_code_error(
         ],
         ..Default::default()
     });
-
-    true
 }
 
 fn store_handler_span_data(span: &Span, invocation_id: &str) {
@@ -793,6 +898,69 @@ mod tests {
                 _ => None,
             });
         assert_eq!(ex_type, Some("error".to_string()));
+    }
+
+    #[test]
+    #[serial]
+    fn build_synthetic_trace_does_not_add_status_code_for_non_http_triggers() {
+        let invocation_id = "inv-synthetic-sqs-non-http";
+        store_event_payload(
+            invocation_id,
+            r#"{"Records":[{"eventSource":"aws:sqs","body":"hello"}]}"#,
+        );
+
+        let trace = build_synthetic_trace(
+            invocation_id,
+            None,
+            Some(r#"{"statusCode": 200, "body": "{\"records_processed\":1}"}"#),
+            &[],
+        )
+        .expect("trace should build");
+
+        let decoded = ExportTraceServiceRequest::decode(trace.body.as_slice())
+            .expect("should decode otlp payload");
+        let span = &decoded.resource_spans[0].scope_spans[0].spans[0];
+
+        assert!(
+            !span
+                .attributes
+                .iter()
+                .any(|kv| kv.key == "http.response.status_code"),
+            "non-HTTP triggers must not get http.response.status_code in the synthetic trace"
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn build_synthetic_trace_adds_status_code_for_api_gateway_trigger() {
+        let invocation_id = "inv-synthetic-apigw-http";
+        store_event_payload(
+            invocation_id,
+            r#"{"httpMethod":"GET","path":"/","requestContext":{}}"#,
+        );
+
+        let trace = build_synthetic_trace(
+            invocation_id,
+            None,
+            Some(r#"{"statusCode": 200, "body": "ok"}"#),
+            &[],
+        )
+        .expect("trace should build");
+
+        let decoded = ExportTraceServiceRequest::decode(trace.body.as_slice())
+            .expect("should decode otlp payload");
+        let span = &decoded.resource_spans[0].scope_spans[0].spans[0];
+
+        let status_code = span
+            .attributes
+            .iter()
+            .find(|kv| kv.key == "http.response.status_code")
+            .and_then(|kv| kv.value.as_ref())
+            .and_then(|v| match &v.value {
+                Some(Value::IntValue(i)) => Some(*i),
+                _ => None,
+            });
+        assert_eq!(status_code, Some(200));
     }
 
     fn make_span_with_invocation(invocation_id: &str) -> Span {
@@ -2083,6 +2251,59 @@ mod tests {
             span.events.iter().all(|e| e.name != "exception"),
             "no exception event for 200 status"
         );
+    }
+
+    #[test]
+    #[serial]
+    fn apply_return_value_error_does_not_add_status_code_for_non_http_triggers() {
+        // A SQS-triggered consumer that happens to return {statusCode: 200, ...}
+        // (a common pattern copied from HTTP handlers) must not get
+        // http.response.status_code — that field only makes sense for actual
+        // HTTP responses.
+        let invocation_id = "inv-return-sqs-non-http";
+        store_event_payload(
+            invocation_id,
+            r#"{"Records":[{"eventSource":"aws:sqs","body":"hello"}]}"#,
+        );
+        let span = make_span_with_invocation(invocation_id);
+        store_lambda_trace(invocation_id, span);
+
+        let return_value = r#"{"statusCode": 200, "body": "{\"records_processed\":1}"}"#;
+        super::apply_return_value_error_to_stored_traces(invocation_id, return_value);
+
+        let decoded = decode_stored_traces(invocation_id);
+        let span = &decoded.resource_spans[0].scope_spans[0].spans[0];
+
+        assert!(
+            find_attribute(span, "http.response.status_code").is_none(),
+            "non-HTTP triggers must not get http.response.status_code"
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn apply_return_value_error_adds_status_code_for_api_gateway_trigger() {
+        let invocation_id = "inv-return-apigw-http";
+        store_event_payload(
+            invocation_id,
+            r#"{"httpMethod":"GET","path":"/","requestContext":{}}"#,
+        );
+        let span = make_span_with_invocation(invocation_id);
+        store_lambda_trace(invocation_id, span);
+
+        let return_value = r#"{"statusCode": 200, "body": "ok"}"#;
+        super::apply_return_value_error_to_stored_traces(invocation_id, return_value);
+
+        let decoded = decode_stored_traces(invocation_id);
+        let span = &decoded.resource_spans[0].scope_spans[0].spans[0];
+
+        let status_code = find_attribute(span, "http.response.status_code")
+            .and_then(|v| v.value.as_ref())
+            .and_then(|v| match v {
+                Value::IntValue(i) => Some(*i),
+                _ => None,
+            });
+        assert_eq!(status_code, Some(200));
     }
 
     #[test]

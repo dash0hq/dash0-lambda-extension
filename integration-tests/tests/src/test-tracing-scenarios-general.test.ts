@@ -117,6 +117,26 @@ const fetchAndVerifyConsumerSpans = async (
                 console.log(`Trigger chain (${scenarioName}): depth=1, type=${expectedType}, name=${consumerAttrs['dash0.trigger.chain.0.name']?.stringValue}`);
             }
 
+            // Verify HTTP semconv attributes extracted from API Gateway v1/v2
+            // proxy integration events, independent of the runtime SDK.
+            if (scenarioName === 'apigateway' || scenarioName === 'httpapi') {
+                expect(consumerAttrs['http.request.method']?.stringValue).toEqual('POST');
+                expect(consumerAttrs['url.path']?.stringValue).toEqual('/');
+                expect(consumerAttrs['url.scheme']?.stringValue).toEqual('https');
+                expect(consumerAttrs['server.address']?.stringValue).toBeDefined();
+                expect(consumerAttrs['client.address']?.stringValue).toBeDefined();
+                expect(consumerAttrs['http.response.status_code']?.intValue).toEqual('200');
+                // The HTTP API route is a fixed "POST /", so http.route is unambiguous.
+                // The REST API is deployed with proxy:true, whose exact resource
+                // matching for the root path can vary, so only require it's present.
+                if (scenarioName === 'httpapi') {
+                    expect(consumerAttrs['http.route']?.stringValue).toEqual('/');
+                } else {
+                    expect(consumerAttrs['http.route']).toBeDefined();
+                }
+                console.log(`HTTP attributes (${scenarioName}): method=${consumerAttrs['http.request.method']?.stringValue}, route=${consumerAttrs['http.route']?.stringValue}, status_code=${consumerAttrs['http.response.status_code']?.intValue}`);
+            }
+
             return;
         } catch (error) {
             console.error(`Error fetching consumer spans on attempt ${attempt}:`, error);
