@@ -54,6 +54,11 @@ const fetchAndVerifyConsumerSpans = async (
                 }),
             });
 
+            // traceparent format: 00-<32 hex trace id>-<16 hex parent span id>-<flags>
+            const apiCallTraceparent = spanResponse.headers.get('traceparent');
+            const apiCallTraceId = apiCallTraceparent?.split('-')[1];
+            console.log(`[trace-lookup] scenario=${scenarioName} consumer=${consumerFunctionName} attempt=${attempt} apiCallTraceparent=${apiCallTraceparent} apiCallTraceId=${apiCallTraceId}`);
+
             const spanPayload = await spanResponse.json() as any;
             expect(spanPayload?.resourceSpans.length).toBeGreaterThanOrEqual(1);
 
