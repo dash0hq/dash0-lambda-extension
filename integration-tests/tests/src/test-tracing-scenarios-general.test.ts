@@ -24,6 +24,7 @@ const fetchAndVerifyConsumerSpans = async (
     leafSpanId: string,
     scenarioName: string,
 ) => {
+    console.log(`[trace-lookup] scenario=${scenarioName} consumer=${consumerFunctionName} producerTraceId=${producerTraceId} leafSpanId=${leafSpanId}`);
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         await delay(RETRY_DELAY_MS);
         console.log(`Attempt ${attempt} to fetch consumer spans for ${consumerFunctionName}`);
@@ -141,6 +142,7 @@ const fetchAndVerifyConsumerSpans = async (
         } catch (error) {
             console.error(`Error fetching consumer spans on attempt ${attempt}:`, error);
             if (attempt === MAX_ATTEMPTS) {
+                console.error(`[trace-lookup] GAVE UP scenario=${scenarioName} consumer=${consumerFunctionName} producerTraceId=${producerTraceId} leafSpanId=${leafSpanId}`);
                 throw error;
             }
         }
