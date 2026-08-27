@@ -358,11 +358,13 @@ mod tests {
     //! handler span end to end.
     //!
     //! `config::endpoints::sandbox_runtime_api()` is backed by a process-wide
-    //! `OnceCell` that latches on first use. This module must be the only
-    //! place in the test binary that touches `AWS_LAMBDA_RUNTIME_API` /
-    //! `sandbox_runtime_api()`, and its test is `#[serial]` to avoid racing
-    //! itself.
+    //! `OnceCell` that latches on first use, so every test in this binary
+    //! that drives a real dispatcher must talk to the *same* mock sandbox —
+    //! see `shared_sandbox`. This module must be the only place in the test
+    //! binary that touches `AWS_LAMBDA_RUNTIME_API` / `sandbox_runtime_api()`,
+    //! and its tests are `#[serial]` to avoid racing each other.
 
+    use std::collections::HashMap;
     use std::convert::Infallible;
     use std::sync::{Arc, Mutex};
 
@@ -392,67 +394,143 @@ mod tests {
             .boxed()
     }
 
-    /// A minimal stand-in for the real Lambda Runtime API: serves one event
-    /// on `GET .../invocation/next` and captures whatever is POSTed to
-    /// `.../response`.
-    async fn spawn_mock_sandbox(
-        event_body: String,
-        request_id: String,
-    ) -> (String, Arc<Mutex<Option<String>>>) {
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
-        let captured_response = Arc::new(Mutex::new(None));
-        let captured_response_clone = captured_response.clone();
+    type PendingNext = Arc<Mutex<Option<(String, String)>>>;
+    type CapturedResponses = Arc<Mutex<HashMap<String, String>>>;
 
-        tokio::spawn(async move {
-            loop {
-                let (stream, _) = match listener.accept().await {
-                    Ok(pair) => pair,
-                    Err(_) => continue,
-                };
-                let io = TokioIo::new(stream);
-                let event_body = event_body.clone();
-                let request_id = request_id.clone();
-                let captured_response = captured_response_clone.clone();
-                tokio::spawn(async move {
-                    let svc = service_fn(move |req: Request<Incoming>| {
-                        let event_body = event_body.clone();
-                        let request_id = request_id.clone();
-                        let captured_response = captured_response.clone();
-                        async move {
-                            let path = req.uri().path().to_string();
-                            let method = req.method().clone();
-                            let response = if method == Method::GET
-                                && path.ends_with("/invocation/next")
-                            {
-                                Response::builder()
-                                    .header("lambda-runtime-aws-request-id", request_id.as_str())
-                                    .body(boxed(event_body))
-                                    .unwrap()
-                            } else if method == Method::POST && path.contains("/response") {
-                                let body_bytes =
-                                    req.into_body().collect().await.unwrap().to_bytes();
-                                *captured_response.lock().unwrap() =
-                                    Some(String::from_utf8_lossy(&body_bytes).to_string());
-                                Response::builder()
-                                    .status(202)
-                                    .body(boxed(Bytes::new()))
-                                    .unwrap()
-                            } else {
-                                Response::builder()
-                                    .status(404)
-                                    .body(boxed(Bytes::new()))
-                                    .unwrap()
-                            };
-                            Ok::<_, Infallible>(response)
-                        }
-                    });
-                    let _ = http1::Builder::new().serve_connection(io, svc).await;
+    struct SharedSandbox {
+        addr: String,
+        pending_next: PendingNext,
+        captured_responses: CapturedResponses,
+    }
+
+    static SHARED_SANDBOX: std::sync::OnceLock<SharedSandbox> = std::sync::OnceLock::new();
+
+    /// A minimal stand-in for the real Lambda Runtime API, started once per
+    /// test binary and shared by every test: serves one queued event per
+    /// `GET .../invocation/next` and records whatever is POSTed to
+    /// `.../<id>/response`, keyed by invocation id. Must be shared (not
+    /// spawned per test) because `sandbox_runtime_api()` is a process-wide
+    /// `OnceCell` — every dispatcher in this binary ends up talking to
+    /// whichever sandbox address latched in first.
+    ///
+    /// Runs on its own dedicated OS thread with its own Tokio runtime,
+    /// rather than being `tokio::spawn`ed from within a test. Each
+    /// `#[tokio::test]` gets a fresh, short-lived runtime, so a task spawned
+    /// from inside test A's runtime is dropped the moment test A returns —
+    /// test B would then hang forever waiting on `/next`. A dedicated thread
+    /// outlives every individual test's runtime.
+    fn shared_sandbox() -> &'static SharedSandbox {
+        SHARED_SANDBOX.get_or_init(|| {
+            let pending_next: PendingNext = Arc::new(Mutex::new(None));
+            let captured_responses: CapturedResponses = Arc::new(Mutex::new(HashMap::new()));
+            let (addr_tx, addr_rx) = std::sync::mpsc::channel();
+
+            let pending_next_bg = pending_next.clone();
+            let captured_responses_bg = captured_responses.clone();
+            std::thread::spawn(move || {
+                let rt = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .expect("failed to build sandbox runtime");
+                rt.block_on(async move {
+                    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+                    let addr = listener.local_addr().unwrap().to_string();
+                    addr_tx.send(addr).expect("test thread receiver dropped");
+
+                    loop {
+                        let (stream, _) = match listener.accept().await {
+                            Ok(pair) => pair,
+                            Err(_) => continue,
+                        };
+                        let io = TokioIo::new(stream);
+                        let pending_next = pending_next_bg.clone();
+                        let captured_responses = captured_responses_bg.clone();
+                        tokio::spawn(async move {
+                            let svc = service_fn(move |req: Request<Incoming>| {
+                                let pending_next = pending_next.clone();
+                                let captured_responses = captured_responses.clone();
+                                async move {
+                                    let path = req.uri().path().to_string();
+                                    let method = req.method().clone();
+                                    let response = if method == Method::GET
+                                        && path.ends_with("/invocation/next")
+                                    {
+                                        let queued = pending_next.lock().unwrap().take();
+                                        match queued {
+                                            Some((event_body, request_id)) => Response::builder()
+                                                .header(
+                                                    "lambda-runtime-aws-request-id",
+                                                    request_id.as_str(),
+                                                )
+                                                .body(boxed(event_body))
+                                                .unwrap(),
+                                            None => Response::builder()
+                                                .status(500)
+                                                .body(boxed(Bytes::from_static(
+                                                    b"test bug: no event queued before /next",
+                                                )))
+                                                .unwrap(),
+                                        }
+                                    } else if method == Method::POST && path.contains("/response") {
+                                        let request_id =
+                                            crate::util::parsers::extract_invocation_id_from_path(
+                                                &path,
+                                            )
+                                            .unwrap_or_default();
+                                        let body_bytes =
+                                            req.into_body().collect().await.unwrap().to_bytes();
+                                        captured_responses.lock().unwrap().insert(
+                                            request_id,
+                                            String::from_utf8_lossy(&body_bytes).to_string(),
+                                        );
+                                        Response::builder()
+                                            .status(202)
+                                            .body(boxed(Bytes::new()))
+                                            .unwrap()
+                                    } else {
+                                        Response::builder()
+                                            .status(404)
+                                            .body(boxed(Bytes::new()))
+                                            .unwrap()
+                                    };
+                                    Ok::<_, Infallible>(response)
+                                }
+                            });
+                            let _ = http1::Builder::new().serve_connection(io, svc).await;
+                        });
+                    }
                 });
-            }
-        });
+            });
 
-        (addr.to_string(), captured_response)
+            let addr = addr_rx.recv().expect("sandbox thread died before binding");
+            SharedSandbox {
+                addr,
+                pending_next,
+                captured_responses,
+            }
+        })
+    }
+
+    /// Queues the event the shared sandbox will serve on the next `/next`
+    /// call, and returns the sandbox's address to point the dispatcher at.
+    async fn queue_sandbox_event(event_body: String, request_id: String) -> String {
+        let sandbox = shared_sandbox();
+        *sandbox.pending_next.lock().unwrap() = Some((event_body, request_id));
+        sandbox.addr.clone()
+    }
+
+    /// Reads (without removing) whatever was POSTed to
+    /// `.../<request_id>/response`. Panics if `shared_sandbox` was never
+    /// initialized — call after `queue_sandbox_event`.
+    fn sandbox_captured_response(request_id: &str) -> Option<String> {
+        SHARED_SANDBOX
+            .get()
+            .expect("shared_sandbox must be initialized before reading captured responses")
+            .captured_responses
+            .lock()
+            .unwrap()
+            .get(request_id)
+            .cloned()
     }
 
     /// Binds the extension's real `route::dispatch` on an ephemeral port, the
@@ -488,6 +566,30 @@ mod tests {
                 "domainName": "abc123.execute-api.us-east-1.amazonaws.com",
                 "identity": {"sourceIp": "1.2.3.4"},
                 "protocol": "HTTP/1.1"
+            }
+        })
+        .to_string()
+    }
+
+    fn v2_api_gateway_event_with_masking_prone_route_key() -> String {
+        // A real HTTP API v2 proxy-integration event shape. routeKey is the
+        // field the default `.*key.*` (case-insensitive) masking rule used
+        // to corrupt before extraction moved to raw-event bytes.
+        serde_json::json!({
+            "version": "2.0",
+            "routeKey": "GET /pets/{id}",
+            "rawPath": "/pets/123",
+            "rawQueryString": "",
+            "requestContext": {
+                "domainName": "abc123.execute-api.us-east-1.amazonaws.com",
+                "http": {
+                    "method": "GET",
+                    "path": "/pets/123",
+                    "protocol": "HTTP/1.1",
+                    "sourceIp": "1.2.3.4"
+                },
+                "routeKey": "GET /pets/{id}",
+                "stage": "$default"
             }
         })
         .to_string()
@@ -558,11 +660,11 @@ mod tests {
         let invocation_id = "test-round-trip-req-id";
         let event_body = v1_api_gateway_event();
 
-        let (sandbox_addr, captured_response) =
-            spawn_mock_sandbox(event_body.clone(), invocation_id.to_string()).await;
+        let sandbox_addr = queue_sandbox_event(event_body.clone(), invocation_id.to_string()).await;
 
-        // Point the extension's sandbox_runtime_api() at our mock. Safe: this
-        // OnceCell has not been touched by any other test in this binary.
+        // Point the extension's sandbox_runtime_api() at the shared mock.
+        // Safe across tests: the OnceCell latches to the same address every
+        // time, since there is only ever one shared sandbox in this binary.
         std::env::set_var("AWS_LAMBDA_RUNTIME_API", &sandbox_addr);
         std::env::set_var(
             "DASH0_API_GATEWAY_RESPONSE_HEADERS_TO_CAPTURE",
@@ -626,7 +728,7 @@ mod tests {
         // The extension must still forward the response through to the real
         // (mock) sandbox runtime API unmodified.
         assert_eq!(
-            captured_response.lock().unwrap().as_deref(),
+            sandbox_captured_response(invocation_id).as_deref(),
             Some(return_payload.as_str())
         );
 
@@ -657,6 +759,109 @@ mod tests {
         );
 
         std::env::remove_var("DASH0_API_GATEWAY_RESPONSE_HEADERS_TO_CAPTURE");
+        invocation_entry::remove(invocation_id);
+    }
+
+    /// Local, no-deploy-needed reproduction of the routeKey masking bug and
+    /// its fix: drives a real HTTP API v2 invocation through the extension's
+    /// own runtime-API proxy (the exact code path production traffic takes),
+    /// and inspects both the stored (masked) event payload and the final
+    /// exported span to confirm http.route and the span name are the real,
+    /// unmasked values — not the "****" placeholder.
+    #[tokio::test]
+    #[serial]
+    async fn httpapi_v2_round_trip_does_not_leak_masked_route_key() {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+
+        let invocation_id = "test-httpapi-v2-masking-req-id";
+        let event_body = v2_api_gateway_event_with_masking_prone_route_key();
+
+        let sandbox_addr = queue_sandbox_event(event_body.clone(), invocation_id.to_string()).await;
+
+        std::env::set_var("AWS_LAMBDA_RUNTIME_API", &sandbox_addr);
+        std::env::set_var("DASH0_ENABLE_API_GATEWAY_SPAN_NAME", "true");
+
+        let extension_addr = spawn_extension_dispatcher().await;
+        let client: Client<_, Full<Bytes>> = Client::builder(TokioExecutor::new()).build_http();
+
+        // 1. Function runtime asks the extension for the next invocation.
+        let next_uri = format!(
+            "http://{}/2018-06-01/runtime/invocation/next",
+            extension_addr
+        );
+        let next_req = Request::builder()
+            .method(Method::GET)
+            .uri(&next_uri)
+            .body(Full::new(Bytes::new()))
+            .unwrap();
+        let next_res = client.request(next_req).await.unwrap();
+        assert_eq!(next_res.status(), 200);
+
+        // 2. Confirm the precondition: the STORED event payload (used for
+        // logging) really is masked. This is expected and unrelated to the
+        // fix — only span-attribute/name extraction must avoid it.
+        let stored_event_payload = invocation_entry::get_event_payload(invocation_id)
+            .expect("event payload should be stored after /next");
+        assert!(
+            stored_event_payload.contains("\"****\""),
+            "expected routeKey to be masked in the stored payload, got: {stored_event_payload}"
+        );
+
+        // 3. The runtime SDK exports its span through the extension.
+        let traces_uri = format!("http://{}/2018-06-01/traces", extension_addr);
+        let traces_req = Request::builder()
+            .method(Method::POST)
+            .uri(&traces_uri)
+            .header("content-type", "application/x-protobuf")
+            .body(Full::new(Bytes::from(otlp_trace_body_for(invocation_id))))
+            .unwrap();
+        let traces_res = client.request(traces_req).await.unwrap();
+        assert_eq!(traces_res.status(), 200);
+
+        // 4. The handler returns a proxy-integration response.
+        let response_uri = format!(
+            "http://{}/2018-06-01/runtime/invocation/{}/response",
+            extension_addr, invocation_id
+        );
+        let response_req = Request::builder()
+            .method(Method::POST)
+            .uri(&response_uri)
+            .body(Full::new(Bytes::from(
+                serde_json::json!({"statusCode": 200, "body": "{}"}).to_string(),
+            )))
+            .unwrap();
+        let response_res = client.request(response_req).await.unwrap();
+        assert_eq!(response_res.status(), 202);
+
+        // 5. The exported span's http.route attribute must be the real
+        // route, not the mask placeholder.
+        let entry = invocation_entry::get(invocation_id)
+            .expect("invocation entry should exist after the round trip");
+        assert_eq!(
+            find_string_attr(&entry.handler_attributes, "http.route"),
+            Some("/pets/:id".to_string()),
+            "http.route must be the real unmasked route"
+        );
+        assert_ne!(
+            find_string_attr(&entry.handler_attributes, "http.route"),
+            Some("****".to_string())
+        );
+
+        // 6. The span NAME (only reachable via the raw stored trace, since
+        // handler_attributes doesn't carry it) must also be unmasked.
+        let stored_trace = entry
+            .traces
+            .first()
+            .expect("a trace should have been stored");
+        let decoded = ExportTraceServiceRequest::decode(stored_trace.body.as_slice())
+            .expect("stored trace should decode as OTLP");
+        let span_name = &decoded.resource_spans[0].scope_spans[0].spans[0].name;
+        assert_eq!(
+            span_name, "GET /pets/:id",
+            "the derived span name must use the real route, not the mask placeholder"
+        );
+
+        std::env::remove_var("DASH0_ENABLE_API_GATEWAY_SPAN_NAME");
         invocation_entry::remove(invocation_id);
     }
 }
