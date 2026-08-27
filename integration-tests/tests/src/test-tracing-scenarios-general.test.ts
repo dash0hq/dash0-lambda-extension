@@ -132,13 +132,7 @@ const fetchAndVerifyConsumerSpans = async (
                 expect(consumerAttrs['server.address']?.stringValue).toBeDefined();
                 expect(consumerAttrs['client.address']?.stringValue).toBeDefined();
                 expect(consumerAttrs['http.response.status_code']?.intValue).toEqual('200');
-                // Only require http.route is present, not its exact value: the REST API is
-                // deployed with proxy:true (exact resource matching for the root path can
-                // vary), and the HTTP API's test traffic is frequently unsampled (Sampled=0
-                // in the propagated trace context), which Dash0's backend masks to "****" for
-                // route/operation-derived fields by design — not something this extension or
-                // this test controls.
-                expect(consumerAttrs['http.route']).toBeDefined();
+                expect(consumerAttrs['http.route']?.stringValue).toEqual('/');
                 console.log(`HTTP attributes (${scenarioName}): method=${consumerAttrs['http.request.method']?.stringValue}, route=${consumerAttrs['http.route']?.stringValue}, status_code=${consumerAttrs['http.response.status_code']?.intValue}`);
             }
 
