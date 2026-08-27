@@ -51,13 +51,19 @@ pub fn build_synthetic_trace(
         sqs_links = extract_span_links(&event_payload);
 
         attributes.extend(extract_span_attributes_from_event(&event_payload));
-        maybe_rename_for_api_gateway(&mut span_name, &event_payload);
     } else {
         tracing::warn!(
             "[{}] No stored event payload found for invocation id {}",
             crate::log_prefix(),
             invocation_id
         );
+    }
+
+    let (api_gateway_attributes, api_gateway_span_name) =
+        invocation_entry::get_api_gateway_request_data(invocation_id);
+    attributes.extend(api_gateway_attributes);
+    if let Some(name) = api_gateway_span_name {
+        span_name = name;
     }
 
     if let Some(return_value) = return_value {
@@ -434,7 +440,14 @@ fn extract_span_attributes_from_event(event_payload: &str) -> Vec<KeyValue> {
             &chain_result,
         ));
 
-        attributes.extend(extract_api_gateway_attributes(&json_val));
+        // Note: API Gateway HTTP semconv attributes (http.route, etc.) are
+        // NOT extracted here. `event_payload` has already been through
+        // process_payload's secret masking by this point, which corrupts
+        // structural fields like HTTP API v2's `routeKey` (case-insensitive
+        // match on the default `.*key.*` rule). Those attributes are
+        // extracted from the raw event bytes in runtime_proxy.rs before
+        // masking runs, and stored on InvocationEntry — see
+        // add_event_payload_to_span / build_synthetic_trace below.
     }
 
     attributes
@@ -443,6 +456,8 @@ fn extract_span_attributes_from_event(event_payload: &str) -> Vec<KeyValue> {
 /// HTTP semconv attributes for API Gateway v1/v2 proxy integration events.
 /// Request attributes are populated unconditionally (no PII risk); headers
 /// and the query string are opt-in via `DASH0_API_GATEWAY_*` env vars.
+/// Must be called on the raw, unmasked event — see
+/// `extract_api_gateway_request_data_from_raw_event`.
 fn extract_api_gateway_attributes(json_val: &serde_json::Value) -> Vec<KeyValue> {
     use crate::otlp::attributes::http_request_header;
     use crate::otlp::http_attributes::*;
@@ -510,21 +525,36 @@ fn extract_api_gateway_response_attributes(return_value: &str) -> Vec<KeyValue> 
     attrs
 }
 
-/// Overrides the span name to `<METHOD> <route>` for an API Gateway event,
-/// when `DASH0_ENABLE_API_GATEWAY_SPAN_NAME` is set. No-op otherwise.
-fn maybe_rename_for_api_gateway(span_name: &mut String, event_payload: &str) {
-    if !crate::config::user::is_api_gateway_span_name_enabled() {
-        return;
-    }
-    let json_val: serde_json::Value = match serde_json::from_str(event_payload) {
+/// Extracts API Gateway HTTP semconv request attributes and (when
+/// `DASH0_ENABLE_API_GATEWAY_SPAN_NAME` is set) the derived `<METHOD> <route>`
+/// span name, directly from the raw invoke event bytes.
+///
+/// This must run before `process_payload` masks the event: masking
+/// (default rule `.*key.*`, case-insensitive) corrupts structural fields
+/// like HTTP API v2's `routeKey`, which is otherwise indistinguishable from
+/// a real secret once replaced with the mask placeholder. Called once from
+/// `runtime_proxy.rs::validate_and_mangle_next_event`, before masking, and
+/// the result is stored on `InvocationEntry` for later use by
+/// `add_event_payload_to_span` / `build_synthetic_trace`.
+pub(crate) fn extract_api_gateway_request_data_from_raw_event(
+    raw_event_bytes: &[u8],
+) -> (Vec<KeyValue>, Option<String>) {
+    let json_val: serde_json::Value = match serde_json::from_slice(raw_event_bytes) {
         Ok(v) => v,
-        Err(_) => return,
+        Err(_) => return (Vec::new(), None),
     };
-    if let Some(version) = crate::otlp::http_attributes::detect_api_gateway_event(&json_val) {
-        if let Some(name) = crate::otlp::http_attributes::extract_span_name(&json_val, &version) {
-            *span_name = name;
-        }
-    }
+
+    let attributes = extract_api_gateway_attributes(&json_val);
+
+    let span_name = if crate::config::user::is_api_gateway_span_name_enabled() {
+        crate::otlp::http_attributes::detect_api_gateway_event(&json_val).and_then(|version| {
+            crate::otlp::http_attributes::extract_span_name(&json_val, &version)
+        })
+    } else {
+        None
+    };
+
+    (attributes, span_name)
 }
 
 fn add_event_payload_to_span(span: &mut Span, invocation_id: &str) {
@@ -542,13 +572,19 @@ fn add_event_payload_to_span(span: &mut Span, invocation_id: &str) {
 
         span.attributes
             .extend(extract_span_attributes_from_event(&event_payload));
-        maybe_rename_for_api_gateway(&mut span.name, &event_payload);
     } else {
         tracing::warn!(
             "[{}] No stored event payload found for invocation id {}",
             crate::log_prefix(),
             invocation_id
         );
+    }
+
+    let (api_gateway_attributes, api_gateway_span_name) =
+        invocation_entry::get_api_gateway_request_data(invocation_id);
+    span.attributes.extend(api_gateway_attributes);
+    if let Some(name) = api_gateway_span_name {
+        span.name = name;
     }
 }
 
@@ -961,6 +997,85 @@ mod tests {
                 _ => None,
             });
         assert_eq!(status_code, Some(200));
+    }
+
+    /// Root cause, now fixed: http.route/dash0.operation.name used to come
+    /// back as the literal string "****" for HTTP API v2 events (never for
+    /// REST API v1), because the extension's default secret-masking rules
+    /// include `.*key.*` (case-insensitive), and only v2's proxy-integration
+    /// event has a top-level `routeKey` field — v1 has no key containing
+    /// "key" at all. `process_payload` masked `routeKey` before the event
+    /// was ever stored as `entry.event_payload`, and HTTP attribute
+    /// extraction used to read that already-masked payload. The fix:
+    /// extraction now runs on the raw event bytes in
+    /// runtime_proxy.rs::validate_and_mangle_next_event, before masking.
+    /// This helper reproduces the same event shape as the real bug report.
+    fn v2_event_with_masking_prone_route_key() -> &'static str {
+        r#"{
+            "version": "2.0",
+            "routeKey": "POST /",
+            "rawPath": "/",
+            "rawQueryString": "",
+            "requestContext": {
+                "domainName": "4dalsvuzw1.execute-api.eu-central-1.amazonaws.com",
+                "http": {
+                    "method": "POST",
+                    "path": "/",
+                    "protocol": "HTTP/1.1",
+                    "sourceIp": "3.121.127.207"
+                },
+                "routeKey": "POST /",
+                "stage": "$default"
+            },
+            "body": "{}"
+        }"#
+    }
+
+    #[test]
+    fn masking_the_stored_event_payload_does_corrupt_route_key() {
+        // Confirms the precondition the bug depended on: process_payload
+        // really does mask routeKey (case-insensitive `.*key.*` match).
+        let masked =
+            crate::util::truncate::process_payload(v2_event_with_masking_prone_route_key());
+        assert!(
+            masked.contains("\"****\""),
+            "expected routeKey to be masked in the stored payload, got: {masked}"
+        );
+    }
+
+    #[test]
+    fn extracting_from_the_masked_event_payload_no_longer_yields_http_route() {
+        // extract_span_attributes_from_event operates on the (masked)
+        // entry.event_payload and must no longer derive http.route from it —
+        // that responsibility moved to raw-event extraction.
+        let masked =
+            crate::util::truncate::process_payload(v2_event_with_masking_prone_route_key());
+        let attrs = super::extract_span_attributes_from_event(&masked);
+        assert!(
+            !attrs.iter().any(|kv| kv.key == "http.route"),
+            "extract_span_attributes_from_event must not derive http.route from the masked payload"
+        );
+    }
+
+    #[test]
+    fn extracting_from_the_raw_event_yields_the_real_unmasked_route() {
+        let (attrs, _span_name) = super::extract_api_gateway_request_data_from_raw_event(
+            v2_event_with_masking_prone_route_key().as_bytes(),
+        );
+
+        let route = attrs
+            .iter()
+            .find(|kv| kv.key == "http.route")
+            .and_then(|kv| kv.value.as_ref())
+            .and_then(|v| match &v.value {
+                Some(Value::StringValue(s)) => Some(s.clone()),
+                _ => None,
+            });
+        assert_eq!(
+            route,
+            Some("/".to_string()),
+            "extraction from raw event bytes must yield the real route, unaffected by masking"
+        );
     }
 
     fn make_span_with_invocation(invocation_id: &str) -> Span {

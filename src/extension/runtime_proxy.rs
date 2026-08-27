@@ -316,6 +316,13 @@ async fn validate_and_mangle_next_event(
         }
     };
 
+    // Must run before process_payload masks the event below: masking
+    // corrupts structural fields like HTTP API v2's `routeKey` (case-
+    // insensitive match on the default `.*key.*` rule), which would
+    // otherwise leak the mask placeholder into http.route.
+    let (api_gateway_request_attributes, api_gateway_span_name) =
+        crate::otlp::span_mutations::extract_api_gateway_request_data_from_raw_event(&body_bytes);
+
     let payload = process_payload(&String::from_utf8_lossy(&body_bytes));
 
     let event_log = build_payload_log(
@@ -328,6 +335,8 @@ async fn validate_and_mangle_next_event(
     );
     invocation_entry::update(&_aws_request_id, |entry| {
         entry.event_payload = Some(payload);
+        entry.api_gateway_request_attributes = api_gateway_request_attributes;
+        entry.api_gateway_span_name = api_gateway_span_name;
         if let Some(log) = event_log {
             entry.logs.push(log);
         }
