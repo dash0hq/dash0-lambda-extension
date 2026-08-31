@@ -150,14 +150,29 @@ pub fn get_trace_span_ids(
     })
 }
 
-/// Lightweight getter: returns (trace_id, root_span_id) for log correlation.
+/// Lightweight getter: returns (trace_id, span_id) for log correlation.
+///
+/// When X-Ray tracing is enabled, the extension does not emit supplementary spans
+/// (root span / init span), so `root_span_id` is never exported to the backend.
+/// In that case we fall back to `span_id` (the handler span from the OTel
+/// instrumentation) so that the log → span backlink resolves correctly.
+/// In the standard (non-X-Ray) path we prefer `root_span_id` because the
+/// supplementary root span is emitted and acts as the natural parent for logs.
 pub fn get_trace_span_ids_for_logs(
     invocation_id: &str,
 ) -> Option<(Option<String>, Option<String>)> {
-    INVOCATION_STORE
-        .lock()
-        .get(invocation_id)
-        .map(|e| (e.trace_id.clone(), e.root_span_id.clone()))
+    INVOCATION_STORE.lock().get(invocation_id).map(|e| {
+        let sid = if crate::config::user::is_xray_traces_enabled() {
+            // X-Ray mode: no supplementary root span is ever exported; use the
+            // handler span id so logs reference an existing span.
+            e.span_id.clone()
+        } else {
+            // Standard mode: prefer root_span_id (the supplementary root span),
+            // fall back to span_id if it has not been set yet.
+            e.root_span_id.clone().or_else(|| e.span_id.clone())
+        };
+        (e.trace_id.clone(), sid)
+    })
 }
 
 /// Lightweight getter: returns the telemetry data fields needed for span annotation.
@@ -575,5 +590,68 @@ mod tests {
             !store.contains_key("inv-no-start"),
             "entry with start_time=0 should be evicted first"
         );
+    }
+
+    // ── get_trace_span_ids_for_logs ──────────────────────────────────
+
+    #[test]
+    #[serial]
+    fn get_trace_span_ids_for_logs_returns_root_span_id_in_standard_mode() {
+        reset_store();
+        std::env::remove_var("DASH0_XRAY_TRACES_ENABLED");
+
+        let inv = "inv-logs-standard";
+        update(inv, |e| {
+            e.trace_id = Some("aa".repeat(16));
+            e.root_span_id = Some("bb".repeat(8));
+            e.span_id = Some("cc".repeat(8));
+        });
+
+        let result = get_trace_span_ids_for_logs(inv).expect("entry should exist");
+        assert_eq!(result.0, Some("aa".repeat(16)));
+        // standard mode → root_span_id wins
+        assert_eq!(result.1, Some("bb".repeat(8)));
+    }
+
+    #[test]
+    #[serial]
+    fn get_trace_span_ids_for_logs_falls_back_to_span_id_when_root_absent() {
+        reset_store();
+        std::env::remove_var("DASH0_XRAY_TRACES_ENABLED");
+
+        let inv = "inv-logs-no-root";
+        update(inv, |e| {
+            e.trace_id = Some("aa".repeat(16));
+            e.root_span_id = None;
+            e.span_id = Some("dd".repeat(8));
+        });
+
+        let result = get_trace_span_ids_for_logs(inv).expect("entry should exist");
+        assert_eq!(result.0, Some("aa".repeat(16)));
+        // no root_span_id → fall back to span_id
+        assert_eq!(result.1, Some("dd".repeat(8)));
+    }
+
+    #[test]
+    #[serial]
+    fn get_trace_span_ids_for_logs_uses_handler_span_id_in_xray_mode() {
+        reset_store();
+        std::env::set_var("DASH0_XRAY_TRACES_ENABLED", "true");
+
+        let inv = "inv-logs-xray";
+        update(inv, |e| {
+            e.trace_id = Some("ee".repeat(16));
+            // root_span_id is set (happens during handle_invoke_event) but no
+            // supplementary root span is ever exported in X-Ray mode.
+            e.root_span_id = Some("ff".repeat(8));
+            e.span_id = Some("1234567890abcdef".to_string());
+        });
+
+        let result = get_trace_span_ids_for_logs(inv).expect("entry should exist");
+        assert_eq!(result.0, Some("ee".repeat(16)));
+        // X-Ray mode → must use span_id (the handler span), NOT root_span_id
+        assert_eq!(result.1, Some("1234567890abcdef".to_string()));
+
+        std::env::remove_var("DASH0_XRAY_TRACES_ENABLED");
     }
 }
