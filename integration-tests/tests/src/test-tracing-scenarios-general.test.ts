@@ -24,6 +24,7 @@ const fetchAndVerifyConsumerSpans = async (
     leafSpanId: string,
     scenarioName: string,
 ) => {
+    console.log(`[trace-lookup] scenario=${scenarioName} consumer=${consumerFunctionName} producerTraceId=${producerTraceId} leafSpanId=${leafSpanId}`);
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         await delay(RETRY_DELAY_MS);
         console.log(`Attempt ${attempt} to fetch consumer spans for ${consumerFunctionName}`);
@@ -52,6 +53,11 @@ const fetchAndVerifyConsumerSpans = async (
                     dataset: DASH0_LAMBDA_TESTS_DATASET
                 }),
             });
+
+            // traceparent format: 00-<32 hex trace id>-<16 hex parent span id>-<flags>
+            const apiCallTraceparent = spanResponse.headers.get('traceparent');
+            const apiCallTraceId = apiCallTraceparent?.split('-')[1];
+            console.log(`[trace-lookup] scenario=${scenarioName} consumer=${consumerFunctionName} attempt=${attempt} apiCallTraceparent=${apiCallTraceparent} apiCallTraceId=${apiCallTraceId}`);
 
             const spanPayload = await spanResponse.json() as any;
             expect(spanPayload?.resourceSpans.length).toBeGreaterThanOrEqual(1);
@@ -117,10 +123,24 @@ const fetchAndVerifyConsumerSpans = async (
                 console.log(`Trigger chain (${scenarioName}): depth=1, type=${expectedType}, name=${consumerAttrs['dash0.trigger.chain.0.name']?.stringValue}`);
             }
 
+            // Verify HTTP semconv attributes extracted from API Gateway v1/v2
+            // proxy integration events, independent of the runtime SDK.
+            if (scenarioName === 'apigateway' || scenarioName === 'httpapi') {
+                expect(consumerAttrs['http.request.method']?.stringValue).toEqual('POST');
+                expect(consumerAttrs['url.path']?.stringValue).toEqual('/');
+                expect(consumerAttrs['url.scheme']?.stringValue).toEqual('https');
+                expect(consumerAttrs['server.address']?.stringValue).toBeDefined();
+                expect(consumerAttrs['client.address']?.stringValue).toBeDefined();
+                expect(consumerAttrs['http.response.status_code']?.intValue).toEqual('200');
+                expect(consumerAttrs['http.route']?.stringValue).toEqual('/');
+                console.log(`HTTP attributes (${scenarioName}): method=${consumerAttrs['http.request.method']?.stringValue}, route=${consumerAttrs['http.route']?.stringValue}, status_code=${consumerAttrs['http.response.status_code']?.intValue}`);
+            }
+
             return;
         } catch (error) {
             console.error(`Error fetching consumer spans on attempt ${attempt}:`, error);
             if (attempt === MAX_ATTEMPTS) {
+                console.error(`[trace-lookup] GAVE UP scenario=${scenarioName} consumer=${consumerFunctionName} producerTraceId=${producerTraceId} leafSpanId=${leafSpanId}`);
                 throw error;
             }
         }

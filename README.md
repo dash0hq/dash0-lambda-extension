@@ -97,6 +97,16 @@ The extension layers are published to the following AWS regions:
 
 * `DASH0_XRAY_TRACES_ENABLED` - When set to `true`, the extension preserves the original X-Ray trace context instead of creating supplementary spans. Use this when AWS X-Ray active tracing is enabled on the Lambda function. Default: `false`.
 
+* `DASH0_ENABLE_API_GATEWAY_SPAN_NAME` - When set to `true`, renames the handler span for an API Gateway-triggered invocation (REST API v1 or HTTP API v2 proxy integration) to `<method> <route>`, e.g. `GET /pets/:id`. Off by default, so existing span names don't change under you. Default: `false`.
+
+* `DASH0_API_GATEWAY_REQUEST_HEADERS_TO_CAPTURE` - Comma-separated, case-insensitive list of request header names to capture as `http.request.header.<name>` span attributes for API Gateway-triggered invocations. Empty by default: headers may carry PII, auth tokens, or cookies, so none are captured unless named here.
+
+  Example: `DASH0_API_GATEWAY_REQUEST_HEADERS_TO_CAPTURE=content-type,x-request-id`
+
+* `DASH0_API_GATEWAY_RESPONSE_HEADERS_TO_CAPTURE` - Same as above, but for the handler's response headers, captured as `http.response.header.<name>`.
+
+* `DASH0_CAPTURE_API_GATEWAY_QUERY_STRING` - When set to `true`, captures the request query string as `url.query` for API Gateway-triggered invocations. Off by default: query strings can carry signed-URL tokens or other sensitive values. Default: `false`.
+
 * `DASH0_DISABLE_PYTHON_DEPENDENCY_CHECK` - Python only. On startup, the Python distribution checks whether its own dependencies conflict with the versions installed in the function, and skips loading the auto-instrumentation if they do. When set to `true`, that check is skipped and the distribution loads regardless. Use this if the check reports a false positive; note that a real conflict may cause the function to fail at runtime. Default: `false`.
 
 ### Secret Masking
@@ -163,6 +173,35 @@ If you prefer to set up OpenTelemetry instrumentation yourself instead of relyin
 
 The extension enriches telemetry data with additional attributes beyond what the auto-instrumentation provides.
 
+### API Gateway
+
+When a Lambda is invoked through API Gateway, the extension recognizes both integration styles and adds HTTP semantic-convention attributes to the handler span:
+
+* **REST API (v1), proxy integration** - detected by a top-level `httpMethod` field alongside `requestContext`.
+* **HTTP API (v2), proxy integration** - detected by `requestContext.http` alongside a top-level `rawPath` field.
+
+ALB target-group events also carry a `requestContext` but are excluded from this detection, so they are never misclassified as API Gateway.
+
+This runs independently of the in-function OpenTelemetry SDK: the extension already parses the raw invoke event and the raw return payload for every invocation (see [Manual Instrumentation](#manual-instrumentation) for how telemetry reaches the extension). As a result, these attributes appear for every supported Lambda runtime (Node.js, Python, Java, .NET, Go), and even when auto-instrumentation is disabled and the extension builds a synthetic trace itself.
+
+| Attribute | REST API (v1) source | HTTP API (v2) source |
+|---|---|---|
+| `http.request.method` | `httpMethod` | `requestContext.http.method` |
+| `url.path` | `path` | `rawPath` |
+| `http.route` | `resource`, with path parameters normalized (`{id}` -> `:id`, `{proxy+}` -> `:proxy`) | `requestContext.routeKey` with the leading method stripped, normalized the same way |
+| `server.address` / `server.port` | `requestContext.domainName` / always `443` | same |
+| `client.address` | `requestContext.identity.sourceIp` | `requestContext.http.sourceIp` |
+| `network.protocol.version` | parsed from `requestContext.protocol` (e.g. `HTTP/1.1` -> `1.1`) | parsed from `requestContext.http.protocol` |
+| `http.response.status_code` | `statusCode` from the handler's proxy-integration return payload (`{ statusCode, headers, body }`) | same |
+
+Request attributes and the response status code are captured unconditionally, since none of them carry PII. Three behaviors are opt-in via environment variables, each defaulting to off so nothing changes for existing users until you ask for it:
+
+* Renaming the span from the default handler name to `<method> <route>` (e.g. `GET /pets/:id`) - `DASH0_ENABLE_API_GATEWAY_SPAN_NAME`.
+* Capturing specific request or response headers as `http.request.header.<name>` / `http.response.header.<name>` - `DASH0_API_GATEWAY_REQUEST_HEADERS_TO_CAPTURE` / `DASH0_API_GATEWAY_RESPONSE_HEADERS_TO_CAPTURE`, each an explicit allow-list rather than "capture all headers", since headers can carry auth tokens or cookies.
+* Capturing the request query string as `url.query` - `DASH0_CAPTURE_API_GATEWAY_QUERY_STRING`, since query strings can carry signed-URL tokens or other secrets.
+
+See [Configuration](#configuration) for the exact syntax of each variable.
+
 ### Span Attributes
 
 The following attributes are added to spans by the extension (if relevant):
@@ -176,6 +215,17 @@ The following attributes are added to spans by the extension (if relevant):
 | `dash0.faas.trigger_arn` | string | The ARN of the event source (e.g., SQS queue ARN, DynamoDB stream ARN, SNS topic ARN). |
 | `dash0.faas.event_bridge_source` | string | The `source` field from an EventBridge event. |
 | `dash0.faas.event_bridge_detail_type` | string | The `detail-type` field from an EventBridge event. |
+| `http.request.method` | string | The HTTP method. API Gateway-triggered invocations only. |
+| `url.path` | string | The request path. API Gateway-triggered invocations only. |
+| `url.scheme` | string | Always `https`. API Gateway-triggered invocations only. |
+| `http.route` | string | The matched route template, with path parameters normalized (`{id}` -> `:id`). API Gateway-triggered invocations only. |
+| `server.address` | string | The API Gateway domain name. API Gateway-triggered invocations only. |
+| `server.port` | int | Always `443`. API Gateway-triggered invocations only. |
+| `client.address` | string | The caller's source IP. API Gateway-triggered invocations only. |
+| `network.protocol.version` | string | The HTTP protocol version (e.g. `1.1`). API Gateway-triggered invocations only. |
+| `http.response.status_code` | int | The `statusCode` from the handler's proxy-integration return payload. API Gateway-triggered invocations only. |
+
+See [API Gateway](#api-gateway) above for how these are derived for v1/v2 events, and which related attributes are opt-in.
 
 #### Resource Attributes (Spans)
 
