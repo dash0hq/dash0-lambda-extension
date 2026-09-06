@@ -21,7 +21,10 @@ rm -rf "$CLONE_DIR"
 
 git clone --depth 1 --branch "$BRANCH" "$REPO" "$CLONE_DIR"
 cd "$CLONE_DIR"
-npm install
+# --ignore-scripts: the monorepo root pulls in native modules for workspaces we
+# do not build (better-sqlite3), and compiling those needs a toolchain this
+# build has no reason to require. instrumentation-aws-sdk needs none of them.
+npm install --ignore-scripts
 npm run compile -w packages/contrib-test-utils
 npm run version:update -w packages/instrumentation-aws-sdk
 npm run compile -w packages/instrumentation-aws-sdk
