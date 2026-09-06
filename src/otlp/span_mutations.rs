@@ -8,7 +8,6 @@ use hyper::header;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use opentelemetry_proto::tonic::common::v1::any_value::Value;
 use opentelemetry_proto::tonic::common::v1::{AnyValue, InstrumentationScope, KeyValue};
-use opentelemetry_proto::tonic::resource::v1::Resource;
 use opentelemetry_proto::tonic::trace::v1::span::{Event, Link, SpanKind};
 use opentelemetry_proto::tonic::trace::v1::status::StatusCode;
 use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span, Status};
@@ -98,10 +97,7 @@ pub fn build_synthetic_trace(
         schema_url: crate::otlp::OTEL_SCHEMA_URL.to_string(),
     };
 
-    let resource = Resource {
-        attributes: crate::otlp::resources::get_resources_attributes(),
-        ..Default::default()
-    };
+    let resource = crate::otlp::resources::resource_for_invocation(invocation_id);
 
     let export = ExportTraceServiceRequest {
         resource_spans: vec![ResourceSpans {
@@ -635,6 +631,13 @@ pub fn process_trace_request(
     encoded_body: &mut Vec<u8>,
 ) {
     for resource_span in &mut decoded.resource_spans {
+        // Enrich before capturing, so the resource the extension's own spans
+        // reuse is byte-for-byte the one the forwarded spans go out under.
+        if let Some(resource) = resource_span.resource.as_mut() {
+            crate::otlp::resources::enrich_instrumentation_resource(resource);
+        }
+        let incoming_resource = resource_span.resource.clone();
+
         for scope_span in &mut resource_span.scope_spans {
             let is_lambda = scope_span
                 .scope
@@ -656,6 +659,9 @@ pub fn process_trace_request(
                 };
 
                 invocation_ids.push(invocation_id.clone());
+                if let Some(resource) = incoming_resource.clone() {
+                    invocation_entry::store_instrumentation_resource(&invocation_id, resource);
+                }
                 span.name = "handler".to_string();
                 span.kind = SpanKind::Internal as i32;
                 add_event_payload_to_span(span, &invocation_id);
@@ -2134,6 +2140,116 @@ mod tests {
             span.events.iter().all(|e| e.name != "exception"),
             "non-lambda scope should not be modified"
         );
+    }
+
+    /// A resource that differs by one attribute is a different resource
+    /// downstream, which splits one Lambda into two nodes in the trace graph.
+    /// The spans the extension creates must therefore go out under the very
+    /// resource the auto-instrumentation used, not a separately built one.
+    #[test]
+    #[serial]
+    fn process_trace_request_enriches_and_captures_the_instrumentation_resource() {
+        take_traces();
+        let invocation_id = "inv-shared-resource";
+
+        // Stand-in for what the Node SDK's own detectors contribute. The
+        // extension cannot reproduce these from a separate process.
+        let sdk_only = |key: &str, value: &str| KeyValue {
+            key: key.to_string(),
+            value: Some(AnyValue {
+                value: Some(Value::StringValue(value.to_string())),
+            }),
+        };
+        let mut request = make_request_with_scope(
+            "@opentelemetry/instrumentation-aws-lambda",
+            make_span_with_invocation(invocation_id),
+        );
+        request.resource_spans[0].resource = Some(Resource {
+            attributes: vec![
+                sdk_only("service.name", "shared-resource-fn"),
+                sdk_only("telemetry.sdk.language", "nodejs"),
+                sdk_only("process.pid", "53"),
+            ],
+            ..Default::default()
+        });
+
+        let mut invocation_ids = Vec::new();
+        let mut encoded = Vec::new();
+        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded);
+
+        let forwarded = request.resource_spans[0]
+            .resource
+            .clone()
+            .expect("resource is forwarded");
+
+        // The pass-through resource gains what only the extension knows.
+        let keys: Vec<&str> = forwarded
+            .attributes
+            .iter()
+            .map(|kv| kv.key.as_str())
+            .collect();
+        assert!(keys.contains(&"cloud.platform"), "keys were {:?}", keys);
+        assert!(keys.contains(&"cloud.account.id"), "keys were {:?}", keys);
+
+        // ...without dropping anything the SDK detected.
+        assert!(
+            keys.contains(&"telemetry.sdk.language"),
+            "keys were {:?}",
+            keys
+        );
+        assert!(keys.contains(&"process.pid"), "keys were {:?}", keys);
+
+        // The extension's own spans reuse that exact resource, attribute order
+        // included, so the two sets are indistinguishable downstream.
+        assert_eq!(
+            crate::otlp::resources::resource_for_invocation(invocation_id),
+            forwarded,
+            "extension-created spans must reuse the instrumentation resource verbatim"
+        );
+    }
+
+    /// Re-reading the resource from a later batch must not reorder or replace
+    /// what earlier spans already went out under.
+    #[test]
+    #[serial]
+    fn captured_instrumentation_resource_is_not_replaced_by_a_later_batch() {
+        take_traces();
+        let invocation_id = "inv-resource-first-writer";
+
+        let named = |value: &str| {
+            Some(Resource {
+                attributes: vec![KeyValue {
+                    key: "service.name".to_string(),
+                    value: Some(AnyValue {
+                        value: Some(Value::StringValue(value.to_string())),
+                    }),
+                }],
+                ..Default::default()
+            })
+        };
+
+        for value in ["first", "second"] {
+            let mut request = make_request_with_scope(
+                "@opentelemetry/instrumentation-aws-lambda",
+                make_span_with_invocation(invocation_id),
+            );
+            request.resource_spans[0].resource = named(value);
+            let mut ids = Vec::new();
+            let mut encoded = Vec::new();
+            super::process_trace_request(&mut request, &mut ids, &mut encoded);
+        }
+
+        let captured = crate::otlp::resources::resource_for_invocation(invocation_id);
+        let service_name = captured
+            .attributes
+            .iter()
+            .find(|kv| kv.key == "service.name")
+            .and_then(|kv| kv.value.as_ref())
+            .and_then(|v| match &v.value {
+                Some(Value::StringValue(s)) => Some(s.clone()),
+                _ => None,
+            });
+        assert_eq!(service_name, Some("first".to_string()));
     }
 }
 

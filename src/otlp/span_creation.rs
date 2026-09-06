@@ -4,7 +4,6 @@ use hyper::header;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use opentelemetry_proto::tonic::common::v1::any_value::Value;
 use opentelemetry_proto::tonic::common::v1::{AnyValue, InstrumentationScope, KeyValue};
-use opentelemetry_proto::tonic::resource::v1::Resource;
 use opentelemetry_proto::tonic::trace::v1::span::SpanKind;
 use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span};
 use prost::Message;
@@ -201,10 +200,7 @@ pub fn create_spans(
         schema_url: crate::otlp::OTEL_SCHEMA_URL.to_string(),
     };
 
-    let resource = Resource {
-        attributes: crate::otlp::resources::get_resources_attributes(),
-        ..Default::default()
-    };
+    let resource = crate::otlp::resources::resource_for_invocation(invocation_id);
 
     let export = ExportTraceServiceRequest {
         resource_spans: vec![ResourceSpans {

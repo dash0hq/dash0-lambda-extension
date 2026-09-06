@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use once_cell::sync::Lazy;
 use opentelemetry_proto::tonic::common::v1::KeyValue;
+use opentelemetry_proto::tonic::resource::v1::Resource;
 use opentelemetry_proto::tonic::trace::v1::Status;
 use parking_lot::Mutex;
 
@@ -35,6 +36,16 @@ pub struct InvocationEntry {
     pub handler_status: Option<Status>,
     pub traces: Vec<StoredTrace>,
     pub logs: Vec<TelemetryLog>,
+    /// Resource carried by the OTLP payload the in-process auto-instrumentation
+    /// sent for this invocation, after the extension enriched it.
+    ///
+    /// The spans the extension creates itself must go out under this exact
+    /// resource. Building a second one here cannot match it -- the SDK's own
+    /// detectors contribute `process.*` and `telemetry.sdk.*`, which a separate
+    /// process has no way to reproduce -- and a resource that differs by even
+    /// one attribute is a different resource downstream, which splits a single
+    /// Lambda into two nodes in the trace graph.
+    pub instrumentation_resource: Option<Resource>,
 }
 
 impl Default for InvocationEntry {
@@ -59,6 +70,7 @@ impl Default for InvocationEntry {
             handler_status: None,
             traces: Vec::new(),
             logs: Vec::new(),
+            instrumentation_resource: None,
         }
     }
 }
@@ -99,6 +111,29 @@ pub fn get_start_time(invocation_id: &str) -> Option<f64> {
         .get(invocation_id)
         .map(|e| e.start_time)
         .filter(|&t| t > 0.0)
+}
+
+/// Records the resource from the auto-instrumentation's OTLP payload, so the
+/// spans the extension creates for this invocation can reuse it verbatim.
+///
+/// First writer wins: a single export carries one resource, and re-reading it
+/// from a later batch must not reorder or replace what earlier spans already
+/// went out under.
+pub fn store_instrumentation_resource(invocation_id: &str, resource: Resource) {
+    let mut store = INVOCATION_STORE.lock();
+    let entry = store.entry(invocation_id.to_string()).or_default();
+    if entry.instrumentation_resource.is_none() {
+        entry.instrumentation_resource = Some(resource);
+    }
+}
+
+/// Lightweight getter: returns only the resource recorded from the
+/// auto-instrumentation's payload, if one arrived for this invocation.
+pub fn get_instrumentation_resource(invocation_id: &str) -> Option<Resource> {
+    INVOCATION_STORE
+        .lock()
+        .get(invocation_id)
+        .and_then(|e| e.instrumentation_resource.clone())
 }
 
 /// Lightweight getter: returns only the root_span_id.

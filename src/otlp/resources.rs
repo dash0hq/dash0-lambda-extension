@@ -1,5 +1,66 @@
 use opentelemetry_proto::tonic::common::v1::AnyValue;
 use opentelemetry_proto::tonic::common::v1::KeyValue;
+use opentelemetry_proto::tonic::resource::v1::Resource;
+
+/// Attributes the extension knows but the in-process SDK cannot detect: they
+/// come from the Lambda Extensions API registration, which the runtime never
+/// sees.
+fn extension_known_attributes() -> Vec<(&'static str, String)> {
+    use crate::otlp::attributes::*;
+    vec![
+        (CLOUD_PLATFORM, "aws_lambda".to_string()),
+        (
+            CLOUD_RESOURCE_ID,
+            crate::state::global::get_function_arn().unwrap_or_else(|| "unknown".to_string()),
+        ),
+        (
+            CLOUD_ACCOUNT_ID,
+            crate::state::global::get_account_id().unwrap_or_else(|| "unknown".to_string()),
+        ),
+    ]
+}
+
+/// Adds the extension-known attributes to a resource produced by the in-process
+/// auto-instrumentation, leaving every attribute the SDK already set untouched.
+///
+/// Called on the payload as it passes through, so the enriched resource is what
+/// both the forwarded spans and the extension's own spans go out under. Without
+/// the shared resource the two sets describe different resources downstream and
+/// a single Lambda renders as two nodes in the trace graph.
+pub fn enrich_instrumentation_resource(resource: &mut Resource) {
+    for (key, value) in extension_known_attributes() {
+        if resource.attributes.iter().any(|kv| kv.key == key) {
+            continue;
+        }
+        resource.attributes.push(KeyValue {
+            key: key.to_string(),
+            value: Some(AnyValue {
+                value: Some(
+                    opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(value),
+                ),
+            }),
+        });
+    }
+}
+
+/// The resource to put on spans the extension creates for `invocation_id`.
+///
+/// Prefers the resource the auto-instrumentation sent, so both sets of spans
+/// describe the same resource. Falls back to building one when no
+/// auto-instrumentation payload arrived -- auto-instrumentation switched off, or
+/// an error-path synthetic trace for an invocation that never reported.
+pub fn resource_for_invocation(invocation_id: &str) -> Resource {
+    if let Some(resource) =
+        crate::state::invocation_entry::get_instrumentation_resource(invocation_id)
+    {
+        return resource;
+    }
+
+    Resource {
+        attributes: get_resources_attributes(),
+        ..Default::default()
+    }
+}
 
 pub fn try_read_env_from_file(key: &str) -> Option<String> {
     let content = std::fs::read_to_string("/tmp/dash0_env_vars").ok()?;
@@ -379,5 +440,48 @@ deployment.environment.name=preview,service.namespace=slfinrtl";
             attributes.get("service.name").map(String::as_str),
             Some("unknown_service")
         );
+    }
+
+    /// Auto-instrumentation switched off, or an error-path synthetic trace for
+    /// an invocation that never reported: there is no resource to reuse, so the
+    /// extension has to build one.
+    #[test]
+    #[serial_test::serial]
+    fn resource_for_invocation_builds_one_when_no_payload_arrived() {
+        let resource = resource_for_invocation("inv-that-never-sent-telemetry");
+
+        let keys: Vec<&str> = resource
+            .attributes
+            .iter()
+            .map(|kv| kv.key.as_str())
+            .collect();
+        assert!(keys.contains(&"cloud.platform"), "keys were {:?}", keys);
+        assert!(keys.contains(&"cloud.resource_id"), "keys were {:?}", keys);
+        assert!(keys.contains(&"service.name"), "keys were {:?}", keys);
+    }
+
+    /// Enrichment must never clobber a value the SDK already resolved.
+    #[test]
+    #[serial_test::serial]
+    fn enrich_instrumentation_resource_leaves_existing_values_alone() {
+        let mut resource = Resource {
+            attributes: vec![KeyValue {
+                key: "cloud.platform".to_string(),
+                value: Some(AnyValue {
+                    value: Some(Value::StringValue("set_by_the_sdk".to_string())),
+                }),
+            }],
+            ..Default::default()
+        };
+
+        enrich_instrumentation_resource(&mut resource);
+
+        let platform_values: Vec<String> = resource
+            .attributes
+            .iter()
+            .filter(|kv| kv.key == "cloud.platform")
+            .filter_map(|kv| get_string_value(&kv.value))
+            .collect();
+        assert_eq!(platform_values, vec!["set_by_the_sdk".to_string()]);
     }
 }
