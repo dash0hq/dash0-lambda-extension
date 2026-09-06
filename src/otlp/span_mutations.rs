@@ -2142,14 +2142,18 @@ mod tests {
         );
     }
 
-    /// A resource that differs by one attribute is a different resource
-    /// downstream, which splits one Lambda into two nodes in the trace graph.
-    /// The spans the extension creates must therefore go out under the very
-    /// resource the auto-instrumentation used, not a separately built one.
+    /// Downstream, a Lambda's identity is `cloud.platform`, `cloud.account.id`,
+    /// `cloud.region` and `faas.name`. The auto-instrumentation cannot detect
+    /// the first two from inside the runtime, so the extension supplies them --
+    /// and the spans the extension creates itself must then go out under that
+    /// same resource rather than a separately built one, so both sets of spans
+    /// resolve to one resource.
     #[test]
     #[serial]
     fn process_trace_request_enriches_and_captures_the_instrumentation_resource() {
         take_traces();
+        crate::state::global::reset_for_tests();
+        crate::state::global::store_account_id("111122223333");
         let invocation_id = "inv-shared-resource";
 
         // Stand-in for what the Node SDK's own detectors contribute. The

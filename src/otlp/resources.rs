@@ -5,19 +5,22 @@ use opentelemetry_proto::tonic::resource::v1::Resource;
 /// Attributes the extension knows but the in-process SDK cannot detect: they
 /// come from the Lambda Extensions API registration, which the runtime never
 /// sees.
+///
+/// Only attributes whose value is actually known. `cloud.account.id` and
+/// `cloud.platform` decide which resource a signal belongs to downstream, so a
+/// placeholder here would not merely be a missing value -- it would assert an
+/// identity, and one that disagrees with whatever the in-process
+/// instrumentation reported for the same function.
 fn extension_known_attributes() -> Vec<(&'static str, String)> {
     use crate::otlp::attributes::*;
-    vec![
-        (CLOUD_PLATFORM, "aws_lambda".to_string()),
-        (
-            CLOUD_RESOURCE_ID,
-            crate::state::global::get_function_arn().unwrap_or_else(|| "unknown".to_string()),
-        ),
-        (
-            CLOUD_ACCOUNT_ID,
-            crate::state::global::get_account_id().unwrap_or_else(|| "unknown".to_string()),
-        ),
-    ]
+    let mut attributes = vec![(CLOUD_PLATFORM, "aws_lambda".to_string())];
+    if let Some(function_arn) = crate::state::global::get_function_arn() {
+        attributes.push((CLOUD_RESOURCE_ID, function_arn));
+    }
+    if let Some(account_id) = crate::state::global::get_account_id() {
+        attributes.push((CLOUD_ACCOUNT_ID, account_id));
+    }
+    attributes
 }
 
 /// Adds the extension-known attributes to a resource produced by the in-process
@@ -483,5 +486,26 @@ deployment.environment.name=preview,service.namespace=slfinrtl";
             .filter_map(|kv| get_string_value(&kv.value))
             .collect();
         assert_eq!(platform_values, vec!["set_by_the_sdk".to_string()]);
+    }
+
+    /// `cloud.account.id` is one of the four attributes that decide which
+    /// resource a Lambda signal belongs to. Writing a placeholder onto the
+    /// auto-instrumentation's resource would claim an identity the extension
+    /// does not know, and split the function in two if anything else reports
+    /// the real value.
+    #[test]
+    #[serial_test::serial]
+    fn enrich_instrumentation_resource_omits_unknown_identity_attributes() {
+        crate::state::global::reset_for_tests();
+
+        let mut resource = Resource::default();
+        enrich_instrumentation_resource(&mut resource);
+
+        let keys: Vec<&str> = resource
+            .attributes
+            .iter()
+            .map(|kv| kv.key.as_str())
+            .collect();
+        assert_eq!(keys, vec!["cloud.platform"], "keys were {:?}", keys);
     }
 }
