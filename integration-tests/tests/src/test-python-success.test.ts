@@ -42,6 +42,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
         { message: 'START RequestId: ' },
         { message: 'END RequestId: ' },
         { message: "response.status_code:" },
+        { message: "let's parse this as a warning", severity: "warning" },
         { message: JSON.stringify({ name: "dash0_payload", type: "lambda_event", message: { parameter1: "right" } }), isJson: true, attributes: { "dash0.faas.payload_type": "lambda_event" } },
         { message: JSON.stringify({ name: "dash0_payload", type: "lambda_return_value", message: { statusCode: 200,  body: '"Hello from Lambda!"' } }), isJson: true, attributes: { "dash0.faas.payload_type": "lambda_return_value" } },
     ]
