@@ -28,10 +28,14 @@ pub fn is_auto_instrumented_disabled() -> bool {
     }
 }
 
+/// Maximum size, in KB, of a captured Lambda event or return value payload
+/// before the extension truncates it. Defaults to 1MB.
+const DEFAULT_MAX_EVENT_PAYLOAD_KB: usize = 1024;
+
 pub fn max_event_payload_size() -> usize {
     match std::env::var("DASH0_MAX_EVENT_PAYLOAD") {
-        Ok(val) => val.parse::<usize>().unwrap_or(4) * 1024,
-        Err(_) => 4 * 1024,
+        Ok(val) => val.parse::<usize>().unwrap_or(DEFAULT_MAX_EVENT_PAYLOAD_KB) * 1024,
+        Err(_) => DEFAULT_MAX_EVENT_PAYLOAD_KB * 1024,
     }
 }
 
@@ -217,9 +221,9 @@ mod tests {
 
     #[test]
     #[serial]
-    fn max_event_payload_size_defaults_to_4kb() {
+    fn max_event_payload_size_defaults_to_1mb() {
         std::env::remove_var("DASH0_MAX_EVENT_PAYLOAD");
-        assert_eq!(max_event_payload_size(), 4 * 1024);
+        assert_eq!(max_event_payload_size(), 1024 * 1024);
     }
 
     #[test]
@@ -234,7 +238,7 @@ mod tests {
     #[serial]
     fn max_event_payload_size_handles_invalid_value() {
         std::env::set_var("DASH0_MAX_EVENT_PAYLOAD", "not_a_number");
-        assert_eq!(max_event_payload_size(), 4 * 1024);
+        assert_eq!(max_event_payload_size(), 1024 * 1024);
         std::env::remove_var("DASH0_MAX_EVENT_PAYLOAD");
     }
 
