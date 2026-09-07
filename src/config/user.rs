@@ -116,6 +116,45 @@ pub fn is_telemetry_metrics_disabled() -> bool {
     }
 }
 
+/// When true, the handler span for an API Gateway-triggered invocation is
+/// renamed to `<method> <route>`. Off by default so existing span names
+/// don't change under users. See `http_attributes::extract_span_name`.
+pub fn is_api_gateway_span_name_enabled() -> bool {
+    match std::env::var("DASH0_ENABLE_API_GATEWAY_SPAN_NAME") {
+        Ok(val) => matches!(
+            val.as_str(),
+            "1" | "true" | "TRUE" | "True" | "yes" | "YES" | "Yes" | "y" | "Y"
+        ),
+        Err(_) => false,
+    }
+}
+
+/// Comma-separated allow-list of request header names to capture as
+/// `http.request.header.*` for API Gateway-triggered invocations. Empty by
+/// default: headers may carry PII, auth tokens, or cookies.
+pub fn api_gateway_request_headers_to_capture() -> String {
+    std::env::var("DASH0_API_GATEWAY_REQUEST_HEADERS_TO_CAPTURE").unwrap_or_default()
+}
+
+/// Comma-separated allow-list of response header names to capture as
+/// `http.response.header.*` for API Gateway-triggered invocations.
+pub fn api_gateway_response_headers_to_capture() -> String {
+    std::env::var("DASH0_API_GATEWAY_RESPONSE_HEADERS_TO_CAPTURE").unwrap_or_default()
+}
+
+/// When true, captures the request query string as `url.query` for API
+/// Gateway-triggered invocations. Off by default: query strings can carry
+/// signed-URL tokens or other sensitive values.
+pub fn is_api_gateway_query_string_capture_enabled() -> bool {
+    match std::env::var("DASH0_CAPTURE_API_GATEWAY_QUERY_STRING") {
+        Ok(val) => matches!(
+            val.as_str(),
+            "1" | "true" | "TRUE" | "True" | "yes" | "YES" | "Yes" | "y" | "Y"
+        ),
+        Err(_) => false,
+    }
+}
+
 pub fn is_telemetry_traces_disabled() -> bool {
     match std::env::var("DASH0_DISABLE_TELEMETRY_TRACES") {
         Ok(val) => matches!(
