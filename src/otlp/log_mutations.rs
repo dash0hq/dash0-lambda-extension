@@ -139,6 +139,91 @@ fn severity_text_to_number(severity: &str) -> i32 {
     }
 }
 
+/// Dash0 rejects log records whose string body exceeds 1 MiB, so a payload
+/// log body must never grow past this, wrapper and JSON escaping included.
+pub const MAX_LOG_BODY_BYTES: usize = 1024 * 1024;
+
+fn payload_message(payload: &str) -> serde_json::Value {
+    serde_json::from_str::<serde_json::Value>(payload)
+        .unwrap_or_else(|_| serde_json::Value::String(payload.to_string()))
+}
+
+fn render_payload_body(payload_type: &str, message: &serde_json::Value) -> String {
+    serde_json::json!({
+        "name": "dash0_payload",
+        "type": payload_type,
+        "message": message,
+    })
+    .to_string()
+}
+
+/// Number of bytes `c` occupies inside a JSON string literal as serialized by
+/// serde_json: `"` and `\` and the short control escapes take two bytes, other
+/// control characters six (`\u00XX`), everything else its UTF-8 length.
+fn json_escaped_len(c: char) -> usize {
+    match c {
+        '"' | '\\' | '\u{8}' | '\u{c}' | '\n' | '\r' | '\t' => 2,
+        c if (c as u32) < 0x20 => 6,
+        c => c.len_utf8(),
+    }
+}
+
+/// Longest prefix of `s` whose JSON-escaped form fits in `budget` bytes.
+fn cut_to_escaped_budget(s: &str, budget: usize) -> String {
+    let mut used = 0;
+    let mut end = 0;
+    for (idx, c) in s.char_indices() {
+        let cost = json_escaped_len(c);
+        if used + cost > budget {
+            break;
+        }
+        used += cost;
+        end = idx + c.len_utf8();
+    }
+    s[..end].to_string()
+}
+
+/// Build the log body for a payload, shrinking the payload further if the
+/// body (wrapper and escaping included) would exceed MAX_LOG_BODY_BYTES.
+/// Valid JSON payloads get JSON-aware truncation first; string payloads, or
+/// JSON payloads that had to fall back to a plain cut, are cut so that their
+/// escaped form fits.
+fn build_payload_body(payload: &str, payload_type: &str) -> String {
+    let mut message = payload_message(payload);
+    let mut body = render_payload_body(payload_type, &message);
+    if body.len() <= MAX_LOG_BODY_BYTES {
+        return body;
+    }
+
+    if !message.is_string() {
+        let compact = message.to_string();
+        let budget = MAX_LOG_BODY_BYTES.saturating_sub(body.len() - compact.len());
+        message = payload_message(&crate::util::truncate::truncate_payload_to(
+            &compact, budget,
+        ));
+        body = render_payload_body(payload_type, &message);
+        if body.len() <= MAX_LOG_BODY_BYTES {
+            return body;
+        }
+    }
+
+    if let serde_json::Value::String(s) = &message {
+        // Body = wrapper + escaped string; the wrapper is everything but the
+        // escaped string content.
+        let escaped_len = serde_json::to_string(s).map(|e| e.len() - 2).unwrap_or(0);
+        let budget = MAX_LOG_BODY_BYTES.saturating_sub(body.len() - escaped_len);
+        message = serde_json::Value::String(cut_to_escaped_budget(s, budget));
+        body = render_payload_body(payload_type, &message);
+    }
+    tracing::debug!(
+        "[{}] Shrunk {} payload log body to {} bytes to stay within the log body limit.",
+        crate::log_prefix(),
+        payload_type,
+        body.len()
+    );
+    body
+}
+
 pub fn build_payload_log(
     payload: &str,
     payload_type: &str,
@@ -150,8 +235,6 @@ pub fn build_payload_log(
     if !crate::config::user::is_create_payload_log_records() {
         return None;
     }
-    let message = serde_json::from_str::<serde_json::Value>(payload)
-        .unwrap_or_else(|_| serde_json::Value::String(payload.to_string()));
     let time = match timestamp_nanos {
         Some(nanos) => chrono::DateTime::from_timestamp_nanos(nanos as i64).to_rfc3339(),
         None => chrono::Utc::now().to_rfc3339(),
@@ -159,14 +242,7 @@ pub fn build_payload_log(
     Some(TelemetryLog {
         time,
         r#type: "function".to_string(),
-        record: serde_json::Value::String(
-            serde_json::json!({
-                "name": "dash0_payload",
-                "type": payload_type,
-                "message": message,
-            })
-            .to_string(),
-        ),
+        record: serde_json::Value::String(build_payload_body(payload, payload_type)),
         invocation_id: Some(invocation_id.to_string()),
         trace_id,
         span_id,
@@ -326,6 +402,94 @@ mod tests {
                 value: Some(Value::StringValue(s)),
             }) => Some(s.clone()),
             _ => None,
+        }
+    }
+
+    fn payload_log_body(payload: &str, payload_type: &str) -> String {
+        let log = build_payload_log(payload, payload_type, "inv-1", None, None, None)
+            .expect("payload log records are enabled by default");
+        match log.record {
+            serde_json::Value::String(s) => s,
+            other => panic!("expected string record, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn build_payload_log_leaves_small_body_untouched() {
+        let body = payload_log_body(r#"{"a":"b"}"#, "lambda_event");
+        let parsed: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(parsed["name"], "dash0_payload");
+        assert_eq!(parsed["type"], "lambda_event");
+        assert_eq!(parsed["message"], json!({"a": "b"}));
+    }
+
+    #[test]
+    fn build_payload_log_caps_string_payload_body_at_log_body_limit() {
+        // A plain-cut payload is embedded as a string, and every quote gains
+        // a backslash when escaped, so a payload right at the limit renders
+        // to a body well over it.
+        let item = format!("\"{}\",", "x".repeat(30));
+        let payload = format!("[{}", item.repeat(MAX_LOG_BODY_BYTES / item.len() + 1));
+        assert!(serde_json::from_str::<serde_json::Value>(&payload).is_err());
+
+        let body = payload_log_body(&payload, "lambda_event");
+
+        assert!(
+            body.len() <= MAX_LOG_BODY_BYTES,
+            "body is {} bytes",
+            body.len()
+        );
+        // Filled up to within one escaped character of the limit
+        assert!(
+            body.len() > MAX_LOG_BODY_BYTES - 6,
+            "body is {} bytes",
+            body.len()
+        );
+        let parsed: serde_json::Value = serde_json::from_str(&body).unwrap();
+        let message = parsed["message"].as_str().unwrap();
+        assert!(payload.starts_with(message));
+        assert!(message.len() < payload.len());
+    }
+
+    #[test]
+    fn build_payload_log_caps_json_payload_body_with_json_aware_truncation() {
+        // Valid JSON just under the limit: the payload fits, the body with its
+        // wrapper does not, so the longest string value gets replaced.
+        let payload = format!(
+            r#"{{"a":"{}","b":"{}"}}"#,
+            "x".repeat(MAX_LOG_BODY_BYTES - 100),
+            "y".repeat(30)
+        );
+        assert!(payload.len() <= MAX_LOG_BODY_BYTES);
+
+        let body = payload_log_body(&payload, "lambda_return_value");
+
+        assert!(
+            body.len() <= MAX_LOG_BODY_BYTES,
+            "body is {} bytes",
+            body.len()
+        );
+        let parsed: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(parsed["message"]["a"], "[truncated]");
+        assert_eq!(parsed["message"]["b"], "y".repeat(30));
+    }
+
+    #[test]
+    fn cut_to_escaped_budget_counts_escaped_bytes_and_keeps_char_boundaries() {
+        // `"` costs 2, a control char 6, a 3-byte char 3
+        let s = "a\"\u{1}\u{d55c}b";
+        assert_eq!(cut_to_escaped_budget(s, 0), "");
+        assert_eq!(cut_to_escaped_budget(s, 2), "a");
+        assert_eq!(cut_to_escaped_budget(s, 3), "a\"");
+        assert_eq!(cut_to_escaped_budget(s, 8), "a\"");
+        assert_eq!(cut_to_escaped_budget(s, 9), "a\"\u{1}");
+        assert_eq!(cut_to_escaped_budget(s, 11), "a\"\u{1}");
+        assert_eq!(cut_to_escaped_budget(s, 12), "a\"\u{1}\u{d55c}");
+        assert_eq!(cut_to_escaped_budget(s, 13), s);
+        assert_eq!(cut_to_escaped_budget(s, 100), s);
+        for budget in 0..14 {
+            let cut = cut_to_escaped_budget(s, budget);
+            assert!(serde_json::to_string(&cut).unwrap().len() - 2 <= budget);
         }
     }
 
