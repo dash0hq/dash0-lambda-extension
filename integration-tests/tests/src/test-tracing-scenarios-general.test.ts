@@ -139,6 +139,10 @@ const fetchAndVerifyConsumerSpans = async (
                 expect(consumerAttrs['http.response.status_code']?.intValue).toEqual('200');
                 expect(consumerAttrs['http.route']?.stringValue).toEqual(expectedRoute);
                 console.log(`HTTP attributes (${scenarioName}): method=${consumerAttrs['http.request.method']?.stringValue}, route=${consumerAttrs['http.route']?.stringValue}, status_code=${consumerAttrs['http.response.status_code']?.intValue}`);
+
+                // DASH0_ENABLE_API_GATEWAY_SPAN_NAME is set on these consumers,
+                // so the handler span should be renamed to "<method> <route>".
+                expect(consumerHandlerSpan!.name).toEqual(`POST ${expectedRoute}`);
             }
 
             return;

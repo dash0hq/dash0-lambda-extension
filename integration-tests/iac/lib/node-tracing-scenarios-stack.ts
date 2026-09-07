@@ -254,7 +254,10 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         role,
         timeout: cdk.Duration.seconds(10),
         logGroup: props.logGroup,
-        environment: baseEnvironment,
+        environment: {
+          ...baseEnvironment,
+          DASH0_ENABLE_API_GATEWAY_SPAN_NAME: 'true',
+        },
       });
 
       const api = new apigateway.LambdaRestApi(this, `TracingTestApi-${runtimeName}`, {
@@ -288,7 +291,10 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         role,
         timeout: cdk.Duration.seconds(10),
         logGroup: props.logGroup,
-        environment: baseEnvironment,
+        environment: {
+          ...baseEnvironment,
+          DASH0_ENABLE_API_GATEWAY_SPAN_NAME: 'true',
+        },
       });
 
       const httpApi = new apigatewayv2.CfnApi(this, `TracingTestHttpApi-${runtimeName}`, {
@@ -347,7 +353,10 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         role,
         timeout: cdk.Duration.seconds(10),
         logGroup: props.logGroup,
-        environment: baseEnvironment,
+        environment: {
+          ...baseEnvironment,
+          DASH0_ENABLE_API_GATEWAY_SPAN_NAME: 'true',
+        },
       });
 
       const functionUrl = functionUrlConsumer.addFunctionUrl({
