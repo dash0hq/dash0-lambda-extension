@@ -47,30 +47,6 @@ fn string_value(kv: &KeyValue) -> Option<String> {
     }
 }
 
-/// `{proxy+}` -> `:proxy`, `{id}` -> `:id`, matching the normalized
-/// `http.route` form used elsewhere (e.g. `@opentelemetry/instrumentation-http`).
-fn normalize_route(route: &str) -> String {
-    let mut result = String::with_capacity(route.len());
-    let mut chars = route.chars();
-    while let Some(c) = chars.next() {
-        if c == '{' {
-            let mut name = String::new();
-            for c2 in chars.by_ref() {
-                if c2 == '}' {
-                    break;
-                }
-                name.push(c2);
-            }
-            let name = name.trim_end_matches('+');
-            result.push(':');
-            result.push_str(name);
-        } else {
-            result.push(c);
-        }
-    }
-    result
-}
-
 fn is_alb_event(json_val: &Value) -> bool {
     json_val
         .get("requestContext")
@@ -118,7 +94,7 @@ pub fn extract_request_attributes(json_val: &Value, version: &ApiGatewayVersion)
             }
             attrs.push(string_kv(URL_SCHEME, "https".to_string()));
             if let Some(resource) = json_val.get("resource").and_then(|v| v.as_str()) {
-                attrs.push(string_kv(HTTP_ROUTE, normalize_route(resource)));
+                attrs.push(string_kv(HTTP_ROUTE, resource.to_string()));
             }
             if let Some(domain) = rc.get("domainName").and_then(|v| v.as_str()) {
                 attrs.push(string_kv(SERVER_ADDRESS, domain.to_string()));
@@ -154,7 +130,7 @@ pub fn extract_request_attributes(json_val: &Value, version: &ApiGatewayVersion)
                     .split_once(' ')
                     .map(|(_, r)| r)
                     .unwrap_or(route_key);
-                attrs.push(string_kv(HTTP_ROUTE, normalize_route(route)));
+                attrs.push(string_kv(HTTP_ROUTE, route.to_string()));
             }
             if let Some(domain) = rc.get("domainName").and_then(|v| v.as_str()) {
                 attrs.push(string_kv(SERVER_ADDRESS, domain.to_string()));
@@ -376,12 +352,12 @@ mod tests {
     }
 
     #[test]
-    fn extracts_v1_request_attributes_and_normalizes_route() {
+    fn extracts_v1_request_attributes() {
         let attrs = extract_request_attributes(&v1_event(), &ApiGatewayVersion::V1);
         assert_eq!(get_str(&attrs, HTTP_REQUEST_METHOD), Some("GET"));
         assert_eq!(get_str(&attrs, URL_PATH), Some("/pets/123"));
         assert_eq!(get_str(&attrs, URL_SCHEME), Some("https"));
-        assert_eq!(get_str(&attrs, HTTP_ROUTE), Some("/pets/:id"));
+        assert_eq!(get_str(&attrs, HTTP_ROUTE), Some("/pets/{id}"));
         assert_eq!(
             get_str(&attrs, SERVER_ADDRESS),
             Some("abc123.execute-api.us-east-1.amazonaws.com")
@@ -392,11 +368,11 @@ mod tests {
     }
 
     #[test]
-    fn extracts_v2_request_attributes_and_normalizes_route() {
+    fn extracts_v2_request_attributes() {
         let attrs = extract_request_attributes(&v2_event(), &ApiGatewayVersion::V2);
         assert_eq!(get_str(&attrs, HTTP_REQUEST_METHOD), Some("GET"));
         assert_eq!(get_str(&attrs, URL_PATH), Some("/pets/123"));
-        assert_eq!(get_str(&attrs, HTTP_ROUTE), Some("/pets/:id"));
+        assert_eq!(get_str(&attrs, HTTP_ROUTE), Some("/pets/{id}"));
         assert_eq!(get_str(&attrs, CLIENT_ADDRESS), Some("1.2.3.4"));
         assert_eq!(get_str(&attrs, NETWORK_PROTOCOL_VERSION), Some("1.1"));
     }
@@ -413,11 +389,11 @@ mod tests {
     fn builds_span_name_for_v1_and_v2() {
         assert_eq!(
             extract_span_name(&v1_event(), &ApiGatewayVersion::V1),
-            Some("GET /pets/:id".to_string())
+            Some("GET /pets/{id}".to_string())
         );
         assert_eq!(
             extract_span_name(&v2_event(), &ApiGatewayVersion::V2),
-            Some("GET /pets/:id".to_string())
+            Some("GET /pets/{id}".to_string())
         );
     }
 

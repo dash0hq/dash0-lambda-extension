@@ -746,7 +746,7 @@ mod tests {
         );
         assert_eq!(
             find_string_attr(attrs, "http.route"),
-            Some("/pets/:id".to_string())
+            Some("/pets/{id}".to_string())
         );
         assert_eq!(
             find_string_attr(attrs, "client.address"),
@@ -839,7 +839,7 @@ mod tests {
             .expect("invocation entry should exist after the round trip");
         assert_eq!(
             find_string_attr(&entry.handler_attributes, "http.route"),
-            Some("/pets/:id".to_string()),
+            Some("/pets/{id}".to_string()),
             "http.route must be the real unmasked route"
         );
         assert_ne!(
@@ -857,7 +857,7 @@ mod tests {
             .expect("stored trace should decode as OTLP");
         let span_name = &decoded.resource_spans[0].scope_spans[0].spans[0].name;
         assert_eq!(
-            span_name, "GET /pets/:id",
+            span_name, "GET /pets/{id}",
             "the derived span name must use the real route, not the mask placeholder"
         );
 

@@ -97,7 +97,7 @@ The extension layers are published to the following AWS regions:
 
 * `DASH0_XRAY_TRACES_ENABLED` - When set to `true`, the extension preserves the original X-Ray trace context instead of creating supplementary spans. Use this when AWS X-Ray active tracing is enabled on the Lambda function. Default: `false`.
 
-* `DASH0_ENABLE_API_GATEWAY_SPAN_NAME` - When set to `true`, renames the handler span for an API Gateway-triggered invocation (REST API v1 or HTTP API v2 proxy integration) to `<method> <route>`, e.g. `GET /pets/:id`. Off by default, so existing span names don't change under you. Default: `false`.
+* `DASH0_ENABLE_API_GATEWAY_SPAN_NAME` - When set to `true`, renames the handler span for an API Gateway-triggered invocation (REST API v1 or HTTP API v2 proxy integration) to `<method> <route>`, e.g. `GET /pets/{id}`. Off by default, so existing span names don't change under you. Default: `false`.
 
 * `DASH0_API_GATEWAY_REQUEST_HEADERS_TO_CAPTURE` - Comma-separated, case-insensitive list of request header names to capture as `http.request.header.<name>` span attributes for API Gateway-triggered invocations. Empty by default: headers may carry PII, auth tokens, or cookies, so none are captured unless named here.
 
@@ -190,7 +190,7 @@ This runs independently of the in-function OpenTelemetry SDK: the extension alre
 |---|---|---|
 | `http.request.method` | `httpMethod` | `requestContext.http.method` |
 | `url.path` | `path` | `rawPath` |
-| `http.route` | `resource`, with path parameters normalized (`{id}` -> `:id`, `{proxy+}` -> `:proxy`) | `requestContext.routeKey` with the leading method stripped, normalized the same way |
+| `http.route` | `resource`, as-is (e.g. `/pets/{id}`) | `requestContext.routeKey` with the leading method stripped |
 | `server.address` / `server.port` | `requestContext.domainName` / always `443` | same |
 | `client.address` | `requestContext.identity.sourceIp` | `requestContext.http.sourceIp` |
 | `network.protocol.version` | parsed from `requestContext.protocol` (e.g. `HTTP/1.1` -> `1.1`) | parsed from `requestContext.http.protocol` |
@@ -198,7 +198,7 @@ This runs independently of the in-function OpenTelemetry SDK: the extension alre
 
 Request attributes and the response status code are captured unconditionally, since none of them carry PII. Three behaviors are opt-in via environment variables, each defaulting to off so nothing changes for existing users until you ask for it:
 
-* Renaming the span from the default handler name to `<method> <route>` (e.g. `GET /pets/:id`) - `DASH0_ENABLE_API_GATEWAY_SPAN_NAME`.
+* Renaming the span from the default handler name to `<method> <route>` (e.g. `GET /pets/{id}`) - `DASH0_ENABLE_API_GATEWAY_SPAN_NAME`.
 * Capturing specific request or response headers as `http.request.header.<name>` / `http.response.header.<name>` - `DASH0_API_GATEWAY_REQUEST_HEADERS_TO_CAPTURE` / `DASH0_API_GATEWAY_RESPONSE_HEADERS_TO_CAPTURE`, each an explicit allow-list rather than "capture all headers", since headers can carry auth tokens or cookies.
 * Capturing the request query string as `url.query` - `DASH0_CAPTURE_API_GATEWAY_QUERY_STRING`, since query strings can carry signed-URL tokens or other secrets.
 
@@ -220,7 +220,7 @@ The following attributes are added to spans by the extension (if relevant):
 | `http.request.method` | string | The HTTP method. API Gateway-triggered invocations only. |
 | `url.path` | string | The request path. API Gateway-triggered invocations only. |
 | `url.scheme` | string | Always `https`. API Gateway-triggered invocations only. |
-| `http.route` | string | The matched route template, with path parameters normalized (`{id}` -> `:id`). API Gateway-triggered invocations only. |
+| `http.route` | string | The matched route template, as reported by API Gateway (e.g. `/pets/{id}`). API Gateway-triggered invocations only. |
 | `server.address` | string | The API Gateway domain name. API Gateway-triggered invocations only. |
 | `server.port` | int | Always `443`. API Gateway-triggered invocations only. |
 | `client.address` | string | The caller's source IP. API Gateway-triggered invocations only. |
