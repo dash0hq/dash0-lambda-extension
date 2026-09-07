@@ -13,6 +13,7 @@ const scenarios = [
     { name: 'eventbridge', producerPrefix: `${RESOURCE_PREFIX}tracing-eventbridge-producer`, consumerPrefix: `${RESOURCE_PREFIX}tracing-eventbridge-consumer`, runtimes: [...pythonRuntimes, ...nodeRuntimes] },
     { name: 'apigateway', producerPrefix: `${RESOURCE_PREFIX}tracing-apigateway-producer`, consumerPrefix: `${RESOURCE_PREFIX}tracing-apigateway-consumer`, runtimes: [...pythonRuntimes, ...nodeRuntimes] },
     { name: 'httpapi', producerPrefix: `${RESOURCE_PREFIX}tracing-httpapi-producer`, consumerPrefix: `${RESOURCE_PREFIX}tracing-httpapi-consumer`, runtimes: [...pythonRuntimes, ...nodeRuntimes] },
+    { name: 'functionurl', producerPrefix: `${RESOURCE_PREFIX}tracing-functionurl-producer`, consumerPrefix: `${RESOURCE_PREFIX}tracing-functionurl-consumer`, runtimes: [...pythonRuntimes, ...nodeRuntimes] },
     { name: 's3', producerPrefix: `${RESOURCE_PREFIX}tracing-s3-producer`, consumerPrefix: `${RESOURCE_PREFIX}tracing-s3-consumer`, runtimes: [...pythonRuntimes, ...nodeRuntimes] },
     { name: 'lambda', producerPrefix: `${RESOURCE_PREFIX}tracing-lambda-invoker`, consumerPrefix: `${RESOURCE_PREFIX}tracing-lambda-consumer`, runtimes: [...pythonRuntimes, ...nodeRuntimes] },
 ] as const;
@@ -113,7 +114,7 @@ const fetchAndVerifyConsumerSpans = async (
             // Verify trigger chain attributes for scenarios that support them
             const expectedTriggerType: Record<string, string> = {
                 'eventbridge': 'aws:event_bridge', 's3': 'aws:s3',
-                'apigateway': 'aws:api_gateway', 'httpapi': 'aws:api_gateway',
+                'apigateway': 'aws:api_gateway', 'httpapi': 'aws:api_gateway', 'functionurl': 'aws:api_gateway',
             };
             const expectedType = expectedTriggerType[scenarioName];
             if (expectedType) {
@@ -124,15 +125,19 @@ const fetchAndVerifyConsumerSpans = async (
             }
 
             // Verify HTTP semconv attributes extracted from API Gateway v1/v2
-            // proxy integration events, independent of the runtime SDK.
-            if (scenarioName === 'apigateway' || scenarioName === 'httpapi') {
+            // proxy integration events (and Lambda Function URLs, which share
+            // the v2 event shape), independent of the runtime SDK.
+            if (scenarioName === 'apigateway' || scenarioName === 'httpapi' || scenarioName === 'functionurl') {
+                // Function URLs have no route concept of their own; AWS always
+                // reports requestContext.routeKey as "$default" for them.
+                const expectedRoute = scenarioName === 'functionurl' ? '$default' : '/';
                 expect(consumerAttrs['http.request.method']?.stringValue).toEqual('POST');
                 expect(consumerAttrs['url.path']?.stringValue).toEqual('/');
                 expect(consumerAttrs['url.scheme']?.stringValue).toEqual('https');
                 expect(consumerAttrs['server.address']?.stringValue).toBeDefined();
                 expect(consumerAttrs['client.address']?.stringValue).toBeDefined();
                 expect(consumerAttrs['http.response.status_code']?.intValue).toEqual('200');
-                expect(consumerAttrs['http.route']?.stringValue).toEqual('/');
+                expect(consumerAttrs['http.route']?.stringValue).toEqual(expectedRoute);
                 console.log(`HTTP attributes (${scenarioName}): method=${consumerAttrs['http.request.method']?.stringValue}, route=${consumerAttrs['http.route']?.stringValue}, status_code=${consumerAttrs['http.response.status_code']?.intValue}`);
             }
 

@@ -337,6 +337,38 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         },
       });
 
+      // Scenario 6c: Lambda > Function URL > Lambda
+      const functionUrlConsumer = new lambda.Function(this, `FunctionUrlConsumerLambda-${runtimeName}`, {
+        functionName: `${prefix}tracing-functionurl-consumer-${runtimeName}`,
+        runtime,
+        handler: 'consumer.handler',
+        code: nodeCode,
+        layers: [props.layer],
+        role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: baseEnvironment,
+      });
+
+      const functionUrl = functionUrlConsumer.addFunctionUrl({
+        authType: lambda.FunctionUrlAuthType.NONE,
+      });
+
+      const functionUrlProducer = new lambda.Function(this, `FunctionUrlProducerLambda-${runtimeName}`, {
+        functionName: `${prefix}tracing-functionurl-producer-${runtimeName}`,
+        runtime,
+        handler: 'apigateway_producer.handler',
+        code: nodeCode,
+        layers: [props.layer],
+        role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: {
+          ...baseEnvironment,
+          API_URL: functionUrl.url,
+        },
+      });
+
       // Scenario 7: Lambda > S3 > Lambda
       const s3Bucket = new s3.Bucket(this, `TracingTestS3Bucket-${runtimeName}`, {
         bucketName: `${prefix}tracing-test-s3-bucket-${runtimeName}`,

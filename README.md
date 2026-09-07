@@ -182,6 +182,8 @@ When a Lambda is invoked through API Gateway, the extension recognizes both inte
 
 ALB target-group events also carry a `requestContext` but are excluded from this detection, so they are never misclassified as API Gateway.
 
+**Lambda Function URLs** are also covered, with no extra detection logic needed: AWS defines the Function URL invocation event as the same shape as an HTTP API (v2) proxy integration event (`requestContext.http` + top-level `rawPath`), so it's picked up by the v2 path above. The one difference is `http.route`, which is always `$default` for Function URLs, since they have no route concept of their own - `requestContext.routeKey` is always `$default` for this trigger type.
+
 This runs independently of the in-function OpenTelemetry SDK: the extension already parses the raw invoke event and the raw return payload for every invocation (see [Manual Instrumentation](#manual-instrumentation) for how telemetry reaches the extension). As a result, these attributes appear for every supported Lambda runtime (Node.js, Python, Java, .NET, Go), and even when auto-instrumentation is disabled and the extension builds a synthetic trace itself.
 
 | Attribute | REST API (v1) source | HTTP API (v2) source |
