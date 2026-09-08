@@ -271,7 +271,10 @@ export class PythonTracingScenariosStack extends cdk.NestedStack {
         role,
         timeout: cdk.Duration.seconds(10),
         logGroup: props.logGroup,
-        environment: baseEnvironment,
+        environment: {
+          ...baseEnvironment,
+          DASH0_ENABLE_API_GATEWAY_SPAN_NAME: 'true',
+        },
       });
 
       const api = new apigateway.LambdaRestApi(this, `TracingTestApi-${runtimeName}`, {
@@ -305,7 +308,10 @@ export class PythonTracingScenariosStack extends cdk.NestedStack {
         role,
         timeout: cdk.Duration.seconds(10),
         logGroup: props.logGroup,
-        environment: baseEnvironment,
+        environment: {
+          ...baseEnvironment,
+          DASH0_ENABLE_API_GATEWAY_SPAN_NAME: 'true',
+        },
       });
 
       const httpApi = new apigatewayv2.CfnApi(this, `TracingTestHttpApi-${runtimeName}`, {
@@ -351,6 +357,41 @@ export class PythonTracingScenariosStack extends cdk.NestedStack {
         environment: {
           ...baseEnvironment,
           API_URL: httpApiUrl,
+        },
+      });
+
+      // Scenario 6c: Lambda > Function URL > Lambda
+      const functionUrlConsumer = new lambda.Function(this, `FunctionUrlConsumerLambda-${runtimeName}`, {
+        functionName: `${prefix}tracing-functionurl-consumer-${runtimeName}`,
+        runtime,
+        handler: 'consumer.handler',
+        code: pythonCode,
+        layers: [props.layer],
+        role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: {
+          ...baseEnvironment,
+          DASH0_ENABLE_API_GATEWAY_SPAN_NAME: 'true',
+        },
+      });
+
+      const functionUrl = functionUrlConsumer.addFunctionUrl({
+        authType: lambda.FunctionUrlAuthType.NONE,
+      });
+
+      const functionUrlProducer = new lambda.Function(this, `FunctionUrlProducerLambda-${runtimeName}`, {
+        functionName: `${prefix}tracing-functionurl-producer-${runtimeName}`,
+        runtime,
+        handler: 'apigateway_producer.handler',
+        code: pythonCode,
+        layers: [props.layer],
+        role,
+        timeout: cdk.Duration.seconds(10),
+        logGroup: props.logGroup,
+        environment: {
+          ...baseEnvironment,
+          API_URL: functionUrl.url,
         },
       });
 
