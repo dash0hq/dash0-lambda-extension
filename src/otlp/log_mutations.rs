@@ -125,6 +125,38 @@ fn parse_node_lambda_log_message(message: &str) -> Option<(&str, &str)> {
     Some((severity, body))
 }
 
+/// Attempts to parse a Python Lambda log message into its severity and body.
+/// Python Lambda logs (default AWS_LAMBDA_LOG_FORMAT=TEXT) follow the format:
+///   [LEVEL]\t<ISO-8601 timestamp>\t<request-id>\t<message>
+/// e.g.: [INFO]\t2026-03-02T11:53:38.040Z\tf0ae1bc7-ae4b-4317-abf9-3a562e3127ef\tsomething happened
+/// Returns (severity, body) when the prefix matches, otherwise None.
+fn parse_python_lambda_log_message(message: &str) -> Option<(&str, &str)> {
+    use once_cell::sync::Lazy;
+    use regex::Regex;
+
+    static LEVEL_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^\[(\w+)\]$").unwrap());
+    static TIMESTAMP_RE: Lazy<Regex> =
+        Lazy::new(|| Regex::new(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z$").unwrap());
+    static REQUEST_ID_RE: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$").unwrap()
+    });
+
+    let mut parts = message.splitn(4, '\t');
+    let level = parts.next()?;
+    let timestamp = parts.next()?;
+    let request_id = parts.next()?;
+    let body = parts.next()?;
+
+    let severity = LEVEL_RE.captures(level)?.get(1)?.as_str();
+    if !TIMESTAMP_RE.is_match(timestamp) {
+        return None;
+    }
+    if !REQUEST_ID_RE.is_match(request_id) {
+        return None;
+    }
+    Some((severity, body))
+}
+
 /// Maps a severity text to its OTLP severity number.
 /// See https://opentelemetry.io/docs/specs/otel/logs/data-model/#severity-fields
 fn severity_text_to_number(severity: &str) -> i32 {
@@ -360,7 +392,9 @@ pub fn map_logs_to_otlp(logs: &[TelemetryLog]) -> Vec<LogRecord> {
 
         let severity: String = if is_platform_log {
             "INFO".to_string()
-        } else if let Some((sev, body)) = parse_node_lambda_log_message(&body_message) {
+        } else if let Some((sev, body)) = parse_node_lambda_log_message(&body_message)
+            .or_else(|| parse_python_lambda_log_message(&body_message))
+        {
             let sev = sev.to_string();
             body_message = body.to_string();
             sev
@@ -1221,6 +1255,101 @@ mod tests {
             ),
             None
         );
+    }
+
+    #[test]
+    fn test_parse_python_lambda_log_message() {
+        assert_eq!(
+            parse_python_lambda_log_message(
+                "[INFO]\t2026-03-02T11:53:38.040Z\tf0ae1bc7-ae4b-4317-abf9-3a562e3127ef\tresponse.statusCode: 201"
+            ),
+            Some(("INFO", "response.statusCode: 201"))
+        );
+        assert_eq!(
+            parse_python_lambda_log_message(
+                "[ERROR]\t2026-03-02T11:53:38.040Z\tf0ae1bc7-ae4b-4317-abf9-3a562e3127ef\tsomething went wrong"
+            ),
+            Some(("ERROR", "something went wrong"))
+        );
+        assert_eq!(
+            parse_python_lambda_log_message(
+                "[WARNING]\t2026-03-02T11:53:38.040Z\tf0ae1bc7-ae4b-4317-abf9-3a562e3127ef\tlow memory"
+            ),
+            Some(("WARNING", "low memory"))
+        );
+        assert_eq!(
+            parse_python_lambda_log_message(
+                "[DEBUG]\t2026-03-02T11:53:38.040Z\tf0ae1bc7-ae4b-4317-abf9-3a562e3127ef\tverbose output"
+            ),
+            Some(("DEBUG", "verbose output"))
+        );
+        // JSON body with trailing newline is preserved as-is in the body
+        assert_eq!(
+            parse_python_lambda_log_message(
+                "[INFO]\t2026-05-27T19:59:22.469Z\t07c660f0-ea0a-4b1c-bfcf-49fa39e154ca\t{\"hello\":\"ok\"}\n"
+            ),
+            Some(("INFO", "{\"hello\":\"ok\"}\n"))
+        );
+        // No tabs, can't parse
+        assert_eq!(parse_python_lambda_log_message("Hello World"), None);
+        // Only one tab
+        assert_eq!(parse_python_lambda_log_message("[INFO]\tb"), None);
+        // Three parts but no body
+        assert_eq!(
+            parse_python_lambda_log_message(
+                "[INFO]\t2026-03-02T11:53:38.040Z\tf0ae1bc7-ae4b-4317-abf9-3a562e3127ef"
+            ),
+            None
+        );
+        // Level missing brackets
+        assert_eq!(
+            parse_python_lambda_log_message(
+                "INFO\t2026-03-02T11:53:38.040Z\tf0ae1bc7-ae4b-4317-abf9-3a562e3127ef\tmsg"
+            ),
+            None
+        );
+        // Invalid timestamp format
+        assert_eq!(
+            parse_python_lambda_log_message(
+                "[INFO]\tnot-a-timestamp\tf0ae1bc7-ae4b-4317-abf9-3a562e3127ef\tmsg"
+            ),
+            None
+        );
+        // Invalid request ID format
+        assert_eq!(
+            parse_python_lambda_log_message("[INFO]\t2026-03-02T11:53:38.040Z\tnot-a-uuid\tmsg"),
+            None
+        );
+    }
+
+    #[test]
+    fn test_function_log_with_python_severity_parsed() {
+        let logs = vec![TelemetryLog {
+            time: "2026-03-02T11:53:38.040Z".to_string(),
+            r#type: "function".to_string(),
+            record: json!("[ERROR]\t2026-03-02T11:53:38.040Z\tf0ae1bc7-ae4b-4317-abf9-3a562e3127ef\tsomething failed"),
+            invocation_id: Some("inv-sev-3".to_string()),
+            trace_id: None,
+            span_id: None,
+            custom_attributes: vec![],
+        }];
+
+        let result = map_logs_to_otlp(&logs);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].severity_number, 17); // ERROR
+        assert_eq!(result[0].severity_text, "ERROR");
+        let body = result[0]
+            .body
+            .as_ref()
+            .and_then(|v| v.value.as_ref())
+            .and_then(|v| match v {
+                opentelemetry_proto::tonic::common::v1::any_value::Value::StringValue(s) => {
+                    Some(s.as_str())
+                }
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(body, "something failed");
     }
 
     #[test]
