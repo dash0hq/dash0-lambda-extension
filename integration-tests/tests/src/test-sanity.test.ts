@@ -69,7 +69,7 @@ describe('Production sanity checks', () => {
             'sanity-python-success',
             'opentelemetry.instrumentation.aws_lambda',
             () => [
-                { message: 'response.status_code:' },
+                { message: 'response.status_code:', severity: '' },
                 { message: JSON.stringify({ name: "dash0_payload", type: "lambda_return_value", message: { statusCode: 200, body: '"Hello from Lambda!"' } }), isJson: true, attributes: { "dash0.faas.payload_type": "lambda_return_value" } },
             ],
         );
