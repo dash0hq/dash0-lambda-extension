@@ -35,11 +35,11 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
 
     const logsToBeChecked: LogToCheck[] = [
         { message: 'START RequestId: ' },
-        { message: "Input received:" },
+        { message: "Input received:", severity: "" },
         { message: 'END RequestId: ' },
         { message: JSON.stringify({ name: "dash0_payload", type: "lambda_event", message: { parameter1: "throw" } }), isJson: true },
         { message: JSON.stringify({ name: "dash0_payload", type: "lambda_return_value" }), isJson: true },
-        { message: "java.lang.RuntimeException" },
+        { message: "java.lang.RuntimeException", severity: "" },
     ]
     if (!invocationEnd) {
         logsToBeChecked.push({ message: 'REPORT RequestId: ' });

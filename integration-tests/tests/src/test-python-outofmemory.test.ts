@@ -37,7 +37,7 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
     const logsToBeChecked: LogToCheck[] = [
         { message: 'START RequestId: ' },
         { message: 'END RequestId: ' },
-        { message: "response.status_code:" },
+        { message: "response.status_code:", severity: "" },
         { message: JSON.stringify({ name: "dash0_payload", type: "lambda_event", message: { parameter1: "right" } }), isJson: true },
     ];
     if (!invocationEnd) {
