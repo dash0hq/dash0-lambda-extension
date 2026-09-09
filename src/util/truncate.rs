@@ -108,6 +108,17 @@ fn truncate_json_strings(json: &str, max_size: usize) -> String {
     }
 }
 
+/// Shrink `payload` to at most `max_size` bytes: JSON-aware truncation when
+/// the payload is JSON with long string values, a plain byte cut otherwise.
+pub fn truncate_payload_to(payload: &str, max_size: usize) -> String {
+    if payload.len() <= max_size {
+        return payload.to_string();
+    }
+
+    std::panic::catch_unwind(|| truncate_json_strings(payload, max_size))
+        .unwrap_or_else(|_| truncate_plain(payload, max_size))
+}
+
 pub fn process_payload(payload_str: &str) -> String {
     let masked_payload = mask_json_string(payload_str);
 
@@ -116,8 +127,7 @@ pub fn process_payload(payload_str: &str) -> String {
         return masked_payload;
     }
 
-    std::panic::catch_unwind(|| truncate_json_strings(&masked_payload, max_size))
-        .unwrap_or_else(|_| truncate_plain(&masked_payload, max_size))
+    truncate_payload_to(&masked_payload, max_size)
 }
 
 #[cfg(test)]
