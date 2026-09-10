@@ -197,11 +197,17 @@ jobs:
           TEST_MYSQL_PASSWORD: ${{ secrets.TEST_MYSQL_PASSWORD }}
 
   integration-test:
-    name: Integration Test
+    name: Integration Test (${{ matrix.group }})
     if: github.event.pull_request.head.repo.full_name == github.repository
     needs: [deploy-cdk, deploy-sls]
     runs-on: ubuntu-latest
     environment: staging
+    strategy:
+      # One group flaking must not cancel or block the others.
+      fail-fast: false
+      matrix:
+        # Keep in sync with the group names in integration-tests/tests/vitest.groups.ts
+        group: [node, python, java, db, tracing, sls-plugin, other]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -218,7 +224,7 @@ jobs:
         run: npm ci
       - name: Run integration tests
         working-directory: integration-tests/tests
-        run: npm run test
+        run: npm run test -- --project ${{ matrix.group }}
         env:
           DASH0_DEV_API_TOKEN: ${{ secrets.DASH0_DEV_API_TOKEN }}
 
