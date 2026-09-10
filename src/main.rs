@@ -123,11 +123,16 @@ async fn main() {
         }
     });
 
-    // TEMP (measurement only, not for merge): no eager background prefetch --
-    // the token is resolved purely lazily, on first actual need in the
-    // export path (config::token::get_dash0_token, single-flight-safe).
-    // Testing whether Lambda's Init Duration is sensitive to background
-    // task CPU/network activity even after the first `next` call.
+    // The Dash0 token (which may be a real network round trip to Secrets
+    // Manager) is intentionally *not* resolved here. It's fetched lazily,
+    // on first actual need, by the first telemetry export
+    // (`config::token::get_dash0_token`, single-flight-safe via
+    // `tokio::sync::OnceCell`) -- gating the event loop below on it would
+    // put a slow network request back on the critical path Lambda uses to
+    // decide the extension is ready (confirmed via this extension's own
+    // `Extension init` timing log, which is unaffected by the token fetch
+    // with this structure but was ~80ms higher when the fetch was joined
+    // in front of it).
 
     // Initialize the extension and continually get next extension event.
     tokio::task::spawn(async {
