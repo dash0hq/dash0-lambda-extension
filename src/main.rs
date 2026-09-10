@@ -123,25 +123,11 @@ async fn main() {
         }
     });
 
-    // Prefetch the Dash0 token (which may be a real network round trip to
-    // Secrets Manager) in the background, without gating the extension event
-    // loop below on it: Lambda's Init phase doesn't end until this extension
-    // calls `next` for the first time, so joining on the token fetch before
-    // that call would put a slow network request right back on the
-    // cold-start critical path -- exactly what we're trying to avoid.
-    //
-    // The token is resolved by whichever happens first: this background
-    // prefetch, or the first telemetry export actually needing it (see
-    // `config::token::get_dash0_token`, which is single-flight-safe). The
-    // 100ms delay here is deliberate: a fast-returning invocation resolves
-    // the token itself, right when it's needed, without an extra background
-    // task competing for CPU/network during the most contended part of cold
-    // start; an invocation still running past 100ms gets the token
-    // pre-resolved in the background well before its export needs it.
-    tokio::spawn(async {
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        config::token::get_dash0_token().await;
-    });
+    // TEMP (measurement only, not for merge): no eager background prefetch --
+    // the token is resolved purely lazily, on first actual need in the
+    // export path (config::token::get_dash0_token, single-flight-safe).
+    // Testing whether Lambda's Init Duration is sensitive to background
+    // task CPU/network activity even after the first `next` call.
 
     // Initialize the extension and continually get next extension event.
     tokio::task::spawn(async {
