@@ -131,9 +131,21 @@ async fn main() {
         // Lambda Application runtime will start once our extension is registered
         stats::app_start();
 
+        // Lambda Extension API requires we wait for next extension event. On
+        // failure (e.g. a transient hiccup on the Runtime API socket), back
+        // off with capped exponential delay instead of retrying immediately
+        // -- without this, a sustained failure turns into a tight loop that
+        // pins a full CPU core and floods the logs.
+        const MIN_BACKOFF: std::time::Duration = std::time::Duration::from_millis(50);
+        const MAX_BACKOFF: std::time::Duration = std::time::Duration::from_secs(5);
+        let mut backoff = MIN_BACKOFF;
         loop {
-            // Lambda Extension API requires we wait for next extension event
-            extension::events::get_next().await;
+            if extension::events::get_next().await {
+                backoff = MIN_BACKOFF;
+            } else {
+                tokio::time::sleep(backoff).await;
+                backoff = std::cmp::min(backoff * 2, MAX_BACKOFF);
+            }
         }
     });
 

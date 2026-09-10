@@ -148,7 +148,12 @@ async fn wait_for_runtime_done() {
 
 /// Get next event from the Lambda Extensions API
 ///
-pub async fn get_next() {
+/// Fetches and processes the next extension event.
+///
+/// Returns `false` on any failure to talk to the Extensions API, so the
+/// caller can back off before retrying instead of hammering it in a tight
+/// loop.
+pub async fn get_next() -> bool {
     let uri = make_uri("/event/next");
 
     let mut request = match hyper::Request::builder()
@@ -163,7 +168,7 @@ pub async fn get_next() {
                 crate::log_prefix_with("Extension"),
                 e
             );
-            return;
+            return false;
         }
     };
 
@@ -179,7 +184,7 @@ pub async fn get_next() {
                 crate::log_prefix_with("Extension"),
                 e
             );
-            return;
+            return false;
         }
     }
 
@@ -195,7 +200,7 @@ pub async fn get_next() {
                         crate::log_prefix_with("Extension"),
                         err
                     );
-                    return;
+                    return false;
                 }
             };
 
@@ -226,6 +231,7 @@ pub async fn get_next() {
                     wait_for_runtime_done().await;
                 }
             }
+            true
         }
         Err(err) => {
             tracing::error!(
@@ -233,6 +239,7 @@ pub async fn get_next() {
                 crate::log_prefix_with("Extension"),
                 err
             );
+            false
         }
     }
 }
