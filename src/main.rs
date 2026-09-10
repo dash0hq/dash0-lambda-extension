@@ -71,11 +71,6 @@ async fn main() {
     stats::init_start();
 
     config::endpoints::latch_runtime_env();
-    // Token resolution (which may be a real HTTPS call to Secrets Manager)
-    // runs concurrently with extension registration below via tokio::join!,
-    // rather than sequentially in front of it -- it isn't needed until the
-    // first telemetry export, which can't happen before registration
-    // completes anyway.
 
     init_masking_rules();
     route::init();
@@ -128,12 +123,29 @@ async fn main() {
         }
     });
 
+    // Prefetch the Dash0 token (which may be a real network round trip to
+    // Secrets Manager) in the background, without gating the extension event
+    // loop below on it: Lambda's Init phase doesn't end until this extension
+    // calls `next` for the first time, so joining on the token fetch before
+    // that call would put a slow network request right back on the
+    // cold-start critical path -- exactly what we're trying to avoid.
+    //
+    // The token is resolved by whichever happens first: this background
+    // prefetch, or the first telemetry export actually needing it (see
+    // `config::token::get_dash0_token`, which is single-flight-safe). The
+    // 100ms delay here is deliberate: a fast-returning invocation resolves
+    // the token itself, right when it's needed, without an extra background
+    // task competing for CPU/network during the most contended part of cold
+    // start; an invocation still running past 100ms gets the token
+    // pre-resolved in the background well before its export needs it.
+    tokio::spawn(async {
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        config::token::get_dash0_token().await;
+    });
+
     // Initialize the extension and continually get next extension event.
     tokio::task::spawn(async {
-        tokio::join!(
-            extension::register::register(),
-            config::token::init_dash0_token(),
-        );
+        extension::register::register().await;
         extension::register::register_telemetry().await;
         // Lambda Application runtime will start once our extension is registered
         stats::app_start();
