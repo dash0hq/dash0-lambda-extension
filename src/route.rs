@@ -116,7 +116,9 @@ static ROUTES: Lazy<Routes> = Lazy::new(|| {
 
 pub fn init() {
     Lazy::force(&ROUTES);
-    Lazy::force(&HTTPS_CLIENT);
+    // HTTPS_CLIENT is intentionally left lazy: forcing it here parses the
+    // full OS trust store synchronously, ahead of extension registration,
+    // for a client that's only needed later, at first telemetry export.
     invocation_entry::force_init();
 }
 
