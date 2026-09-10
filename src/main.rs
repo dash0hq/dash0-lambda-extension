@@ -71,7 +71,11 @@ async fn main() {
     stats::init_start();
 
     config::endpoints::latch_runtime_env();
-    config::token::init_dash0_token().await;
+    // Token resolution (which may be a real HTTPS call to Secrets Manager)
+    // runs concurrently with extension registration below via tokio::join!,
+    // rather than sequentially in front of it -- it isn't needed until the
+    // first telemetry export, which can't happen before registration
+    // completes anyway.
 
     init_masking_rules();
     route::init();
@@ -126,7 +130,10 @@ async fn main() {
 
     // Initialize the extension and continually get next extension event.
     tokio::task::spawn(async {
-        extension::register::register().await;
+        tokio::join!(
+            extension::register::register(),
+            config::token::init_dash0_token(),
+        );
         extension::register::register_telemetry().await;
         // Lambda Application runtime will start once our extension is registered
         stats::app_start();
