@@ -281,6 +281,10 @@ export class PythonTracingScenariosStack extends cdk.NestedStack {
         restApiName: `${prefix}tracing-test-api-${runtimeName}`,
         handler: apiGatewayConsumer,
         proxy: true,
+        // REGIONAL avoids the account-wide 120-per-region quota on EDGE-type
+        // APIs, which every concurrently open PR's integration-test stack
+        // otherwise eats into.
+        endpointConfiguration: { types: [apigateway.EndpointType.REGIONAL] },
       });
 
       const apiGatewayProducer = new lambda.Function(this, `ApiGatewayProducerLambda-${runtimeName}`, {
