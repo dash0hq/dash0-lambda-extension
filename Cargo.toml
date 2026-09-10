@@ -36,3 +36,12 @@ default = []
 [dev-dependencies]
 tokio-test = "0.4"
 serial_test = "3.0"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+# NOTE: deliberately NOT panic = "abort" -- src/util/truncate.rs relies on
+# catch_unwind as a real fallback (malformed payload -> plain truncation
+# instead of losing the whole extension process). panic = "abort" would
+# turn that into a full-process crash instead of a graceful degrade.
