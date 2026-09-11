@@ -35,15 +35,15 @@ pub struct InvocationEntry {
     pub handler_status: Option<Status>,
     pub traces: Vec<StoredTrace>,
     pub logs: Vec<TelemetryLog>,
-    /// HTTP semconv attributes extracted from an API Gateway v1/v2 event
-    /// before secret masking runs on the stored `event_payload`. Masking
+    /// HTTP semconv attributes extracted from an API Gateway v1/v2 or ALB
+    /// event before secret masking runs on the stored `event_payload`. Masking
     /// (default rule `.*key.*`, case-insensitive) corrupts structural fields
     /// like HTTP API v2's `routeKey`, so this must come from the raw bytes,
-    /// not from `event_payload`. Empty when the event isn't API Gateway.
-    pub api_gateway_request_attributes: Vec<KeyValue>,
+    /// not from `event_payload`. Empty when the event isn't HTTP-triggered.
+    pub http_request_attributes: Vec<KeyValue>,
     /// Span name derived from the same pre-masking extraction, set only when
     /// DASH0_ENABLE_API_GATEWAY_SPAN_NAME is enabled.
-    pub api_gateway_span_name: Option<String>,
+    pub http_span_name: Option<String>,
 }
 
 impl Default for InvocationEntry {
@@ -68,8 +68,8 @@ impl Default for InvocationEntry {
             handler_status: None,
             traces: Vec::new(),
             logs: Vec::new(),
-            api_gateway_request_attributes: Vec::new(),
-            api_gateway_span_name: None,
+            http_request_attributes: Vec::new(),
+            http_span_name: None,
         }
     }
 }
@@ -103,18 +103,13 @@ pub fn get_event_payload(invocation_id: &str) -> Option<String> {
         .and_then(|e| e.event_payload.clone())
 }
 
-/// Lightweight getter: returns the pre-masking API Gateway request attributes
-/// and span name, avoiding a full entry clone.
-pub fn get_api_gateway_request_data(invocation_id: &str) -> (Vec<KeyValue>, Option<String>) {
+/// Lightweight getter: returns the pre-masking HTTP request attributes and
+/// span name, avoiding a full entry clone.
+pub fn get_http_request_data(invocation_id: &str) -> (Vec<KeyValue>, Option<String>) {
     INVOCATION_STORE
         .lock()
         .get(invocation_id)
-        .map(|e| {
-            (
-                e.api_gateway_request_attributes.clone(),
-                e.api_gateway_span_name.clone(),
-            )
-        })
+        .map(|e| (e.http_request_attributes.clone(), e.http_span_name.clone()))
         .unwrap_or_default()
 }
 

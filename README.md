@@ -97,15 +97,17 @@ The extension layers are published to the following AWS regions:
 
 * `DASH0_XRAY_TRACES_ENABLED` - When set to `true`, the extension preserves the original X-Ray trace context instead of creating supplementary spans. Use this when AWS X-Ray active tracing is enabled on the Lambda function. Default: `false`.
 
-* `DASH0_ENABLE_API_GATEWAY_SPAN_NAME` - When set to `true`, renames the handler span for an API Gateway-triggered invocation (REST API v1 or HTTP API v2 proxy integration) to `<method> <route>`, e.g. `GET /pets/{id}`. Off by default, so existing span names don't change under you. Default: `false`.
+The four `API_GATEWAY` variables below also apply to Application Load Balancer-triggered invocations; the names are kept for backwards compatibility.
 
-* `DASH0_API_GATEWAY_REQUEST_HEADERS_TO_CAPTURE` - Comma-separated, case-insensitive list of request header names to capture as `http.request.header.<name>` span attributes for API Gateway-triggered invocations. Empty by default: headers may carry PII, auth tokens, or cookies, so none are captured unless named here.
+* `DASH0_ENABLE_API_GATEWAY_SPAN_NAME` - When set to `true`, renames the handler span for an HTTP-triggered invocation (API Gateway REST API v1, HTTP API v2 proxy integration, or ALB) to `<method> <route>`, e.g. `GET /pets/{id}`. ALB reports no route, so those spans are named after the bare method (e.g. `GET`). Off by default, so existing span names don't change under you. Default: `false`.
+
+* `DASH0_API_GATEWAY_REQUEST_HEADERS_TO_CAPTURE` - Comma-separated, case-insensitive list of request header names to capture as `http.request.header.<name>` span attributes for API Gateway- and ALB-triggered invocations. Empty by default: headers may carry PII, auth tokens, or cookies, so none are captured unless named here.
 
   Example: `DASH0_API_GATEWAY_REQUEST_HEADERS_TO_CAPTURE=content-type,x-request-id`
 
 * `DASH0_API_GATEWAY_RESPONSE_HEADERS_TO_CAPTURE` - Same as above, but for the handler's response headers, captured as `http.response.header.<name>`.
 
-* `DASH0_CAPTURE_API_GATEWAY_QUERY_STRING` - When set to `true`, captures the request query string as `url.query` for API Gateway-triggered invocations. Off by default: query strings can carry signed-URL tokens or other sensitive values. Default: `false`.
+* `DASH0_CAPTURE_API_GATEWAY_QUERY_STRING` - When set to `true`, captures the request query string as `url.query` for API Gateway- and ALB-triggered invocations. Off by default: query strings can carry signed-URL tokens or other sensitive values. Default: `false`.
 
 * `DASH0_DISABLE_PYTHON_DEPENDENCY_CHECK` - Python only. On startup, the Python distribution checks whether its own dependencies conflict with the versions installed in the function, and skips loading the auto-instrumentation if they do. When set to `true`, that check is skipped and the distribution loads regardless. Use this if the check reports a false positive; note that a real conflict may cause the function to fail at runtime. Default: `false`.
 
@@ -173,32 +175,40 @@ If you prefer to set up OpenTelemetry instrumentation yourself instead of relyin
 
 The extension enriches telemetry data with additional attributes beyond what the auto-instrumentation provides.
 
-### API Gateway
+### API Gateway and Application Load Balancer
 
-When a Lambda is invoked through API Gateway, the extension recognizes both integration styles and adds HTTP semantic-convention attributes to the handler span:
+When a Lambda is invoked over HTTP, the extension recognizes the trigger shape and adds HTTP semantic-convention attributes to the handler span:
 
 * **REST API (v1), proxy integration** - detected by a top-level `httpMethod` field alongside `requestContext`.
 * **HTTP API (v2), proxy integration** - detected by `requestContext.http` alongside a top-level `rawPath` field.
-
-ALB target-group events also carry a `requestContext` but are excluded from this detection, so they are never misclassified as API Gateway.
+* **Application Load Balancer** - detected by a `requestContext.elb` object. ALB events also carry a top-level `httpMethod`, so this check runs first to keep them from being reported as REST API (v1).
 
 **Lambda Function URLs** are also covered, with no extra detection logic needed: AWS defines the Function URL invocation event as the same shape as an HTTP API (v2) proxy integration event (`requestContext.http` + top-level `rawPath`), so it's picked up by the v2 path above. The one difference is `http.route`, which is always `$default` for Function URLs, since they have no route concept of their own - `requestContext.routeKey` is always `$default` for this trigger type.
 
 This runs independently of the in-function OpenTelemetry SDK: the extension already parses the raw invoke event and the raw return payload for every invocation (see [Manual Instrumentation](#manual-instrumentation) for how telemetry reaches the extension). As a result, these attributes appear for every supported Lambda runtime (Node.js, Python, Java, .NET, Go), and even when auto-instrumentation is disabled and the extension builds a synthetic trace itself.
 
-| Attribute | REST API (v1) source | HTTP API (v2) source |
-|---|---|---|
-| `http.request.method` | `httpMethod` | `requestContext.http.method` |
-| `url.path` | `path` | `rawPath` |
-| `http.route` | `resource`, as-is (e.g. `/pets/{id}`) | `requestContext.routeKey` with the leading method stripped |
-| `server.address` / `server.port` | `requestContext.domainName` / always `443` | same |
-| `client.address` | `requestContext.identity.sourceIp` | `requestContext.http.sourceIp` |
-| `network.protocol.version` | parsed from `requestContext.protocol` (e.g. `HTTP/1.1` -> `1.1`) | parsed from `requestContext.http.protocol` |
-| `http.response.status_code` | `statusCode` from the handler's proxy-integration return payload (`{ statusCode, headers, body }`) | same |
+| Attribute | REST API (v1) source | HTTP API (v2) source | ALB source |
+|---|---|---|---|
+| `http.request.method` | `httpMethod` | `requestContext.http.method` | `httpMethod` |
+| `url.path` | `path` | `rawPath` | `path` |
+| `url.scheme` | always `https` | same | the `x-forwarded-proto` header |
+| `http.route` | `resource`, as-is (e.g. `/pets/{id}`) | `requestContext.routeKey` with the leading method stripped | *not available* |
+| `server.address` / `server.port` | `requestContext.domainName` / always `443` | same | the `host` header, split on a trailing port; port falls back to `x-forwarded-port` |
+| `client.address` | `requestContext.identity.sourceIp` | `requestContext.http.sourceIp` | first entry of the `x-forwarded-for` header |
+| `network.protocol.version` | parsed from `requestContext.protocol` (e.g. `HTTP/1.1` -> `1.1`) | parsed from `requestContext.http.protocol` | *not available* |
+| `http.response.status_code` | `statusCode` from the handler's proxy-integration return payload (`{ statusCode, headers, body }`) | same | same |
 
-Request attributes and the response status code are captured unconditionally, since none of them carry PII. Three behaviors are opt-in via environment variables, each defaulting to off so nothing changes for existing users until you ask for it:
+#### ALB specifics
 
-* Renaming the span from the default handler name to `<method> <route>` (e.g. `GET /pets/{id}`) - `DASH0_ENABLE_API_GATEWAY_SPAN_NAME`.
+ALB reports no route template (there is no `resource` or `routeKey` field), so `http.route` is left unset rather than filled in with the high-cardinality request path. Likewise there is no protocol field, so `network.protocol.version` is omitted. Because ALB listeners serve plain HTTP as well as HTTPS, `url.scheme` follows `x-forwarded-proto` instead of being hardcoded to `https` as it is for API Gateway.
+
+Target groups with the `lambda.multi_value_headers.enabled` attribute send `multiValueHeaders` and `multiValueQueryStringParameters` *instead of* `headers` and `queryStringParameters`, in both directions. Both shapes are handled. A header that appears multiple times is captured as a single comma-separated value, so `http.request.header.<name>` stays a string in either configuration.
+
+Health-check invocations (`user-agent: ELB-HealthChecker/2.0`) carry no `host` and no forwarding headers, so they yield just `http.request.method` and `url.path`.
+
+Request attributes and the response status code are captured unconditionally, since none of them carry PII. Three behaviors are opt-in via environment variables, each defaulting to off so nothing changes for existing users until you ask for it. The variables are named after API Gateway for backwards compatibility, but they apply to ALB-triggered invocations too:
+
+* Renaming the span from the default handler name to `<method> <route>` (e.g. `GET /pets/{id}`) - `DASH0_ENABLE_API_GATEWAY_SPAN_NAME`. For ALB, where no route is available, the span is named after the bare method (e.g. `GET`), per the HTTP semantic conventions.
 * Capturing specific request or response headers as `http.request.header.<name>` / `http.response.header.<name>` - `DASH0_API_GATEWAY_REQUEST_HEADERS_TO_CAPTURE` / `DASH0_API_GATEWAY_RESPONSE_HEADERS_TO_CAPTURE`, each an explicit allow-list rather than "capture all headers", since headers can carry auth tokens or cookies.
 * Capturing the request query string as `url.query` - `DASH0_CAPTURE_API_GATEWAY_QUERY_STRING`, since query strings can carry signed-URL tokens or other secrets.
 
@@ -217,17 +227,17 @@ The following attributes are added to spans by the extension (if relevant):
 | `dash0.faas.trigger_arn` | string | The ARN of the event source (e.g., SQS queue ARN, DynamoDB stream ARN, SNS topic ARN). |
 | `dash0.faas.event_bridge_source` | string | The `source` field from an EventBridge event. |
 | `dash0.faas.event_bridge_detail_type` | string | The `detail-type` field from an EventBridge event. |
-| `http.request.method` | string | The HTTP method. API Gateway-triggered invocations only. |
-| `url.path` | string | The request path. API Gateway-triggered invocations only. |
-| `url.scheme` | string | Always `https`. API Gateway-triggered invocations only. |
-| `http.route` | string | The matched route template, as reported by API Gateway (e.g. `/pets/{id}`). API Gateway-triggered invocations only. |
-| `server.address` | string | The API Gateway domain name. API Gateway-triggered invocations only. |
-| `server.port` | int | Always `443`. API Gateway-triggered invocations only. |
-| `client.address` | string | The caller's source IP. API Gateway-triggered invocations only. |
-| `network.protocol.version` | string | The HTTP protocol version (e.g. `1.1`). API Gateway-triggered invocations only. |
-| `http.response.status_code` | int | The `statusCode` from the handler's proxy-integration return payload. API Gateway-triggered invocations only. |
+| `http.request.method` | string | The HTTP method. API Gateway- and ALB-triggered invocations only. |
+| `url.path` | string | The request path. API Gateway- and ALB-triggered invocations only. |
+| `url.scheme` | string | Always `https` for API Gateway; from `x-forwarded-proto` for ALB. |
+| `http.route` | string | The matched route template, as reported by API Gateway (e.g. `/pets/{id}`). API Gateway-triggered invocations only - ALB reports no route. |
+| `server.address` | string | The API Gateway domain name, or the `host` header for ALB. |
+| `server.port` | int | Always `443` for API Gateway; from the `host` header or `x-forwarded-port` for ALB. |
+| `client.address` | string | The caller's source IP. API Gateway- and ALB-triggered invocations only. |
+| `network.protocol.version` | string | The HTTP protocol version (e.g. `1.1`). API Gateway-triggered invocations only - ALB reports no protocol. |
+| `http.response.status_code` | int | The `statusCode` from the handler's return payload. API Gateway- and ALB-triggered invocations only. |
 
-See [API Gateway](#api-gateway) above for how these are derived for v1/v2 events, and which related attributes are opt-in.
+See [API Gateway and Application Load Balancer](#api-gateway-and-application-load-balancer) above for how these are derived per trigger type, and which related attributes are opt-in.
 
 #### Resource Attributes (Spans)
 

@@ -59,16 +59,16 @@ pub fn build_synthetic_trace(
         );
     }
 
-    let (api_gateway_attributes, api_gateway_span_name) =
-        invocation_entry::get_api_gateway_request_data(invocation_id);
-    attributes.extend(api_gateway_attributes);
-    if let Some(name) = api_gateway_span_name {
+    let (http_request_attributes, http_span_name) =
+        invocation_entry::get_http_request_data(invocation_id);
+    attributes.extend(http_request_attributes);
+    if let Some(name) = http_span_name {
         span_name = name;
     }
 
     if let Some(return_value) = return_value {
-        if is_api_gateway_invocation(invocation_id) {
-            attributes.extend(extract_api_gateway_response_attributes(return_value));
+        if is_http_invocation(invocation_id) {
+            attributes.extend(extract_http_response_attributes(return_value));
         }
     }
 
@@ -440,8 +440,9 @@ fn extract_span_attributes_from_event(event_payload: &str) -> Vec<KeyValue> {
             &chain_result,
         ));
 
-        // Note: API Gateway HTTP semconv attributes (http.route, etc.) are
-        // NOT extracted here. `event_payload` has already been through
+        // Note: HTTP semconv attributes (http.route, etc.) for API Gateway-
+        // and ALB-triggered invocations are NOT extracted here.
+        // `event_payload` has already been through
         // process_payload's secret masking by this point, which corrupts
         // structural fields like HTTP API v2's `routeKey` (case-insensitive
         // match on the default `.*key.*` rule). Those attributes are
@@ -453,30 +454,31 @@ fn extract_span_attributes_from_event(event_payload: &str) -> Vec<KeyValue> {
     attributes
 }
 
-/// HTTP semconv attributes for API Gateway v1/v2 proxy integration events.
-/// Request attributes are populated unconditionally (no PII risk); headers
-/// and the query string are opt-in via `DASH0_API_GATEWAY_*` env vars.
+/// HTTP semconv attributes for API Gateway v1/v2 proxy integration events and
+/// ALB target-group events. Request attributes are populated unconditionally
+/// (no PII risk); headers and the query string are opt-in via
+/// `DASH0_API_GATEWAY_*` env vars, which cover both trigger types.
 /// Must be called on the raw, unmasked event — see
-/// `extract_api_gateway_request_data_from_raw_event`.
-fn extract_api_gateway_attributes(json_val: &serde_json::Value) -> Vec<KeyValue> {
+/// `extract_http_request_data_from_raw_event`.
+fn extract_http_attributes(json_val: &serde_json::Value) -> Vec<KeyValue> {
     use crate::otlp::attributes::http_request_header;
     use crate::otlp::http_attributes::*;
 
-    let version = match detect_api_gateway_event(json_val) {
-        Some(version) => version,
+    let kind = match detect_http_event(json_val) {
+        Some(kind) => kind,
         None => return Vec::new(),
     };
 
-    let mut attrs = extract_request_attributes(json_val, &version);
+    let mut attrs = extract_request_attributes(json_val, &kind);
 
     if crate::config::user::is_api_gateway_query_string_capture_enabled() {
-        if let Some(kv) = extract_query_string_attribute(json_val, &version) {
+        if let Some(kv) = extract_query_string_attribute(json_val, &kind) {
             attrs.push(kv);
         }
     }
 
     attrs.extend(extract_header_attributes(
-        json_val.get("headers"),
+        resolve_headers(json_val),
         &crate::config::user::api_gateway_request_headers_to_capture(),
         http_request_header,
     ));
@@ -485,10 +487,11 @@ fn extract_api_gateway_attributes(json_val: &serde_json::Value) -> Vec<KeyValue>
 }
 
 /// Whether the invocation's original event was an API Gateway v1/v2 proxy
-/// integration event. Used to gate response-side HTTP attributes, since a
-/// `statusCode` field in the return value alone doesn't imply an HTTP
-/// response — other trigger types can happen to return one too.
-fn is_api_gateway_invocation(invocation_id: &str) -> bool {
+/// integration event or an ALB target-group event. Used to gate response-side
+/// HTTP attributes, since a `statusCode` field in the return value alone
+/// doesn't imply an HTTP response — other trigger types can happen to return
+/// one too.
+fn is_http_invocation(invocation_id: &str) -> bool {
     let event_payload = match invocation_entry::get_event_payload(invocation_id) {
         Some(payload) => payload,
         None => return false,
@@ -497,13 +500,16 @@ fn is_api_gateway_invocation(invocation_id: &str) -> bool {
         Ok(v) => v,
         Err(_) => return false,
     };
-    crate::otlp::http_attributes::detect_api_gateway_event(&json_val).is_some()
+    crate::otlp::http_attributes::detect_http_event(&json_val).is_some()
 }
 
 /// HTTP semconv attributes extracted from a Lambda return payload:
 /// `http.response.status_code` unconditionally when present, response
 /// headers only when `DASH0_API_GATEWAY_RESPONSE_HEADERS_TO_CAPTURE` is set.
-fn extract_api_gateway_response_attributes(return_value: &str) -> Vec<KeyValue> {
+/// Shared by API Gateway proxy integrations and ALB, whose response shapes
+/// agree on `statusCode`/`headers` (ALB adds an optional `statusDescription`,
+/// which has no semconv attribute).
+fn extract_http_response_attributes(return_value: &str) -> Vec<KeyValue> {
     use crate::otlp::attributes::http_response_header;
     use crate::otlp::http_attributes::*;
 
@@ -517,7 +523,7 @@ fn extract_api_gateway_response_attributes(return_value: &str) -> Vec<KeyValue> 
         .collect();
 
     attrs.extend(extract_header_attributes(
-        json_val.get("headers"),
+        resolve_headers(&json_val),
         &crate::config::user::api_gateway_response_headers_to_capture(),
         http_response_header,
     ));
@@ -525,18 +531,20 @@ fn extract_api_gateway_response_attributes(return_value: &str) -> Vec<KeyValue> 
     attrs
 }
 
-/// Extracts API Gateway HTTP semconv request attributes and (when
+/// Extracts HTTP semconv request attributes and (when
 /// `DASH0_ENABLE_API_GATEWAY_SPAN_NAME` is set) the derived `<METHOD> <route>`
 /// span name, directly from the raw invoke event bytes.
 ///
 /// This must run before `process_payload` masks the event: masking
 /// (default rule `.*key.*`, case-insensitive) corrupts structural fields
 /// like HTTP API v2's `routeKey`, which is otherwise indistinguishable from
-/// a real secret once replaced with the mask placeholder. Called once from
+/// a real secret once replaced with the mask placeholder. ALB events have no
+/// such field, but query-string and header names are equally exposed to the
+/// mask rules, so they take the same path. Called once from
 /// `runtime_proxy.rs::validate_and_mangle_next_event`, before masking, and
 /// the result is stored on `InvocationEntry` for later use by
 /// `add_event_payload_to_span` / `build_synthetic_trace`.
-pub(crate) fn extract_api_gateway_request_data_from_raw_event(
+pub(crate) fn extract_http_request_data_from_raw_event(
     raw_event_bytes: &[u8],
 ) -> (Vec<KeyValue>, Option<String>) {
     let json_val: serde_json::Value = match serde_json::from_slice(raw_event_bytes) {
@@ -544,12 +552,11 @@ pub(crate) fn extract_api_gateway_request_data_from_raw_event(
         Err(_) => return (Vec::new(), None),
     };
 
-    let attributes = extract_api_gateway_attributes(&json_val);
+    let attributes = extract_http_attributes(&json_val);
 
     let span_name = if crate::config::user::is_api_gateway_span_name_enabled() {
-        crate::otlp::http_attributes::detect_api_gateway_event(&json_val).and_then(|version| {
-            crate::otlp::http_attributes::extract_span_name(&json_val, &version)
-        })
+        crate::otlp::http_attributes::detect_http_event(&json_val)
+            .and_then(|kind| crate::otlp::http_attributes::extract_span_name(&json_val, &kind))
     } else {
         None
     };
@@ -580,10 +587,10 @@ fn add_event_payload_to_span(span: &mut Span, invocation_id: &str) {
         );
     }
 
-    let (api_gateway_attributes, api_gateway_span_name) =
-        invocation_entry::get_api_gateway_request_data(invocation_id);
-    span.attributes.extend(api_gateway_attributes);
-    if let Some(name) = api_gateway_span_name {
+    let (http_request_attributes, http_span_name) =
+        invocation_entry::get_http_request_data(invocation_id);
+    span.attributes.extend(http_request_attributes);
+    if let Some(name) = http_span_name {
         span.name = name;
     }
 }
@@ -623,8 +630,8 @@ pub fn apply_return_value_error_to_stored_traces(invocation_id: &str, return_val
     // response headers — a `statusCode` field in the return value alone
     // doesn't mean this was an HTTP response (e.g. SQS/EventBridge consumers
     // in this codebase's own test fixtures happen to return one too).
-    let response_attributes = if is_api_gateway_invocation(invocation_id) {
-        extract_api_gateway_response_attributes(return_value)
+    let response_attributes = if is_http_invocation(invocation_id) {
+        extract_http_response_attributes(return_value)
     } else {
         Vec::new()
     };
@@ -1059,7 +1066,7 @@ mod tests {
 
     #[test]
     fn extracting_from_the_raw_event_yields_the_real_unmasked_route() {
-        let (attrs, _span_name) = super::extract_api_gateway_request_data_from_raw_event(
+        let (attrs, _span_name) = super::extract_http_request_data_from_raw_event(
             v2_event_with_masking_prone_route_key().as_bytes(),
         );
 
@@ -1076,6 +1083,62 @@ mod tests {
             Some("/".to_string()),
             "extraction from raw event bytes must yield the real route, unaffected by masking"
         );
+    }
+
+    /// End-to-end through the raw-event path the runtime proxy uses, so ALB
+    /// coverage is wired up and not just present in `http_attributes`.
+    #[test]
+    fn alb_event_yields_http_attributes_through_the_raw_event_path() {
+        let event = r#"{
+            "requestContext": {"elb": {"targetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/tg/49e9d65c45c6791a"}},
+            "httpMethod": "POST",
+            "path": "/orders",
+            "headers": {
+                "host": "lambda-alb-123578498.us-east-1.elb.amazonaws.com",
+                "x-forwarded-for": "72.12.164.125",
+                "x-forwarded-port": "443",
+                "x-forwarded-proto": "https"
+            },
+            "body": "",
+            "isBase64Encoded": false
+        }"#;
+
+        let (attrs, _span_name) = super::extract_http_request_data_from_raw_event(event.as_bytes());
+
+        let string_attr = |key: &str| {
+            attrs
+                .iter()
+                .find(|kv| kv.key == key)
+                .and_then(|kv| kv.value.as_ref())
+                .and_then(|v| match &v.value {
+                    Some(Value::StringValue(s)) => Some(s.clone()),
+                    _ => None,
+                })
+        };
+
+        assert_eq!(string_attr("http.request.method"), Some("POST".to_string()));
+        assert_eq!(string_attr("url.path"), Some("/orders".to_string()));
+        assert_eq!(string_attr("url.scheme"), Some("https".to_string()));
+        assert_eq!(
+            string_attr("server.address"),
+            Some("lambda-alb-123578498.us-east-1.elb.amazonaws.com".to_string())
+        );
+        assert_eq!(
+            string_attr("client.address"),
+            Some("72.12.164.125".to_string())
+        );
+        assert_eq!(string_attr("http.route"), None);
+    }
+
+    /// The response-side attributes are gated on the *event* being HTTP, so a
+    /// non-HTTP trigger that happens to return a `statusCode` stays untouched.
+    #[test]
+    fn non_http_events_yield_no_http_attributes() {
+        let (attrs, span_name) = super::extract_http_request_data_from_raw_event(
+            br#"{"Records": [{"eventSource": "aws:sqs"}]}"#,
+        );
+        assert!(attrs.is_empty());
+        assert!(span_name.is_none());
     }
 
     fn make_span_with_invocation(invocation_id: &str) -> Span {
