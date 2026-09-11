@@ -1,5 +1,6 @@
-//! HTTP semantic-convention attribute extraction for API Gateway-triggered
-//! invocations (REST API v1 and HTTP API v2 proxy integration event shapes).
+//! HTTP semantic-convention attribute extraction for HTTP-triggered
+//! invocations: API Gateway REST API (v1) and HTTP API (v2) proxy integration
+//! event shapes, and Application Load Balancer target-group events.
 //!
 //! Runs independently of the in-function runtime SDK: the extension already
 //! buffers the raw invoke event and the raw return payload for every
@@ -15,9 +16,16 @@ use serde_json::Value;
 
 use crate::otlp::attributes::*;
 
-pub enum ApiGatewayVersion {
-    V1,
-    V2,
+/// The kind of HTTP-fronted trigger an invoke event came from. Each shape
+/// carries the same information under different field names, so extraction
+/// branches on this rather than probing fields ad hoc.
+pub enum HttpEventKind {
+    /// API Gateway REST API, proxy integration.
+    ApiGatewayV1,
+    /// API Gateway HTTP API, payload format version 2.0.
+    ApiGatewayV2,
+    /// Application Load Balancer target-group event.
+    Alb,
 }
 
 fn string_kv(key: &str, value: String) -> KeyValue {
@@ -54,38 +62,133 @@ fn is_alb_event(json_val: &Value) -> bool {
         .is_some_and(|elb| elb.is_object())
 }
 
-/// Detects whether `json_val` is an API Gateway REST API (v1) or HTTP API
-/// (v2) proxy integration event. Returns `None` for ALB target-group events,
-/// which also carry a `requestContext` but must not be misclassified.
-pub fn detect_api_gateway_event(json_val: &Value) -> Option<ApiGatewayVersion> {
+/// Detects which HTTP-fronted trigger shape `json_val` is, if any.
+///
+/// ALB must be checked first: its events also carry a `requestContext` and a
+/// top-level `httpMethod`, so they would otherwise fall into the v1 branch and
+/// be reported as API Gateway. The `requestContext.elb` object is the
+/// discriminator — it is present on every ALB event, including health checks.
+pub fn detect_http_event(json_val: &Value) -> Option<HttpEventKind> {
     if is_alb_event(json_val) {
-        return None;
+        return Some(HttpEventKind::Alb);
     }
     let rc = json_val.get("requestContext")?;
     if rc.get("http").is_some() && json_val.get("rawPath").is_some() {
-        return Some(ApiGatewayVersion::V2);
+        return Some(HttpEventKind::ApiGatewayV2);
     }
     if json_val
         .get("httpMethod")
         .and_then(|v| v.as_str())
         .is_some()
     {
-        return Some(ApiGatewayVersion::V1);
+        return Some(HttpEventKind::ApiGatewayV1);
     }
     None
 }
 
+/// Resolves the headers object of an event or return payload.
+///
+/// ALB target groups with `lambda.multi_value_headers.enabled` send
+/// `multiValueHeaders` (name -> array of values) *instead of* `headers`, not
+/// alongside it, in both directions. Reading only `headers` therefore yields
+/// nothing at all on such target groups.
+pub fn resolve_headers(json_val: &Value) -> Option<&Value> {
+    json_val
+        .get("headers")
+        .filter(|v| v.is_object())
+        .or_else(|| json_val.get("multiValueHeaders").filter(|v| v.is_object()))
+}
+
+/// Looks up a single header value, tolerating both the string-valued
+/// (`headers`) and array-valued (`multiValueHeaders`) shapes. ALB lower-cases
+/// request header names, but the match is case-insensitive regardless.
+fn header_str<'a>(headers: Option<&'a Value>, name: &str) -> Option<&'a str> {
+    let obj = headers?.as_object()?;
+    let value = obj.get(name).or_else(|| {
+        obj.iter()
+            .find(|(key, _)| key.eq_ignore_ascii_case(name))
+            .map(|(_, value)| value)
+    })?;
+    match value {
+        Value::String(s) => Some(s.as_str()),
+        Value::Array(values) => values.first().and_then(|v| v.as_str()),
+        _ => None,
+    }
+}
+
+/// Splits a `Host` header into host and optional port. IPv6 literals are
+/// bracketed (`[::1]:8080`), so only a colon after the closing bracket counts.
+fn split_host_port(host: &str) -> (&str, Option<i64>) {
+    let search_from = host.rfind(']').map(|i| i + 1).unwrap_or(0);
+    match host[search_from..].rfind(':') {
+        Some(offset) => {
+            let index = search_from + offset;
+            match host[index + 1..].parse::<i64>() {
+                Ok(port) => (&host[..index], Some(port)),
+                Err(_) => (host, None),
+            }
+        }
+        None => (host, None),
+    }
+}
+
 /// Extracts request-side HTTP semconv attributes. No PII risk, populated
 /// unconditionally (unlike headers/query string, which are opt-in).
-pub fn extract_request_attributes(json_val: &Value, version: &ApiGatewayVersion) -> Vec<KeyValue> {
+pub fn extract_request_attributes(json_val: &Value, kind: &HttpEventKind) -> Vec<KeyValue> {
     let mut attrs = Vec::new();
     let rc = match json_val.get("requestContext") {
         Some(rc) => rc,
         None => return attrs,
     };
 
-    match version {
-        ApiGatewayVersion::V1 => {
+    match kind {
+        HttpEventKind::Alb => {
+            // ALB carries none of API Gateway's routing metadata: there is no
+            // `resource`/`routeKey` (so no `http.route`, and hence no
+            // low-cardinality span name) and no `protocol` (so no
+            // `network.protocol.version`). Everything below the method and
+            // path comes from the forwarding headers ALB adds to every
+            // request. Health-check events carry only `user-agent`, so each
+            // attribute is independently optional.
+            let headers = resolve_headers(json_val);
+
+            if let Some(method) = json_val.get("httpMethod").and_then(|v| v.as_str()) {
+                attrs.push(string_kv(HTTP_REQUEST_METHOD, method.to_string()));
+            }
+            if let Some(path) = json_val.get("path").and_then(|v| v.as_str()) {
+                attrs.push(string_kv(URL_PATH, path.to_string()));
+            }
+            // Not hardcoded to "https" as in the API Gateway branches: ALB
+            // listeners accept plain HTTP too, and the original client scheme
+            // is what `x-forwarded-proto` reports.
+            if let Some(scheme) = header_str(headers, "x-forwarded-proto") {
+                attrs.push(string_kv(URL_SCHEME, scheme.to_string()));
+            }
+            if let Some(host) = header_str(headers, "host") {
+                let (address, port_in_host) = split_host_port(host);
+                if !address.is_empty() {
+                    attrs.push(string_kv(SERVER_ADDRESS, address.to_string()));
+                }
+                // A port in the Host header is what the client actually
+                // addressed, so it wins over the listener port ALB reports.
+                let port = port_in_host.or_else(|| {
+                    header_str(headers, "x-forwarded-port").and_then(|p| p.parse::<i64>().ok())
+                });
+                if let Some(port) = port {
+                    attrs.push(int_kv(SERVER_PORT, port));
+                }
+            }
+            // `x-forwarded-for` accumulates proxy hops left to right; the
+            // original client is the first entry.
+            if let Some(ip) = header_str(headers, "x-forwarded-for")
+                .and_then(|v| v.split(',').next())
+                .map(str::trim)
+                .filter(|ip| !ip.is_empty())
+            {
+                attrs.push(string_kv(CLIENT_ADDRESS, ip.to_string()));
+            }
+        }
+        HttpEventKind::ApiGatewayV1 => {
             if let Some(method) = json_val.get("httpMethod").and_then(|v| v.as_str()) {
                 attrs.push(string_kv(HTTP_REQUEST_METHOD, method.to_string()));
             }
@@ -116,7 +219,7 @@ pub fn extract_request_attributes(json_val: &Value, version: &ApiGatewayVersion)
                 }
             }
         }
-        ApiGatewayVersion::V2 => {
+        HttpEventKind::ApiGatewayV2 => {
             let http = rc.get("http");
             if let Some(method) = http.and_then(|h| h.get("method")).and_then(|v| v.as_str()) {
                 attrs.push(string_kv(HTTP_REQUEST_METHOD, method.to_string()));
@@ -161,8 +264,11 @@ pub fn extract_request_attributes(json_val: &Value, version: &ApiGatewayVersion)
 
 /// Builds `"<METHOD> <route>"`, used only when span-naming is opted in via
 /// `DASH0_ENABLE_API_GATEWAY_SPAN_NAME`.
-pub fn extract_span_name(json_val: &Value, version: &ApiGatewayVersion) -> Option<String> {
-    let attrs = extract_request_attributes(json_val, version);
+///
+/// ALB reports no route template, and `url.path` is high-cardinality, so per
+/// HTTP semconv the name falls back to the bare method (e.g. `GET`) there.
+pub fn extract_span_name(json_val: &Value, kind: &HttpEventKind) -> Option<String> {
+    let attrs = extract_request_attributes(json_val, kind);
     let method = attrs
         .iter()
         .find(|kv| kv.key == HTTP_REQUEST_METHOD)
@@ -170,8 +276,12 @@ pub fn extract_span_name(json_val: &Value, version: &ApiGatewayVersion) -> Optio
     let route = attrs
         .iter()
         .find(|kv| kv.key == HTTP_ROUTE)
-        .and_then(string_value)?;
-    Some(format!("{} {}", method, route))
+        .and_then(string_value);
+    match route {
+        Some(route) => Some(format!("{} {}", method, route)),
+        None if matches!(kind, HttpEventKind::Alb) => Some(method),
+        None => None,
+    }
 }
 
 /// Extracts `http.response.status_code` from a Lambda proxy-integration
@@ -214,46 +324,78 @@ pub fn extract_header_attributes(
     allow_list
         .iter()
         .filter_map(|name| {
-            lower_cased
-                .get(name)
-                .and_then(|v| v.as_str())
-                .map(|s| string_kv(&prefix_fn(name), s.to_string()))
+            let value = match lower_cased.get(name)? {
+                Value::String(s) => s.clone(),
+                // `multiValueHeaders` shape. Repeated field lines are folded
+                // into one comma-separated value (RFC 9110 §5.3) so the
+                // attribute stays a string, as it already is for the
+                // single-value shape.
+                Value::Array(values) => {
+                    let parts: Vec<&str> = values.iter().filter_map(|v| v.as_str()).collect();
+                    if parts.is_empty() {
+                        return None;
+                    }
+                    parts.join(", ")
+                }
+                _ => return None,
+            };
+            Some(string_kv(&prefix_fn(name), value))
         })
         .collect()
 }
 
 /// Extracts `url.query`, gated by `DASH0_CAPTURE_API_GATEWAY_QUERY_STRING`
 /// since query strings can carry signed-URL tokens or other secrets.
-pub fn extract_query_string_attribute(
-    json_val: &Value,
-    version: &ApiGatewayVersion,
-) -> Option<KeyValue> {
-    match version {
-        ApiGatewayVersion::V1 => {
-            let params = json_val
-                .get("multiValueQueryStringParameters")?
-                .as_object()?;
-            let mut parts = Vec::new();
-            for (key, values) in params {
-                if let Some(values) = values.as_array() {
-                    for value in values {
-                        if let Some(value) = value.as_str() {
-                            parts.push(format!("{}={}", key, value));
-                        }
-                    }
-                }
-            }
-            if parts.is_empty() {
-                None
-            } else {
-                Some(string_kv(URL_QUERY, parts.join("&")))
-            }
+pub fn extract_query_string_attribute(json_val: &Value, kind: &HttpEventKind) -> Option<KeyValue> {
+    match kind {
+        HttpEventKind::ApiGatewayV1 => {
+            flatten_query_parameters(json_val.get("multiValueQueryStringParameters")?)
         }
-        ApiGatewayVersion::V2 => json_val
+        HttpEventKind::ApiGatewayV2 => json_val
             .get("rawQueryString")
             .and_then(|v| v.as_str())
             .filter(|s| !s.is_empty())
             .map(|s| string_kv(URL_QUERY, s.to_string())),
+        // Like headers, ALB sends `multiValueQueryStringParameters` instead of
+        // `queryStringParameters` when multi-value headers are enabled.
+        // Neither is URL-decoded by ALB, so the values reassemble into the
+        // original query string as-is.
+        HttpEventKind::Alb => {
+            let params = json_val
+                .get("queryStringParameters")
+                .filter(|v| v.is_object())
+                .or_else(|| {
+                    json_val
+                        .get("multiValueQueryStringParameters")
+                        .filter(|v| v.is_object())
+                })?;
+            flatten_query_parameters(params)
+        }
+    }
+}
+
+/// Rebuilds a `key=value&key=value` query string from a parameter map whose
+/// values are either strings or arrays of strings.
+fn flatten_query_parameters(params: &Value) -> Option<KeyValue> {
+    let params = params.as_object()?;
+    let mut parts = Vec::new();
+    for (key, value) in params {
+        match value {
+            Value::String(value) => parts.push(format!("{}={}", key, value)),
+            Value::Array(values) => {
+                for value in values {
+                    if let Some(value) = value.as_str() {
+                        parts.push(format!("{}={}", key, value));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    if parts.is_empty() {
+        None
+    } else {
+        Some(string_kv(URL_QUERY, parts.join("&")))
     }
 }
 
@@ -294,6 +436,56 @@ mod tests {
         })
     }
 
+    /// Default ALB target group (multi-value headers disabled), taken from the
+    /// example event in the Application Load Balancer user guide.
+    fn alb_event() -> Value {
+        serde_json::json!({
+            "requestContext": {
+                "elb": {
+                    "targetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/lambda-279XGJDqGZ5rsrHC2Fjr/49e9d65c45c6791a"
+                }
+            },
+            "httpMethod": "GET",
+            "path": "/lambda",
+            "queryStringParameters": {"query": "1234ABCD"},
+            "headers": {
+                "content-type": "application/json",
+                "host": "lambda-alb-123578498.us-east-1.elb.amazonaws.com",
+                "x-amzn-trace-id": "Root=1-5c536348-3d683b8b04734faae651f476",
+                "x-forwarded-for": "72.12.164.125",
+                "x-forwarded-port": "80",
+                "x-forwarded-proto": "http"
+            },
+            "body": "",
+            "isBase64Encoded": false
+        })
+    }
+
+    /// Same request against a target group with
+    /// `lambda.multi_value_headers.enabled`: ALB then sends
+    /// `multiValueHeaders` / `multiValueQueryStringParameters` *instead of*
+    /// the single-value fields, which are absent entirely.
+    fn alb_event_multi_value() -> Value {
+        serde_json::json!({
+            "requestContext": {
+                "elb": {"targetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/tg/49e9d65c45c6791a"}
+            },
+            "httpMethod": "POST",
+            "path": "/lambda",
+            "multiValueQueryStringParameters": {"myKey": ["val1", "val2"]},
+            "multiValueHeaders": {
+                "content-type": ["application/json"],
+                "cookie": ["name1=value1", "name2=value2"],
+                "host": ["lambda-alb-123578498.us-east-1.elb.amazonaws.com"],
+                "x-forwarded-for": ["72.12.164.125"],
+                "x-forwarded-port": ["443"],
+                "x-forwarded-proto": ["https"]
+            },
+            "body": "",
+            "isBase64Encoded": false
+        })
+    }
+
     fn get_str<'a>(attrs: &'a [KeyValue], key: &str) -> Option<&'a str> {
         attrs.iter().find(|kv| kv.key == key).and_then(|kv| {
             if let Some(AnyValue {
@@ -323,37 +515,42 @@ mod tests {
     #[test]
     fn detects_v1_event() {
         assert!(matches!(
-            detect_api_gateway_event(&v1_event()),
-            Some(ApiGatewayVersion::V1)
+            detect_http_event(&v1_event()),
+            Some(HttpEventKind::ApiGatewayV1)
         ));
     }
 
     #[test]
     fn detects_v2_event() {
         assert!(matches!(
-            detect_api_gateway_event(&v2_event()),
-            Some(ApiGatewayVersion::V2)
+            detect_http_event(&v2_event()),
+            Some(HttpEventKind::ApiGatewayV2)
         ));
     }
 
     #[test]
     fn does_not_detect_non_api_gateway_events() {
-        assert!(detect_api_gateway_event(&serde_json::json!({"Records": []})).is_none());
+        assert!(detect_http_event(&serde_json::json!({"Records": []})).is_none());
     }
 
+    /// ALB events carry a top-level `httpMethod` just like API Gateway v1, so
+    /// this guards the ordering inside `detect_http_event`.
     #[test]
-    fn does_not_misclassify_alb_events() {
+    fn classifies_alb_events_as_alb_not_api_gateway_v1() {
         let alb_event = serde_json::json!({
             "httpMethod": "GET",
             "path": "/lambda",
             "requestContext": {"elb": {"targetGroupArn": "arn:aws:elasticloadbalancing:..."}}
         });
-        assert!(detect_api_gateway_event(&alb_event).is_none());
+        assert!(matches!(
+            detect_http_event(&alb_event),
+            Some(HttpEventKind::Alb)
+        ));
     }
 
     #[test]
     fn extracts_v1_request_attributes() {
-        let attrs = extract_request_attributes(&v1_event(), &ApiGatewayVersion::V1);
+        let attrs = extract_request_attributes(&v1_event(), &HttpEventKind::ApiGatewayV1);
         assert_eq!(get_str(&attrs, HTTP_REQUEST_METHOD), Some("GET"));
         assert_eq!(get_str(&attrs, URL_PATH), Some("/pets/123"));
         assert_eq!(get_str(&attrs, URL_SCHEME), Some("https"));
@@ -369,7 +566,7 @@ mod tests {
 
     #[test]
     fn extracts_v2_request_attributes() {
-        let attrs = extract_request_attributes(&v2_event(), &ApiGatewayVersion::V2);
+        let attrs = extract_request_attributes(&v2_event(), &HttpEventKind::ApiGatewayV2);
         assert_eq!(get_str(&attrs, HTTP_REQUEST_METHOD), Some("GET"));
         assert_eq!(get_str(&attrs, URL_PATH), Some("/pets/123"));
         assert_eq!(get_str(&attrs, HTTP_ROUTE), Some("/pets/{id}"));
@@ -381,18 +578,18 @@ mod tests {
     fn handles_default_v2_route_key_without_leading_method() {
         let mut event = v2_event();
         event["requestContext"]["routeKey"] = serde_json::json!("$default");
-        let attrs = extract_request_attributes(&event, &ApiGatewayVersion::V2);
+        let attrs = extract_request_attributes(&event, &HttpEventKind::ApiGatewayV2);
         assert_eq!(get_str(&attrs, HTTP_ROUTE), Some("$default"));
     }
 
     #[test]
     fn builds_span_name_for_v1_and_v2() {
         assert_eq!(
-            extract_span_name(&v1_event(), &ApiGatewayVersion::V1),
+            extract_span_name(&v1_event(), &HttpEventKind::ApiGatewayV1),
             Some("GET /pets/{id}".to_string())
         );
         assert_eq!(
-            extract_span_name(&v2_event(), &ApiGatewayVersion::V2),
+            extract_span_name(&v2_event(), &HttpEventKind::ApiGatewayV2),
             Some("GET /pets/{id}".to_string())
         );
     }
@@ -401,7 +598,7 @@ mod tests {
     fn span_name_none_without_route() {
         let mut event = v1_event();
         event.as_object_mut().unwrap().remove("resource");
-        assert!(extract_span_name(&event, &ApiGatewayVersion::V1).is_none());
+        assert!(extract_span_name(&event, &HttpEventKind::ApiGatewayV1).is_none());
     }
 
     #[test]
@@ -443,7 +640,7 @@ mod tests {
 
     #[test]
     fn query_string_flattens_v1_multi_value_params() {
-        let kv = extract_query_string_attribute(&v1_event(), &ApiGatewayVersion::V1).unwrap();
+        let kv = extract_query_string_attribute(&v1_event(), &HttpEventKind::ApiGatewayV1).unwrap();
         assert_eq!(
             get_str(std::slice::from_ref(&kv), URL_QUERY),
             Some("color=red&color=blue")
@@ -452,7 +649,7 @@ mod tests {
 
     #[test]
     fn query_string_uses_v2_raw_query_string_as_is() {
-        let kv = extract_query_string_attribute(&v2_event(), &ApiGatewayVersion::V2).unwrap();
+        let kv = extract_query_string_attribute(&v2_event(), &HttpEventKind::ApiGatewayV2).unwrap();
         assert_eq!(
             get_str(std::slice::from_ref(&kv), URL_QUERY),
             Some("color=red")
@@ -463,6 +660,194 @@ mod tests {
     fn query_string_none_when_absent() {
         let mut event = v2_event();
         event["rawQueryString"] = serde_json::json!("");
-        assert!(extract_query_string_attribute(&event, &ApiGatewayVersion::V2).is_none());
+        assert!(extract_query_string_attribute(&event, &HttpEventKind::ApiGatewayV2).is_none());
+    }
+
+    // ── ALB ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn extracts_alb_request_attributes() {
+        let attrs = extract_request_attributes(&alb_event(), &HttpEventKind::Alb);
+        assert_eq!(get_str(&attrs, HTTP_REQUEST_METHOD), Some("GET"));
+        assert_eq!(get_str(&attrs, URL_PATH), Some("/lambda"));
+        assert_eq!(
+            get_str(&attrs, SERVER_ADDRESS),
+            Some("lambda-alb-123578498.us-east-1.elb.amazonaws.com")
+        );
+        assert_eq!(get_str(&attrs, CLIENT_ADDRESS), Some("72.12.164.125"));
+    }
+
+    /// ALB listeners serve plain HTTP as well, so the scheme must follow
+    /// `x-forwarded-proto` rather than being hardcoded to https the way the
+    /// API Gateway branches do.
+    #[test]
+    fn alb_scheme_and_port_follow_forwarded_headers() {
+        let attrs = extract_request_attributes(&alb_event(), &HttpEventKind::Alb);
+        assert_eq!(get_str(&attrs, URL_SCHEME), Some("http"));
+        assert_eq!(get_int(&attrs, SERVER_PORT), Some(80));
+
+        let attrs = extract_request_attributes(&alb_event_multi_value(), &HttpEventKind::Alb);
+        assert_eq!(get_str(&attrs, URL_SCHEME), Some("https"));
+        assert_eq!(get_int(&attrs, SERVER_PORT), Some(443));
+    }
+
+    #[test]
+    fn alb_multi_value_headers_are_read_when_single_value_headers_are_absent() {
+        let event = alb_event_multi_value();
+        let attrs = extract_request_attributes(&event, &HttpEventKind::Alb);
+        assert_eq!(
+            get_str(&attrs, SERVER_ADDRESS),
+            Some("lambda-alb-123578498.us-east-1.elb.amazonaws.com")
+        );
+        assert_eq!(get_str(&attrs, CLIENT_ADDRESS), Some("72.12.164.125"));
+    }
+
+    /// A port in the Host header is what the client actually addressed and
+    /// wins over the listener port ALB reports in `x-forwarded-port`.
+    #[test]
+    fn alb_host_header_port_takes_precedence() {
+        let mut event = alb_event();
+        event["headers"]["host"] = serde_json::json!("example.com:8443");
+        let attrs = extract_request_attributes(&event, &HttpEventKind::Alb);
+        assert_eq!(get_str(&attrs, SERVER_ADDRESS), Some("example.com"));
+        assert_eq!(get_int(&attrs, SERVER_PORT), Some(8443));
+    }
+
+    #[test]
+    fn alb_ipv6_host_header_is_not_split_on_its_own_colons() {
+        let mut event = alb_event();
+        event["headers"]["host"] = serde_json::json!("[2001:db8::1]:8443");
+        let attrs = extract_request_attributes(&event, &HttpEventKind::Alb);
+        assert_eq!(get_str(&attrs, SERVER_ADDRESS), Some("[2001:db8::1]"));
+        assert_eq!(get_int(&attrs, SERVER_PORT), Some(8443));
+
+        let mut event = alb_event();
+        event["headers"]["host"] = serde_json::json!("[2001:db8::1]");
+        let attrs = extract_request_attributes(&event, &HttpEventKind::Alb);
+        assert_eq!(get_str(&attrs, SERVER_ADDRESS), Some("[2001:db8::1]"));
+    }
+
+    #[test]
+    fn alb_client_address_takes_first_forwarded_for_hop() {
+        let mut event = alb_event();
+        event["headers"]["x-forwarded-for"] =
+            serde_json::json!("72.12.164.125, 10.0.0.1, 10.0.0.2");
+        let attrs = extract_request_attributes(&event, &HttpEventKind::Alb);
+        assert_eq!(get_str(&attrs, CLIENT_ADDRESS), Some("72.12.164.125"));
+    }
+
+    /// ALB reports no route template, so `http.route` must be absent rather
+    /// than guessed from the high-cardinality path.
+    #[test]
+    fn alb_has_no_route_or_protocol_version() {
+        let attrs = extract_request_attributes(&alb_event(), &HttpEventKind::Alb);
+        assert_eq!(get_str(&attrs, HTTP_ROUTE), None);
+        assert_eq!(get_str(&attrs, NETWORK_PROTOCOL_VERSION), None);
+    }
+
+    /// Health checks (`ELB-HealthChecker/2.0`) carry no host and no forwarding
+    /// headers at all, so extraction must degrade to method and path.
+    #[test]
+    fn alb_health_check_event_yields_only_method_and_path() {
+        let event = serde_json::json!({
+            "requestContext": {"elb": {"targetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/tg/abc"}},
+            "httpMethod": "GET",
+            "path": "/",
+            "queryStringParameters": {},
+            "headers": {"user-agent": "ELB-HealthChecker/2.0"},
+            "body": "",
+            "isBase64Encoded": false
+        });
+        let attrs = extract_request_attributes(&event, &HttpEventKind::Alb);
+        assert_eq!(get_str(&attrs, HTTP_REQUEST_METHOD), Some("GET"));
+        assert_eq!(get_str(&attrs, URL_PATH), Some("/"));
+        assert_eq!(get_str(&attrs, SERVER_ADDRESS), None);
+        assert_eq!(get_str(&attrs, CLIENT_ADDRESS), None);
+        assert_eq!(get_str(&attrs, URL_SCHEME), None);
+    }
+
+    /// No route means no `<METHOD> <route>`; semconv falls back to the bare
+    /// method rather than producing nothing.
+    #[test]
+    fn alb_span_name_falls_back_to_method() {
+        assert_eq!(
+            extract_span_name(&alb_event(), &HttpEventKind::Alb),
+            Some("GET".to_string())
+        );
+    }
+
+    #[test]
+    fn alb_query_string_handles_both_shapes() {
+        let kv = extract_query_string_attribute(&alb_event(), &HttpEventKind::Alb).unwrap();
+        assert_eq!(
+            get_str(std::slice::from_ref(&kv), URL_QUERY),
+            Some("query=1234ABCD")
+        );
+
+        let kv =
+            extract_query_string_attribute(&alb_event_multi_value(), &HttpEventKind::Alb).unwrap();
+        assert_eq!(
+            get_str(std::slice::from_ref(&kv), URL_QUERY),
+            Some("myKey=val1&myKey=val2")
+        );
+    }
+
+    #[test]
+    fn alb_query_string_none_when_empty() {
+        let mut event = alb_event();
+        event["queryStringParameters"] = serde_json::json!({});
+        assert!(extract_query_string_attribute(&event, &HttpEventKind::Alb).is_none());
+    }
+
+    #[test]
+    fn alb_header_capture_folds_repeated_multi_value_entries() {
+        let event = alb_event_multi_value();
+        let attrs =
+            extract_header_attributes(resolve_headers(&event), "cookie", http_request_header);
+        assert_eq!(
+            get_str(&attrs, &http_request_header("cookie")),
+            Some("name1=value1, name2=value2")
+        );
+    }
+
+    #[test]
+    fn alb_header_capture_reads_single_value_shape() {
+        let event = alb_event();
+        let attrs =
+            extract_header_attributes(resolve_headers(&event), "content-type", http_request_header);
+        assert_eq!(
+            get_str(&attrs, &http_request_header("content-type")),
+            Some("application/json")
+        );
+    }
+
+    /// ALB responses use the same `statusCode` field as API Gateway proxy
+    /// integrations, plus an optional `statusDescription` that has no semconv
+    /// attribute and is ignored.
+    #[test]
+    fn alb_response_status_code_and_multi_value_headers() {
+        let response = serde_json::json!({
+            "statusCode": 201,
+            "statusDescription": "201 Created",
+            "isBase64Encoded": false,
+            "multiValueHeaders": {"content-type": ["application/json"]},
+            "body": "{}"
+        });
+        assert_eq!(
+            get_int(
+                std::slice::from_ref(&extract_response_status_code_attribute(&response).unwrap()),
+                HTTP_RESPONSE_STATUS_CODE
+            ),
+            Some(201)
+        );
+        let attrs = extract_header_attributes(
+            resolve_headers(&response),
+            "content-type",
+            http_response_header,
+        );
+        assert_eq!(
+            get_str(&attrs, &http_response_header("content-type")),
+            Some("application/json")
+        );
     }
 }
