@@ -120,9 +120,11 @@ pub fn is_telemetry_metrics_disabled() -> bool {
     }
 }
 
-/// When true, the handler span for an API Gateway-triggered invocation is
-/// renamed to `<method> <route>`. Off by default so existing span names
-/// don't change under users. See `http_attributes::extract_span_name`.
+/// When true, the handler span for an API Gateway- or ALB-triggered
+/// invocation is renamed to `<method> <route>` (just `<method>` for ALB, which
+/// reports no route). Off by default so existing span names don't change under
+/// users. The env var keeps its API Gateway name for backwards compatibility.
+/// See `http_attributes::extract_span_name`.
 pub fn is_api_gateway_span_name_enabled() -> bool {
     match std::env::var("DASH0_ENABLE_API_GATEWAY_SPAN_NAME") {
         Ok(val) => matches!(
