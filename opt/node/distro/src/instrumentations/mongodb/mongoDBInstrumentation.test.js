@@ -13,7 +13,7 @@ describe('Dash0MongoDBInstrumentation', () => {
 
   let dash0MongoDBInstrumentation = new Dash0MongoDBInstrumentation();
 
-  test('getInstrumentedModule should return "mongodb"', () => {
-    expect(dash0MongoDBInstrumentation.getInstrumentedModule()).toEqual('mongodb');
+  test('getInstrumentedModules should return ["mongodb"]', () => {
+    expect(dash0MongoDBInstrumentation.getInstrumentedModules()).toEqual(['mongodb']);
   });
 });

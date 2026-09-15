@@ -7,7 +7,7 @@ describe('Dash0GrpcInstrumentation', () => {
 
   let dash0GrpcInstrumentation = new Dash0GrpcInstrumentation();
 
-  test('getInstrumentedModule should return "@grpc/grpc-js"', () => {
-    expect(dash0GrpcInstrumentation.getInstrumentedModule()).toEqual('@grpc/grpc-js');
+  test('getInstrumentedModules should return ["@grpc/grpc-js"]', () => {
+    expect(dash0GrpcInstrumentation.getInstrumentedModules()).toEqual(['@grpc/grpc-js']);
   });
 });

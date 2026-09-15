@@ -83,8 +83,8 @@ export default class Dash0UndiciInstrumentation extends TracingInstrumentor<Undi
     return true;
   }
 
-  getInstrumentedModule(): string {
-    return 'fetch';
+  getInstrumentedModules(): string[] {
+    return ['fetch'];
   }
 
   getInstrumentation(): UndiciInstrumentation {

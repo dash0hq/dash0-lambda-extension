@@ -8,8 +8,8 @@ export default class Dash0Mysql2Instrumentation extends TracingInstrumentor<MySQ
     );
   }
 
-  getInstrumentedModule(): string {
-    return 'mysql2';
+  getInstrumentedModules(): string[] {
+    return ['mysql2'];
   }
 
   getInstrumentation(): MySQL2Instrumentation {

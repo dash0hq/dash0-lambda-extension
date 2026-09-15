@@ -6,8 +6,8 @@ import { getSpanAttributeMaxLength } from '../../utils';
 import { TracingInstrumentor } from '../instrumentor';
 
 export default class Dash0FastifyInstrumentation extends TracingInstrumentor<FastifyInstrumentation> {
-  getInstrumentedModule(): string {
-    return 'fastify';
+  getInstrumentedModules(): string[] {
+    return ['fastify'];
   }
 
   getInstrumentation(): FastifyInstrumentation {

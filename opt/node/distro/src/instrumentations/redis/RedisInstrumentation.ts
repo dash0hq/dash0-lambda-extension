@@ -11,8 +11,8 @@ export default class Dash0RedisInstrumentation extends TracingInstrumentor<Redis
     );
   }
 
-  getInstrumentedModule(): string {
-    return 'redis';
+  getInstrumentedModules(): string[] {
+    return ['redis'];
   }
 
   getInstrumentation(): RedisInstrumentation {

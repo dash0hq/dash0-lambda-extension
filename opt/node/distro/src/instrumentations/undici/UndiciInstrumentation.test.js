@@ -14,7 +14,7 @@ describe('Dash0UndiciInstrumentation', () => {
 
   let dash0UndiciInstrumentation = new Dash0UndiciInstrumentation();
 
-  test('getInstrumentedModule should return "fetch"', () => {
-    expect(dash0UndiciInstrumentation.getInstrumentedModule()).toEqual('fetch');
+  test('getInstrumentedModules should return ["fetch"]', () => {
+    expect(dash0UndiciInstrumentation.getInstrumentedModules()).toEqual(['fetch']);
   });
 });

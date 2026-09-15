@@ -14,7 +14,7 @@ describe('Dash0IORedisInstrumentation', () => {
 
   let dash0IORedisInstrumentation = new Dash0IORedisInstrumentation();
 
-  test('getInstrumentedModule should return "ioredis"', () => {
-    expect(dash0IORedisInstrumentation.getInstrumentedModule()).toEqual('ioredis');
+  test('getInstrumentedModules should return ["ioredis"]', () => {
+    expect(dash0IORedisInstrumentation.getInstrumentedModules()).toEqual(['ioredis']);
   });
 });
