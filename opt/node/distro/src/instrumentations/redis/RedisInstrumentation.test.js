@@ -13,7 +13,7 @@ describe('Dash0RedisInstrumentation', () => {
 
   let dash0RedisInstrumentation = new Dash0RedisInstrumentation();
 
-  test('getInstrumentedModules should return ["redis and be applicable"]', () => {
+  test('getInstrumentedModules should return ["redis"] and be applicable', () => {
     expect(dash0RedisInstrumentation.getInstrumentedModules()).toEqual(['redis']);
   });
 });
