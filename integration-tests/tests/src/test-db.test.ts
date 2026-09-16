@@ -28,6 +28,12 @@ interface DbSpanExpectation {
     scopeName: string;
     spanNames: string[];
     dbSystemName: string;
+    /*
+     * Names of the spans whose statement must carry the query parameter values. The DB
+     * lambdas pass the AWS request ID as a query parameter, so the invocation ID has to
+     * show up in the statement of those spans.
+     */
+    spanNamesWithParameterValues?: string[];
 }
 
 // Node.js expectations
@@ -41,6 +47,7 @@ const nodeMysqlExpectation: DbSpanExpectation = {
     scopeName: '@opentelemetry/instrumentation-mysql2',
     spanNames: ['CREATE', 'INSERT', 'SELECT'],
     dbSystemName: 'mysql',
+    spanNamesWithParameterValues: ['INSERT', 'SELECT'],
 };
 
 // Python expectations
@@ -150,6 +157,7 @@ const verifyDbInvocation = async (functionName: string, expectation: DbSpanExpec
         traceId,
         parentSpanId: handlerSpanId,
         expectation,
+        invocationId,
     });
 };
 
@@ -158,11 +166,13 @@ const checkDbSpans = async ({
     traceId,
     parentSpanId,
     expectation,
+    invocationId,
 }: {
     functionName: string;
     traceId: string;
     parentSpanId: string;
     expectation: DbSpanExpectation;
+    invocationId: string;
 }) => {
     const now = Date.now();
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -226,6 +236,14 @@ const checkDbSpans = async ({
                 expect(attrs['db.system.name']?.stringValue).toEqual(expectation.dbSystemName);
                 expect(attrs['db.namespace']?.stringValue).toEqual('testdb');
                 expect(matchingSpan.kind).toEqual(3); // CLIENT
+
+                if (expectation.spanNamesWithParameterValues?.includes(expectedName)) {
+                    const statement = attrs['db.query.text']?.stringValue ?? attrs['db.statement']?.stringValue;
+                    expect(
+                        statement,
+                        `Expected the statement of the "${expectedName}" span to carry the query parameter value, got: ${statement}`,
+                    ).toContain(invocationId);
+                }
             }
 
             return;
