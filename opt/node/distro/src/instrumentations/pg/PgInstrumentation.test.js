@@ -13,8 +13,8 @@ describe('Dash0PgInstrumentation', () => {
 
   let dash0PgInstrumentation = new Dash0PgInstrumentation();
 
-  test('getInstrumentedModule should return "pg"', () => {
-    expect(dash0PgInstrumentation.getInstrumentedModule()).toEqual('pg');
+  test('getInstrumentedModules should return ["pg"]', () => {
+    expect(dash0PgInstrumentation.getInstrumentedModules()).toEqual(['pg']);
   });
 
 });

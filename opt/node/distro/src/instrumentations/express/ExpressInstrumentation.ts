@@ -3,8 +3,8 @@ import { ExpressInstrumentation } from 'opentelemetry-instrumentation-express';
 import { TracingInstrumentor } from '../instrumentor';
 
 export default class Dash0ExpressInstrumentation extends TracingInstrumentor<ExpressInstrumentation> {
-  getInstrumentedModule(): string {
-    return 'express';
+  getInstrumentedModules(): string[] {
+    return ['express'];
   }
 
   getInstrumentation(): ExpressInstrumentation {

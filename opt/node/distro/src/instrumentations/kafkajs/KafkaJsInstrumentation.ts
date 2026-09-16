@@ -6,8 +6,8 @@ import { getSpanAttributeMaxLength } from '../../utils';
 import { TracingInstrumentor } from '../instrumentor';
 
 export default class Dash0KafkaJsInstrumentation extends TracingInstrumentor<KafkaJsInstrumentation> {
-  getInstrumentedModule(): string {
-    return 'kafkajs';
+  getInstrumentedModules(): string[] {
+    return ['kafkajs'];
   }
 
   getInstrumentation(): KafkaJsInstrumentation {

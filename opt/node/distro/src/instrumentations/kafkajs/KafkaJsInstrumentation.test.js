@@ -7,7 +7,7 @@ describe('Dash0KafkaJsInstrumentation', () => {
 
   let dash0KafkaJsInstrumentation = new Dash0KafkaJsInstrumentation();
 
-  test('getInstrumentedModule should return "kafkajs"', () => {
-    expect(dash0KafkaJsInstrumentation.getInstrumentedModule()).toEqual('kafkajs');
+  test('getInstrumentedModules should return ["kafkajs"]', () => {
+    expect(dash0KafkaJsInstrumentation.getInstrumentedModules()).toEqual(['kafkajs']);
   });
 });

@@ -17,10 +17,13 @@ const SQS_PUBLISH_OPERATIONS = ['SendMessage', 'SendMessageBatch'];
 const SQS_CONSUME_OPERATIONS = ['ReceiveMessage'];
 
 export const preRequestHook = (span: MutableSpan, requestInfo: AwsSdkRequestHookInformation) => {
-
+  const awsServiceIdentifier = (span.attributes?.[SEMATTRS_RPC_SERVICE] as string)?.toLowerCase();
   const sqsOperation = span.attributes?.[SEMATTRS_RPC_METHOD] as string;
 
-  if (SQS_PUBLISH_OPERATIONS.includes(sqsOperation)) {
+  // SendMessage is not unique to SQS, so the operation alone does not identify a
+  // queue publish: another service's span would be labelled as messaging and its
+  // command input captured as a message body.
+  if (awsServiceIdentifier === AwsParsedService.SQS && SQS_PUBLISH_OPERATIONS.includes(sqsOperation)) {
     span.setAttribute('aws.queue.name', span.attributes['messaging.destination.name']);
     span.setAttribute(SEMATTRS_MESSAGING_OPERATION, sqsOperation);
     span.setAttribute(

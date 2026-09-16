@@ -23,7 +23,7 @@ export default class Dash0HttpInstrumentation extends TracingInstrumentor<HttpIn
     );
   }
 
-  getInstrumentedModule = () => 'http';
+  getInstrumentedModules = () => ['http'];
 
   getInstrumentation = () =>
     new HttpInstrumentation({

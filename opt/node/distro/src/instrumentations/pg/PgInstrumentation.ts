@@ -8,8 +8,8 @@ export default class Dash0PgInstrumentation extends TracingInstrumentor<PgInstru
     );
   }
 
-  getInstrumentedModule(): string {
-    return 'pg';
+  getInstrumentedModules(): string[] {
+    return ['pg'];
   }
 
   getInstrumentation(): PgInstrumentation {

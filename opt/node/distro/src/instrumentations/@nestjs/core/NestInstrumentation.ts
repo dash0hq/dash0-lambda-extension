@@ -8,8 +8,8 @@ export default class Dash0NestInstrumentation extends TracingInstrumentor<NestIn
     );
   }
 
-  getInstrumentedModule(): string {
-    return '@nestjs/core';
+  getInstrumentedModules(): string[] {
+    return ['@nestjs/core'];
   }
 
   getInstrumentation(): NestInstrumentation {

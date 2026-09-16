@@ -7,8 +7,8 @@ export default class Dash0MongoDBInstrumentation extends TracingInstrumentor<Mon
       super.isApplicable()
     );
   }
-  getInstrumentedModule(): string {
-    return 'mongodb';
+  getInstrumentedModules(): string[] {
+    return ['mongodb'];
   }
 
   getInstrumentation(): MongoDBInstrumentation {

@@ -61,9 +61,9 @@ describe('Dash0UndiciInstrumentation', () => {
   }
 
   describe('class API', () => {
-    test('getInstrumentedModule returns "fetch"', () => {
+    test('getInstrumentedModules returns ["fetch"]', () => {
       const Cls = loadModule();
-      expect(new Cls().getInstrumentedModule()).toBe('fetch');
+      expect(new Cls().getInstrumentedModules()).toEqual(['fetch']);
     });
 
     test('isApplicable returns true', () => {

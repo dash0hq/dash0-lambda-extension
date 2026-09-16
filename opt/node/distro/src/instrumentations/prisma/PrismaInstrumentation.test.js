@@ -7,7 +7,7 @@ describe('Dash0PrismaInstrumentation', () => {
 
   let dash0PrismaInstrumentation = new Dash0PrismaInstrumentation();
 
-  test('getInstrumentedModule should return "@prisma/client"', () => {
-    expect(dash0PrismaInstrumentation.getInstrumentedModule()).toEqual('@prisma/client');
+  test('getInstrumentedModules should return ["@prisma/client"]', () => {
+    expect(dash0PrismaInstrumentation.getInstrumentedModules()).toEqual(['@prisma/client']);
   });
 });

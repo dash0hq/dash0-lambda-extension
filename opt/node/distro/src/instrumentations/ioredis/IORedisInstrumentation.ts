@@ -11,8 +11,8 @@ export default class Dash0IORedisInstrumentation extends TracingInstrumentor<IOR
     );
   }
 
-  getInstrumentedModule(): string {
-    return 'ioredis';
+  getInstrumentedModules(): string[] {
+    return ['ioredis'];
   }
 
   getInstrumentation(): IORedisInstrumentation {

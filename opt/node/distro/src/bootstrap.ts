@@ -124,8 +124,8 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
       instrumentations: instrumentationsToInstall.map((i) => i.getInstrumentation()),
     });
 
-    const instrumentedModules: string[] = instrumentationsToInstall.map((i) =>
-      i.getInstrumentedModule()
+    const instrumentedModules: string[] = instrumentationsToInstall.flatMap((i) =>
+      i.getInstrumentedModules()
     );
 
     logger.debug(`Instrumented modules: ${instrumentedModules.join(', ')}`);

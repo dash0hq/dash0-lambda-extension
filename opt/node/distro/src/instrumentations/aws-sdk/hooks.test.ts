@@ -123,6 +123,26 @@ describe('aws-sdk instrumentation hooks', () => {
       }
     );
 
+    // SendMessage is not unique to SQS -- Connect Participant Service has one too.
+    // Matching on the operation alone would label another service's span as
+    // messaging and serialize its command input into messaging.publish.body,
+    // capturing a request payload we otherwise never capture.
+    test('leaves a SendMessage span from another AWS service alone', () => {
+      const span = rootSpanWithAttributes({
+        'rpc.service': 'ConnectParticipant',
+        'rpc.method': 'SendMessage',
+      });
+      const awsSdkRequest: AwsSdkRequestHookInformation = awsRequestWithCommandInput({
+        Content: 'a customer support message',
+      });
+
+      preRequestHook(span, awsSdkRequest);
+
+      expect(span.attributes['messaging.publish.body']).toBeUndefined();
+      expect(span.attributes['messaging.operation']).toBeUndefined();
+      expect(span.attributes['aws.queue.name']).toBeUndefined();
+    });
+
     describe('scrubbing the request body', () => {
       const secretKey = 'shhhh';
       const secretValue = 'some-secret';
