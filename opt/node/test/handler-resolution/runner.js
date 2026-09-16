@@ -8,16 +8,22 @@
  * it installs is global and caches loaded modules. Running the scenarios in-process
  * would leak state between them.
  *
+ * The runner models the Lambda runtime interface faithfully, which is the point of
+ * the whole exercise: the RIC derives the module path from `_HANDLER` the same way
+ * the instrumentation does, then hands that path to Node's resolver. The two cannot
+ * disagree about the path -- only about how it is turned into a file. Node resolves
+ * directories and package `main` fields; the instrumentation only stats `.js`, `.mjs`
+ * and `.cjs`. Every divergence lives in that gap.
+ *
  * Usage: node runner.js '<scenario JSON>'
  *
  * Scenario:
- *   handler       value of the `_HANDLER` env var, i.e. what AWS is configured with
- *   bundlePath    where the handler file actually lands in the deployment package,
- *                 relative to LAMBDA_TASK_ROOT
- *   lambdaHandler optional override passed to AwsLambdaInstrumentation's config
+ *   handler        value of the `_HANDLER` env var, i.e. what AWS is configured with
+ *   files          { relative path inside the deployment package: file contents }
+ *   lambdaHandler  optional override passed to AwsLambdaInstrumentation's config
  *
  * Prints a JSON result on stdout:
- *   { statusCode, spans: [{ name, scope }], diag: [...] }
+ *   { taskRoot, modulePath, loadedFrom, loadError, statusCode, spans, diag }
  */
 
 const fs = require('fs');
@@ -26,13 +32,13 @@ const path = require('path');
 
 const scenario = JSON.parse(process.argv[2]);
 
-// Build a throwaway deployment package. `bundlePath` is deliberately independent of
-// `handler` so we can model a bundler that flattens its output while the configured
-// handler string keeps the source directory.
+// Build a throwaway deployment package.
 const taskRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'lambda-task-root-'));
-const bundleFile = path.join(taskRoot, scenario.bundlePath);
-fs.mkdirSync(path.dirname(bundleFile), { recursive: true });
-fs.writeFileSync(bundleFile, 'exports.handler = async () => ({ statusCode: 200, body: "ok" });\n');
+Object.keys(scenario.files).forEach(function (relative) {
+  const file = path.join(taskRoot, relative);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, scenario.files[relative]);
+});
 
 process.env.LAMBDA_TASK_ROOT = taskRoot;
 process.env._HANDLER = scenario.handler;
@@ -70,26 +76,49 @@ registerInstrumentations({
 });
 
 (async () => {
-  // The Lambda runtime loads the user module from where the package actually put it,
-  // by absolute path and without an extension.
-  const userModule = require(bundleFile.replace(/\.[cm]?js$/, ''));
+  // What the runtime interface does: resolve(appRoot, moduleRoot, module), then require.
+  const handlerName = path.basename(scenario.handler);
+  const moduleRoot = scenario.handler.substring(0, scenario.handler.length - handlerName.length);
+  const parts = handlerName.split('.', 2);
+  const modulePath = path.resolve(taskRoot, moduleRoot, parts[0]);
+  const functionName = parts[1];
 
-  const result = await userModule[scenario.handler.split('.').pop()](
-    { hello: 'world' },
-    {
-      functionName: 'syncjob-service-staging',
-      functionVersion: '$LATEST',
-      invokedFunctionArn: 'arn:aws:lambda:eu-west-1:123456789012:function:syncjob-service-staging',
-      awsRequestId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
-    },
-  );
+  let userModule = null;
+  let loadedFrom = null;
+  let loadError = null;
+  try {
+    userModule = require(modulePath);
+    loadedFrom = require.resolve(modulePath);
+  } catch (err) {
+    // A function whose handler cannot be loaded never returns 200 — it fails the
+    // invocation with Runtime.ImportModuleError. Recorded rather than thrown so the
+    // test can assert on it.
+    loadError = err.code || String(err).split('\n')[0];
+  }
+
+  let statusCode = null;
+  if (userModule && typeof userModule[functionName] === 'function') {
+    const result = await userModule[functionName](
+      { hello: 'world' },
+      {
+        functionName: 'syncjob-service-staging',
+        functionVersion: '$LATEST',
+        invokedFunctionArn: 'arn:aws:lambda:us-east-1:123456789012:function:syncjob-service-staging',
+        awsRequestId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+      },
+    );
+    statusCode = result.statusCode;
+  }
 
   await tracerProvider.forceFlush();
 
   process.stdout.write(
     JSON.stringify({
-      taskRoot,
-      statusCode: result.statusCode,
+      taskRoot: taskRoot,
+      modulePath: modulePath,
+      loadedFrom: loadedFrom,
+      loadError: loadError,
+      statusCode: statusCode,
       spans: memoryExporter.getFinishedSpans().map((span) => ({
         name: span.name,
         scope: span.instrumentationScope.name,
