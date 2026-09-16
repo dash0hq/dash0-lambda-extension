@@ -29,6 +29,9 @@
  * control below pins down.
  *
  * Every scenario runs in its own process; see `handler-resolution/runner.js`.
+ *
+ * Full write-up, including the fix options and how to diagnose a report like this:
+ * `handler-resolution/README.md`.
  */
 
 import { execFileSync } from 'child_process';
