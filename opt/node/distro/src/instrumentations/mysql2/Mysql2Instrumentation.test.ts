@@ -7,6 +7,7 @@ import {
 import Dash0Mysql2Instrumentation, { Dash0MySQL2Instrumentation } from './Mysql2Instrumentation';
 
 const CONNECTION_FILE_NAME = 'mysql2/lib/connection.js';
+const PROMISE_FILE_NAME = 'mysql2/promise.js';
 
 /*
  * Stands in for `mysql2/lib/connection.js`. The instrumentation only cares about the
@@ -67,12 +68,26 @@ describe('Dash0Mysql2Instrumentation', () => {
   });
 
   describe('query parameter values', () => {
-    /**
-     * Loading `mysql2` patches `mysql2/lib/connection.js` first and the `mysql2` module
-     * itself second, which is what leaves upstream's wrapper without a `format` function.
-     * Both hooks are driven here in that order.
+    /*
+     * `mysql2/lib/connection.js` is always patched first, before anything has handed
+     * upstream a `format` function. Which hook supplies it afterwards depends on the entry
+     * point the application uses, measured against mysql2 3.24.4:
+     *
+     *   require('mysql2') and import 'mysql2'                  the mysql2 module hook
+     *   require('mysql2/promise') and import 'mysql2/promise'   the promise.js file hook
+     *
+     * The module hook does not run at all for the promise entry points.
      */
-    const loadModuleInRealWorldOrder = (instrumentation: Dash0MySQL2Instrumentation) => {
+    const FORMAT_CARRIERS = {
+      'the mysql2 module hook': (definition: InstrumentationNodeModuleDefinition) => definition,
+      'the promise.js file hook': (definition: InstrumentationNodeModuleDefinition) =>
+        definition.files.find((file) => file.name === PROMISE_FILE_NAME)!,
+    };
+
+    const loadModuleInRealWorldOrder = (
+      instrumentation: Dash0MySQL2Instrumentation,
+      formatCarrier: keyof typeof FORMAT_CARRIERS = 'the mysql2 module hook'
+    ) => {
       instrumentation.setTracerProvider(provider);
 
       // init() is protected, and calling it is how the definitions under test are produced.
@@ -83,9 +98,12 @@ describe('Dash0Mysql2Instrumentation', () => {
       const connectionFile = definition?.files?.find((file) => file.name === CONNECTION_FILE_NAME);
       expect(connectionFile?.patch).toBeDefined();
 
+      const carrier = FORMAT_CARRIERS[formatCarrier](definition!);
+      expect(carrier?.patch).toBeDefined();
+
       const Connection = createConnectionModule();
       connectionFile!.patch!(Connection);
-      definition!.patch!(mysql2Module);
+      carrier.patch!(mysql2Module);
 
       return new Connection();
     };
@@ -96,27 +114,35 @@ describe('Dash0Mysql2Instrumentation', () => {
       return spans[0].attributes['db.statement'];
     };
 
-    test('are interpolated into db.statement for query()', () => {
-      const connection = loadModuleInRealWorldOrder(new Dash0MySQL2Instrumentation());
+    for (const formatCarrier of Object.keys(FORMAT_CARRIERS) as (keyof typeof FORMAT_CARRIERS)[]) {
+      test(`are interpolated into db.statement for query() when format arrives via ${formatCarrier}`, () => {
+        const connection = loadModuleInRealWorldOrder(
+          new Dash0MySQL2Instrumentation(),
+          formatCarrier
+        );
 
-      (connection as any).query(
-        'SELECT * FROM users WHERE id = ? AND email = ?',
-        [42, 'alice@example.com'],
-        () => {}
-      );
+        (connection as any).query(
+          'SELECT * FROM users WHERE id = ? AND email = ?',
+          [42, 'alice@example.com'],
+          () => {}
+        );
 
-      expect(dbStatementOf()).toEqual(
-        "SELECT * FROM users WHERE id = 42 AND email = 'alice@example.com'"
-      );
-    });
+        expect(dbStatementOf()).toEqual(
+          "SELECT * FROM users WHERE id = 42 AND email = 'alice@example.com'"
+        );
+      });
 
-    test('are interpolated into db.statement for execute()', () => {
-      const connection = loadModuleInRealWorldOrder(new Dash0MySQL2Instrumentation());
+      test(`are interpolated into db.statement for execute() when format arrives via ${formatCarrier}`, () => {
+        const connection = loadModuleInRealWorldOrder(
+          new Dash0MySQL2Instrumentation(),
+          formatCarrier
+        );
 
-      (connection as any).execute('SELECT * FROM users WHERE id = ?', [42], () => {});
+        (connection as any).execute('SELECT * FROM users WHERE id = ?', [42], () => {});
 
-      expect(dbStatementOf()).toEqual('SELECT * FROM users WHERE id = 42');
-    });
+        expect(dbStatementOf()).toEqual('SELECT * FROM users WHERE id = 42');
+      });
+    }
 
     test('are left as placeholders without the re-patch, which is the upstream bug', () => {
       const instrumentation = new (class extends Dash0MySQL2Instrumentation {
@@ -128,7 +154,7 @@ describe('Dash0Mysql2Instrumentation', () => {
         }
       })();
 
-      const connection = loadModuleInRealWorldOrder(instrumentation);
+      const connection = loadModuleInRealWorldOrder(instrumentation, 'the promise.js file hook');
 
       (connection as any).query('SELECT * FROM users WHERE id = ?', [42], () => {});
 

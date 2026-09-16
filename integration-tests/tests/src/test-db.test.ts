@@ -226,6 +226,11 @@ const checkDbSpans = async ({
 
             expect(dbSpans.length, `Expected ${expectation.spanNames.length} DB spans, got ${dbSpans.length}`).toBeGreaterThanOrEqual(expectation.spanNames.length);
 
+            // A name that drifts out of spanNames would silently skip the parameter value check below.
+            for (const name of expectation.spanNamesWithParameterValues ?? []) {
+                expect(expectation.spanNames, `"${name}" is not one of the expected span names`).toContain(name);
+            }
+
             const remainingSpans = [...dbSpans];
             for (const expectedName of expectation.spanNames) {
                 const idx = remainingSpans.findIndex((s: any) => s.name === expectedName);
@@ -239,6 +244,7 @@ const checkDbSpans = async ({
 
                 if (expectation.spanNamesWithParameterValues?.includes(expectedName)) {
                     const statement = attrs['db.query.text']?.stringValue ?? attrs['db.statement']?.stringValue;
+                    expect(statement, `No statement attribute on the "${expectedName}" span`).toBeDefined();
                     expect(
                         statement,
                         `Expected the statement of the "${expectedName}" span to carry the query parameter value, got: ${statement}`,

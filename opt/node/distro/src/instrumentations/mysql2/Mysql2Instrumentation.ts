@@ -6,17 +6,29 @@ import { TracingInstrumentor } from '../instrumentor';
 const MODULE_NAME = 'mysql2';
 const CONNECTION_FILE_NAME = 'mysql2/lib/connection.js';
 
+type PatchFunction = (moduleExports: any, moduleVersion?: string) => any;
+
 /**
- * Upstream reads the `mysql2` module's `format` function when it patches the connection
- * prototype, and the wrapper it installs closes over that value for the life of the
- * process. `mysql2/index.js` requires `./lib/connection.js` before it assigns
- * `exports.format`, so the file hook always runs first and the wrapper is left with
- * `format === undefined`. `getQueryText` then falls back to the raw statement and the
- * query parameter values are never interpolated into `db.statement`.
+ * Upstream reads `format` when it patches the connection prototype, and the wrapper it
+ * installs closes over that value for the life of the process. `format` is only populated
+ * by the hooks for `mysql2` itself and for `mysql2/promise.js`, and both of those run
+ * after `mysql2/lib/connection.js` has been patched, because `mysql2/index.js` requires
+ * the connection before it assigns `exports.format`. The wrapper is therefore left with
+ * `format === undefined`, `getQueryText` falls back to the raw statement, and the query
+ * parameter values are never interpolated into `db.statement`.
  *
- * Patching the connection prototype a second time, once the module hook has populated
- * `format`, produces a wrapper that closes over the real function. Upstream unwraps
- * before it wraps, so re-patching replaces the wrapper instead of stacking another one.
+ * Which hook eventually supplies `format` depends on how the application loads the driver:
+ *
+ *   require('mysql2')          connection.js, then the mysql2 module hook
+ *   require('mysql2/promise')  connection.js, then the promise.js file hook
+ *   import 'mysql2'            connection.js, then the mysql2 module hook
+ *   import 'mysql2/promise'    connection.js, then the promise.js file hook
+ *
+ * The module hook does not run at all for the promise entry points, so re-patching from
+ * that hook alone would leave them unfixed. Every hook other than the connection one is
+ * treated as a possible source of `format`, and the connection prototype is patched again
+ * after it runs. Upstream unwraps before it wraps, so re-patching replaces the wrapper
+ * instead of stacking another one, and it is a no-op once `format` is already in place.
  */
 export class Dash0MySQL2Instrumentation extends MySQL2Instrumentation {
   protected override init(): InstrumentationNodeModuleDefinition[] {
@@ -46,14 +58,26 @@ export class Dash0MySQL2Instrumentation extends MySQL2Instrumentation {
         return patchConnection(moduleExports, moduleVersion);
       };
 
-      const patchModule = definition.patch;
-      definition.patch = (moduleExports: unknown, moduleVersion?: string) => {
-        const patched = patchModule ? patchModule(moduleExports, moduleVersion) : moduleExports;
-        if (connectionExports) {
-          patchConnection(connectionExports, moduleVersion);
+      const repatchConnectionAfter = (patchable: { patch?: PatchFunction }) => {
+        const originalPatch = patchable.patch;
+        if (!originalPatch) {
+          return;
         }
-        return patched;
+        patchable.patch = (moduleExports: unknown, moduleVersion?: string) => {
+          const patched = originalPatch(moduleExports, moduleVersion);
+          if (connectionExports) {
+            patchConnection(connectionExports, moduleVersion);
+          }
+          return patched;
+        };
       };
+
+      repatchConnectionAfter(definition);
+      for (const file of definition.files ?? []) {
+        if (file !== connectionFile) {
+          repatchConnectionAfter(file);
+        }
+      }
     }
 
     return definitions;
