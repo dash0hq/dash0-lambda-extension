@@ -46,12 +46,34 @@ const EXTENSION_LOOKUP_ORDER = ['', '.js', '.mjs', '.cjs'];
 /** Extensions upstream can rediscover from a handler string we hand it. */
 const UPSTREAM_RESOLVABLE_EXTENSIONS = ['.js', '.mjs', '.cjs'];
 
+/*
+ * The namespace every log line from the JS side carries, so that `DASH0_DEBUG=true` output
+ * is greppable as ours. It is `DASH0_LOGGING_NAMESPACE` from `distro/src/constants.ts`,
+ * repeated rather than imported: that constant is only reachable through `distro/dist`,
+ * which is gitignored and is not built by the `node-distro-test` CI job, and this module
+ * has to stay importable by the plain-Node test runner without a build step.
+ *
+ * The Rust extension has its own, separate convention -- `log_prefix()` in `src/main.rs`,
+ * which yields `DASH0` and `DASH0:<suffix>` -- so extension lines read `[DASH0] ...`.
+ * Nothing shares a namespace across the two sides.
+ */
 const logger = diag.createComponentLogger({ namespace: '@dash0/opentelemetry' });
 
+/*
+ * There is no built-in `isFile` predicate. `fs.existsSync` is the closest, but it cannot
+ * tell a file from a directory, and a directory has to count as a miss here -- the runtime
+ * `import()`s what it finds, and `import()` rejects directories.
+ *
+ * `throwIfNoEntry: false` is the built-in way to handle the ordinary miss without an
+ * exception. The catch covers what that flag does not: ENOTDIR when a path component is
+ * itself a file, EACCES on an unreadable directory. Those must not escape -- `init.mjs`
+ * wraps the whole initialisation in one try/catch, so a throw here would cost every
+ * instrumentation, not just this correction.
+ */
 function isFile(candidate) {
   try {
-    return fs.statSync(candidate).isFile();
-  } catch (e) {
+    return fs.statSync(candidate, { throwIfNoEntry: false })?.isFile() ?? false;
+  } catch {
     return false;
   }
 }
@@ -131,8 +153,14 @@ export function resolveLambdaHandler(env = process.env) {
     return undefined;
   }
 
-  const relative = path.relative(taskRoot, resolved.slice(0, -extension.length));
-  if (relative === '' || relative.includes('.')) {
+  /*
+   * A handler string names a module, not a file: `<path without extension>.<function>`,
+   * relative to the task root. Rebuild it in those two steps, because upstream will undo
+   * them in the same order.
+   */
+  const resolvedWithoutExtension = resolved.slice(0, -extension.length);
+  const moduleRelativeToTaskRoot = path.relative(taskRoot, resolvedWithoutExtension);
+  if (moduleRelativeToTaskRoot === '' || moduleRelativeToTaskRoot.includes('.')) {
     /*
      * A dot would be re-parsed by upstream as the module/function separator. This also
      * rules out anything resolved outside the task root (`../..`), e.g. a handler shipped
@@ -141,7 +169,7 @@ export function resolveLambdaHandler(env = process.env) {
     return undefined;
   }
 
-  const corrected = `${relative}.${functionName}`;
+  const corrected = `${moduleRelativeToTaskRoot}.${functionName}`;
   logger.debug(
     'The Lambda handler resolves to a file the instrumentation would not have found; ' +
       'correcting the handler passed to the instrumentation.',
