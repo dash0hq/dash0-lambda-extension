@@ -34,6 +34,12 @@ function makeExportsConfigurable(moduleExports: any): any {
   return fixed;
 }
 
+/*
+ * Nothing here is Lambda-specific -- `_onRequire` comes from `InstrumentationBase`, so any
+ * instrumentation could do this. Only the handler needs it: it is the one module that is
+ * both esbuild-bundled and still reached through the require hook. A library bundled the
+ * same way is not patched at all, because no `require` of it survives the bundling.
+ */
 function fixExportsBeforePatching(instrumentation: AwsLambdaInstrumentation): void {
   // `_onRequire` rather than `init()`: `init()` has already run by the time the constructor
   // returns, whereas `_onRequire` runs when the runtime loads the handler.
