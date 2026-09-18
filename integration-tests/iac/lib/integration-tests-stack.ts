@@ -309,6 +309,46 @@ class NodeStack extends cdk.NestedStack {
       });
     }
 
+    /*
+     * Functions whose handler string carries a directory prefix that the deployment
+     * package does not have -- the shape a bundler leaves behind when it flattens its
+     * output and nobody updates the handler.
+     *
+     * The package is a single `index.js` at its root; the handler says `dist/index.handler`.
+     * The Lambda runtime still loads it, because when none of `<taskRoot>/dist/index`,
+     * `.js`, `.mjs`, `.cjs` exists it falls back to resolving `index` as a *bare*
+     * specifier, and NODE_PATH on Lambda contains `/var/task`. The function is therefore
+     * perfectly healthy, which is exactly what makes the failure it guards against so
+     * hard to spot: `@opentelemetry/instrumentation-aws-lambda` only stats the three
+     * extensions, so without `opt/node/distro/src/lambdaHandlerResolution.ts` it arms its hook on
+     * `/var/task/dist/index`, a path nothing ever loads, and no handler span is produced.
+     *
+     * `lambda.Function` rather than `NodejsFunction`: the point is to ship the package
+     * exactly as written, with no bundling step in between.
+     */
+    for (const runtime of runtimes) {
+      const runtimeName = runtime.name.replace(/\./g, '-');
+      new lambda.Function(this, `stale-handler-prefix-${runtimeName}`, {
+        functionName: `${props.prefix}stale-handler-prefix-${runtimeName}`,
+        runtime,
+        memorySize: 128,
+        handler: 'dist/index.handler',
+        architecture: lambda.Architecture.X86_64,
+        timeout: cdk.Duration.seconds(10),
+        code: lambda.Code.fromAsset(path.join(__dirname, '../lambdas/node-stale-handler-prefix')),
+        layers: [props.layer],
+        role: props.role,
+        environment: {
+          AWS_LAMBDA_EXEC_WRAPPER: "/opt/wrapper",
+          DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
+          DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
+          DASH0_EXTENSION_LOG_LEVEL: "info",
+        },
+        logGroup: props.logGroup,
+        loggingFormat: lambda.LoggingFormat.TEXT,
+      });
+    }
+
   }
 }
 

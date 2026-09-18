@@ -66,6 +66,10 @@ build/dash0_aarch64: $(RS_FILES) Cargo.toml
 
 PYTHON_DISTRO_SRC := $(shell find opt/python/distro/src -type f)
 NODE_DISTRO_SRC := $(shell find opt/node/distro/src -type f)
+# The .mjs files at the root of opt/node -- the layer entrypoint, the loader it ships and
+# the webpack config that bundles them. Globbed rather than listed so that a future sibling
+# cannot silently produce a stale layer.
+NODE_LAYER_MJS := $(shell find opt/node -maxdepth 1 -name '*.mjs')
 JAVA_DISTRO_SRC := $(shell find opt/java/opentelemetry-java-distro -type f \( -path '*/src/*' -o -name '*.gradle' -o -name 'gradle.properties' \))
 
 build/python: opt/python/distro/requirements.txt opt/python/Dockerfile $(PYTHON_DISTRO_SRC)
@@ -93,7 +97,7 @@ build/$(ZIP_NAME_PYTHON): build/dash0_x86_64 build/dash0_aarch64 opt/entrypoint 
 	@cd build/stage-python && zip -r ../$(ZIP_NAME_PYTHON) *
 
 
-build/$(ZIP_NAME_NODE): build/dash0_x86_64 build/dash0_aarch64 opt/entrypoint opt/shared.sh opt/node/package.json opt/node/wrapper opt/node/webpack.config.mjs opt/node/init.mjs $(NODE_DISTRO_SRC)
+build/$(ZIP_NAME_NODE): build/dash0_x86_64 build/dash0_aarch64 opt/entrypoint opt/shared.sh opt/node/package.json opt/node/wrapper $(NODE_LAYER_MJS) $(NODE_DISTRO_SRC)
 	@echo Building Node.js layer
 	@rm -f build/$(ZIP_NAME_NODE)
 	@rm -rf build/stage-node
