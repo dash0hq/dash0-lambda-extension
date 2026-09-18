@@ -13,7 +13,7 @@
  *
  * `@opentelemetry/instrumentation-aws-lambda` replicates only the three extensions, so on
  * its own it arms its require hook on `/var/task/dist/index` -- a path nothing ever loads.
- * The handler is silently left unwrapped. `opt/node/lambdaHandlerResolution.mjs` closes
+ * The handler is silently left unwrapped. `opt/node/distro/src/lambdaHandlerResolution.ts` closes
  * that gap by working out what the runtime will actually load and passing it to upstream
  * as `lambdaHandler`.
  *

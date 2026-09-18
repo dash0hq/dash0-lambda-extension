@@ -10,6 +10,10 @@
  *   - jest patches `Module._resolveFilename`, so a resolution assertion made inside jest
  *     would be testing jest's resolver rather than Node's. This runner is plain Node.
  *
+ * Being plain Node, it consumes the distro the way the layer does: from `distro/dist`, so
+ * `npm run build` has to have run. The `node-distro-test` CI job builds before testing for
+ * this reason.
+ *
  * What it models
  * --------------
  * The AWS Lambda runtime interface client (`dist/function/module-loader.js`, inlined into
@@ -61,6 +65,21 @@ process.env.AWS_LAMBDA_FUNCTION_NAME = 'handler-resolution-test';
 
 const { diag, DiagLogLevel } = require('@opentelemetry/api');
 
+const { AwsLambdaInstrumentation } = require('@opentelemetry/instrumentation-aws-lambda');
+const { registerInstrumentations } = require('@opentelemetry/instrumentation');
+const { NodeTracerProvider } = require('@opentelemetry/sdk-trace-node');
+const { InMemorySpanExporter, SimpleSpanProcessor } = require('@opentelemetry/sdk-trace-base');
+
+// Loaded before the capturing logger below is installed, and not after: `distro/src/
+// logging.ts` calls `diag.setLogger` as an import side effect -- that is how the layer
+// gets a logger at all -- and reaches this file through `instrumentor.ts` ->
+// `requireUtils.ts`. Requiring it afterwards would silently replace the logger the
+// assertions read.
+const DISTRO = '../../distro/dist/src';
+const { resolveLambdaHandler } = require(`${DISTRO}/lambdaHandlerResolution.js`);
+const Dash0AwsLambdaInstrumentation =
+  require(`${DISTRO}/instrumentations/aws-lambda/AwsLambdaInstrumentation.js`).default;
+
 // Capture what would reach the function's CloudWatch log group, so the test can assert on
 // the exact line customers report.
 const diagMessages = [];
@@ -69,13 +88,6 @@ diag.setLogger(
   { verbose() {}, debug() {}, info() {}, warn: collect, error: collect },
   DiagLogLevel.WARN
 );
-
-const { AwsLambdaInstrumentation } = require('@opentelemetry/instrumentation-aws-lambda');
-const { registerInstrumentations } = require('@opentelemetry/instrumentation');
-const { NodeTracerProvider } = require('@opentelemetry/sdk-trace-node');
-const { InMemorySpanExporter, SimpleSpanProcessor } = require('@opentelemetry/sdk-trace-base');
-
-const { resolveLambdaHandler } = await import('../../lambdaHandlerResolution.mjs');
 
 /** The runtime interface client's `loadModule`, minus the loading. */
 function resolveLikeTheRuntime(handlerDef) {
@@ -111,19 +123,35 @@ function resolveLikeTheRuntime(handlerDef) {
   }
 }
 
+// Reported back to the test. With the fix this is what the instrumentation below is
+// built with; without it, what it would have been built with.
+const lambdaHandler = scenario.applyFix ? resolveLambdaHandler() : undefined;
+
+/*
+ * Mirrors `distro/src/bootstrap.ts`, ordering included: with the fix, the distro's own
+ * wrapper, gated on `isApplicable()` and registered against no explicit tracer provider;
+ * without it, the bare upstream instrumentation that the wrapper replaced.
+ *
+ * The provider is created and registered globally only afterwards -- so these scenarios
+ * also pin down that the late binding reaches the handler spans. `registerInstrumentations`
+ * with no `tracerProvider` binds to the API's ProxyTracerProvider, whose tracers resolve
+ * their delegate on each `startSpan`; `tracerProvider.register()` below supplies it, and
+ * the handler is patched later still, when it is required.
+ */
+const instrumentor = new Dash0AwsLambdaInstrumentation();
+registerInstrumentations({
+  instrumentations: [
+    scenario.applyFix && instrumentor.isApplicable()
+      ? instrumentor.getInstrumentation()
+      : new AwsLambdaInstrumentation({}),
+  ],
+});
+
 const memoryExporter = new InMemorySpanExporter();
 const tracerProvider = new NodeTracerProvider({
   spanProcessors: [new SimpleSpanProcessor(memoryExporter)],
 });
-
-// Mirrors `opt/node/init.mjs`: an empty config without the fix, and a corrected
-// `lambdaHandler` with it.
-const lambdaHandler = scenario.applyFix ? resolveLambdaHandler() : undefined;
-
-registerInstrumentations({
-  instrumentations: [new AwsLambdaInstrumentation(lambdaHandler ? { lambdaHandler } : {})],
-  tracerProvider,
-});
+tracerProvider.register();
 
 const { base, resolved, error } = resolveLikeTheRuntime(scenario.handler);
 

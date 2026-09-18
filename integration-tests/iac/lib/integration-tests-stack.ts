@@ -320,7 +320,7 @@ class NodeStack extends cdk.NestedStack {
      * specifier, and NODE_PATH on Lambda contains `/var/task`. The function is therefore
      * perfectly healthy, which is exactly what makes the failure it guards against so
      * hard to spot: `@opentelemetry/instrumentation-aws-lambda` only stats the three
-     * extensions, so without `opt/node/lambdaHandlerResolution.mjs` it arms its hook on
+     * extensions, so without `opt/node/distro/src/lambdaHandlerResolution.ts` it arms its hook on
      * `/var/task/dist/index`, a path nothing ever loads, and no handler span is produced.
      *
      * `lambda.Function` rather than `NodejsFunction`: the point is to ship the package

@@ -1,7 +1,7 @@
 # Handler file resolution
 
 Notes on the failure mode that `../handler-resolution.test.ts` reproduces, and on the fix
-in `opt/node/lambdaHandlerResolution.mjs`: an instrumented Node function that is healthy in
+in `opt/node/distro/src/lambdaHandlerResolution.ts`: an instrumented Node function that is healthy in
 every observable way and still emits no handler spans.
 
 ## The symptom
@@ -110,7 +110,7 @@ dies at init. Directory modules are not a viable layout on this runtime at all.
 
 ## The fix
 
-`opt/node/lambdaHandlerResolution.mjs` computes what the runtime will actually load — the
+`opt/node/distro/src/lambdaHandlerResolution.ts` computes what the runtime will actually load — the
 same five steps, using `require.resolve` rather than a reimplementation of it, so
 `node_modules` precedence, `NODE_PATH` ordering, `exports` maps and symlinks are all
 inherited from the same resolver the runtime calls. It expresses the result back as a
