@@ -2,6 +2,7 @@
 !jest.config.js
 !lambdas/manual/*.js
 !lambdas/dockerized-node/*.js
+!lambdas/node-stale-handler-prefix/*.js
 *.d.ts
 node_modules
 
