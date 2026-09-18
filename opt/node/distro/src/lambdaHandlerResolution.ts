@@ -3,6 +3,8 @@ import fs from 'fs';
 import path from 'path';
 import { diag } from '@opentelemetry/api';
 
+import { DASH0_LOGGING_NAMESPACE } from './constants';
+
 /*
  * The AWS Lambda Node.js runtime interface client resolves the handler module in five
  * steps (`dist/function/module-loader.js`, inlined into /var/runtime/index.mjs):
@@ -48,16 +50,18 @@ const UPSTREAM_RESOLVABLE_EXTENSIONS = ['.js', '.mjs', '.cjs'];
 
 /*
  * The namespace every log line from the JS side carries, so that `DASH0_DEBUG=true` output
- * is greppable as ours. It is `DASH0_LOGGING_NAMESPACE` from `distro/src/constants.ts`,
- * repeated rather than imported: that constant is only reachable through `distro/dist`,
- * which is gitignored and is not built by the `node-distro-test` CI job, and this module
- * has to stay importable by the plain-Node test runner without a build step.
+ * is greppable as ours.
+ *
+ * A component logger of our own, rather than the shared one from `./logging`: importing
+ * that module installs a global diag logger as a side effect, and the plain-Node test
+ * runner (`test/handler-resolution/runner.mjs`) installs its own to capture what would
+ * reach the function's log group.
  *
  * The Rust extension has its own, separate convention -- `log_prefix()` in `src/main.rs`,
  * which yields `DASH0` and `DASH0:<suffix>` -- so extension lines read `[DASH0] ...`.
  * Nothing shares a namespace across the two sides.
  */
-const logger = diag.createComponentLogger({ namespace: '@dash0/opentelemetry' });
+const logger = diag.createComponentLogger({ namespace: DASH0_LOGGING_NAMESPACE });
 
 /*
  * There is no built-in `isFile` predicate. `fs.existsSync` is the closest, but it cannot
@@ -66,11 +70,11 @@ const logger = diag.createComponentLogger({ namespace: '@dash0/opentelemetry' })
  *
  * `throwIfNoEntry: false` is the built-in way to handle the ordinary miss without an
  * exception. The catch covers what that flag does not: ENOTDIR when a path component is
- * itself a file, EACCES on an unreadable directory. Those must not escape -- `init.mjs`
+ * itself a file, EACCES on an unreadable directory. Those must not escape -- `bootstrap.ts`
  * wraps the whole initialisation in one try/catch, so a throw here would cost every
  * instrumentation, not just this correction.
  */
-function isFile(candidate) {
+function isFile(candidate: string): boolean {
   try {
     return fs.statSync(candidate, { throwIfNoEntry: false })?.isFile() ?? false;
   } catch {
@@ -83,7 +87,11 @@ function isFile(candidate) {
  * anchor path need not exist; it only seeds the resolution paths, and resolution falls
  * through to NODE_PATH from there.
  */
-function resolveBareSpecifier(taskRoot, moduleRoot, moduleName) {
+function resolveBareSpecifier(
+  taskRoot: string,
+  moduleRoot: string,
+  moduleName: string
+): string | undefined {
   try {
     return createRequire(path.join(taskRoot, 'index.js')).resolve(moduleName, {
       paths: [taskRoot, path.join(taskRoot, moduleRoot)],
@@ -100,7 +108,7 @@ function resolveBareSpecifier(taskRoot, moduleRoot, moduleName) {
  * Returns `undefined` whenever upstream already gets it right and whenever we cannot
  * improve on it, so the worst case is exactly today's behaviour.
  */
-export function resolveLambdaHandler(env = process.env) {
+export function resolveLambdaHandler(env: NodeJS.ProcessEnv = process.env): string | undefined {
   const taskRoot = env.LAMBDA_TASK_ROOT;
   const handlerDef = env._HANDLER;
 

@@ -19,6 +19,7 @@ import { FileSpanExporter } from './exporters';
 import Dash0GrpcInstrumentation from './instrumentations/@grpc/grpc-js/GrpcInstrumentation';
 import Dash0NestInstrumentation from './instrumentations/@nestjs/core/NestInstrumentation';
 import Dash0AmqplibInstrumentation from './instrumentations/amqplib/AmqplibInstrumentation';
+import Dash0AwsLambdaInstrumentation from './instrumentations/aws-lambda/AwsLambdaInstrumentation';
 import Dash0ExpressInstrumentation from './instrumentations/express/ExpressInstrumentation';
 import Dash0FastifyInstrumentation from './instrumentations/fastify/FastifyInstrumentation';
 import Dash0HttpInstrumentation from './instrumentations/https/HttpInstrumentation';
@@ -99,6 +100,7 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
 
     const instrumentationsToInstall = [
       new Dash0AmqplibInstrumentation(),
+      new Dash0AwsLambdaInstrumentation(),
       new Dash0ExpressInstrumentation(),
       new Dash0GrpcInstrumentation(),
       new Dash0NestInstrumentation(),
