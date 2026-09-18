@@ -10,7 +10,7 @@
  * configured with a handler carrying a directory prefix that is not in the package.
  *
  * This is instrumentation-only. The Rust extension never reads the handler string, and
- * neither did `opt/node/init.mjs` before the fix under test: it constructed
+ * neither did the layer before the fix under test: it constructed
  * `AwsLambdaInstrumentation` with an empty config and left resolution to upstream.
  *
  * The gap: the Lambda runtime resolves the handler module in five steps, and upstream
@@ -20,8 +20,8 @@
  * downstream treats this as an error, because a hook that matches nothing is a normal
  * state.
  *
- * `opt/node/lambdaHandlerResolution.mjs` closes it by computing what the runtime will
- * actually load and passing it to upstream's `lambdaHandler` config option.
+ * `opt/node/distro/src/lambdaHandlerResolution.ts` closes it by computing what the
+ * runtime will actually load and passing it to upstream's `lambdaHandler` config option.
  *
  * Every scenario runs in its own process; see `handler-resolution/runner.mjs`, which also
  * explains what it models and where it deliberately deviates. Full write-up, including
@@ -46,7 +46,7 @@ interface Scenario {
   handler: string;
   /** The deployment package: path inside it -> contents. */
   files: Record<string, string>;
-  /** Whether to apply our handler correction, as `init.mjs` does. */
+  /** Whether to instrument through the distro's wrapper, which applies the correction. */
   applyFix?: boolean;
 }
 
