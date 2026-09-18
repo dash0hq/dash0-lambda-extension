@@ -8,6 +8,7 @@ import {
   resourceFromAttributes,
   defaultResource,
 } from '@opentelemetry/resources';
+import type { SpanProcessor } from '@opentelemetry/sdk-trace-base';
 import {BasicTracerProvider, BatchSpanProcessor, SimpleSpanProcessor} from '@opentelemetry/sdk-trace-base';
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 
@@ -72,6 +73,73 @@ function reportInitError(err: Error) {
   );
 }
 
+function applicableInstrumentations(ignoredHostnames: string[]) {
+  return [
+    new Dash0AmqplibInstrumentation(),
+    new Dash0AwsLambdaInstrumentation(),
+    new Dash0ExpressInstrumentation(),
+    new Dash0GrpcInstrumentation(),
+    new Dash0NestInstrumentation(),
+    new Dash0FastifyInstrumentation(),
+    new Dash0HttpInstrumentation(...ignoredHostnames),
+    new Dash0IORedisInstrumentation(),
+    new Dash0KafkaJsInstrumentation(),
+    new Dash0MongoDBInstrumentation(),
+    new Dash0Mysql2Instrumentation(),
+    new Dash0PgInstrumentation(),
+    new Dash0PrismaInstrumentation(),
+    new Dash0RedisInstrumentation(),
+    new Dash0AwsSdkV3LibInstrumentation(),
+    new Dash0UndiciInstrumentation(),
+  ].filter((i) => i.isApplicable());
+}
+
+function detectInfrastructureAndRuntimeResource(): Resource {
+  return defaultResource().merge(
+    detectResources({
+      detectors: [envDetector, processDetector],
+    })
+  );
+}
+
+function createSpanProcessors(): SpanProcessor[] {
+  const spanProcessors: SpanProcessor[] = [];
+
+  if (process.env.DASH0_DEBUG_SPANDUMP) {
+    spanProcessors.push(
+      new SimpleSpanProcessor(new FileSpanExporter(process.env.DASH0_DEBUG_SPANDUMP))
+    );
+  }
+
+  const dashToken = process.env.DASH0_TOKEN || '';
+  const otlpTraceExporter = new OTLPTraceExporter({
+    url: traceEndpoint,
+    headers: {
+      Authorization: `Bearer ${dashToken.trim()}`,
+    },
+  });
+
+  spanProcessors.push(
+    new BatchSpanProcessor(otlpTraceExporter, {
+      // Spans are dropped once the queue is full; the batch size must not exceed it.
+      maxQueueSize: 1000,
+      maxExportBatchSize: 100,
+    })
+  );
+
+  return spanProcessors;
+}
+
+function createPropagator(): CompositePropagator {
+  return new CompositePropagator({
+    propagators: [
+      new Dash0W3CTraceContextPropagator(),
+      new W3CBaggagePropagator(),
+      new AWSXRayLambdaPropagator(),
+    ],
+  });
+}
+
 export const init = async (): Promise<Dash0SdkInitialization> => {
   if (isTraceInitialized) {
     const message =
@@ -98,30 +166,10 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
 
     const ignoredHostnames = [new URL(traceEndpoint).hostname];
 
-    const instrumentationsToInstall = [
-      new Dash0AmqplibInstrumentation(),
-      new Dash0AwsLambdaInstrumentation(),
-      new Dash0ExpressInstrumentation(),
-      new Dash0GrpcInstrumentation(),
-      new Dash0NestInstrumentation(),
-      new Dash0FastifyInstrumentation(),
-      new Dash0HttpInstrumentation(...ignoredHostnames),
-      new Dash0IORedisInstrumentation(),
-      new Dash0KafkaJsInstrumentation(),
-      new Dash0MongoDBInstrumentation(),
-      new Dash0Mysql2Instrumentation(),
-      new Dash0PgInstrumentation(),
-      new Dash0PrismaInstrumentation(),
-      new Dash0RedisInstrumentation(),
-      new Dash0AwsSdkV3LibInstrumentation(),
-      new Dash0UndiciInstrumentation(),
-    ].filter((i) => i.isApplicable());
+    const instrumentationsToInstall = applicableInstrumentations(ignoredHostnames);
 
-    /*
-     * Register instrumentation globally, so that all tracer providers
-     * will receive traces. This may be necessary when there is already
-     * built-in instrumentation in the app.
-     */
+    // Deliberately without a tracer provider: the instrumentations bind to the global one,
+    // so spans also reach any provider the application registered itself.
     registerInstrumentations({
       instrumentations: instrumentationsToInstall.map((i) => i.getInstrumentation()),
     });
@@ -132,68 +180,17 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
 
     logger.debug(`Instrumented modules: ${instrumentedModules.join(', ')}`);
 
-    const dashToken = process.env.DASH0_TOKEN || '';
+    const resource = defaultResource().merge(detectInfrastructureAndRuntimeResource());
 
-    const infrastructureDetectors = [
-      envDetector,
-      processDetector,
-    ];
-
-    /*
-     * These are the resources describing the infrastructure and the runtime that will be
-     * sent along with the dependency reporting.
-     */
-    const infrastructureResource = defaultResource().merge(
-      detectResources({
-        detectors: infrastructureDetectors,
-      })
-    );
-
-    const resource = defaultResource()
-      .merge(infrastructureResource)
-
-    // Build span processors array
-    const spanProcessors = [];
-    if (process.env.DASH0_DEBUG_SPANDUMP) {
-      spanProcessors.push(
-        new SimpleSpanProcessor(new FileSpanExporter(process.env.DASH0_DEBUG_SPANDUMP))
-      );
-    }
-
-    const otlpTraceExporter = new OTLPTraceExporter({
-      url: traceEndpoint,
-      headers: {
-        Authorization: `Bearer ${dashToken.trim()}`,
-      },
-    });
-
-    spanProcessors.push(
-      new BatchSpanProcessor(otlpTraceExporter, {
-        // The maximum queue size. After the size is reached spans are dropped.
-        maxQueueSize: 1000,
-        // The maximum batch size of every export. It must be smaller or equal to maxQueueSize.
-        maxExportBatchSize: 100,
-      })
-    );
-
-    // Create providers with processors
     const tracerProvider = new NodeTracerProvider({
       resource,
       spanLimits: {
         attributeValueLengthLimit: getSpanAttributeMaxLength(),
       },
-      spanProcessors,
+      spanProcessors: createSpanProcessors(),
     });
 
-    tracerProvider.register({
-      propagator: new CompositePropagator({
-        propagators: [
-          new Dash0W3CTraceContextPropagator(),
-          new W3CBaggagePropagator(),
-          new AWSXRayLambdaPropagator(),
-        ],
-      }),
-    });
+    tracerProvider.register({ propagator: createPropagator() });
 
     logger.info(
       `Dash0 OpenTelemetry Distro started`

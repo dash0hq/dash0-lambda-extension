@@ -3,10 +3,7 @@ import { AwsLambdaInstrumentation } from '@opentelemetry/instrumentation-aws-lam
 import { resolveLambdaHandler } from '../../lambdaHandlerResolution';
 import { TracingInstrumentor } from '../instrumentor';
 
-/**
- * The signature of `InstrumentationBase#_onRequire`, which is `private` in the upstream
- * type declarations and so is not reachable through the public surface of the class.
- */
+/** `InstrumentationBase#_onRequire`, which upstream declares `private`. */
 type OnRequireHook = (module: any, exports: any, name: string, basedir?: string) => any;
 
 /*
@@ -37,54 +34,38 @@ function makeExportsConfigurable(moduleExports: any): any {
   return fixed;
 }
 
+function fixExportsBeforePatching(instrumentation: AwsLambdaInstrumentation): void {
+  // `_onRequire` rather than `init()`: `init()` has already run by the time the constructor
+  // returns, whereas `_onRequire` runs when the runtime loads the handler.
+  const patchable = instrumentation as unknown as { _onRequire: OnRequireHook };
+  const originalOnRequire = patchable._onRequire;
+  patchable._onRequire = function (module, exports, name, basedir) {
+    return originalOnRequire.call(this, module, makeExportsConfigurable(exports), name, basedir);
+  };
+}
+
 export default class Dash0AwsLambdaInstrumentation extends TracingInstrumentor<AwsLambdaInstrumentation> {
-  /**
-   * Every other instrumentation here asks "is this library installed", which is what the
-   * inherited implementation answers. This one does not patch a package at all: it patches
-   * the function's own handler module, a path computed from `LAMBDA_TASK_ROOT` and
-   * `_HANDLER`. Those two variables are set by the Lambda runtime and by nothing else, so
-   * their presence is the question worth asking -- are we running in a Lambda function.
-   */
+  // Not the inherited "is the package installed": this patches the function's handler
+  // module, a path computed from `_HANDLER`. Both variables are set by the Lambda runtime
+  // and by nothing else, so together they answer "are we running in a Lambda function".
   override isApplicable(): boolean {
     return Boolean(process.env.LAMBDA_TASK_ROOT && process.env._HANDLER);
   }
 
-  /**
-   * Not an npm package, unlike every other entry in this list: the module this
-   * instrumentation patches is the function's handler, whose path is known only at
-   * runtime. `aws-lambda` names it in the `Instrumented modules: ...` debug line, which is
-   * what this list feeds. Nothing tries to require it -- `isApplicable()` above is
-   * overridden precisely so that this list is never used to answer that question.
-   */
+  // Not an npm package: it only labels this entry in the `Instrumented modules: ...` line.
+  // Nothing requires it -- that is what the `isApplicable()` override above is for.
   getInstrumentedModules(): string[] {
     return ['aws-lambda'];
   }
 
   getInstrumentation(): AwsLambdaInstrumentation {
-    /*
-     * Upstream resolves the handler file with three `statSync` calls, while the Lambda
-     * runtime has two further resolution paths. When the runtime uses one of them the
-     * instrumentation hooks a file that is never loaded, and the handler is never wrapped:
-     * the function returns normally and no span is produced. `resolveLambdaHandler`
-     * returns a corrected handler string in exactly that case, and `undefined` otherwise
-     * -- see `lambdaHandlerResolution.ts`.
-     */
+    // Upstream locates the handler file by trying three extensions, where the runtime has
+    // two further resolution paths. `resolveLambdaHandler` returns a corrected handler
+    // string when the runtime would load something upstream cannot find, else `undefined`.
     const lambdaHandler = resolveLambdaHandler();
 
     const instrumentation = new AwsLambdaInstrumentation(lambdaHandler ? { lambdaHandler } : {});
-
-    /*
-     * Override `_onRequire` on the instance to fix non-configurable exports before
-     * patching (see `makeExportsConfigurable` above). We can't override `init()` because
-     * it's already called during construction (via `enable()`). `_onRequire` is called
-     * lazily when modules are required, so this override takes effect before the Lambda
-     * runtime loads the handler.
-     */
-    const patchable = instrumentation as unknown as { _onRequire: OnRequireHook };
-    const originalOnRequire = patchable._onRequire;
-    patchable._onRequire = function (module, exports, name, basedir) {
-      return originalOnRequire.call(this, module, makeExportsConfigurable(exports), name, basedir);
-    };
+    fixExportsBeforePatching(instrumentation);
 
     return instrumentation;
   }
