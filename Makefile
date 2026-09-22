@@ -93,7 +93,7 @@ build/$(ZIP_NAME_PYTHON): build/dash0_x86_64 build/dash0_aarch64 opt/entrypoint 
 	@cd build/stage-python && zip -r ../$(ZIP_NAME_PYTHON) *
 
 
-build/$(ZIP_NAME_NODE): build/dash0_x86_64 build/dash0_aarch64 opt/entrypoint opt/shared.sh opt/node/package.json opt/node/wrapper opt/node/webpack.config.mjs opt/node/init.mjs $(NODE_DISTRO_SRC)
+build/$(ZIP_NAME_NODE): build/dash0_x86_64 build/dash0_aarch64 opt/entrypoint opt/shared.sh opt/node/package.json opt/node/wrapper opt/node/webpack.config.mjs opt/node/init.mjs opt/node/lambdaHandlerResolution.mjs $(NODE_DISTRO_SRC)
 	@echo Building Node.js layer
 	@rm -f build/$(ZIP_NAME_NODE)
 	@rm -rf build/stage-node
