@@ -242,6 +242,10 @@ class PythonStack extends cdk.NestedStack {
           restApiName: `${props.prefix}apigw-error-500-${suffix}`,
           handler: fn,
           proxy: true,
+          // REGIONAL avoids the account-wide 120-per-region quota on EDGE-type
+          // APIs, which every concurrently open PR's integration-test stack
+          // otherwise eats into (17 REST APIs per stack).
+          endpointConfiguration: { types: [apigateway.EndpointType.REGIONAL] },
         });
       }
     }
