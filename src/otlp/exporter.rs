@@ -210,6 +210,7 @@ fn _build_otlp_request(
     method: hyper::Method,
     body: Vec<u8>,
     gzip_encoded: bool,
+    token: Option<&str>,
 ) -> Result<Request<ReqBody>, String> {
     let (scheme, authority) =
         parse_otlp_endpoint().ok_or_else(|| "Failed to parse OTLP endpoint".to_string())?;
@@ -244,7 +245,7 @@ fn _build_otlp_request(
             );
         }
 
-        if let Some(token) = crate::config::get_dash0_token() {
+        if let Some(token) = token {
             if !token.is_empty() {
                 if let Ok(auth_val) =
                     header::HeaderValue::from_str(format!("Bearer {}", token).as_str())
@@ -278,7 +279,12 @@ async fn send_request(
     item_count: usize,
     item_type: &str,
 ) -> Result<(), ()> {
-    if crate::config::get_dash0_token().is_none() {
+    // Resolves the token if it isn't already cached (single-flight -- see
+    // `get_dash0_token`'s doc comment). On a fast-returning invocation whose
+    // export races ahead of the background prefetch, this is where the real
+    // Secrets Manager round trip actually happens.
+    let token = crate::config::get_dash0_token().await;
+    if token.is_none() {
         return Ok(());
     }
 
@@ -305,7 +311,13 @@ async fn send_request(
     let max_attempts = request_retries() + 1;
 
     for attempt in 1..=max_attempts {
-        let req = match _build_otlp_request(path, method.clone(), body.clone(), gzip_encoded) {
+        let req = match _build_otlp_request(
+            path,
+            method.clone(),
+            body.clone(),
+            gzip_encoded,
+            token.as_deref(),
+        ) {
             Ok(req) => req,
             Err(err) => {
                 tracing::error!(
@@ -560,7 +572,7 @@ mod tests {
         .encode_to_vec();
         let compressed = gzip(&original).expect("gzip should succeed");
 
-        let req = _build_otlp_request("/v1/traces", Method::POST, compressed.clone(), true)
+        let req = _build_otlp_request("/v1/traces", Method::POST, compressed.clone(), true, None)
             .expect("request should build");
 
         // (a) Content-Encoding: gzip is set
@@ -603,7 +615,7 @@ mod tests {
         }
         .encode_to_vec();
 
-        let req = _build_otlp_request("/v1/traces", Method::POST, body.clone(), false)
+        let req = _build_otlp_request("/v1/traces", Method::POST, body.clone(), false, None)
             .expect("request should build");
 
         // No Content-Encoding header when compression is disabled
