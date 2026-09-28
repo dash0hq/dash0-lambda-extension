@@ -28,8 +28,9 @@ import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 import com.google.protobuf.GeneratedMessageV3;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
-import io.grpc.ClientCall;
 import io.dash0.instrumentation.core.Dash0SemanticAttributes;
+import io.grpc.ClientCall;
+import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.instrumentation.api.util.VirtualField;
 import io.opentelemetry.javaagent.bootstrap.CallDepth;
 import io.opentelemetry.javaagent.bootstrap.Java8BytecodeBridge;
@@ -74,6 +75,7 @@ public class ClientCallInstrumentation implements TypeInstrumentation {
     @Advice.OnMethodEnter(suppress = Throwable.class)
     public static void methodEnter(
         @Advice.This ClientCall<?, ?> clientCall,
+        @Advice.Argument(0) ClientCall.Listener<?> listener,
         @Advice.Local("dash0CallDepth") CallDepth callDepth) {
       callDepth = CallDepth.forClass(ClientCall.class);
       if (callDepth.getAndIncrement() != 0) {
@@ -84,6 +86,14 @@ public class ClientCallInstrumentation implements TypeInstrumentation {
           VirtualField.find(ClientCall.class, StringListHolder.class);
 
       requestMsgs.set(clientCall, new StringListHolder(new ArrayList<>()));
+
+      // The upstream instrumentation starts the call with the client span current, but notifies
+      // the application's listener with the parent context current. Remember the client span on
+      // the listener so that response payloads end up on the client span.
+      Span span = Java8BytecodeBridge.currentSpan();
+      if (listener != null && span.getSpanContext().isValid()) {
+        VirtualField.find(ClientCall.Listener.class, Span.class).set(listener, span);
+      }
     }
 
     @Advice.OnMethodExit(onThrowable = Throwable.class, suppress = Throwable.class)

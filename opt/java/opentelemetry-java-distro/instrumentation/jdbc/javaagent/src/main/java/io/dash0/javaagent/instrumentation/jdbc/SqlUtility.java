@@ -17,7 +17,8 @@
  */
 package io.dash0.javaagent.instrumentation.jdbc;
 
-import io.opentelemetry.javaagent.bootstrap.internal.AgentInstrumentationConfig;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.instrumentation.api.incubator.config.internal.DeclarativeConfigUtil;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
@@ -28,8 +29,8 @@ public final class SqlUtility {
   public static final String JSON_TRUNCATION_MARKER = "✂";
 
   public static final int ATTRIBUTE_VALUE_MAX_LENGTH =
-      AgentInstrumentationConfig.get()
-          .getInt("otel.instrumentation.jdbc.attribute-value-max-length", Integer.MAX_VALUE);
+      DeclarativeConfigUtil.getInstrumentationConfig(GlobalOpenTelemetry.get(), "jdbc")
+          .getInt("attribute_value_max_length", Integer.MAX_VALUE);
 
   private SqlUtility() {}
 

@@ -30,8 +30,9 @@ import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 import com.google.protobuf.GeneratedMessageV3;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
-import io.grpc.ClientCall;
 import io.dash0.instrumentation.core.Dash0SemanticAttributes;
+import io.grpc.ClientCall;
+import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.instrumentation.api.util.VirtualField;
 import io.opentelemetry.javaagent.bootstrap.CallDepth;
 import io.opentelemetry.javaagent.bootstrap.Java8BytecodeBridge;
@@ -101,6 +102,11 @@ public class ClientCallListenerInstrumentation implements TypeInstrumentation {
         return;
       }
 
+      Span span = VirtualField.find(ClientCall.Listener.class, Span.class).get(listener);
+      if (span == null) {
+        span = Java8BytecodeBridge.currentSpan();
+      }
+
       if (msg instanceof GeneratedMessageV3) {
         List<String> responseMsgs =
             VirtualField.find(ClientCall.Listener.class, StringListHolder.class)
@@ -111,17 +117,14 @@ public class ClientCallListenerInstrumentation implements TypeInstrumentation {
               JsonFormat.printer()
                   .omittingInsignificantWhitespace()
                   .print((GeneratedMessageV3) msg));
-          Java8BytecodeBridge.currentSpan()
-              .setAttribute(
-                  Dash0SemanticAttributes.GRPC_RESPONSE_BODY, JsonUtil.toJson(responseMsgs));
+          span.setAttribute(
+              Dash0SemanticAttributes.GRPC_RESPONSE_BODY, JsonUtil.toJson(responseMsgs));
         } catch (InvalidProtocolBufferException e) {
           // At this point we know that msg is a GeneratedMessageV3, so this should never happen
-          Java8BytecodeBridge.currentSpan()
-              .setAttribute(Dash0SemanticAttributes.GRPC_RESPONSE_BODY, msg.toString());
+          span.setAttribute(Dash0SemanticAttributes.GRPC_RESPONSE_BODY, msg.toString());
         }
       } else {
-        Java8BytecodeBridge.currentSpan()
-            .setAttribute(Dash0SemanticAttributes.GRPC_RESPONSE_BODY, msg.toString());
+        span.setAttribute(Dash0SemanticAttributes.GRPC_RESPONSE_BODY, msg.toString());
       }
     }
 
@@ -137,6 +140,7 @@ public class ClientCallListenerInstrumentation implements TypeInstrumentation {
     public static void methodEnter(@Advice.This ClientCall.Listener<?> listener) {
       VirtualField<ClientCall.Listener<?>, StringListHolder> virtualField =
           VirtualField.find(ClientCall.Listener.class, StringListHolder.class);
+      VirtualField.find(ClientCall.Listener.class, Span.class).set(listener, null);
       StringListHolder holder = virtualField.get(listener);
       if (holder == null) {
         return;

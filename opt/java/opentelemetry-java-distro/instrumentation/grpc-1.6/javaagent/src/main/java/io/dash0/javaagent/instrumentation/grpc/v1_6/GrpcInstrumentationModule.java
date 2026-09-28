@@ -34,6 +34,7 @@ public class GrpcInstrumentationModule extends InstrumentationModule {
     return Arrays.asList(
         new ClientCallInstrumentation(),
         new ClientCallListenerInstrumentation(),
+        new ForwardingClientCallListenerInstrumentation(),
         new ServerCallInstrumentation(),
         new ServerCallListenerInstrumentation());
   }

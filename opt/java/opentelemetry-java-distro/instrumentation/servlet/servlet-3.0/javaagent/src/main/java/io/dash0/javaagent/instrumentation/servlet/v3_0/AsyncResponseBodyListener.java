@@ -25,7 +25,7 @@ import io.dash0.instrumentation.core.SpanAndRelatedObjectHolder;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.instrumentation.api.util.VirtualField;
-import io.opentelemetry.javaagent.instrumentation.servlet.ServletAsyncListener;
+import io.opentelemetry.instrumentation.servlet.common.internal.ServletAsyncListener;
 import io.opentelemetry.javaagent.instrumentation.servlet.v3_0.Servlet3Singletons;
 import java.io.BufferedReader;
 import java.io.PrintWriter;

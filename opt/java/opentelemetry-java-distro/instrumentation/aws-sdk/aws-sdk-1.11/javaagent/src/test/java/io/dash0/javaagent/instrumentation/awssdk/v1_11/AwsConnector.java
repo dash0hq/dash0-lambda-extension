@@ -35,7 +35,6 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Iterator;
-import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.localstack.LocalStackContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
@@ -142,12 +141,12 @@ public class AwsConnector {
   }
 
   public String createQueue(final String queueName) {
-    DefaultGroovyMethods.println(this, "Create queue " + queueName);
+    System.out.println("Create queue " + queueName);
     return sqsClient.createQueue(queueName).getQueueUrl();
   }
 
   public String getQueueArn(final String queueUrl) {
-    DefaultGroovyMethods.println(this, "Get ARN for queue " + queueUrl);
+    System.out.println("Get ARN for queue " + queueUrl);
     return sqsClient
         .getQueueAttributes(new GetQueueAttributesRequest(queueUrl).withAttributeNames("QueueArn"))
         .getAttributes()
@@ -155,24 +154,24 @@ public class AwsConnector {
   }
 
   public SetTopicAttributesResult setTopicPublishingPolicy(final String topicArn) {
-    DefaultGroovyMethods.println(this, "Set policy for topic " + topicArn);
+    System.out.println("Set policy for topic " + topicArn);
     return snsClient.setTopicAttributes(
         new SetTopicAttributesRequest(topicArn, "Policy", String.format(SNS_POLICY, topicArn)));
   }
 
   public SetQueueAttributesResult setQueuePublishingPolicy(String queueUrl, final String queueArn) {
-    DefaultGroovyMethods.println(this, "Set policy for queue " + queueArn);
+    System.out.println("Set policy for queue " + queueArn);
     return sqsClient.setQueueAttributes(
         queueUrl, Collections.singletonMap("Policy", String.format(SQS_POLICY, queueArn)));
   }
 
   public Bucket createBucket(final String bucketName) {
-    DefaultGroovyMethods.println(this, "Create bucket " + bucketName);
+    System.out.println("Create bucket " + bucketName);
     return s3Client.createBucket(bucketName);
   }
 
   public void deleteBucket(final String bucketName) {
-    DefaultGroovyMethods.println(this, "Delete bucket " + bucketName);
+    System.out.println("Delete bucket " + bucketName);
     ObjectListing objectListing = s3Client.listObjects(bucketName);
     Iterator<S3ObjectSummary> objIter = objectListing.getObjectSummaries().iterator();
     while (objIter.hasNext()) {
@@ -183,8 +182,7 @@ public class AwsConnector {
   }
 
   public void enableS3ToSqsNotifications(final String bucketName, final String sqsQueueArn) {
-    DefaultGroovyMethods.println(
-        this, "Enable notification for bucket " + bucketName + " to queue " + sqsQueueArn);
+    System.out.println("Enable notification for bucket " + bucketName + " to queue " + sqsQueueArn);
     BucketNotificationConfiguration notificationConfiguration =
         new BucketNotificationConfiguration();
     notificationConfiguration.addConfiguration(
@@ -195,8 +193,7 @@ public class AwsConnector {
   }
 
   public void enableS3ToSnsNotifications(final String bucketName, final String snsTopicArn) {
-    DefaultGroovyMethods.println(
-        this, "Enable notification for bucket " + bucketName + " to topic " + snsTopicArn);
+    System.out.println("Enable notification for bucket " + bucketName + " to topic " + snsTopicArn);
     BucketNotificationConfiguration notificationConfiguration =
         new BucketNotificationConfiguration();
     notificationConfiguration.addConfiguration(
@@ -207,25 +204,24 @@ public class AwsConnector {
   }
 
   public String createTopicAndSubscribeQueue(final String topicName, final String queueArn) {
-    DefaultGroovyMethods.println(
-        this, "Create topic " + topicName + " and subscribe to queue " + queueArn);
+    System.out.println("Create topic " + topicName + " and subscribe to queue " + queueArn);
     CreateTopicResult ctr = snsClient.createTopic(topicName);
     snsClient.subscribe(ctr.getTopicArn(), "sqs", queueArn);
     return ctr.getTopicArn();
   }
 
   public ReceiveMessageResult receiveMessage(final String queueUrl) {
-    DefaultGroovyMethods.println(this, "Receive message from queue " + queueUrl);
+    System.out.println("Receive message from queue " + queueUrl);
     return sqsClient.receiveMessage(new ReceiveMessageRequest(queueUrl).withWaitTimeSeconds(20));
   }
 
   public PurgeQueueResult purgeQueue(final String queueUrl) {
-    DefaultGroovyMethods.println(this, "Purge queue " + queueUrl);
+    System.out.println("Purge queue " + queueUrl);
     return sqsClient.purgeQueue(new PurgeQueueRequest(queueUrl));
   }
 
   public PutObjectResult putSampleData(final String bucketName) {
-    DefaultGroovyMethods.println(this, "Put sample data to bucket " + bucketName);
+    System.out.println("Put sample data to bucket " + bucketName);
     return s3Client.putObject(bucketName, "otelTestKey", "otelTestData");
   }
 

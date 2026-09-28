@@ -55,7 +55,10 @@ dependencies {
 
   // OTel Lambda wrapper libraries - must be on the application classpath so the Lambda runtime
   // can load TracingRequestWrapper via Class.forName (set as _HANDLER by the wrapper script)
-  classpathLibs("io.opentelemetry.instrumentation:opentelemetry-aws-lambda-events-2.2:${versions.opentelemetryJavaagentAlpha}") {
+  classpathLibs("io.opentelemetry.instrumentation:opentelemetry-aws-lambda-events-3.11:${versions.opentelemetryJavaagentAlpha}") {
+    transitive = false
+  }
+  classpathLibs("io.opentelemetry.instrumentation:opentelemetry-aws-lambda-events-common-2.2:${versions.opentelemetryJavaagentAlpha}") {
     transitive = false
   }
   classpathLibs("io.opentelemetry.instrumentation:opentelemetry-aws-lambda-core-1.0:${versions.opentelemetryJavaagentAlpha}") {
@@ -99,18 +102,33 @@ tasks {
     archiveFileName.set("javaagentLibs-relocated.jar")
 
     mergeServiceFiles()
+    // Shadow 9: mergeServiceFiles only sees duplicates that the duplicates strategy lets through
+    filesMatching("META-INF/services/**") {
+      duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    }
+    // version .properties files ship in both library and javaagent artifacts
+    filesMatching("META-INF/io/opentelemetry/instrumentation/**") {
+      duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    }
     exclude("**/module-info.class")
+    // classes in this package are loaded by the bootstrap class loader, e.g. servlet-common-bootstrap
+    exclude("io/opentelemetry/javaagent/bootstrap/**")
     relocatePackages(it)
 
     // exclude known bootstrap dependencies - they can't appear in the inst/ directory
     dependencies {
-      exclude("org.slf4j:slf4j-api")
-      exclude("io.opentelemetry:opentelemetry-api")
-      exclude("io.opentelemetry:opentelemetry-api-logs")
-      exclude("io.opentelemetry:opentelemetry-context")
-      exclude("io.opentelemetry.semconv:opentelemetry-semconv")
+      exclude(dependency("org.slf4j:slf4j-api"))
+      exclude(dependency("io.opentelemetry:opentelemetry-api"))
+      exclude(dependency("io.opentelemetry:opentelemetry-api-logs"))
+      exclude(dependency("io.opentelemetry:opentelemetry-context"))
+      exclude(dependency("io.opentelemetry.semconv:opentelemetry-semconv"))
+      // bootstrap part of the instrumentation API, mirrors upstream excludeBootstrapClasses()
+      exclude(dependency("io.opentelemetry.instrumentation:opentelemetry-instrumentation-api"))
+      exclude(dependency("io.opentelemetry.instrumentation:opentelemetry-instrumentation-api-incubator"))
+      exclude(dependency("io.opentelemetry.instrumentation:opentelemetry-instrumentation-annotations-support"))
+      exclude(dependency("io.opentelemetry.javaagent:opentelemetry-javaagent-bootstrap"))
       // metrics advice API
-      exclude("io.opentelemetry:opentelemetry-api-incubator")
+      exclude(dependency("io.opentelemetry:opentelemetry-api-incubator"))
     }
   }
 
@@ -139,8 +157,10 @@ tasks {
 
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
-    mergeServiceFiles {
-      include("inst/META-INF/services/*")
+    mergeServiceFiles("inst/META-INF/services")
+    // Shadow 9: mergeServiceFiles only sees duplicates that the duplicates strategy lets through
+    filesMatching("inst/META-INF/services/**") {
+      duplicatesStrategy = DuplicatesStrategy.INCLUDE
     }
     exclude("**/module-info.class")
     relocatePackages(it)

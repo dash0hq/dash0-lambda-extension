@@ -12,7 +12,7 @@ buildscript {
   dependencies {
     classpath "com.diffplug.spotless:spotless-plugin-gradle:8.0.0"
     classpath "com.gradleup.shadow:shadow-gradle-plugin:8.3.9"
-    classpath "io.opentelemetry.instrumentation:gradle-plugins:2.10.0-alpha"
+    classpath "io.opentelemetry.instrumentation:gradle-plugins:2.31.1-alpha"
   }
 }
 
@@ -53,12 +53,12 @@ subprojects {
 
   ext {
     versions = [
-      opentelemetrySdk           : "1.49.0",
-      opentelemetryContrib       : "1.49.0-alpha",
-      opentelemetryJavaagent     : "2.15.0",
-      opentelemetryJavaagentAlpha: "2.15.0-alpha",
-      opentelemetrySemconv       : "1.32.0",
-      opentelemetrySemconvIncubating: "1.32.0-alpha",
+      opentelemetrySdk           : "1.65.0",
+      opentelemetryContrib       : "1.59.0-alpha",
+      opentelemetryJavaagent     : "2.31.1",
+      opentelemetryJavaagentAlpha: "2.31.1-alpha",
+      opentelemetrySemconv       : "1.43.0",
+      opentelemetrySemconvIncubating: "1.43.0-alpha",
 
       // Instrumentation versions
       apachehttpclient50         : "5.0",

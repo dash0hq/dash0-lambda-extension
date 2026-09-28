@@ -8,10 +8,12 @@ package io.opentelemetry.instrumentation.awssdk.v2_2;
 import io.opentelemetry.instrumentation.api.incubator.semconv.rpc.RpcAttributesGetter;
 import software.amazon.awssdk.core.interceptor.ExecutionAttributes;
 import software.amazon.awssdk.core.interceptor.SdkExecutionAttribute;
+import software.amazon.awssdk.http.SdkHttpResponse;
 
-enum AwsSdkRpcAttributesGetter implements RpcAttributesGetter<ExecutionAttributes> {
+enum AwsSdkRpcAttributesGetter implements RpcAttributesGetter<ExecutionAttributes, SdkHttpResponse> {
   INSTANCE;
 
+  @Deprecated
   @Override
   public String getSystem(ExecutionAttributes request) {
     return "aws-api";
@@ -22,6 +24,7 @@ enum AwsSdkRpcAttributesGetter implements RpcAttributesGetter<ExecutionAttribute
     return request.getAttribute(SdkExecutionAttribute.SERVICE_NAME);
   }
 
+  @Deprecated
   @Override
   public String getMethod(ExecutionAttributes request) {
     return request.getAttribute(SdkExecutionAttribute.OPERATION_NAME);
