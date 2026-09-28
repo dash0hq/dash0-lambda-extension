@@ -26,7 +26,15 @@ import com.google.common.util.concurrent.MoreExecutors;
 import example.GreeterGrpc;
 import example.Helloworld;
 import io.grpc.BindableService;
+import io.grpc.CallOptions;
+import io.grpc.Channel;
+import io.grpc.ClientCall;
+import io.grpc.ClientInterceptor;
+import io.grpc.ForwardingClientCall;
+import io.grpc.ForwardingClientCallListener;
 import io.grpc.ManagedChannel;
+import io.grpc.Metadata;
+import io.grpc.MethodDescriptor;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.stub.StreamObserver;
@@ -126,6 +134,80 @@ class GrpcTest extends AbstractGrpcTest {
                         String.format(RESPONSE_BODY_TEMPLATE, paramName));
               });
         });
+  }
+
+  // An application interceptor on the stub wraps the call and the listener outside of the
+  // upstream tracing interceptor; the response payload must still land on the client span.
+  @Test
+  void blockingWithClientInterceptor() throws Exception {
+    BindableService greeter =
+        new GreeterGrpc.GreeterImplBase() {
+          @Override
+          public void sayHello(
+              Helloworld.Request request, StreamObserver<Helloworld.Response> responseObserver) {
+            responseObserver.onNext(
+                Helloworld.Response.newBuilder().setMessage("Hello " + request.getName()).build());
+            responseObserver.onCompleted();
+          }
+        };
+
+    Server server = ServerBuilder.forPort(0).addService(greeter).build().start();
+    ManagedChannel channel = createChannel(server);
+    closer.add(() -> channel.shutdownNow().awaitTermination(10, TimeUnit.SECONDS));
+    closer.add(() -> server.shutdownNow().awaitTermination());
+
+    ClientInterceptor interceptor =
+        new ClientInterceptor() {
+          @Override
+          public <REQ, RESP> ClientCall<REQ, RESP> interceptCall(
+              MethodDescriptor<REQ, RESP> method, CallOptions callOptions, Channel next) {
+            return new ForwardingClientCall.SimpleForwardingClientCall<REQ, RESP>(
+                next.newCall(method, callOptions)) {
+              @Override
+              public void start(Listener<RESP> responseListener, Metadata headers) {
+                super.start(
+                    new ForwardingClientCallListener.SimpleForwardingClientCallListener<RESP>(
+                        responseListener) {},
+                    headers);
+              }
+            };
+          }
+        };
+    GreeterGrpc.GreeterBlockingStub stub =
+        GreeterGrpc.newBlockingStub(channel).withInterceptors(interceptor);
+
+    Helloworld.Response response =
+        instrumentation.runWithSpan(
+            "parent", () -> stub.sayHello(Helloworld.Request.newBuilder().setName("name").build()));
+
+    assertThat(response.getMessage()).isEqualTo("Hello name");
+
+    instrumentation.waitAndAssertTraces(
+        trace ->
+            trace.hasSpansSatisfyingExactly(
+                span ->
+                    span.hasName("parent")
+                        .hasKind(SpanKind.INTERNAL)
+                        .hasNoParent()
+                        .doesNotHave(
+                            new org.assertj.core.api.Condition<>(
+                                data ->
+                                    data.getAttributes()
+                                            .get(
+                                                AttributeKey.stringKey("rpc.grpc.response.payload"))
+                                        != null,
+                                "response payload")),
+                span ->
+                    span.hasName("example.Greeter/SayHello")
+                        .hasKind(SpanKind.CLIENT)
+                        .hasParent(trace.getSpan(0))
+                        .hasAttribute(
+                            AttributeKey.stringKey("rpc.grpc.response.payload"),
+                            String.format(RESPONSE_BODY_TEMPLATE, "name")),
+                span ->
+                    span.hasName("example.Greeter/SayHello")
+                        .hasKind(SpanKind.SERVER)
+                        .hasParent(trace.getSpan(1))));
   }
 
   @Test

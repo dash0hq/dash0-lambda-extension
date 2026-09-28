@@ -50,10 +50,6 @@ shadowJar {
   filesMatching("META-INF/services/**") {
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
   }
-  // Shadow 9: mergeServiceFiles only sees duplicates that the duplicates strategy lets through
-  filesMatching("software/amazon/awssdk/global/handlers/**") {
-    duplicatesStrategy = DuplicatesStrategy.INCLUDE
-  }
 
   archiveFileName = 'agent-testing.jar'
 

@@ -77,6 +77,15 @@ public class ClientCallInstrumentation implements TypeInstrumentation {
         @Advice.This ClientCall<?, ?> clientCall,
         @Advice.Argument(0) ClientCall.Listener<?> listener,
         @Advice.Local("dash0CallDepth") CallDepth callDepth) {
+      // The upstream instrumentation starts the call with the client span current, but notifies
+      // the application's listener with the parent context current. Remember the client span on
+      // the upstream tracing listener so that response payloads end up on the client span. This
+      // runs before the call depth check because application interceptors can wrap the call.
+      if (listener != null && listener.getClass().getName().endsWith("TracingClientCallListener")) {
+        VirtualField.find(ClientCall.Listener.class, Span.class)
+            .set(listener, Java8BytecodeBridge.currentSpan());
+      }
+
       callDepth = CallDepth.forClass(ClientCall.class);
       if (callDepth.getAndIncrement() != 0) {
         return;
@@ -86,14 +95,6 @@ public class ClientCallInstrumentation implements TypeInstrumentation {
           VirtualField.find(ClientCall.class, StringListHolder.class);
 
       requestMsgs.set(clientCall, new StringListHolder(new ArrayList<>()));
-
-      // The upstream instrumentation starts the call with the client span current, but notifies
-      // the application's listener with the parent context current. Remember the client span on
-      // the listener so that response payloads end up on the client span.
-      Span span = Java8BytecodeBridge.currentSpan();
-      if (listener != null && span.getSpanContext().isValid()) {
-        VirtualField.find(ClientCall.Listener.class, Span.class).set(listener, span);
-      }
     }
 
     @Advice.OnMethodExit(onThrowable = Throwable.class, suppress = Throwable.class)

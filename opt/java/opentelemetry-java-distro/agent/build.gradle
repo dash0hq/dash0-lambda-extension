@@ -111,8 +111,6 @@ tasks {
       duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     }
     exclude("**/module-info.class")
-    // classes in this package are loaded by the bootstrap class loader, e.g. servlet-common-bootstrap
-    exclude("io/opentelemetry/javaagent/bootstrap/**")
     relocatePackages(it)
 
     // exclude known bootstrap dependencies - they can't appear in the inst/ directory
@@ -122,11 +120,9 @@ tasks {
       exclude(dependency("io.opentelemetry:opentelemetry-api-logs"))
       exclude(dependency("io.opentelemetry:opentelemetry-context"))
       exclude(dependency("io.opentelemetry.semconv:opentelemetry-semconv"))
-      // bootstrap part of the instrumentation API, mirrors upstream excludeBootstrapClasses()
+      // the instrumentation API lives in the bootstrap class loader of the upstream agent
       exclude(dependency("io.opentelemetry.instrumentation:opentelemetry-instrumentation-api"))
       exclude(dependency("io.opentelemetry.instrumentation:opentelemetry-instrumentation-api-incubator"))
-      exclude(dependency("io.opentelemetry.instrumentation:opentelemetry-instrumentation-annotations-support"))
-      exclude(dependency("io.opentelemetry.javaagent:opentelemetry-javaagent-bootstrap"))
       // metrics advice API
       exclude(dependency("io.opentelemetry:opentelemetry-api-incubator"))
     }

@@ -13,7 +13,6 @@ import software.amazon.awssdk.http.SdkHttpResponse;
 enum AwsSdkRpcAttributesGetter implements RpcAttributesGetter<ExecutionAttributes, SdkHttpResponse> {
   INSTANCE;
 
-  @Deprecated
   @Override
   public String getSystem(ExecutionAttributes request) {
     return "aws-api";
@@ -24,7 +23,6 @@ enum AwsSdkRpcAttributesGetter implements RpcAttributesGetter<ExecutionAttribute
     return request.getAttribute(SdkExecutionAttribute.SERVICE_NAME);
   }
 
-  @Deprecated
   @Override
   public String getMethod(ExecutionAttributes request) {
     return request.getAttribute(SdkExecutionAttribute.OPERATION_NAME);

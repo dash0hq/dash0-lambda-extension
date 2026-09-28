@@ -99,8 +99,4 @@ tasks.withType(com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
   mergeServiceFiles {
     include("software/amazon/awssdk/global/handlers/execution.interceptors")
   }
-  // Shadow 9: mergeServiceFiles only sees duplicates that the duplicates strategy lets through
-  filesMatching("software/amazon/awssdk/global/handlers/**") {
-    duplicatesStrategy = DuplicatesStrategy.INCLUDE
-  }
 }
