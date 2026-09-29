@@ -70,6 +70,12 @@ jobs:
       - name: Install dependencies
         working-directory: opt/node
         run: npm install
+      # The handler-resolution scenarios run as plain Node child processes and consume the
+      # distro from `distro/dist`, the way the layer does. That directory is gitignored, so
+      # it has to be built here.
+      - name: Build the distro
+        working-directory: opt/node
+        run: npm run build
       - name: Run tests
         working-directory: opt/node
         run: npm test
