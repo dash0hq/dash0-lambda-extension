@@ -28,8 +28,9 @@ import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 import com.google.protobuf.GeneratedMessageV3;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
-import io.grpc.ClientCall;
 import io.dash0.instrumentation.core.Dash0SemanticAttributes;
+import io.grpc.ClientCall;
+import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.instrumentation.api.util.VirtualField;
 import io.opentelemetry.javaagent.bootstrap.CallDepth;
 import io.opentelemetry.javaagent.bootstrap.Java8BytecodeBridge;
@@ -74,7 +75,17 @@ public class ClientCallInstrumentation implements TypeInstrumentation {
     @Advice.OnMethodEnter(suppress = Throwable.class)
     public static void methodEnter(
         @Advice.This ClientCall<?, ?> clientCall,
+        @Advice.Argument(0) ClientCall.Listener<?> listener,
         @Advice.Local("dash0CallDepth") CallDepth callDepth) {
+      // The upstream instrumentation starts the call with the client span current, but notifies
+      // the application's listener with the parent context current. Remember the client span on
+      // the upstream tracing listener so that response payloads end up on the client span. This
+      // runs before the call depth check because application interceptors can wrap the call.
+      if (listener != null && listener.getClass().getName().endsWith("TracingClientCallListener")) {
+        VirtualField.find(ClientCall.Listener.class, Span.class)
+            .set(listener, Java8BytecodeBridge.currentSpan());
+      }
+
       callDepth = CallDepth.forClass(ClientCall.class);
       if (callDepth.getAndIncrement() != 0) {
         return;

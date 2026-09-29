@@ -31,7 +31,7 @@ public class PayloadTracingIterable<K, V> implements Iterable<ConsumerRecord<K, 
 
   public static <K, V> Iterable<ConsumerRecord<K, V>> wrap(
       Iterable<ConsumerRecord<K, V>> delegate) {
-    if (KafkaClientsConsumerProcessTracing.wrappingEnabled()) {
+    if (KafkaClientsConsumerProcessTracing.isWrappingEnabled()) {
       return new PayloadTracingIterable<>(delegate);
     }
     return delegate;

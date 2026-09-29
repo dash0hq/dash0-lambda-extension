@@ -102,9 +102,7 @@ tasks {
 
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
-    mergeServiceFiles {
-      include("inst/META-INF/services/*")
-    }
+    mergeServiceFiles("inst/META-INF/services")
     exclude("**/module-info.class")
     relocatePackages(it)
 

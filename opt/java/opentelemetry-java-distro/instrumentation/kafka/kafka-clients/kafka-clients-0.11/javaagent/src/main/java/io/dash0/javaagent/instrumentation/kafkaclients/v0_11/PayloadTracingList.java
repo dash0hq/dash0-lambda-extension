@@ -33,7 +33,7 @@ public class PayloadTracingList<K, V> extends PayloadTracingIterable<K, V>
   }
 
   public static <K, V> List<ConsumerRecord<K, V>> wrap(List<ConsumerRecord<K, V>> delegate) {
-    if (KafkaClientsConsumerProcessTracing.wrappingEnabled()) {
+    if (KafkaClientsConsumerProcessTracing.isWrappingEnabled()) {
       return new PayloadTracingList<>(delegate);
     }
     return delegate;

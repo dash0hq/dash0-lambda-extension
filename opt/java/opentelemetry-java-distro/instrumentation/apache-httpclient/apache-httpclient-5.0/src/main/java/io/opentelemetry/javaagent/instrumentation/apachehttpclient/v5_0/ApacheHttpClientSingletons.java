@@ -7,14 +7,14 @@ package io.opentelemetry.javaagent.instrumentation.apachehttpclient.v5_0;
 
 import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.instrumentation.api.incubator.config.internal.CommonConfig;
-import io.opentelemetry.instrumentation.api.incubator.semconv.http.HttpClientPeerServiceAttributesExtractor;
+import io.opentelemetry.instrumentation.api.incubator.semconv.http.HttpClientServicePeerAttributesExtractor;
 import io.opentelemetry.instrumentation.api.incubator.semconv.http.HttpExperimentalAttributesExtractor;
 import io.opentelemetry.instrumentation.api.instrumenter.Instrumenter;
 import io.opentelemetry.instrumentation.api.instrumenter.InstrumenterBuilder;
 import io.opentelemetry.instrumentation.api.semconv.http.HttpClientAttributesExtractor;
 import io.opentelemetry.instrumentation.api.semconv.http.HttpSpanNameExtractor;
 import io.opentelemetry.instrumentation.api.semconv.http.HttpSpanStatusExtractor;
-import io.opentelemetry.javaagent.bootstrap.internal.AgentInstrumentationConfig;
+import io.opentelemetry.javaagent.bootstrap.internal.AgentCommonConfig;
 import org.apache.hc.core5.http.HttpRequest;
 import org.apache.hc.core5.http.HttpResponse;
 
@@ -27,7 +27,7 @@ public final class ApacheHttpClientSingletons {
     ApacheHttpClientHttpAttributesGetter httpAttributesGetter =
         new ApacheHttpClientHttpAttributesGetter();
 
-    CommonConfig config = new CommonConfig(AgentInstrumentationConfig.get());
+    CommonConfig config = AgentCommonConfig.get();
 
     InstrumenterBuilder<HttpRequest, HttpResponse> builder =
         Instrumenter.<HttpRequest, HttpResponse>builder(
@@ -44,8 +44,8 @@ public final class ApacheHttpClientSingletons {
                     .setKnownMethods(config.getKnownHttpRequestMethods())
                     .build())
             .addAttributesExtractor(
-                HttpClientPeerServiceAttributesExtractor.create(
-                    httpAttributesGetter, config.getPeerServiceResolver()))
+                HttpClientServicePeerAttributesExtractor.create(
+                    httpAttributesGetter, GlobalOpenTelemetry.get()))
             // Custom HTTP payload extractor
             .addAttributesExtractor(new HttpPayloadExtractor())
             // Custom Context customizer for holding response payload

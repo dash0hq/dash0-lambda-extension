@@ -7,14 +7,14 @@ package io.opentelemetry.javaagent.instrumentation.httpclient;
 
 import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.instrumentation.api.incubator.config.internal.CommonConfig;
-import io.opentelemetry.instrumentation.api.incubator.semconv.http.HttpClientPeerServiceAttributesExtractor;
+import io.opentelemetry.instrumentation.api.incubator.semconv.http.HttpClientServicePeerAttributesExtractor;
 import io.opentelemetry.instrumentation.api.incubator.semconv.http.HttpExperimentalAttributesExtractor;
 import io.opentelemetry.instrumentation.api.instrumenter.AttributesExtractor;
 import io.opentelemetry.instrumentation.api.instrumenter.Instrumenter;
 import io.opentelemetry.instrumentation.httpclient.internal.HttpHeadersSetter;
 import io.opentelemetry.instrumentation.httpclient.internal.JavaHttpClientAttributesGetter;
 import io.opentelemetry.instrumentation.httpclient.internal.JavaHttpClientInstrumenterFactory;
-import io.opentelemetry.javaagent.bootstrap.internal.AgentInstrumentationConfig;
+import io.opentelemetry.javaagent.bootstrap.internal.AgentCommonConfig;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
@@ -28,13 +28,13 @@ public class JavaHttpClientSingletons {
   static {
     SETTER = new HttpHeadersSetter(GlobalOpenTelemetry.getPropagators());
 
-    CommonConfig config = new CommonConfig(AgentInstrumentationConfig.get());
+    CommonConfig config = AgentCommonConfig.get();
 
     List<AttributesExtractor<? super HttpRequest, ? super HttpResponse<?>>> additionalExtractors =
         new ArrayList<>();
     additionalExtractors.add(
-        HttpClientPeerServiceAttributesExtractor.create(
-            JavaHttpClientAttributesGetter.INSTANCE, config.getPeerServiceResolver()));
+        HttpClientServicePeerAttributesExtractor.create(
+            JavaHttpClientAttributesGetter.INSTANCE, GlobalOpenTelemetry.get()));
 
     if (config.shouldEmitExperimentalHttpClientTelemetry()) {
       additionalExtractors.add(

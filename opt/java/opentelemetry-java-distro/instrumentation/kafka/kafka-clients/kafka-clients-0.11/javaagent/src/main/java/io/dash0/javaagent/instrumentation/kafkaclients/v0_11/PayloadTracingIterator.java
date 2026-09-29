@@ -39,7 +39,7 @@ public class PayloadTracingIterator<K, V> implements Iterator<ConsumerRecord<K, 
 
   public static <K, V> Iterator<ConsumerRecord<K, V>> wrap(
       Iterator<ConsumerRecord<K, V>> delegateIterator) {
-    if (KafkaClientsConsumerProcessTracing.wrappingEnabled()) {
+    if (KafkaClientsConsumerProcessTracing.isWrappingEnabled()) {
       return new PayloadTracingIterator<>(delegateIterator);
     }
     return delegateIterator;
@@ -53,7 +53,7 @@ public class PayloadTracingIterator<K, V> implements Iterator<ConsumerRecord<K, 
   @Override
   public ConsumerRecord<K, V> next() {
     ConsumerRecord<K, V> next = delegateIterator.next();
-    if (next != null && KafkaClientsConsumerProcessTracing.wrappingEnabled()) {
+    if (next != null && KafkaClientsConsumerProcessTracing.isWrappingEnabled()) {
       Span span = Java8BytecodeBridge.currentSpan();
       span.setAttribute(Dash0SemanticAttributes.MESSAGING_PAYLOAD, next.value().toString());
       span.setAttribute(

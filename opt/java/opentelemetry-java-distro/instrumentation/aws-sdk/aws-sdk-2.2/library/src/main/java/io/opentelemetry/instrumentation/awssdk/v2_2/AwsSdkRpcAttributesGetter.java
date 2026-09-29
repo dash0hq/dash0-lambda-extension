@@ -8,8 +8,9 @@ package io.opentelemetry.instrumentation.awssdk.v2_2;
 import io.opentelemetry.instrumentation.api.incubator.semconv.rpc.RpcAttributesGetter;
 import software.amazon.awssdk.core.interceptor.ExecutionAttributes;
 import software.amazon.awssdk.core.interceptor.SdkExecutionAttribute;
+import software.amazon.awssdk.http.SdkHttpResponse;
 
-enum AwsSdkRpcAttributesGetter implements RpcAttributesGetter<ExecutionAttributes> {
+enum AwsSdkRpcAttributesGetter implements RpcAttributesGetter<ExecutionAttributes, SdkHttpResponse> {
   INSTANCE;
 
   @Override

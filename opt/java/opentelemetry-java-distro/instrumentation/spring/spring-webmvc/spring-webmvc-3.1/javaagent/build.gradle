@@ -21,7 +21,7 @@ dependencies {
   compileOnly("javax.servlet:javax.servlet-api:3.1.0")
 
   implementation("io.opentelemetry.javaagent.instrumentation:opentelemetry-javaagent-servlet-common-bootstrap:${versions.opentelemetryJavaagentAlpha}")
-  implementation("io.opentelemetry.javaagent.instrumentation:opentelemetry-javaagent-spring-webmvc-common:${versions.opentelemetryJavaagentAlpha}")
+  implementation("io.opentelemetry.javaagent.instrumentation:opentelemetry-javaagent-spring-webmvc-common-3.1:${versions.opentelemetryJavaagentAlpha}")
 
   testImplementation project(":instrumentation:spring:spring-webmvc:testing")
   testImplementation("org.springframework:spring-webmvc:${versions.springwebmvc31}")
@@ -31,10 +31,8 @@ dependencies {
   // Instrumentations for testing
   testInstrumentation project(":instrumentation:servlet:servlet-3.0:javaagent")
   testInstrumentation("io.opentelemetry.javaagent.instrumentation:opentelemetry-javaagent-servlet-3.0:${versions.opentelemetryJavaagentAlpha}")
-  testInstrumentation("io.opentelemetry.javaagent.instrumentation:opentelemetry-javaagent-servlet-javax-common:${versions.opentelemetryJavaagentAlpha}")
   testInstrumentation("io.opentelemetry.javaagent.instrumentation:opentelemetry-javaagent-tomcat-7.0:${versions.opentelemetryJavaagentAlpha}")
-  testInstrumentation("io.opentelemetry.javaagent.instrumentation:opentelemetry-javaagent-spring-webmvc-common:${versions.opentelemetryJavaagentAlpha}")
-  testInstrumentation("io.opentelemetry.javaagent.instrumentation:opentelemetry-javaagent-spring-web-3.1:${versions.opentelemetryJavaagentAlpha}")
+  testInstrumentation("io.opentelemetry.javaagent.instrumentation:opentelemetry-javaagent-spring-webmvc-common-3.1:${versions.opentelemetryJavaagentAlpha}")
 }
 
 configurations.testRuntimeClasspath {
