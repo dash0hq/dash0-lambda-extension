@@ -114,8 +114,20 @@ static ROUTES: Lazy<Routes> = Lazy::new(|| {
     Routes { get, post }
 });
 
+/// Routes for the dedicated OTLP/HTTP listener on the default OpenTelemetry
+/// HTTP port. Only OTLP ingest paths are exposed there — the Lambda Runtime
+/// API proxy routes stay on the proxy listener.
+static OTLP_ROUTES: Lazy<MatchitRouter<Handler>> = Lazy::new(|| {
+    let mut post = MatchitRouter::new();
+    post.insert("/v1/traces", h_traces as Handler).unwrap();
+    post.insert("/v1/logs", h_logs as Handler).unwrap();
+    post.insert("/v1/metrics", h_metrics as Handler).unwrap();
+    post
+});
+
 pub fn init() {
     Lazy::force(&ROUTES);
+    Lazy::force(&OTLP_ROUTES);
     Lazy::force(&HTTPS_CLIENT);
     invocation_entry::force_init();
 }
@@ -130,6 +142,31 @@ pub async fn dispatch(req: Request<Incoming>) -> Result<Response<ResBody>, Infal
     let handler = table
         .and_then(|t| t.at(req.uri().path()).ok().map(|m| *m.value))
         .unwrap_or(h_notfound as Handler);
+
+    match handler(req).await {
+        Ok(resp) => Ok(resp),
+        Err(e) => {
+            tracing::error!("[{}] Handler error: {}", crate::log_prefix(), e);
+            Ok(Response::builder()
+                .status(500)
+                .body(full_body(Bytes::from_static(b"500 - Internal Error")))
+                .unwrap())
+        }
+    }
+}
+
+/// Dispatch for the dedicated OTLP/HTTP listener: only OTLP ingest routes,
+/// anything else is a 404 (no runtime proxy passthrough).
+pub async fn dispatch_otlp(req: Request<Incoming>) -> Result<Response<ResBody>, Infallible> {
+    let handler = if *req.method() == Method::POST {
+        OTLP_ROUTES.at(req.uri().path()).ok().map(|m| *m.value)
+    } else {
+        None
+    };
+
+    let Some(handler) = handler else {
+        return Ok(Response::builder().status(404).body(empty_body()).unwrap());
+    };
 
     match handler(req).await {
         Ok(resp) => Ok(resp),

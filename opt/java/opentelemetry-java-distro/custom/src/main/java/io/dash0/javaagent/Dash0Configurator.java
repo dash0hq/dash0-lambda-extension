@@ -47,7 +47,7 @@ public class Dash0Configurator implements AutoConfigurationCustomizerProvider {
   public static final Logger LOGGER = Logger.getLogger(Dash0Configurator.class.getName());
 
   public static final String DASH0_EXTENSION_ENDPOINT_URL =
-      "http://127.0.0.1:9009";
+      "http://127.0.0.1:4318";
 
   @Override
   public void customize(AutoConfigurationCustomizer autoConfiguration) {
