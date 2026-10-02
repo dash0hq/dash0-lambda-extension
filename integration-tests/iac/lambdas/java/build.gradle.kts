@@ -14,6 +14,8 @@ dependencies {
     implementation("com.amazonaws:aws-lambda-java-events:3.11.4")
     implementation("software.amazon.awssdk:sqs:2.25.27")
     implementation("software.amazon.awssdk:sns:2.25.27")
+    // Customers need the OTel API as a normal runtime dependency; the layer does not ship it.
+    implementation("io.opentelemetry:opentelemetry-api:1.65.0")
     testImplementation(platform("org.junit:junit-bom:5.10.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

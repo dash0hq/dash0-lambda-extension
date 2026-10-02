@@ -78,7 +78,7 @@ public class Dash0Configurator implements AutoConfigurationCustomizerProvider {
     return tracerProvider;
   }
 
-  private Map<String, String> propertiesCustomizer(ConfigProperties originalCfg) {
+  Map<String, String> propertiesCustomizer(ConfigProperties originalCfg) {
     String accessToken = originalCfg.getString(DASH0_TOKEN);
 
     Map<String, String> customizedCfg = new HashMap<>();
@@ -109,9 +109,11 @@ public class Dash0Configurator implements AutoConfigurationCustomizerProvider {
     setIfNotSet(originalCfg, customizedCfg, "otel.exporter.otlp.protocol", "http/protobuf");
 
     /*
-     * Disable the metrics exporter
+     * Enable the OTLP metrics exporter by default so that metrics recorded through the OpenTelemetry API
+     * (e.g. GlobalOpenTelemetry.getMeter) reach the Dash0 extension. Users can opt out with
+     * OTEL_METRICS_EXPORTER=none or -Dotel.metrics.exporter=none.
      */
-    setIfNotSet(originalCfg, customizedCfg, "otel.metrics.exporter", "none");
+    setIfNotSet(originalCfg, customizedCfg, "otel.metrics.exporter", "otlp");
 
     /*
      * Set limits in terms of span attribute length to match those that we have
