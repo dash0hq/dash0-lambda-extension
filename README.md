@@ -111,7 +111,9 @@ The four `API_GATEWAY` variables below also apply to Application Load Balancer-t
 
 * `DASH0_DISABLE_PYTHON_DEPENDENCY_CHECK` - Python only. On startup, the Python distribution checks whether its own dependencies conflict with the versions installed in the function, and skips loading the auto-instrumentation if they do. When set to `true`, that check is skipped and the distribution loads regardless. Use this if the check reports a false positive; note that a real conflict may cause the function to fail at runtime. Default: `false`.
 
-* `DASH0_JAVA_SDK_SELF_METRICS_ENABLED` - Java only. When set to `true`, the OpenTelemetry SDK's self-metrics about its OTLP exporter and span processor (`otlp.exporter.seen`, `otlp.exporter.exported`, `queueSize`, `processedSpans`) are exported along with your application's metrics. Off by default. The JVM runtime metrics are controlled separately by `OTEL_INSTRUMENTATION_RUNTIME_TELEMETRY_ENABLED` (see [Custom Metrics](#custom-metrics)).
+* `DASH0_JAVA_SDK_SELF_METRICS_ENABLED` - Java only. When set to `true`, exports the OpenTelemetry SDK's self-metrics (`otlp.exporter.seen`, `otlp.exporter.exported`, `queueSize`, `processedSpans`). Default: `false`.
+
+* `OTEL_INSTRUMENTATION_RUNTIME_TELEMETRY_ENABLED` - Java only. When set to `true`, exports the JVM runtime metrics (`jvm.*`). Default: `false`.
 
 ### Secret Masking
 
