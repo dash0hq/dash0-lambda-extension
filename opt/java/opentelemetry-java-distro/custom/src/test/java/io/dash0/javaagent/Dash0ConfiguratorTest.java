@@ -107,14 +107,6 @@ public class Dash0ConfiguratorTest {
     assertFalse(result.containsKey(RUNTIME_TELEMETRY));
   }
 
-  @Test
-  void agentMetricsOptInKeepsRuntimeTelemetry() {
-    Map<String, String> values = new HashMap<>();
-    values.put(Dash0Configurator.DASH0_AGENT_METRICS_ENABLED, "true");
-    Map<String, String> result = new Dash0Configurator().propertiesCustomizer(configOf(values));
-    assertFalse(result.containsKey(RUNTIME_TELEMETRY));
-  }
-
   /** Records one counter per scope through a meter provider built by the configurator. */
   private static Set<String> exportedMetricNames(Map<String, String> values) {
     List<MetricData> exported = new ArrayList<>();
@@ -159,7 +151,7 @@ public class Dash0ConfiguratorTest {
   }
 
   @Test
-  void sdkSelfMetricsAreDroppedByDefault() {
+  void sdkSelfMetricsAreDropped() {
     Set<String> names = exportedMetricNames(new HashMap<>());
     assertTrue(names.contains("orders.processed"));
     assertTrue(names.contains("jvm.class.loaded"));
@@ -167,13 +159,4 @@ public class Dash0ConfiguratorTest {
     assertFalse(names.contains("otlp.exporter.seen"));
   }
 
-  @Test
-  void sdkSelfMetricsAreKeptWhenOptedIn() {
-    Map<String, String> values = new HashMap<>();
-    values.put(Dash0Configurator.DASH0_AGENT_METRICS_ENABLED, "true");
-    Set<String> names = exportedMetricNames(values);
-    assertTrue(names.contains("orders.processed"));
-    assertTrue(names.contains("processedSpans"));
-    assertTrue(names.contains("otlp.exporter.seen"));
-  }
 }

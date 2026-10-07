@@ -279,6 +279,12 @@ The extension creates the following histogram metrics for each Lambda invocation
 | `dash0.faas.billed_duration` | ms | Billed duration of the invocation. |
 | `faas.mem_usage` | MB | Memory used by the invocation. |
 
+#### Custom Metrics (Java)
+
+With auto-instrumentation, Java functions can record their own metrics through the OpenTelemetry API (for example `GlobalOpenTelemetry.getMeter("my-app").counterBuilder("orders.processed").build().add(1)`). The agent exports them to the extension with an OTLP exporter that is enabled by default, and flushes them when the handler returns. Add `io.opentelemetry:opentelemetry-api` to your function as a regular runtime dependency (`implementation` in Gradle, the default `compile` scope in Maven); the agent only bundles a private copy. Set `OTEL_METRICS_EXPORTER=none` to turn metric export off.
+
+The agent's JVM runtime metrics (`jvm.*`) are disabled by default. To enable them, set `OTEL_INSTRUMENTATION_RUNTIME_TELEMETRY_ENABLED=true`.
+
 #### Resource Attributes (Metrics)
 
 These attributes are added to the resource of metric data:

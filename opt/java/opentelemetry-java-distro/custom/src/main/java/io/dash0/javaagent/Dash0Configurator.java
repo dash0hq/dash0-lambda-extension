@@ -48,12 +48,6 @@ public class Dash0Configurator implements AutoConfigurationCustomizerProvider {
   public static final String DASH0_EXTENSION_ENDPOINT = "dash0.extension.endpoint";
   public static final String DASH0_DEBUG_SPANDUMP = "dash0.debug.spandump";
 
-  /**
-   * Opt-in (env: DASH0_AGENT_METRICS_ENABLED). By default only metrics recorded by the application
-   * through the OpenTelemetry API are exported. When true, the metrics produced by the agent itself
-   * (JVM runtime metrics and the SDK self-metrics) are exported as well.
-   */
-  public static final String DASH0_AGENT_METRICS_ENABLED = "dash0.agent.metrics.enabled";
 
   /** Instrumentation scopes of the SDK self-metrics (exporter and span processor). */
   static final List<String> AGENT_SELF_METRIC_SCOPES =
@@ -73,21 +67,15 @@ public class Dash0Configurator implements AutoConfigurationCustomizerProvider {
         .addPropertiesSupplier(this::getDefaultProperties);
   }
 
-  /** Drops the SDK self-metrics unless the user opted in to agent metrics. */
+  /** Drops the SDK self-metrics (exporter and span processor), which have no customer value. */
   SdkMeterProviderBuilder meterProviderCustomizer(
       SdkMeterProviderBuilder meterProvider, ConfigProperties cfg) {
-    if (!isAgentMetricsEnabled(cfg)) {
-      for (String scope : AGENT_SELF_METRIC_SCOPES) {
-        meterProvider.registerView(
-            InstrumentSelector.builder().setMeterName(scope).build(),
-            View.builder().setAggregation(Aggregation.drop()).build());
-      }
+    for (String scope : AGENT_SELF_METRIC_SCOPES) {
+      meterProvider.registerView(
+          InstrumentSelector.builder().setMeterName(scope).build(),
+          View.builder().setAggregation(Aggregation.drop()).build());
     }
     return meterProvider;
-  }
-
-  private static boolean isAgentMetricsEnabled(ConfigProperties cfg) {
-    return Boolean.parseBoolean(cfg.getString(DASH0_AGENT_METRICS_ENABLED));
   }
 
   private SdkTracerProviderBuilder tracerProviderCustomizer(
@@ -149,14 +137,11 @@ public class Dash0Configurator implements AutoConfigurationCustomizerProvider {
     setIfNotSet(originalCfg, customizedCfg, "otel.metrics.exporter", "otlp");
 
     /*
-     * Only export the application's own metrics by default: switch off the JVM runtime metrics
-     * unless the user opted in via DASH0_AGENT_METRICS_ENABLED (an explicit
-     * OTEL_INSTRUMENTATION_RUNTIME_TELEMETRY_ENABLED still wins). The SDK self-metrics are dropped
-     * by a view, see meterProviderCustomizer.
+     * Switch off the JVM runtime metrics by default; users can opt in with
+     * OTEL_INSTRUMENTATION_RUNTIME_TELEMETRY_ENABLED=true. The SDK self-metrics are dropped by a
+     * view, see meterProviderCustomizer.
      */
-    if (!isAgentMetricsEnabled(originalCfg)) {
-      setIfNotSet(originalCfg, customizedCfg, "otel.instrumentation.runtime-telemetry.enabled", "false");
-    }
+    setIfNotSet(originalCfg, customizedCfg, "otel.instrumentation.runtime-telemetry.enabled", "false");
 
     /*
      * Set limits in terms of span attribute length to match those that we have
