@@ -111,6 +111,10 @@ The four `API_GATEWAY` variables below also apply to Application Load Balancer-t
 
 * `DASH0_DISABLE_PYTHON_DEPENDENCY_CHECK` - Python only. On startup, the Python distribution checks whether its own dependencies conflict with the versions installed in the function, and skips loading the auto-instrumentation if they do. When set to `true`, that check is skipped and the distribution loads regardless. Use this if the check reports a false positive; note that a real conflict may cause the function to fail at runtime. Default: `false`.
 
+* `DASH0_JAVA_SDK_SELF_METRICS_ENABLED` - Java only. When set to `true`, exports the OpenTelemetry SDK's self-metrics (`otlp.exporter.seen`, `otlp.exporter.exported`, `queueSize`, `processedSpans`). Default: `false`.
+
+* `OTEL_INSTRUMENTATION_RUNTIME_TELEMETRY_ENABLED` - Java only. When set to `true`, exports the JVM runtime metrics (`jvm.*`). Default: `false`.
+
 ### Secret Masking
 
 The extension automatically masks sensitive data in traces payloads. By default, any JSON key matching these patterns (case-insensitive) will have its value replaced with `****`:
@@ -278,6 +282,16 @@ The extension creates the following histogram metrics for each Lambda invocation
 | `faas.init_duration` | ms | Duration of the cold start initialization. Only present on cold start invocations. |
 | `dash0.faas.billed_duration` | ms | Billed duration of the invocation. |
 | `faas.mem_usage` | MB | Memory used by the invocation. |
+
+#### Custom Metrics
+
+Besides the metrics created by the extension, functions can record their own metrics through the OpenTelemetry API. How this works depends on the runtime.
+
+##### Java
+
+With auto-instrumentation, Java functions can record their own metrics through the OpenTelemetry API (for example `GlobalOpenTelemetry.getMeter("my-app").counterBuilder("orders.processed").build().add(1)`). The agent exports them to the extension with an OTLP exporter that is enabled by default, and flushes them when the handler returns. Add `io.opentelemetry:opentelemetry-api` to your function as a regular runtime dependency (`implementation` in Gradle, the default `compile` scope in Maven); the agent only bundles a private copy. Set `OTEL_METRICS_EXPORTER=none` to turn metric export off.
+
+The agent's JVM runtime metrics (`jvm.*`) are disabled by default. To enable them, set `OTEL_INSTRUMENTATION_RUNTIME_TELEMETRY_ENABLED=true`. The OpenTelemetry SDK's own self-metrics about its exporter and span processor (`otlp.exporter.seen`, `otlp.exporter.exported`, `queueSize`, `processedSpans`) are also not exported by default; set `DASH0_JAVA_SDK_SELF_METRICS_ENABLED=true` to export them.
 
 #### Resource Attributes (Metrics)
 
