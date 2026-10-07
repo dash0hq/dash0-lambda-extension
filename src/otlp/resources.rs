@@ -1,10 +1,44 @@
+use once_cell::sync::Lazy;
 use opentelemetry_proto::tonic::common::v1::AnyValue;
 use opentelemetry_proto::tonic::common::v1::KeyValue;
+use parking_lot::Mutex;
+use std::sync::Arc;
+
+/// `opt/shared.sh` writes this file once per cold start and it never changes
+/// again for the life of the execution environment, so it only needs to be
+/// read and parsed once per process rather than on every call site that
+/// wants a value out of it (there are several, invoked on every export).
+static ENV_VARS_FILE_CACHE: Lazy<Mutex<Option<Arc<Option<serde_json::Value>>>>> =
+    Lazy::new(|| Mutex::new(None));
+
+fn cached_env_vars_file() -> Arc<Option<serde_json::Value>> {
+    let mut guard = ENV_VARS_FILE_CACHE.lock();
+    if let Some(cached) = guard.as_ref() {
+        return cached.clone();
+    }
+    let loaded = Arc::new(
+        std::fs::read_to_string("/tmp/dash0_env_vars")
+            .ok()
+            .and_then(|content| serde_json::from_str(&content).ok()),
+    );
+    *guard = Some(loaded.clone());
+    loaded
+}
+
+/// Test-only: the cache above assumes the file is written once at cold
+/// start, which doesn't hold across tests in this module that each write
+/// different content to the same path. Tests call this between runs so they
+/// don't see a previous test's cached value.
+#[cfg(test)]
+pub(crate) fn reset_env_vars_file_cache_for_test() {
+    *ENV_VARS_FILE_CACHE.lock() = None;
+}
 
 pub fn try_read_env_from_file(key: &str) -> Option<String> {
-    let content = std::fs::read_to_string("/tmp/dash0_env_vars").ok()?;
-    let json: serde_json::Value = serde_json::from_str(&content).ok()?;
-    json.get(key)
+    cached_env_vars_file()
+        .as_ref()
+        .as_ref()?
+        .get(key)
         .and_then(|v| v.as_str())
         .map(|s| s.to_string())
 }
@@ -124,6 +158,7 @@ mod tests {
     #[test]
     #[serial_test::serial]
     fn test_get_resources_attributes_structure() {
+        super::reset_env_vars_file_cache_for_test();
         let expected_service_name = "test-service-name";
         std::env::set_var("OTEL_SERVICE_NAME", expected_service_name);
 
@@ -150,6 +185,7 @@ mod tests {
     #[test]
     #[serial_test::serial]
     fn test_get_resources_attributes_from_file_fallback() {
+        super::reset_env_vars_file_cache_for_test();
         std::env::remove_var("OTEL_SERVICE_NAME");
         std::env::remove_var("OTEL_RESOURCE_ATTRIBUTES");
 
@@ -218,6 +254,7 @@ deployment.environment.name=preview,service.namespace=slfinrtl";
     #[test]
     #[serial_test::serial]
     fn test_configured_attributes_do_not_hide_wrapper_attributes() {
+        super::reset_env_vars_file_cache_for_test();
         std::env::remove_var("OTEL_SERVICE_NAME");
         std::env::set_var(
             "OTEL_RESOURCE_ATTRIBUTES",
@@ -264,6 +301,7 @@ deployment.environment.name=preview,service.namespace=slfinrtl";
     #[test]
     #[serial_test::serial]
     fn test_configured_value_wins_on_conflicting_key() {
+        super::reset_env_vars_file_cache_for_test();
         std::env::remove_var("OTEL_SERVICE_NAME");
         std::env::set_var(
             "OTEL_RESOURCE_ATTRIBUTES",
@@ -300,6 +338,7 @@ deployment.environment.name=preview,service.namespace=slfinrtl";
     #[test]
     #[serial_test::serial]
     fn test_service_name_precedence() {
+        super::reset_env_vars_file_cache_for_test();
         std::env::set_var("OTEL_SERVICE_NAME", "from-otel-service-name");
         std::env::set_var("OTEL_RESOURCE_ATTRIBUTES", "service.name=from-attributes");
         write_wrapper_file(WRAPPER_ATTRS);
@@ -333,6 +372,7 @@ deployment.environment.name=preview,service.namespace=slfinrtl";
     #[test]
     #[serial_test::serial]
     fn test_file_service_name_fallback_does_not_override_configured_resource_attribute() {
+        super::reset_env_vars_file_cache_for_test();
         std::env::remove_var("OTEL_SERVICE_NAME");
         std::env::set_var("OTEL_RESOURCE_ATTRIBUTES", "service.name=from-attributes");
         std::fs::write(
@@ -360,6 +400,7 @@ deployment.environment.name=preview,service.namespace=slfinrtl";
     #[test]
     #[serial_test::serial]
     fn test_malformed_pairs_are_skipped() {
+        super::reset_env_vars_file_cache_for_test();
         std::env::remove_var("OTEL_SERVICE_NAME");
         std::env::remove_var("OTEL_RESOURCE_ATTRIBUTES");
         write_wrapper_file(",,no-equals-sign,=orphan-value, spaced.key = spaced value ,ok=1");
