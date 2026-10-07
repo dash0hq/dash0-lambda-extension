@@ -151,6 +151,16 @@ public class Dash0ConfiguratorTest {
   }
 
   @Test
+  void sdkSelfMetricsAreKeptWhenOptedIn() {
+    Map<String, String> values = new HashMap<>();
+    values.put(Dash0Configurator.DASH0_JAVA_SDK_SELF_METRICS_ENABLED, "true");
+    Set<String> names = exportedMetricNames(values);
+    assertTrue(names.contains("orders.processed"));
+    assertTrue(names.contains("processedSpans"));
+    assertTrue(names.contains("otlp.exporter.seen"));
+  }
+
+  @Test
   void sdkSelfMetricsAreDropped() {
     Set<String> names = exportedMetricNames(new HashMap<>());
     assertTrue(names.contains("orders.processed"));

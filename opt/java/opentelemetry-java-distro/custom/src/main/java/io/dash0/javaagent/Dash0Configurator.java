@@ -48,6 +48,12 @@ public class Dash0Configurator implements AutoConfigurationCustomizerProvider {
   public static final String DASH0_EXTENSION_ENDPOINT = "dash0.extension.endpoint";
   public static final String DASH0_DEBUG_SPANDUMP = "dash0.debug.spandump";
 
+  /**
+   * Opt-in (env: DASH0_JAVA_SDK_SELF_METRICS_ENABLED, Java only). By default the SDK self-metrics
+   * are dropped; when true they are exported with the other metrics.
+   */
+  public static final String DASH0_JAVA_SDK_SELF_METRICS_ENABLED =
+      "dash0.java.sdk.self.metrics.enabled";
 
   /** Instrumentation scopes of the SDK self-metrics (exporter and span processor). */
   static final List<String> AGENT_SELF_METRIC_SCOPES =
@@ -67,9 +73,15 @@ public class Dash0Configurator implements AutoConfigurationCustomizerProvider {
         .addPropertiesSupplier(this::getDefaultProperties);
   }
 
-  /** Drops the SDK self-metrics (exporter and span processor), which have no customer value. */
+  /**
+   * Drops the SDK self-metrics (exporter and span processor) unless the user opted in with
+   * DASH0_JAVA_SDK_SELF_METRICS_ENABLED=true.
+   */
   SdkMeterProviderBuilder meterProviderCustomizer(
       SdkMeterProviderBuilder meterProvider, ConfigProperties cfg) {
+    if (Boolean.parseBoolean(cfg.getString(DASH0_JAVA_SDK_SELF_METRICS_ENABLED))) {
+      return meterProvider;
+    }
     for (String scope : AGENT_SELF_METRIC_SCOPES) {
       meterProvider.registerView(
           InstrumentSelector.builder().setMeterName(scope).build(),
@@ -139,7 +151,7 @@ public class Dash0Configurator implements AutoConfigurationCustomizerProvider {
     /*
      * Switch off the JVM runtime metrics by default; users can opt in with
      * OTEL_INSTRUMENTATION_RUNTIME_TELEMETRY_ENABLED=true. The SDK self-metrics are dropped by a
-     * view, see meterProviderCustomizer.
+     * view unless DASH0_JAVA_SDK_SELF_METRICS_ENABLED=true, see meterProviderCustomizer.
      */
     setIfNotSet(originalCfg, customizedCfg, "otel.instrumentation.runtime-telemetry.enabled", "false");
 
