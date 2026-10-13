@@ -55,9 +55,17 @@ public class Dash0Configurator implements AutoConfigurationCustomizerProvider {
   public static final String DASH0_JAVA_SDK_SELF_METRICS_ENABLED =
       "dash0.java.sdk.self.metrics.enabled";
 
-  /** Instrumentation scopes of the SDK self-metrics (exporter and span processor). */
+  /**
+   * Instrumentation scopes of the SDK self-metrics: the OTLP exporter (one scope per transport,
+   * shared by the span, log and metric exporters) and the batch span and log record processors.
+   */
   static final List<String> AGENT_SELF_METRIC_SCOPES =
-      Arrays.asList("io.opentelemetry.exporters.otlp-http", "io.opentelemetry.sdk.trace");
+      Arrays.asList(
+          "io.opentelemetry.exporters.otlp-http",
+          "io.opentelemetry.exporters.otlp-grpc",
+          "io.opentelemetry.exporters.otlp-http-json",
+          "io.opentelemetry.sdk.trace",
+          "io.opentelemetry.sdk.logs");
 
   public static final Logger LOGGER = Logger.getLogger(Dash0Configurator.class.getName());
 

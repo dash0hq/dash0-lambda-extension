@@ -32,6 +32,14 @@ import io.opentelemetry.sdk.metrics.data.AggregationTemporality;
 import io.opentelemetry.sdk.metrics.data.MetricData;
 import io.opentelemetry.sdk.metrics.export.MetricExporter;
 import io.opentelemetry.sdk.metrics.export.PeriodicMetricReader;
+import io.opentelemetry.sdk.logs.SdkLoggerProvider;
+import io.opentelemetry.sdk.logs.data.LogRecordData;
+import io.opentelemetry.sdk.logs.export.BatchLogRecordProcessor;
+import io.opentelemetry.sdk.logs.export.LogRecordExporter;
+import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import io.opentelemetry.sdk.trace.data.SpanData;
+import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
+import io.opentelemetry.sdk.trace.export.SpanExporter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -39,6 +47,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -109,6 +119,19 @@ public class Dash0ConfiguratorTest {
 
   /** Records one counter per scope through a meter provider built by the configurator. */
   private static Set<String> exportedMetricNames(Map<String, String> values) {
+    return exportedMetricNames(
+        values,
+        provider -> {
+          provider.get("custom-app").counterBuilder("orders.processed").build().add(1);
+          provider.get("io.opentelemetry.sdk.trace").counterBuilder("processedSpans").build().add(1);
+          provider.get("io.opentelemetry.exporters.otlp-http").counterBuilder("otlp.exporter.seen").build().add(1);
+          provider.get("io.opentelemetry.runtime-telemetry-java8").counterBuilder("jvm.class.loaded").build().add(1);
+        });
+  }
+
+  /** Runs the recorder against a meter provider built by the configurator and returns the exported metric names. */
+  private static Set<String> exportedMetricNames(
+      Map<String, String> values, Consumer<SdkMeterProvider> recorder) {
     List<MetricData> exported = new ArrayList<>();
     MetricExporter exporter =
         new MetricExporter() {
@@ -137,11 +160,8 @@ public class Dash0ConfiguratorTest {
         SdkMeterProvider.builder().registerMetricReader(PeriodicMetricReader.create(exporter));
     SdkMeterProvider provider =
         new Dash0Configurator().meterProviderCustomizer(builder, configOf(values)).build();
-    provider.get("custom-app").counterBuilder("orders.processed").build().add(1);
-    provider.get("io.opentelemetry.sdk.trace").counterBuilder("processedSpans").build().add(1);
-    provider.get("io.opentelemetry.exporters.otlp-http").counterBuilder("otlp.exporter.seen").build().add(1);
-    provider.get("io.opentelemetry.runtime-telemetry-java8").counterBuilder("jvm.class.loaded").build().add(1);
-    provider.forceFlush().join(5, java.util.concurrent.TimeUnit.SECONDS);
+    recorder.accept(provider);
+    provider.forceFlush().join(5, TimeUnit.SECONDS);
     provider.close();
     Set<String> names = new HashSet<>();
     for (MetricData m : exported) {
@@ -169,4 +189,92 @@ public class Dash0ConfiguratorTest {
     assertFalse(names.contains("otlp.exporter.seen"));
   }
 
+  /** Scopes of the SDK self-metrics, spelled out independently of the constant in the configurator. */
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "io.opentelemetry.exporters.otlp-http",
+        "io.opentelemetry.exporters.otlp-grpc",
+        "io.opentelemetry.exporters.otlp-http-json",
+        "io.opentelemetry.sdk.trace",
+        "io.opentelemetry.sdk.logs"
+      })
+  void sdkSelfMetricScopeIsDropped(String scope) {
+    Set<String> names =
+        exportedMetricNames(
+            new HashMap<>(),
+            provider -> {
+              provider.get("custom-app").counterBuilder("orders.processed").build().add(1);
+              provider.get(scope).counterBuilder("self.metric").build().add(1);
+            });
+    assertTrue(names.contains("orders.processed"));
+    assertFalse(names.contains("self.metric"));
+  }
+
+  /** Uses the real SDK batch processors, so the scope and metric names come from the SDK itself. */
+  @Test
+  void selfMetricsOfSdkBatchProcessorsAreDropped() {
+    SpanExporter spanExporter =
+        new SpanExporter() {
+          @Override
+          public CompletableResultCode export(Collection<SpanData> spans) {
+            return CompletableResultCode.ofSuccess();
+          }
+
+          @Override
+          public CompletableResultCode flush() {
+            return CompletableResultCode.ofSuccess();
+          }
+
+          @Override
+          public CompletableResultCode shutdown() {
+            return CompletableResultCode.ofSuccess();
+          }
+        };
+    LogRecordExporter logExporter =
+        new LogRecordExporter() {
+          @Override
+          public CompletableResultCode export(Collection<LogRecordData> logs) {
+            return CompletableResultCode.ofSuccess();
+          }
+
+          @Override
+          public CompletableResultCode flush() {
+            return CompletableResultCode.ofSuccess();
+          }
+
+          @Override
+          public CompletableResultCode shutdown() {
+            return CompletableResultCode.ofSuccess();
+          }
+        };
+    Set<String> names =
+        exportedMetricNames(
+            new HashMap<>(),
+            provider -> {
+              provider.get("custom-app").counterBuilder("orders.processed").build().add(1);
+              SdkTracerProvider tracerProvider =
+                  SdkTracerProvider.builder()
+                      .addSpanProcessor(
+                          BatchSpanProcessor.builder(spanExporter)
+                              .setMeterProvider(() -> provider)
+                              .build())
+                      .build();
+              tracerProvider.get("t").spanBuilder("s").startSpan().end();
+              tracerProvider.forceFlush().join(5, TimeUnit.SECONDS);
+              SdkLoggerProvider loggerProvider =
+                  SdkLoggerProvider.builder()
+                      .addLogRecordProcessor(
+                          BatchLogRecordProcessor.builder(logExporter)
+                              .setMeterProvider(() -> provider)
+                              .build())
+                      .build();
+              loggerProvider.get("l").logRecordBuilder().setBody("b").emit();
+              loggerProvider.forceFlush().join(5, TimeUnit.SECONDS);
+            });
+    assertTrue(names.contains("orders.processed"));
+    assertFalse(names.contains("queueSize"));
+    assertFalse(names.contains("processedSpans"));
+    assertFalse(names.contains("processedLogs"));
+  }
 }
