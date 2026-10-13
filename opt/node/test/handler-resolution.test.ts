@@ -56,6 +56,8 @@ interface Result {
   loadedFrom: string | null;
   loadError: string | null;
   statusCode: number | null;
+  /** Spans already exported when the handler returned, i.e. before Lambda freezes. */
+  spansAtHandlerReturn: number | null;
   lambdaHandler: string | null;
   spans: { name: string; scope: string }[];
   diag: string[];
@@ -94,6 +96,24 @@ function invoke({ handler, files, applyFix = false }: Scenario): Result {
 
   return JSON.parse(stdout);
 }
+
+describe('aws-lambda handler span export', () => {
+  /*
+   * Lambda freezes the environment right after the response, so a span still queued in the
+   * batch processor when the handler returns is not exported. The instrumentation flushes
+   * at that point, but only if it was handed the tracer provider.
+   */
+  it('exports the handler span before the handler returns', () => {
+    const result = invoke({
+      handler: 'index.handler',
+      files: { 'index.js': HANDLER_SOURCE },
+      applyFix: true,
+    });
+
+    expect(result.statusCode).toBe(200);
+    expect(result.spansAtHandlerReturn).toBe(1);
+  });
+});
 
 describe('aws-lambda handler file resolution', () => {
   describe('when upstream resolves the handler correctly', () => {

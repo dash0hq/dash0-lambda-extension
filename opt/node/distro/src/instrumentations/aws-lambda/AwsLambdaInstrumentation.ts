@@ -1,3 +1,4 @@
+import type { TracerProvider } from '@opentelemetry/api';
 import { AwsLambdaInstrumentation } from '@opentelemetry/instrumentation-aws-lambda';
 
 import { resolveLambdaHandler } from '../../lambdaHandlerResolution';
@@ -38,6 +39,8 @@ function makeExportsConfigurable(moduleExports: any): any {
 }
 
 export default class Dash0AwsLambdaInstrumentation extends TracingInstrumentor<AwsLambdaInstrumentation> {
+  private instrumentation?: AwsLambdaInstrumentation;
+
   /**
    * Every other instrumentation here asks "is this library installed", which is what the
    * inherited implementation answers. This one does not patch a package at all: it patches
@@ -86,6 +89,20 @@ export default class Dash0AwsLambdaInstrumentation extends TracingInstrumentor<A
       return originalOnRequire.call(this, module, makeExportsConfigurable(exports), name, basedir);
     };
 
+    this.instrumentation = instrumentation;
     return instrumentation;
+  }
+
+  /**
+   * Hands the distro's tracer provider to the instrumentation, once the distro has created
+   * it. Tracing works without this, through the global provider, but the instrumentation
+   * only learns how to flush a provider here: `setTracerProvider()` is the one place it
+   * stores the provider's `forceFlush`. Without that, the handler span is still in the
+   * batch queue when the handler returns and Lambda freezes the environment, so it is not
+   * exported. `init.mjs` used to do this by passing the provider to
+   * `registerInstrumentations`.
+   */
+  bindTracerProvider(tracerProvider: TracerProvider): void {
+    this.instrumentation?.setTracerProvider(tracerProvider);
   }
 }

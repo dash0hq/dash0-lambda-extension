@@ -47,7 +47,8 @@
  *   applyFix       when true, pass our corrected handler into the instrumentation config
  *
  * Prints a JSON result on stdout:
- *   { taskRoot, base, loadedFrom, loadError, statusCode, lambdaHandler, spans, diag }
+ *   { taskRoot, base, loadedFrom, loadError, statusCode, spansAtHandlerReturn,
+ *     lambdaHandler, spans, diag }
  */
 
 import fs from 'fs';
@@ -68,7 +69,7 @@ const { diag, DiagLogLevel } = require('@opentelemetry/api');
 const { AwsLambdaInstrumentation } = require('@opentelemetry/instrumentation-aws-lambda');
 const { registerInstrumentations } = require('@opentelemetry/instrumentation');
 const { NodeTracerProvider } = require('@opentelemetry/sdk-trace-node');
-const { InMemorySpanExporter, SimpleSpanProcessor } = require('@opentelemetry/sdk-trace-base');
+const { InMemorySpanExporter, BatchSpanProcessor } = require('@opentelemetry/sdk-trace-base');
 
 // Loaded before the capturing logger below is installed, and not after: `distro/src/
 // logging.ts` calls `diag.setLogger` as an import side effect -- that is how the layer
@@ -137,6 +138,11 @@ const lambdaHandler = scenario.applyFix ? resolveLambdaHandler() : undefined;
  * with no `tracerProvider` binds to the API's ProxyTracerProvider, whose tracers resolve
  * their delegate on each `startSpan`; `tracerProvider.register()` below supplies it, and
  * the handler is patched later still, when it is required.
+ *
+ * Creating the spans is not the whole job, though. The instrumentation also flushes the
+ * provider when the handler returns, because Lambda freezes the environment right after
+ * the response; it can only do that once it has been handed the provider, which
+ * `bindTracerProvider` below does, as `bootstrap.ts` does.
  */
 const instrumentor = new Dash0AwsLambdaInstrumentation();
 registerInstrumentations({
@@ -148,14 +154,20 @@ registerInstrumentations({
 });
 
 const memoryExporter = new InMemorySpanExporter();
+// A batch processor with a delay far longer than this process lives, like the layer's:
+// the only way a span reaches the exporter in time is the flush at handler return.
 const tracerProvider = new NodeTracerProvider({
-  spanProcessors: [new SimpleSpanProcessor(memoryExporter)],
+  spanProcessors: [new BatchSpanProcessor(memoryExporter, { scheduledDelayMillis: 600000 })],
 });
 tracerProvider.register();
+if (scenario.applyFix && instrumentor.isApplicable()) {
+  instrumentor.bindTracerProvider(tracerProvider);
+}
 
 const { base, resolved, error } = resolveLikeTheRuntime(scenario.handler);
 
 let statusCode = null;
+let spansAtHandlerReturn = null;
 let loadError = error;
 if (resolved) {
   try {
@@ -172,6 +184,9 @@ if (resolved) {
       }
     );
     statusCode = result.statusCode;
+    // What has reached the exporter by the time the handler has returned, which is the
+    // last moment before Lambda freezes the environment.
+    spansAtHandlerReturn = memoryExporter.getFinishedSpans().length;
   } catch (e) {
     loadError = e.code || String(e).split('\n')[0];
   }
@@ -186,6 +201,7 @@ process.stdout.write(
     loadedFrom: resolved ?? null,
     loadError: loadError ?? null,
     statusCode,
+    spansAtHandlerReturn,
     lambdaHandler: lambdaHandler ?? null,
     spans: memoryExporter.getFinishedSpans().map(span => ({
       name: span.name,
