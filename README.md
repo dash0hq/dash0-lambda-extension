@@ -113,7 +113,7 @@ The four `API_GATEWAY` variables below also apply to Application Load Balancer-t
 
 * `DASH0_JAVA_SDK_SELF_METRICS_ENABLED` - Java only. When set to `true`, exports the OpenTelemetry SDK's self-metrics (`otlp.exporter.seen`, `otlp.exporter.exported`, `queueSize`, `processedSpans`, `processedLogs`). Default: `false`.
 
-* `OTEL_INSTRUMENTATION_RUNTIME_TELEMETRY_ENABLED` - Java only. When set to `true`, exports the JVM runtime metrics (`jvm.*`). Default: `false`.
+* `DASH0_JAVA_RUNTIME_METRICS_ENABLED` - Java only. When set to `true`, exports the JVM runtime metrics (`jvm.*`). Default: `false`.
 
 ### Secret Masking
 
@@ -291,7 +291,7 @@ Besides the metrics created by the extension, functions can record their own met
 
 With auto-instrumentation, Java functions can record their own metrics through the OpenTelemetry API (for example `GlobalOpenTelemetry.getMeter("my-app").counterBuilder("orders.processed").build().add(1)`). The agent exports them to the extension with an OTLP exporter that is enabled by default, and flushes them when the handler returns. Add `io.opentelemetry:opentelemetry-api` to your function as a regular runtime dependency (`implementation` in Gradle, the default `compile` scope in Maven); the agent only bundles a private copy. Set `OTEL_METRICS_EXPORTER=none` to turn metric export off.
 
-The agent's JVM runtime metrics (`jvm.*`) are disabled by default. To enable them, set `OTEL_INSTRUMENTATION_RUNTIME_TELEMETRY_ENABLED=true`. The OpenTelemetry SDK's own self-metrics about its exporter and span processor (`otlp.exporter.seen`, `otlp.exporter.exported`, `queueSize`, `processedSpans`, `processedLogs`) are also not exported by default; set `DASH0_JAVA_SDK_SELF_METRICS_ENABLED=true` to export them.
+The agent's JVM runtime metrics (`jvm.*`) are disabled by default. To enable them, set `DASH0_JAVA_RUNTIME_METRICS_ENABLED=true`. The OpenTelemetry SDK's own self-metrics about its exporter and span processor (`otlp.exporter.seen`, `otlp.exporter.exported`, `queueSize`, `processedSpans`, `processedLogs`) are also not exported by default; set `DASH0_JAVA_SDK_SELF_METRICS_ENABLED=true` to export them.
 
 #### Resource Attributes (Metrics)
 

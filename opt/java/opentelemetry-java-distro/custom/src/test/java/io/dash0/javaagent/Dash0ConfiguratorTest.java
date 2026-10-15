@@ -110,6 +110,31 @@ public class Dash0ConfiguratorTest {
   }
 
   @Test
+  void runtimeMetricsOptInEnablesRuntimeTelemetry() {
+    Map<String, String> values = new HashMap<>();
+    values.put(Dash0Configurator.DASH0_JAVA_RUNTIME_METRICS_ENABLED, "true");
+    Map<String, String> result = new Dash0Configurator().propertiesCustomizer(configOf(values));
+    assertEquals("true", result.get(RUNTIME_TELEMETRY));
+  }
+
+  @Test
+  void runtimeMetricsOptInIsFalseUnlessTrue() {
+    Map<String, String> values = new HashMap<>();
+    values.put(Dash0Configurator.DASH0_JAVA_RUNTIME_METRICS_ENABLED, "false");
+    Map<String, String> result = new Dash0Configurator().propertiesCustomizer(configOf(values));
+    assertEquals("false", result.get(RUNTIME_TELEMETRY));
+  }
+
+  @Test
+  void explicitRuntimeTelemetryWinsOverRuntimeMetricsOptIn() {
+    Map<String, String> values = new HashMap<>();
+    values.put(Dash0Configurator.DASH0_JAVA_RUNTIME_METRICS_ENABLED, "true");
+    values.put(RUNTIME_TELEMETRY, "false");
+    Map<String, String> result = new Dash0Configurator().propertiesCustomizer(configOf(values));
+    assertFalse(result.containsKey(RUNTIME_TELEMETRY));
+  }
+
+  @Test
   void explicitRuntimeTelemetryIsNotOverridden() {
     Map<String, String> values = new HashMap<>();
     values.put(RUNTIME_TELEMETRY, "true");
