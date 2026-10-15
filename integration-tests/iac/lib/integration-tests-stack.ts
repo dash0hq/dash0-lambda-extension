@@ -379,6 +379,36 @@ class JavaStack extends cdk.NestedStack {
     const runtimes = JAVA_CDK_RUNTIMES;
 
     createLambdas(this, runtimes, props.layer, props.role, props.logGroup, props.prefix, overrides);
+
+    // Custom (user-defined) OpenTelemetry API metrics. Kept as a separate loop instead of a
+    // createLambdas scenario to avoid multiplying the function count. OTEL_METRICS_EXPORTER is
+    // intentionally not set: the test relies on the layer enabling the OTLP metrics exporter by default.
+    for (const runtime of runtimes) {
+      const runtimeName = runtime.name.replace(/\./g, '-');
+      for (const architecture of [lambda.Architecture.X86_64, lambda.Architecture.ARM_64]) {
+        const functionName = `${props.prefix}${runtimeName}-custommetrics-${architecture.name}`;
+        new lambda.Function(this, functionName, {
+          functionName,
+          runtime,
+          architecture,
+          memorySize: 512,
+          handler: 'org.example.CustomMetricsHandler::handleRequest',
+          timeout: cdk.Duration.seconds(10),
+          code: javaCode,
+          layers: [props.layer],
+          role: props.role,
+          environment: {
+            AWS_LAMBDA_EXEC_WRAPPER: "/opt/wrapper",
+            DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
+            DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
+            DASH0_EXTENSION_LOG_LEVEL: "info",
+            DASH0_SEND_ON_INVOCATION_END: 'true',
+          },
+          logGroup: props.logGroup,
+          loggingFormat: lambda.LoggingFormat.TEXT,
+        });
+      }
+    }
   }
 }
 

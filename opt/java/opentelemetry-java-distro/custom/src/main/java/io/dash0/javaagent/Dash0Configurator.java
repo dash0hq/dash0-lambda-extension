@@ -22,6 +22,10 @@ import io.dash0.javaagent.utils.Strings;
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizer;
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizerProvider;
 import io.opentelemetry.sdk.autoconfigure.spi.ConfigProperties;
+import io.opentelemetry.sdk.metrics.Aggregation;
+import io.opentelemetry.sdk.metrics.InstrumentSelector;
+import io.opentelemetry.sdk.metrics.SdkMeterProviderBuilder;
+import io.opentelemetry.sdk.metrics.View;
 import io.opentelemetry.sdk.trace.SdkTracerProviderBuilder;
 import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
 import java.util.*;
@@ -44,6 +48,33 @@ public class Dash0Configurator implements AutoConfigurationCustomizerProvider {
   public static final String DASH0_EXTENSION_ENDPOINT = "dash0.extension.endpoint";
   public static final String DASH0_DEBUG_SPANDUMP = "dash0.debug.spandump";
 
+  /**
+   * Opt-in (env: DASH0_JAVA_RUNTIME_METRICS_ENABLED, Java only). By default the JVM runtime metrics
+   * (jvm.*) are not exported; when true they are. An explicit
+   * OTEL_INSTRUMENTATION_RUNTIME_TELEMETRY_ENABLED takes precedence.
+   */
+  public static final String DASH0_JAVA_RUNTIME_METRICS_ENABLED =
+      "dash0.java.runtime.metrics.enabled";
+
+  /**
+   * Opt-in (env: DASH0_JAVA_SDK_SELF_METRICS_ENABLED, Java only). By default the SDK self-metrics
+   * are dropped; when true they are exported with the other metrics.
+   */
+  public static final String DASH0_JAVA_SDK_SELF_METRICS_ENABLED =
+      "dash0.java.sdk.self.metrics.enabled";
+
+  /**
+   * Instrumentation scopes of the SDK self-metrics: the OTLP exporter (one scope per transport,
+   * shared by the span, log and metric exporters) and the batch span and log record processors.
+   */
+  static final List<String> AGENT_SELF_METRIC_SCOPES =
+      Arrays.asList(
+          "io.opentelemetry.exporters.otlp-http",
+          "io.opentelemetry.exporters.otlp-grpc",
+          "io.opentelemetry.exporters.otlp-http-json",
+          "io.opentelemetry.sdk.trace",
+          "io.opentelemetry.sdk.logs");
+
   public static final Logger LOGGER = Logger.getLogger(Dash0Configurator.class.getName());
 
   public static final String DASH0_EXTENSION_ENDPOINT_URL =
@@ -54,7 +85,25 @@ public class Dash0Configurator implements AutoConfigurationCustomizerProvider {
     autoConfiguration
         .addPropertiesCustomizer(this::propertiesCustomizer)
         .addTracerProviderCustomizer(this::tracerProviderCustomizer)
+        .addMeterProviderCustomizer(this::meterProviderCustomizer)
         .addPropertiesSupplier(this::getDefaultProperties);
+  }
+
+  /**
+   * Drops the SDK self-metrics (exporter and span processor) unless the user opted in with
+   * DASH0_JAVA_SDK_SELF_METRICS_ENABLED=true.
+   */
+  SdkMeterProviderBuilder meterProviderCustomizer(
+      SdkMeterProviderBuilder meterProvider, ConfigProperties cfg) {
+    if (Boolean.parseBoolean(cfg.getString(DASH0_JAVA_SDK_SELF_METRICS_ENABLED))) {
+      return meterProvider;
+    }
+    for (String scope : AGENT_SELF_METRIC_SCOPES) {
+      meterProvider.registerView(
+          InstrumentSelector.builder().setMeterName(scope).build(),
+          View.builder().setAggregation(Aggregation.drop()).build());
+    }
+    return meterProvider;
   }
 
   private SdkTracerProviderBuilder tracerProviderCustomizer(
@@ -78,7 +127,7 @@ public class Dash0Configurator implements AutoConfigurationCustomizerProvider {
     return tracerProvider;
   }
 
-  private Map<String, String> propertiesCustomizer(ConfigProperties originalCfg) {
+  Map<String, String> propertiesCustomizer(ConfigProperties originalCfg) {
     String accessToken = originalCfg.getString(DASH0_TOKEN);
 
     Map<String, String> customizedCfg = new HashMap<>();
@@ -109,9 +158,25 @@ public class Dash0Configurator implements AutoConfigurationCustomizerProvider {
     setIfNotSet(originalCfg, customizedCfg, "otel.exporter.otlp.protocol", "http/protobuf");
 
     /*
-     * Disable the metrics exporter
+     * Enable the OTLP metrics exporter by default so that metrics recorded through the OpenTelemetry API
+     * (e.g. GlobalOpenTelemetry.getMeter) reach the Dash0 extension. Users can opt out with
+     * OTEL_METRICS_EXPORTER=none or -Dotel.metrics.exporter=none.
      */
-    setIfNotSet(originalCfg, customizedCfg, "otel.metrics.exporter", "none");
+    setIfNotSet(originalCfg, customizedCfg, "otel.metrics.exporter", "otlp");
+
+    /*
+     * Switch off the JVM runtime metrics by default; users can opt in with
+     * DASH0_JAVA_RUNTIME_METRICS_ENABLED=true (an explicit
+     * OTEL_INSTRUMENTATION_RUNTIME_TELEMETRY_ENABLED still wins). The SDK self-metrics are dropped
+     * by a view unless DASH0_JAVA_SDK_SELF_METRICS_ENABLED=true, see meterProviderCustomizer.
+     */
+    setIfNotSet(
+        originalCfg,
+        customizedCfg,
+        "otel.instrumentation.runtime-telemetry.enabled",
+        Boolean.parseBoolean(originalCfg.getString(DASH0_JAVA_RUNTIME_METRICS_ENABLED))
+            ? "true"
+            : "false");
 
     /*
      * Set limits in terms of span attribute length to match those that we have
