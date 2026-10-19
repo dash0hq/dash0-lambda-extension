@@ -128,19 +128,27 @@ The extension masks sensitive data in the payloads it captures. Any JSON key mat
 - `.*signature.*`
 - `.*authorization.*`
 
+[Secret masking by example](docs/masking.md) shows what each option below does to the captured span attributes, with the payload before and after masking.
+
 Masking applies to Lambda event and response payloads and to environment variables captured in traces, in every runtime. Masking of the payloads captured by the auto-instrumentation depends on the runtime:
 
 | | Node.js | Python | Java |
 |---|---|---|---|
 | Lambda event and response payloads | ✅ | ✅ | ✅ |
 | Environment variables (`DASH0_MASK_ENV_VARS`) | ✅ | ✅ | ✅ |
-| Payloads captured by the auto-instrumentation (`DASH0_MASK_RULES`) | ✅ | ✅ | ❌ |
-| `DASH0_MASK_REQUEST_BODY` | ✅ | ✅ | ❌ |
-| `DASH0_MASK_RESPONSE_BODY` | ✅ | ✅ | ❌ |
-| `DASH0_MASK_REQUEST_HEADERS` | ✅ | ✅ | ❌ |
-| `DASH0_MASK_RESPONSE_HEADERS` | ✅ | ✅ | ❌ |
+| Payloads captured by the auto-instrumentation (`DASH0_MASK_RULES`) | ✅ | ⚠️ ¹ | ❌ |
+| `DASH0_MASK_RULES=all` | ✅ | ❌ | ❌ |
+| `DASH0_MASK_REQUEST_BODY` | ✅ | ⚠️ ¹ | ❌ |
+| `DASH0_MASK_RESPONSE_BODY` | ✅ | ⚠️ ¹ | ❌ |
+| `DASH0_MASK_REQUEST_HEADERS` | ✅ | ⚠️ ¹ | ❌ |
+| `DASH0_MASK_RESPONSE_HEADERS` | ✅ | ⚠️ ¹ | ❌ |
 | `DASH0_MASK_QUERY_PARAMS` | ✅ | ❌ | ❌ |
-| Keys inside a JSON string body, e.g. an SQS `MessageBody` | ❌ | ✅ top-level body only | ❌ |
+| Kafka and RabbitMQ messages sent (masked with `DASH0_MASK_QUERY_PARAMS`) | ✅ | ❌ | ❌ |
+| Keys inside a JSON string body, e.g. an SQS `MessageBody` | ⚠️ JSON HTTP bodies only | ✅ strings starting with `{` | ❌ |
+
+¹ Python masks HTTP headers (except from `requests` and Django), AWS SDK payloads, FastAPI bodies, and MongoDB and PostgreSQL results. Bodies from `requests`, `httpx` and Django, and Redis, Kafka and RabbitMQ payloads, are not masked.
+
+In Python, patterns must match from the start of the key, so write `.*email.*`, not `email`. Some payloads are never masked, such as gRPC messages and PostgreSQL query parameters in Node.js. [Secret masking by example](docs/masking.md) lists them for each runtime.
 
 Masking matches keys. Where a body is a string that is not parsed, such as an SQS `MessageBody` in Node.js, mask it as a whole (see `all` below) or by its key (e.g. `.*MessageBody.*`).
 
@@ -150,11 +158,13 @@ Each variable takes a JSON array of regex patterns. Write patterns as `.*name.*`
 
 * `DASH0_MASK_RULES` - Patterns for all payloads. When set, this **replaces** the default patterns, so list the defaults too if you want to keep them.
 
-  Example: `DASH0_MASK_RULES='[".*pass.*", ".*key.*", ".*secret.*", ".*credential.*", ".*token.*", ".*email.*"]'`
+  Example: `DASH0_MASK_RULES='[".*pass.*", ".*key.*", ".*secret.*", ".*credential.*", ".*passphrase.*", ".*token.*", ".*signature.*", ".*authorization.*", ".*email.*"]'`
 
-* `DASH0_MASK_ENV_VARS` - Patterns for environment variables captured in traces. Falls back to `DASH0_MASK_RULES` (or the defaults).
+  This list also applies to environment variables unless `DASH0_MASK_ENV_VARS` is set. Keep `.*key.*`, `.*secret.*` and `.*token.*` in it, or the function's `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_SESSION_TOKEN` are sent unmasked.
 
-  Example: `DASH0_MASK_ENV_VARS='[".*PASSWORD.*", ".*API_KEY.*"]'`
+* `DASH0_MASK_ENV_VARS` - Patterns for environment variables captured in traces. Falls back to `DASH0_MASK_RULES` (or the defaults). Every environment variable is captured, including the AWS credentials, so keep `.*key.*`, `.*secret.*` and `.*token.*` in the list.
+
+  Example: `DASH0_MASK_ENV_VARS='[".*pass.*", ".*key.*", ".*secret.*", ".*credential.*", ".*token.*", ".*DATABASE_URL.*"]'`
 
 **Per-payload masking rules:**
 
@@ -169,7 +179,7 @@ These override `DASH0_MASK_RULES` for one kind of payload captured by the auto-i
 | `DASH0_MASK_QUERY_PARAMS` | HTTP query parameters |
 
 Examples:
-- Never capture SQS message bodies or HTTP request bodies: `DASH0_MASK_REQUEST_BODY=all`
+- Never capture outgoing HTTP request bodies or sent SQS messages: `DASH0_MASK_REQUEST_BODY=all`. Received messages need `DASH0_MASK_RESPONSE_BODY=all`. The bodies of SQS messages that trigger your function are part of the Lambda event, which only `DASH0_MASK_RULES` covers.
 - Keep the defaults and also mask SQS message bodies: `DASH0_MASK_RULES='[".*pass.*", ".*key.*", ".*secret.*", ".*credential.*", ".*passphrase.*", ".*token.*", ".*signature.*", ".*authorization.*", ".*MessageBody.*"]'`
 
 ## Manual Instrumentation
