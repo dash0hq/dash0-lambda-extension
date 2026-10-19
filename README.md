@@ -285,13 +285,38 @@ The extension creates the following histogram metrics for each Lambda invocation
 
 #### Custom Metrics
 
-Besides the metrics created by the extension, functions can record their own metrics through the OpenTelemetry API. How this works depends on the runtime.
+Besides the metrics created by the extension, functions can record their own metrics through the OpenTelemetry API. How this works depends on the runtime; the following applies to all of them:
+
+* Metrics are exported with the OpenTelemetry default, cumulative temporality. Set `OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE` (`cumulative`, `delta` or `lowmemory`) to change it.
+* `DASH0_DISABLE_TELEMETRY_METRICS` only disables the metrics created by the extension, not custom metrics.
 
 ##### Java
 
 With auto-instrumentation, Java functions can record their own metrics through the OpenTelemetry API (for example `GlobalOpenTelemetry.getMeter("my-app").counterBuilder("orders.processed").build().add(1)`). The agent exports them to the extension with an OTLP exporter that is enabled by default, and flushes them when the handler returns. Add `io.opentelemetry:opentelemetry-api` to your function as a regular runtime dependency (`implementation` in Gradle, the default `compile` scope in Maven); the agent only bundles a private copy. Set `OTEL_METRICS_EXPORTER=none` to turn metric export off.
 
 The agent's JVM runtime metrics (`jvm.*`) are disabled by default. To enable them, set `DASH0_JAVA_RUNTIME_METRICS_ENABLED=true`. The OpenTelemetry SDK's own self-metrics about its exporter and span processor (`otlp.exporter.seen`, `otlp.exporter.exported`, `queueSize`, `processedSpans`, `processedLogs`) are also not exported by default; set `DASH0_JAVA_SDK_SELF_METRICS_ENABLED=true` to export them.
+
+##### Node.js
+
+With auto-instrumentation, Node.js functions can record their own metrics through the OpenTelemetry API. The layer registers a global `MeterProvider` that exports to the extension, and flushes it when the handler returns, so there is no `MeterProvider` to set up and no `forceFlush()` to call:
+
+```js
+import { metrics } from '@opentelemetry/api';
+
+const meter = metrics.getMeter('my-app');
+const ordersProcessed = meter.createCounter('orders.processed');
+const orderValue = meter.createHistogram('order.value', { unit: 'EUR' });
+
+export async function handler(event) {
+    ordersProcessed.add(1, { 'order.type': event.type });
+    orderValue.record(event.total);
+    return { statusCode: 200 };
+}
+```
+
+Add `@opentelemetry/api` to your function as a regular dependency and bundle it with your code; the layer only bundles a private copy. The global `MeterProvider` is shared across copies of the API as long as the major version matches and the minor version of your copy is not higher than the layer's (currently `1.9`), so any `@opentelemetry/api` from `1.0.0` up to `1.9.x` works.
+
+Only metrics your code records are exported: the layer's library instrumentations (HTTP, AWS SDK, databases, ...) and the OpenTelemetry SDK do not emit metrics of their own. Functions that record no metrics send nothing to the metrics endpoint. Custom metrics are part of auto-instrumentation, so setting `DASH0_DISABLE_AUTO_INSTRUMENTATION` or `DASH0_DISABLE_TELEMETRY_TRACES` turns them off as well.
 
 #### Resource Attributes (Metrics)
 

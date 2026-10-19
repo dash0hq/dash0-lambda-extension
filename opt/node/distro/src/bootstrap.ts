@@ -1,3 +1,5 @@
+import { metrics } from '@opentelemetry/api';
+import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { registerInstrumentations } from '@opentelemetry/instrumentation';
 import type { Resource } from '@opentelemetry/resources';
@@ -10,6 +12,7 @@ import {
 } from '@opentelemetry/resources';
 import {BasicTracerProvider, BatchSpanProcessor, SimpleSpanProcessor} from '@opentelemetry/sdk-trace-base';
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
+import { MeterProvider, PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
 
 import {
   DEFAULT_DASH0_EXTENSION_ENDPOINT,
@@ -53,6 +56,7 @@ declare global {
 
 export interface Dash0SdkInitialization {
   readonly tracerProvider: BasicTracerProvider;
+  readonly meterProvider: MeterProvider;
   readonly resource: Resource;
   readonly instrumentedModules: string[];
 }
@@ -61,6 +65,7 @@ import { dirname, join } from 'path';
 import { logger } from './logging';
 
 const traceEndpoint = process.env.DASH0_EXTENSION_ENDPOINT || DEFAULT_DASH0_EXTENSION_ENDPOINT;
+const metricsEndpoint = new URL('/v1/metrics', traceEndpoint).toString();
 
 let isTraceInitialized = false;
 
@@ -193,12 +198,35 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
       }),
     });
 
+    /*
+     * Registered after the library instrumentations above, which take their meter when they
+     * are created: only metrics recorded by the application reach this provider. The
+     * aws-lambda instrumentation force-flushes it at handler exit (see `init.mjs`), so the
+     * periodic export is only a fallback.
+     */
+    const meterProvider = new MeterProvider({
+      resource,
+      readers: [
+        new PeriodicExportingMetricReader({
+          exporter: new OTLPMetricExporter({
+            url: metricsEndpoint,
+            headers: {
+              Authorization: `Bearer ${dashToken.trim()}`,
+            },
+          }),
+          exportIntervalMillis: 60_000,
+        }),
+      ],
+    });
+    metrics.setGlobalMeterProvider(meterProvider);
+
     logger.info(
       `Dash0 OpenTelemetry Distro started`
     );
 
     return {
       tracerProvider,
+      meterProvider,
       resource,
       instrumentedModules,
     };
