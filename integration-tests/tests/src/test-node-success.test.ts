@@ -53,7 +53,9 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
     ]
     if (traced) {
         logsToBeChecked.push(
-            { message: JSON.stringify({ name: "dash0_payload", type: "http_request_body", message: { title: "foo", body: "bar", userId: 1 } }), isJson: true, spanId: httpSpanId, attributes: { "dash0.faas.payload_type": "http_request_body" } },
+            // masked_field is masked by the Node distro, not the extension: the stack sets
+            // DASH0_MASK_RULES, which opt/shared.sh maps onto the distro's masking config.
+            { message: JSON.stringify({ name: "dash0_payload", type: "http_request_body", message: { title: "foo", body: "bar", userId: 1, masked_field: "****" } }), isJson: true, spanId: httpSpanId, attributes: { "dash0.faas.payload_type": "http_request_body" } },
             { message: JSON.stringify({ name: "dash0_payload", type: "http_response_body" }), isJson: true, spanId: httpSpanId, attributes: { "dash0.faas.payload_type": "http_response_body" } },
         );
     }

@@ -7,6 +7,8 @@ export async function handler(event) {
         title: 'foo',
         body: 'bar',
         userId: 1,
+        // Masked by the Node distro via DASH0_MASK_RULES, set on the function by the stack.
+        masked_field: 'this should not be seen!',
     });
 
     const response = await new Promise((resolve, reject) => {
