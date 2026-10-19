@@ -19,6 +19,7 @@ import { FileSpanExporter } from './exporters';
 import Dash0GrpcInstrumentation from './instrumentations/@grpc/grpc-js/GrpcInstrumentation';
 import Dash0NestInstrumentation from './instrumentations/@nestjs/core/NestInstrumentation';
 import Dash0AmqplibInstrumentation from './instrumentations/amqplib/AmqplibInstrumentation';
+import Dash0AwsLambdaInstrumentation from './instrumentations/aws-lambda/AwsLambdaInstrumentation';
 import Dash0ExpressInstrumentation from './instrumentations/express/ExpressInstrumentation';
 import Dash0FastifyInstrumentation from './instrumentations/fastify/FastifyInstrumentation';
 import Dash0HttpInstrumentation from './instrumentations/https/HttpInstrumentation';
@@ -97,8 +98,11 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
 
     const ignoredHostnames = [new URL(traceEndpoint).hostname];
 
+    const lambdaInstrumentation = new Dash0AwsLambdaInstrumentation();
+
     const instrumentationsToInstall = [
       new Dash0AmqplibInstrumentation(),
+      lambdaInstrumentation,
       new Dash0ExpressInstrumentation(),
       new Dash0GrpcInstrumentation(),
       new Dash0NestInstrumentation(),
@@ -192,6 +196,10 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
         ],
       }),
     });
+
+    // Must follow the provider's creation: see the method for why the Lambda
+    // instrumentation needs the provider itself, not only the global one.
+    lambdaInstrumentation.bindTracerProvider(tracerProvider);
 
     logger.info(
       `Dash0 OpenTelemetry Distro started`

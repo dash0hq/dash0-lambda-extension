@@ -10,6 +10,10 @@
  *   - jest patches `Module._resolveFilename`, so a resolution assertion made inside jest
  *     would be testing jest's resolver rather than Node's. This runner is plain Node.
  *
+ * Being plain Node, it consumes the distro the way the layer does: from `distro/dist`, so
+ * `npm run build` has to have run. The `node-distro-test` CI job builds before testing for
+ * this reason.
+ *
  * What it models
  * --------------
  * The AWS Lambda runtime interface client (`dist/function/module-loader.js`, inlined into
@@ -43,7 +47,8 @@
  *   applyFix       when true, pass our corrected handler into the instrumentation config
  *
  * Prints a JSON result on stdout:
- *   { taskRoot, base, loadedFrom, loadError, statusCode, lambdaHandler, spans, diag }
+ *   { taskRoot, base, loadedFrom, loadError, statusCode, spansAtHandlerReturn,
+ *     lambdaHandler, spans, diag }
  */
 
 import fs from 'fs';
@@ -61,6 +66,21 @@ process.env.AWS_LAMBDA_FUNCTION_NAME = 'handler-resolution-test';
 
 const { diag, DiagLogLevel } = require('@opentelemetry/api');
 
+const { AwsLambdaInstrumentation } = require('@opentelemetry/instrumentation-aws-lambda');
+const { registerInstrumentations } = require('@opentelemetry/instrumentation');
+const { NodeTracerProvider } = require('@opentelemetry/sdk-trace-node');
+const { InMemorySpanExporter, BatchSpanProcessor } = require('@opentelemetry/sdk-trace-base');
+
+// Loaded before the capturing logger below is installed, and not after: `distro/src/
+// logging.ts` calls `diag.setLogger` as an import side effect -- that is how the layer
+// gets a logger at all -- and reaches this file through `instrumentor.ts` ->
+// `requireUtils.ts`. Requiring it afterwards would silently replace the logger the
+// assertions read.
+const DISTRO = '../../distro/dist/src';
+const { resolveLambdaHandler } = require(`${DISTRO}/lambdaHandlerResolution.js`);
+const Dash0AwsLambdaInstrumentation =
+  require(`${DISTRO}/instrumentations/aws-lambda/AwsLambdaInstrumentation.js`).default;
+
 // Capture what would reach the function's CloudWatch log group, so the test can assert on
 // the exact line customers report.
 const diagMessages = [];
@@ -69,13 +89,6 @@ diag.setLogger(
   { verbose() {}, debug() {}, info() {}, warn: collect, error: collect },
   DiagLogLevel.WARN
 );
-
-const { AwsLambdaInstrumentation } = require('@opentelemetry/instrumentation-aws-lambda');
-const { registerInstrumentations } = require('@opentelemetry/instrumentation');
-const { NodeTracerProvider } = require('@opentelemetry/sdk-trace-node');
-const { InMemorySpanExporter, SimpleSpanProcessor } = require('@opentelemetry/sdk-trace-base');
-
-const { resolveLambdaHandler } = await import('../../lambdaHandlerResolution.mjs');
 
 /** The runtime interface client's `loadModule`, minus the loading. */
 function resolveLikeTheRuntime(handlerDef) {
@@ -111,23 +124,50 @@ function resolveLikeTheRuntime(handlerDef) {
   }
 }
 
-const memoryExporter = new InMemorySpanExporter();
-const tracerProvider = new NodeTracerProvider({
-  spanProcessors: [new SimpleSpanProcessor(memoryExporter)],
-});
-
-// Mirrors `opt/node/init.mjs`: an empty config without the fix, and a corrected
-// `lambdaHandler` with it.
+// Reported back to the test. With the fix this is what the instrumentation below is
+// built with; without it, what it would have been built with.
 const lambdaHandler = scenario.applyFix ? resolveLambdaHandler() : undefined;
 
+/*
+ * Mirrors `distro/src/bootstrap.ts`, ordering included: with the fix, the distro's own
+ * wrapper, gated on `isApplicable()` and registered against no explicit tracer provider;
+ * without it, the bare upstream instrumentation that the wrapper replaced.
+ *
+ * The provider is created and registered globally only afterwards -- so these scenarios
+ * also pin down that the late binding reaches the handler spans. `registerInstrumentations`
+ * with no `tracerProvider` binds to the API's ProxyTracerProvider, whose tracers resolve
+ * their delegate on each `startSpan`; `tracerProvider.register()` below supplies it, and
+ * the handler is patched later still, when it is required.
+ *
+ * Creating the spans is not the whole job, though. The instrumentation also flushes the
+ * provider when the handler returns, because Lambda freezes the environment right after
+ * the response; it can only do that once it has been handed the provider, which
+ * `bindTracerProvider` below does, as `bootstrap.ts` does.
+ */
+const instrumentor = new Dash0AwsLambdaInstrumentation();
 registerInstrumentations({
-  instrumentations: [new AwsLambdaInstrumentation(lambdaHandler ? { lambdaHandler } : {})],
-  tracerProvider,
+  instrumentations: [
+    scenario.applyFix && instrumentor.isApplicable()
+      ? instrumentor.getInstrumentation()
+      : new AwsLambdaInstrumentation({}),
+  ],
 });
+
+const memoryExporter = new InMemorySpanExporter();
+// A batch processor with a delay far longer than this process lives, like the layer's:
+// the only way a span reaches the exporter in time is the flush at handler return.
+const tracerProvider = new NodeTracerProvider({
+  spanProcessors: [new BatchSpanProcessor(memoryExporter, { scheduledDelayMillis: 600000 })],
+});
+tracerProvider.register();
+if (scenario.applyFix && instrumentor.isApplicable()) {
+  instrumentor.bindTracerProvider(tracerProvider);
+}
 
 const { base, resolved, error } = resolveLikeTheRuntime(scenario.handler);
 
 let statusCode = null;
+let spansAtHandlerReturn = null;
 let loadError = error;
 if (resolved) {
   try {
@@ -144,6 +184,9 @@ if (resolved) {
       }
     );
     statusCode = result.statusCode;
+    // What has reached the exporter by the time the handler has returned, which is the
+    // last moment before Lambda freezes the environment.
+    spansAtHandlerReturn = memoryExporter.getFinishedSpans().length;
   } catch (e) {
     loadError = e.code || String(e).split('\n')[0];
   }
@@ -158,6 +201,7 @@ process.stdout.write(
     loadedFrom: resolved ?? null,
     loadError: loadError ?? null,
     statusCode,
+    spansAtHandlerReturn,
     lambdaHandler: lambdaHandler ?? null,
     spans: memoryExporter.getFinishedSpans().map(span => ({
       name: span.name,

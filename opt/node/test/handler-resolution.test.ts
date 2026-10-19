@@ -10,7 +10,7 @@
  * configured with a handler carrying a directory prefix that is not in the package.
  *
  * This is instrumentation-only. The Rust extension never reads the handler string, and
- * neither did `opt/node/init.mjs` before the fix under test: it constructed
+ * neither did the layer before the fix under test: it constructed
  * `AwsLambdaInstrumentation` with an empty config and left resolution to upstream.
  *
  * The gap: the Lambda runtime resolves the handler module in five steps, and upstream
@@ -20,8 +20,8 @@
  * downstream treats this as an error, because a hook that matches nothing is a normal
  * state.
  *
- * `opt/node/lambdaHandlerResolution.mjs` closes it by computing what the runtime will
- * actually load and passing it to upstream's `lambdaHandler` config option.
+ * `opt/node/distro/src/lambdaHandlerResolution.ts` closes it by computing what the
+ * runtime will actually load and passing it to upstream's `lambdaHandler` config option.
  *
  * Every scenario runs in its own process; see `handler-resolution/runner.mjs`, which also
  * explains what it models and where it deliberately deviates. Full write-up, including
@@ -46,7 +46,7 @@ interface Scenario {
   handler: string;
   /** The deployment package: path inside it -> contents. */
   files: Record<string, string>;
-  /** Whether to apply our handler correction, as `init.mjs` does. */
+  /** Whether to instrument through the distro's wrapper, which applies the correction. */
   applyFix?: boolean;
 }
 
@@ -56,6 +56,8 @@ interface Result {
   loadedFrom: string | null;
   loadError: string | null;
   statusCode: number | null;
+  /** Spans already exported when the handler returned, i.e. before Lambda freezes. */
+  spansAtHandlerReturn: number | null;
   lambdaHandler: string | null;
   spans: { name: string; scope: string }[];
   diag: string[];
@@ -94,6 +96,24 @@ function invoke({ handler, files, applyFix = false }: Scenario): Result {
 
   return JSON.parse(stdout);
 }
+
+describe('aws-lambda handler span export', () => {
+  /*
+   * Lambda freezes the environment right after the response, so a span still queued in the
+   * batch processor when the handler returns is not exported. The instrumentation flushes
+   * at that point, but only if it was handed the tracer provider.
+   */
+  it('exports the handler span before the handler returns', () => {
+    const result = invoke({
+      handler: 'index.handler',
+      files: { 'index.js': HANDLER_SOURCE },
+      applyFix: true,
+    });
+
+    expect(result.statusCode).toBe(200);
+    expect(result.spansAtHandlerReturn).toBe(1);
+  });
+});
 
 describe('aws-lambda handler file resolution', () => {
   describe('when upstream resolves the handler correctly', () => {
