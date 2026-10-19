@@ -93,6 +93,11 @@ function createLambdas(
             if (runtime.family === lambda.RuntimeFamily.NODEJS) {
               environment["DASH0_MASK_RULES"] = '[".*masked_field.*"]';
               environment["MASKED_FIELD"] = 'sensitive information';
+              if (scenario === "success") {
+                // `title` is not covered by the default masking rules, so it is masked only if
+                // the wrapper maps DASH0_MASK_REQUEST_BODY to the distro's LUMIGO_* variable
+                environment["DASH0_MASK_REQUEST_BODY"] = '[".*title.*"]';
+              }
             }
 
             const functionName = `${prefix}${runtimeName}-${scenario}-${traced}-invocation-end-${invocationEnd}-${architecture.name}`;
