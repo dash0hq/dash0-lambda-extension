@@ -117,53 +117,60 @@ The four `API_GATEWAY` variables below also apply to Application Load Balancer-t
 
 ### Secret Masking
 
-The extension automatically masks sensitive data in traces payloads. By default, any JSON key matching these patterns (case-insensitive) will have its value replaced with `****`:
+The extension masks sensitive data in the payloads it captures. Any JSON key matching one of these patterns (case-insensitive) has its value replaced with `****`:
 
 - `.*pass.*`
 - `.*key.*`
 - `.*secret.*`
 - `.*credential.*`
 - `.*passphrase.*`
+- `.*token.*`
+- `.*signature.*`
+- `.*authorization.*`
 
-This is applied to:
-- Lambda event payloads
-- Lambda response payloads
-- Any http request/response payloads captured by the auto-instrumentation
+Masking applies to Lambda event and response payloads and to environment variables captured in traces, in every runtime. Masking of the payloads captured by the auto-instrumentation depends on the runtime:
+
+| | Node.js | Python | Java |
+|---|---|---|---|
+| Lambda event and response payloads | ✅ | ✅ | ✅ |
+| Environment variables (`DASH0_MASK_ENV_VARS`) | ✅ | ✅ | ✅ |
+| Payloads captured by the auto-instrumentation (`DASH0_MASK_RULES`) | ✅ | ✅ | ❌ |
+| `DASH0_MASK_REQUEST_BODY` | ✅ | ✅ | ❌ |
+| `DASH0_MASK_RESPONSE_BODY` | ✅ | ✅ | ❌ |
+| `DASH0_MASK_REQUEST_HEADERS` | ✅ | ✅ | ❌ |
+| `DASH0_MASK_RESPONSE_HEADERS` | ✅ | ✅ | ❌ |
+| `DASH0_MASK_QUERY_PARAMS` | ✅ | ❌ | ❌ |
+| Keys inside a JSON string body, e.g. an SQS `MessageBody` | ❌ | ✅ top-level body only | ❌ |
+
+Masking matches keys. Where a body is a string that is not parsed, such as an SQS `MessageBody` in Node.js, mask it as a whole (see `all` below) or by its key (e.g. `.*MessageBody.*`).
 
 **Custom masking rules:**
 
-* `DASH0_MASK_RULES` - JSON array of regex patterns to customize which keys are masked. When set, this **replaces** the default patterns.
+Each variable takes a JSON array of regex patterns. Write patterns as `.*name.*` so they match anywhere in the key in every runtime. A value that is not a JSON array is ignored with a warning in the function's logs, and the fallback applies (`DASH0_MASK_RULES`, or the defaults).
 
-  Example: `DASH0_MASK_RULES='[".*token.*", ".*auth.*", ".*private.*"]'`
+* `DASH0_MASK_RULES` - Patterns for all payloads. When set, this **replaces** the default patterns, so list the defaults too if you want to keep them.
 
-* `DASH0_MASK_ENV_VARS` - JSON array of regex patterns specifically for masking environment variables captured in traces. When not set, falls back to using `DASH0_MASK_RULES` (or the defaults).
+  Example: `DASH0_MASK_RULES='[".*pass.*", ".*key.*", ".*secret.*", ".*credential.*", ".*token.*", ".*email.*"]'`
+
+* `DASH0_MASK_ENV_VARS` - Patterns for environment variables captured in traces. Falls back to `DASH0_MASK_RULES` (or the defaults).
 
   Example: `DASH0_MASK_ENV_VARS='[".*PASSWORD.*", ".*API_KEY.*"]'`
 
-**Secret masking in HTTP request and response payloads:**
+**Per-payload masking rules:**
 
-The following environment variables allow fine-grained control over secret masking in HTTP payloads captured by the auto-instrumentation. Each accepts a JSON array of regex patterns. When not set, they fall back to `DASH0_MASK_RULES` (or the defaults).
+These override `DASH0_MASK_RULES` for one kind of payload captured by the auto-instrumentation (see the table above for runtime support). When not set, that payload uses `DASH0_MASK_RULES` (or the defaults). Instead of a JSON array, each also accepts the value `all`, which replaces the whole payload with `****`.
 
-* `DASH0_MASK_REQUEST_BODY` - Regex patterns for masking keys in HTTP request bodies.
+| Variable | Applies to |
+|---|---|
+| `DASH0_MASK_REQUEST_BODY` | HTTP request bodies, SQS `SendMessage`/`SendMessageBatch` bodies |
+| `DASH0_MASK_RESPONSE_BODY` | HTTP response bodies, SQS `ReceiveMessage` bodies |
+| `DASH0_MASK_REQUEST_HEADERS` | HTTP request headers |
+| `DASH0_MASK_RESPONSE_HEADERS` | HTTP response headers |
+| `DASH0_MASK_QUERY_PARAMS` | HTTP query parameters |
 
-  Example: `DASH0_MASK_REQUEST_BODY='[".*credit_card.*", ".*ssn.*"]'`
-
-* `DASH0_MASK_REQUEST_HEADERS` - Regex patterns for masking HTTP request header names.
-
-  Example: `DASH0_MASK_REQUEST_HEADERS='[".*authorization.*", ".*cookie.*"]'`
-
-* `DASH0_MASK_RESPONSE_BODY` - Regex patterns for masking keys in HTTP response bodies.
-
-  Example: `DASH0_MASK_RESPONSE_BODY='[".*token.*", ".*session.*"]'`
-
-* `DASH0_MASK_RESPONSE_HEADERS` - Regex patterns for masking HTTP response header names.
-
-  Example: `DASH0_MASK_RESPONSE_HEADERS='[".*set-cookie.*"]'`
-
-* `DASH0_MASK_QUERY_PARAMS` - Regex patterns for masking HTTP query parameter names.
-
-  Example: `DASH0_MASK_QUERY_PARAMS='[".*api_key.*", ".*token.*"]'`
-
+Examples:
+- Never capture SQS message bodies or HTTP request bodies: `DASH0_MASK_REQUEST_BODY=all`
+- Keep the defaults and also mask SQS message bodies: `DASH0_MASK_RULES='[".*pass.*", ".*key.*", ".*secret.*", ".*credential.*", ".*passphrase.*", ".*token.*", ".*signature.*", ".*authorization.*", ".*MessageBody.*"]'`
 
 ## Manual Instrumentation
 

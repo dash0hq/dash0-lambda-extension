@@ -52,6 +52,8 @@ jobs:
         run: |
           python -m venv opt/python/distro/.venv
           opt/python/distro/.venv/bin/pip install -r opt/python/distro/requirements-dev.txt
+      - name: Run wrapper script tests
+        run: bash opt/test/shared.test.sh
       - name: Run tests
         working-directory: opt/python/distro
         run: .venv/bin/pytest
@@ -70,6 +72,8 @@ jobs:
       - name: Install dependencies
         working-directory: opt/node
         run: npm install
+      - name: Run wrapper script tests
+        run: bash opt/test/shared.test.sh
       - name: Run tests
         working-directory: opt/node
         run: npm test
