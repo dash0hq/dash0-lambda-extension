@@ -633,13 +633,9 @@ Function log:
 +{ "email": "jane@example.com", "password": "****", "apiToken": "****", "orderId": "42" }
 ```
 
-The wrapper only checks the shape of the value. A value that looks like an array but isn't valid JSON, such as `[".*email.*",]`, gets past that check, and then:
+Values that look like an array but aren't a valid JSON array of strings, such as `[".*email.*",]`, `[.*email.*]` or `[null]`, are ignored in the same way.
 
-- **Node.js** uses the masking library's own built-in patterns for that payload, even when `DASH0_MASK_RULES` is set.
-- **Python** stops masking if the value is in `DASH0_MASK_RULES`. In a per-payload variable, it falls back to `DASH0_MASK_RULES` or the defaults.
-- **The extension** uses the defaults.
-
-In the extension, a pattern that isn't a valid regular expression is dropped without a warning, and `[]` turns masking off.
+The wrapper doesn't check that each string is a valid regular expression. The extension drops such a pattern without a warning. `[]` is a valid value, and in the extension it turns masking off.
 
 ## Payloads that are strings
 

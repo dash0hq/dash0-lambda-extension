@@ -103,7 +103,8 @@ assert_eq "does not set per-payload vars that are not configured" \
 
 # --- invalid values ---------------------------------------------------------------------
 
-for invalid in 'not json' '[".*email.*"' '".*email.*"' '{"a": 1}'; do
+for invalid in 'not json' '[".*email.*"' '".*email.*"' '{"a": 1}' \
+  '[null]' '[1]' '[".*email.*",]' '[.*email.*]' '[".*a.*" ".*b.*"]' '[".*a.*\"]' '[[".*a.*"]]'; do
   assert_eq "DASH0_MASK_RULES=$invalid falls back to the defaults, like the Rust extension" \
     "$DEFAULT_RULES" "$(mapped LUMIGO_SECRET_MASKING_REGEX DASH0_MASK_RULES="$invalid")"
 done
@@ -123,6 +124,11 @@ assert_contains "warns on stderr naming DASH0_MASK_QUERY_PARAMS" "DASH0_MASK_QUE
 mapped LUMIGO_SECRET_MASKING_REGEX DASH0_MASK_RULES=$' [".*a.*"]\n' DASH0_MASK_REQUEST_BODY=all >/dev/null
 assert_eq "accepts JSON arrays with surrounding whitespace and \"all\" without warning" \
   "" "$(cat "$STDERR_FILE")"
+
+for valid in '[]' '[ ]' '[".*a.*", ".*b.*"]' $'[\n  ".*a.*",\n  ".*b.*"\n]' '["^x\\.y$"]' '["say \"hi\""]' '[",", "]"]'; do
+  assert_eq "accepts the JSON array $valid" \
+    "$valid" "$(mapped LUMIGO_SECRET_MASKING_REGEX DASH0_MASK_RULES="$valid")"
+done
 
 # --- wiring -----------------------------------------------------------------------------
 

@@ -43,11 +43,14 @@ DASH0_DEFAULT_MASK_RULES='[".*pass.*",".*key.*",".*secret.*",".*credential.*",".
 # DASH0_MASK_* variables onto them here, before the runtime starts. A DASH0_MASK_* value
 # overrides its LUMIGO_* counterpart; LUMIGO_* still works on its own for backwards
 # compatibility. Values (a JSON array of regexes, or "all") are passed through verbatim.
-# A value of any other shape is ignored with a warning, so that it falls back to
-# DASH0_MASK_RULES or the defaults, as in the Rust extension, rather than to the Lumigo
-# libraries' own built-in defaults.
+# Any other value, including malformed JSON such as '[null]' or '["a",]', is ignored with a
+# warning, so that it falls back to DASH0_MASK_RULES or the defaults, as in the Rust
+# extension, rather than to the Lumigo libraries' own built-in defaults.
 is_valid_mask_value() {
-  [[ "$1" == "all" || "$1" =~ ^[[:space:]]*\[.*\][[:space:]]*$ ]]
+  # A JSON array of strings is a regular language, so it can be validated exactly here.
+  local string='"([^"\\]|\\.)*"'
+  local array="^[[:space:]]*\[[[:space:]]*(${string}[[:space:]]*(,[[:space:]]*${string}[[:space:]]*)*)?\][[:space:]]*$"
+  [[ "$1" == "all" || "$1" =~ $array ]]
 }
 
 valid_mask_value_of() {
