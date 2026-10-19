@@ -17,7 +17,7 @@ pub async fn metrics(req: Request<Incoming>) -> Result<Response<ResBody>, hyper:
     let mut encoded_body: Vec<u8> = body_bytes.to_vec();
     let mut converted_from_json = false;
 
-    tracing::info!(
+    tracing::debug!(
         "[{}] /v1/metrics body: {}",
         crate::log_prefix(),
         String::from_utf8_lossy(&encoded_body)

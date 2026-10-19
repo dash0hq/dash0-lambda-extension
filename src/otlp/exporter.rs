@@ -7,6 +7,8 @@ use flate2::Compression;
 use http_body_util::Full;
 use hyper::{header, Request, Uri};
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
+use opentelemetry_proto::tonic::common::v1::KeyValue;
+use opentelemetry_proto::tonic::resource::v1::Resource;
 use prost::Message;
 
 use crate::config::{get_dash0_dataset, request_retries, request_timeout_ms};
@@ -49,7 +51,7 @@ pub async fn flush_telemetry_logs(exclude_invocation_id: Option<&str>) {
 
     let resource_logs = ResourceLogs {
         resource: Some(opentelemetry_proto::tonic::resource::v1::Resource {
-            attributes: get_resources_attributes(),
+            attributes: lambda_resource_attributes(),
             dropped_attributes_count: 0,
             ..Default::default()
         }),
@@ -125,7 +127,7 @@ pub async fn flush_metrics() {
 }
 
 fn build_metrics_request(metrics: Vec<StoredMetric>) -> Option<Vec<u8>> {
-    let combined_resource_metrics = combine_items(
+    let mut combined_resource_metrics = combine_items(
         &metrics,
         |m| &m.body,
         |b| ExportMetricsServiceRequest::decode(b).map(|d| d.resource_metrics),
@@ -136,6 +138,11 @@ fn build_metrics_request(metrics: Vec<StoredMetric>) -> Option<Vec<u8>> {
         return None;
     }
 
+    let attributes = lambda_resource_attributes();
+    for rm in combined_resource_metrics.iter_mut() {
+        merge_resource_attributes(&mut rm.resource, &attributes);
+    }
+
     let combined_export = ExportMetricsServiceRequest {
         resource_metrics: combined_resource_metrics,
     };
@@ -144,7 +151,7 @@ fn build_metrics_request(metrics: Vec<StoredMetric>) -> Option<Vec<u8>> {
 }
 
 fn build_logs_request(logs: Vec<StoredLog>) -> Option<Vec<u8>> {
-    let combined_resource_logs = combine_items(
+    let mut combined_resource_logs = combine_items(
         &logs,
         |l| &l.body,
         |b| ExportLogsServiceRequest::decode(b).map(|d| d.resource_logs),
@@ -153,6 +160,11 @@ fn build_logs_request(logs: Vec<StoredLog>) -> Option<Vec<u8>> {
 
     if combined_resource_logs.is_empty() {
         return None;
+    }
+
+    let attributes = lambda_resource_attributes();
+    for rl in combined_resource_logs.iter_mut() {
+        merge_resource_attributes(&mut rl.resource, &attributes);
     }
 
     let combined_export = ExportLogsServiceRequest {
@@ -196,7 +208,10 @@ fn _build_traces_request(traces: Vec<StoredTrace>) -> Option<Vec<u8>> {
         return None;
     }
 
-    add_env_vars(&mut combined_resource_spans);
+    let attributes = lambda_resource_attributes();
+    for rs in combined_resource_spans.iter_mut() {
+        merge_resource_attributes(&mut rs.resource, &attributes);
+    }
 
     let combined_export = ExportTraceServiceRequest {
         resource_spans: combined_resource_spans,
@@ -388,14 +403,29 @@ fn gzip(body: &[u8]) -> std::io::Result<Vec<u8>> {
     encoder.finish()
 }
 
-fn add_env_vars(resource_spans: &mut [opentelemetry_proto::tonic::trace::v1::ResourceSpans]) {
-    let env_attrs = crate::state::global::get_env_var_attrs();
-    if env_attrs.is_empty() {
-        return;
-    }
-    for rs in resource_spans.iter_mut() {
-        let resource = rs.resource.get_or_insert_with(Default::default);
-        resource.attributes.extend(env_attrs.clone());
+/// The resource attributes every signal leaving the extension carries: the ones
+/// the extension puts on its own telemetry, plus the function's environment
+/// variables as `process.environment_variable.*`.
+fn lambda_resource_attributes() -> Vec<KeyValue> {
+    let mut attributes = get_resources_attributes();
+    merge_missing_attributes(&mut attributes, &crate::state::global::get_env_var_attrs());
+    attributes
+}
+
+/// Adds the Lambda resource attributes to a resource received from user code.
+/// Keys the SDK already set are kept, so the SDK's own values win. Without this,
+/// SDK telemetry and the extension's own telemetry for the same function can
+/// land on different resources.
+fn merge_resource_attributes(resource: &mut Option<Resource>, attributes: &[KeyValue]) {
+    let resource = resource.get_or_insert_with(Default::default);
+    merge_missing_attributes(&mut resource.attributes, attributes);
+}
+
+fn merge_missing_attributes(target: &mut Vec<KeyValue>, attributes: &[KeyValue]) {
+    for kv in attributes {
+        if !target.iter().any(|existing| existing.key == kv.key) {
+            target.push(kv.clone());
+        }
     }
 }
 
@@ -638,5 +668,219 @@ mod tests {
 
         // Verify we got a result
         assert!(result.is_some());
+    }
+
+    fn string_kv(key: &str, value: &str) -> KeyValue {
+        use opentelemetry_proto::tonic::common::v1::{any_value::Value, AnyValue};
+        KeyValue {
+            key: key.to_string(),
+            value: Some(AnyValue {
+                value: Some(Value::StringValue(value.to_string())),
+            }),
+        }
+    }
+
+    fn attribute_values(resource: &Option<Resource>, key: &str) -> Vec<String> {
+        use opentelemetry_proto::tonic::common::v1::{any_value::Value, AnyValue};
+        resource
+            .as_ref()
+            .map(|r| r.attributes.as_slice())
+            .unwrap_or_default()
+            .iter()
+            .filter(|kv| kv.key == key)
+            .filter_map(|kv| match &kv.value {
+                Some(AnyValue {
+                    value: Some(Value::StringValue(s)),
+                }) => Some(s.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    // A resource as an SDK sends it: OTEL_RESOURCE_ATTRIBUTES applied, but none of
+    // the attributes only the extension knows, like the function ARN.
+    fn sdk_resource() -> Option<Resource> {
+        Some(Resource {
+            attributes: vec![
+                string_kv("service.name", "sdk-service"),
+                string_kv("cloud.platform", "set-by-sdk"),
+            ],
+            ..Default::default()
+        })
+    }
+
+    // Puts the process-wide state that get_resources_attributes and
+    // get_env_var_attrs read into a known shape. Callers must be #[serial].
+    fn set_up_lambda_state() {
+        crate::state::global::reset_for_tests();
+        let _ = std::fs::remove_file("/tmp/dash0_env_vars");
+        std::env::remove_var("OTEL_SERVICE_NAME");
+        std::env::remove_var("OTEL_RESOURCE_ATTRIBUTES");
+        std::env::set_var("AWS_REGION", "eu-west-1");
+        std::env::set_var("AWS_LAMBDA_FUNCTION_NAME", "my-fn");
+        crate::state::global::store_account_id("123456789012");
+
+        std::fs::write(
+            "/tmp/dash0_env_vars",
+            serde_json::json!({ "MY_SETTING": "on" }).to_string(),
+        )
+        .unwrap();
+        crate::state::global::init_env_var_attrs();
+        std::fs::remove_file("/tmp/dash0_env_vars").unwrap();
+    }
+
+    fn tear_down_lambda_state() {
+        crate::state::global::reset_for_tests();
+        std::env::remove_var("AWS_REGION");
+        std::env::remove_var("AWS_LAMBDA_FUNCTION_NAME");
+    }
+
+    const FUNCTION_ARN: &str = "arn:aws:lambda:eu-west-1:123456789012:function:my-fn";
+
+    fn assert_enriched(resource: &Option<Resource>) {
+        assert_eq!(
+            attribute_values(resource, "cloud.resource_id"),
+            vec![FUNCTION_ARN]
+        );
+        assert_eq!(
+            attribute_values(resource, "cloud.account.id"),
+            vec!["123456789012"]
+        );
+        assert_eq!(
+            attribute_values(resource, "process.environment_variable.MY_SETTING"),
+            vec!["on"]
+        );
+        // The SDK's own values win, and no key appears twice.
+        assert_eq!(
+            attribute_values(resource, "service.name"),
+            vec!["sdk-service"]
+        );
+        assert_eq!(
+            attribute_values(resource, "cloud.platform"),
+            vec!["set-by-sdk"]
+        );
+    }
+
+    #[test]
+    fn test_merge_resource_attributes_keeps_existing_keys() {
+        let mut resource = sdk_resource();
+        let attributes = vec![
+            string_kv("service.name", "from-extension"),
+            string_kv("cloud.resource_id", "arn"),
+        ];
+
+        merge_resource_attributes(&mut resource, &attributes);
+
+        assert_eq!(
+            attribute_values(&resource, "service.name"),
+            vec!["sdk-service"]
+        );
+        assert_eq!(
+            attribute_values(&resource, "cloud.resource_id"),
+            vec!["arn"]
+        );
+        assert_eq!(resource.unwrap().attributes.len(), 3);
+    }
+
+    #[test]
+    fn test_merge_resource_attributes_creates_missing_resource() {
+        let mut resource = None;
+
+        merge_resource_attributes(&mut resource, &[string_kv("cloud.platform", "aws_lambda")]);
+
+        assert_eq!(
+            attribute_values(&resource, "cloud.platform"),
+            vec!["aws_lambda"]
+        );
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn test_build_metrics_request_adds_lambda_resource_attributes() {
+        use opentelemetry_proto::tonic::metrics::v1::ResourceMetrics;
+        set_up_lambda_state();
+
+        let body = ExportMetricsServiceRequest {
+            resource_metrics: vec![
+                ResourceMetrics {
+                    resource: sdk_resource(),
+                    ..Default::default()
+                },
+                // Some exporters omit the resource entirely.
+                ResourceMetrics::default(),
+            ],
+        }
+        .encode_to_vec();
+        let metric = StoredMetric {
+            method: Method::POST,
+            path_and_query: "/v1/metrics".to_string(),
+            headers: header::HeaderMap::new(),
+            body,
+        };
+
+        let encoded = build_metrics_request(vec![metric]).expect("request should build");
+        tear_down_lambda_state();
+
+        let decoded = ExportMetricsServiceRequest::decode(encoded.as_slice()).unwrap();
+        assert_enriched(&decoded.resource_metrics[0].resource);
+        let bare = &decoded.resource_metrics[1].resource;
+        assert_eq!(attribute_values(bare, "cloud.platform"), vec!["aws_lambda"]);
+        assert_eq!(
+            attribute_values(bare, "cloud.resource_id"),
+            vec![FUNCTION_ARN]
+        );
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn test_build_logs_request_adds_lambda_resource_attributes() {
+        set_up_lambda_state();
+
+        let body = ExportLogsServiceRequest {
+            resource_logs: vec![ResourceLogs {
+                resource: sdk_resource(),
+                ..Default::default()
+            }],
+        }
+        .encode_to_vec();
+        let log = StoredLog {
+            method: Method::POST,
+            path_and_query: "/v1/logs".to_string(),
+            headers: header::HeaderMap::new(),
+            body,
+        };
+
+        let encoded = build_logs_request(vec![log]).expect("request should build");
+        tear_down_lambda_state();
+
+        let decoded = ExportLogsServiceRequest::decode(encoded.as_slice()).unwrap();
+        assert_enriched(&decoded.resource_logs[0].resource);
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn test_build_traces_request_adds_lambda_resource_attributes() {
+        set_up_lambda_state();
+
+        let body = ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans {
+                resource: sdk_resource(),
+                ..Default::default()
+            }],
+        }
+        .encode_to_vec();
+        let trace = StoredTrace {
+            method: Method::POST,
+            path_and_query: "/v1/traces".to_string(),
+            headers: header::HeaderMap::new(),
+            body,
+            invocation_ids: vec!["inv-1".to_string()],
+        };
+
+        let encoded = _build_traces_request(vec![trace]).expect("request should build");
+        tear_down_lambda_state();
+
+        let decoded = ExportTraceServiceRequest::decode(encoded.as_slice()).unwrap();
+        assert_enriched(&decoded.resource_spans[0].resource);
     }
 }
