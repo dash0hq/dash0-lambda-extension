@@ -498,13 +498,17 @@ export const checkMetrics = async ({
     functionName,
     metricNames,
     metricType = 'histogram',
+    requireResourceId = false,
 }: {
     functionName: string;
     metricNames: string[];
     // Value of the otel_metric_type label; pass '' to omit the type matcher.
     metricType?: string;
+    // Also require the function ARN as cloud.resource_id on the metric's resource.
+    requireResourceId?: boolean;
 }): Promise<void> => {
     const typeMatcher = metricType ? ` otel_metric_type = "${metricType}",` : '';
+    const resourceIdMatcher = requireResourceId ? ` cloud_resource_id =~ ".*:function:${functionName}",` : '';
     for (const metricName of metricNames) {
         let found = false;
         for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -516,7 +520,7 @@ export const checkMetrics = async ({
                     start: 'now-10m',
                     end: 'now',
                     step: '1m',
-                    query: `{otel_metric_name = "${metricName}",${typeMatcher} service_name = "${functionName}"}`,
+                    query: `{otel_metric_name = "${metricName}",${typeMatcher}${resourceIdMatcher} service_name = "${functionName}"}`,
                 });
                 const response = await fetch(DASH0_ENDPOINT + 'prometheus/api/v1/query_range', {
                     method: 'POST',
