@@ -24,9 +24,11 @@ class RequestsInstrumentor(AbstractInstrumentor):
             with dash0_safe_execute("requests request_hook"):
                 span.set_attribute(
                     "http.request.headers",
-                    dump_with_context("requestHeaders", request.headers),
+                    dump_with_context("requestHeaders", dict(request.headers)),
                 )
-                add_body_attribute(span, request.body, "http.request.body")
+                add_body_attribute(
+                    span, request.body, "http.request.body", "requestBody"
+                )
 
         def response_hook(
             span: Span, request: PreparedRequest, response: Response
@@ -34,9 +36,11 @@ class RequestsInstrumentor(AbstractInstrumentor):
             with dash0_safe_execute("requests response_hook"):
                 span.set_attribute(
                     "http.response.headers",
-                    dump_with_context("responseHeaders", response.headers),
+                    dump_with_context("responseHeaders", dict(response.headers)),
                 )
-                add_body_attribute(span, response.content, "http.response.body")
+                add_body_attribute(
+                    span, response.content, "http.response.body", "responseBody"
+                )
                 if "x-amzn-requestid" in response.headers:
                     span.set_attribute(
                         "messageId", response.headers["x-amzn-requestid"]

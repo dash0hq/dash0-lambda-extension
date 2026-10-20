@@ -2,13 +2,13 @@ import logging
 
 import pytest
 
-from lumigo_core.scrubbing import get_omitting_regex
 from dash0_opentelemetry import logger
+from dash0_opentelemetry.libs.masking import _parse_rule
 
 
 @pytest.fixture(autouse=True)
 def clear_cache():
-    get_omitting_regex.cache_clear()
+    _parse_rule.cache_clear()
 
 
 @pytest.fixture(autouse=True)

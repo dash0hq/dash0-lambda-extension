@@ -1,10 +1,23 @@
-from typing import Any, Dict
+from typing import Any, Dict, List, Tuple
 
 from opentelemetry.trace.span import Span
 
 from dash0_opentelemetry.instrumentations import AbstractInstrumentor
 from dash0_opentelemetry.libs.general_utils import dash0_safe_execute
 from dash0_opentelemetry.libs.json_utils import dump_with_context
+from dash0_opentelemetry.libs.masking import parse_query_string
+
+
+def headers_from_environ(environ: Dict[str, Any]) -> Dict[str, str]:
+    headers = {
+        key[5:].replace("_", "-").lower(): value
+        for key, value in environ.items()
+        if key.startswith("HTTP_")
+    }
+    for key in ("CONTENT_TYPE", "CONTENT_LENGTH"):
+        if environ.get(key):
+            headers[key.replace("_", "-").lower()] = environ[key]
+    return headers
 
 
 class FlaskInstrumentorWrapper(AbstractInstrumentor):
@@ -21,16 +34,24 @@ class FlaskInstrumentorWrapper(AbstractInstrumentor):
             with dash0_safe_execute("flask_request_hook"):
                 span.set_attribute(
                     "http.request.headers",
-                    dump_with_context("requestHeaders", flask_request_environ),
+                    dump_with_context(
+                        "requestHeaders", headers_from_environ(flask_request_environ)
+                    ),
                 )
+                query = flask_request_environ.get("QUERY_STRING")
+                if query:
+                    span.set_attribute(
+                        "http.request.query",
+                        dump_with_context("queryParams", parse_query_string(query)),
+                    )
 
         def response_hook(
-            span: Span, status: int, response_headers: Dict[str, Any]
+            span: Span, status: str, response_headers: List[Tuple[str, str]]
         ) -> None:
             with dash0_safe_execute("flask_response_hook"):
                 span.set_attribute(
                     "http.response.headers",
-                    dump_with_context("responseHeaders", response_headers),
+                    dump_with_context("responseHeaders", dict(response_headers)),
                 )
 
         FlaskInstrumentor().instrument(

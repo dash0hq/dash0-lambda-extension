@@ -28,12 +28,15 @@ class RedisInstrumentor(AbstractInstrumentor):
                 # when this hook is called, but only includes the command name for some
                 # versions so we need to set it ourselves.
                 add_body_attribute(
-                    span, " ".join(str(arg) for arg in args), "db.statement"
+                    span,
+                    " ".join(str(arg) for arg in args),
+                    "db.statement",
+                    "requestBody",
                 )
 
         def response_hook(span: Span, instance: Connection, response: Any) -> None:
             with dash0_safe_execute("redis_response_hook"):
-                add_body_attribute(span, response, "db.response.body")
+                add_body_attribute(span, response, "db.response.body", "responseBody")
 
         RedisInstrumentor().instrument(
             request_hook=request_hook,

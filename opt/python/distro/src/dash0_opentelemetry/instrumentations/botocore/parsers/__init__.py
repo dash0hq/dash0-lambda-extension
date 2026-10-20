@@ -4,7 +4,6 @@ import json
 import logging
 from typing import Any, Dict, Optional, Type
 
-from lumigo_core.triggers.event_trigger import parse_triggers
 from opentelemetry.trace import Span
 
 from dash0_opentelemetry import logger
@@ -15,12 +14,16 @@ from dash0_opentelemetry.libs.general_utils import (
     dash0_safe_wrapper,
 )
 from dash0_opentelemetry.libs.json_utils import dump_with_context
+from dash0_opentelemetry.libs.masking import lumigo_config_logs_silenced
 from dash0_opentelemetry.utils.aws_utils import (
     extract_region_from_arn,
     get_resource_fullname,
 )
 
 from dash0_opentelemetry.utils.span_utils import safe_get_span_attribute
+
+with lumigo_config_logs_silenced():
+    from lumigo_core.triggers.event_trigger import parse_triggers
 
 
 class AwsParser:
@@ -282,27 +285,36 @@ class SnsParser(AwsParser):
         )
 
 
+SQS_PUBLISH_OPERATIONS = ("SendMessage", "SendMessageBatch")
+SQS_CONSUME_OPERATIONS = ("ReceiveMessage",)
+
+
 class SqsParser(AwsParser):
     @staticmethod
     def extract_queue_name_from_url(queue_url: str) -> str:
         return queue_url.split("/")[-1]
 
     @classmethod
-    @dash0_safe_wrapper(level=logging.DEBUG)
-    def safe_extract_http_request_body(
+    def _get_request_additional_attributes(
         cls,
-        span: Optional[Span] = None,
-        service_name: Optional[str] = None,
-        operation_name: Optional[str] = None,
-        api_params: Optional[Dict[Any, Any]] = None,
-    ) -> Optional[str]:
-        return (
-            dump_with_context(
-                "requestBody", api_params.get("MessageBody", api_params or {})
-            )
-            if api_params
-            else None
+        span: Span,
+        service_name: str,
+        operation_name: str,
+        api_params: Dict[Any, Any],
+    ) -> Dict[str, Any]:
+        attributes = super()._get_request_additional_attributes(
+            span=span,
+            service_name=service_name,
+            operation_name=operation_name,
+            api_params=api_params,
         )
+        # Like the Node distro: the whole input of a send, masked by key, as the message body.
+        if operation_name in SQS_PUBLISH_OPERATIONS:
+            attributes.pop("http.request.body", None)
+            attributes["messaging.publish.body"] = dump_with_context(
+                "requestBody", api_params
+            )
+        return attributes
 
     @classmethod
     @dash0_safe_wrapper(level=logging.DEBUG)
@@ -344,6 +356,13 @@ class SqsParser(AwsParser):
     def parse_response(
         cls, span: Span, service_name: str, operation_name: str, result: Dict[Any, Any]
     ) -> None:
+        if operation_name in SQS_CONSUME_OPERATIONS:
+            messages = {
+                k: v for k, v in (result or {}).items() if k != "ResponseMetadata"
+            }
+            span.set_attribute(
+                "messaging.consume.body", dump_with_context("responseBody", messages)
+            )
         trigger_details = parse_triggers(
             {
                 "service_name": service_name,
@@ -352,9 +371,7 @@ class SqsParser(AwsParser):
             }
         )
         if trigger_details:
-            span.set_attributes(
-                {"dash0Data": json.dumps({"trigger": trigger_details})}
-            )
+            span.set_attributes({"dash0Data": json.dumps({"trigger": trigger_details})})
 
 
 class LambdaParser(AwsParser):

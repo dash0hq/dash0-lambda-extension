@@ -3,6 +3,7 @@ from typing import Any, Dict
 from opentelemetry.trace import Span
 
 from dash0_opentelemetry.libs.general_utils import dash0_safe_execute
+from dash0_opentelemetry.libs.masking import parse_query_string
 from dash0_opentelemetry.libs.json_utils import (
     dump,
     dump_with_context,
@@ -29,9 +30,12 @@ class FastAPIParser:
             path = scope.get("path", "")
             attributes = {
                 "http.request.headers": dump_with_context("requestHeaders", headers),
-                "http.request.query_string": dump(query_string),
                 "http.request.path": dump(path),
             }
+            if query_string:
+                attributes["http.request.query"] = dump_with_context(
+                    "queryParams", parse_query_string(query_string)
+                )
             span.set_attributes(attributes)
 
     @staticmethod
