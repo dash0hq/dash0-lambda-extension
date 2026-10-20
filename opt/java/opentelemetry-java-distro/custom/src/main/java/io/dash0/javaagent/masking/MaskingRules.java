@@ -25,6 +25,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
@@ -40,6 +42,8 @@ public final class MaskingRules {
   private static final JsonFactory JSON_FACTORY = new JsonFactory();
 
   public static final String MASKED_VALUE = "****";
+
+  private static final Pattern BACKREFERENCE = Pattern.compile("\\\\(?:[1-9]|k<)");
   static final String ALL = "all";
 
   /**
@@ -60,12 +64,83 @@ public final class MaskingRules {
 
   public static final MaskingRules DEFAULTS = ofPatterns(DEFAULT_PATTERNS);
 
+  /** Keys longer than this are matched every time, so the cache can't grow without bound. */
+  static final int MAX_CACHED_KEY_LENGTH = 128;
+
+  static final int MAX_CACHED_KEYS = 4096;
+
   private final boolean maskAll;
   private final List<Pattern> patterns;
+
+  /**
+   * The patterns joined into one, so that a key is checked with one matcher instead of one per
+   * pattern. Some patterns can't be joined and are kept in {@link #separate}: backreferences,
+   * because joining renumbers the groups, and patterns that swallow the closing parenthesis, such
+   * as an unterminated {@code \\Q} or a {@code (?x)} comment.
+   */
+  private final Pattern combined;
+
+  private final List<Pattern> separate;
+
+  /** Whether each key matches. Payloads use the same key names over and over. */
+  private final Map<String, Boolean> cache = new ConcurrentHashMap<>();
 
   private MaskingRules(boolean maskAll, List<Pattern> patterns) {
     this.maskAll = maskAll;
     this.patterns = patterns;
+    List<String> joinable = new ArrayList<>();
+    List<Pattern> separate = new ArrayList<>();
+    for (Pattern pattern : patterns) {
+      String group = "(?:" + stripWildcards(pattern.pattern()) + ")";
+      if (BACKREFERENCE.matcher(pattern.pattern()).find() || !compiles(group)) {
+        separate.add(pattern);
+      } else {
+        joinable.add(group);
+      }
+    }
+    this.combined =
+        joinable.isEmpty()
+            ? null
+            : Pattern.compile(String.join("|", joinable), Pattern.CASE_INSENSITIVE);
+    this.separate = separate;
+  }
+
+  /**
+   * Drops a leading and a trailing {@code .*}. With {@link java.util.regex.Matcher#find()} they
+   * don't change whether a key matches, but they make the regex engine backtrack over the whole
+   * key. Patterns where the {@code .*} might mean something else are kept as they are.
+   */
+  static String stripWildcards(String pattern) {
+    if (pattern.contains("\\Q")) {
+      return pattern;
+    }
+    String stripped = pattern;
+    if (stripped.startsWith(".*")
+        && (stripped.length() == 2 || "?+*{".indexOf(stripped.charAt(2)) < 0)) {
+      stripped = stripped.substring(2);
+    }
+    if (stripped.endsWith(".*") && !isEscaped(stripped, stripped.length() - 2)) {
+      stripped = stripped.substring(0, stripped.length() - 2);
+    }
+    return stripped;
+  }
+
+  private static boolean compiles(String regex) {
+    try {
+      Pattern.compile(regex, Pattern.CASE_INSENSITIVE);
+      return true;
+    } catch (PatternSyntaxException e) {
+      return false;
+    }
+  }
+
+  /** True when the character at index is preceded by an odd number of backslashes. */
+  private static boolean isEscaped(String pattern, int index) {
+    int backslashes = 0;
+    for (int i = index - 1; i >= 0 && pattern.charAt(i) == '\\'; i--) {
+      backslashes++;
+    }
+    return backslashes % 2 == 1;
   }
 
   static MaskingRules all() {
@@ -132,6 +207,37 @@ public final class MaskingRules {
 
   /** True when a pattern matches anywhere in the key, ignoring case. */
   public boolean matches(String key) {
+    if (maskAll) {
+      return true;
+    }
+    if (key.length() > MAX_CACHED_KEY_LENGTH) {
+      return find(key);
+    }
+    Boolean cached = cache.get(key);
+    if (cached != null) {
+      return cached;
+    }
+    boolean matches = find(key);
+    if (cache.size() < MAX_CACHED_KEYS) {
+      cache.put(key, matches);
+    }
+    return matches;
+  }
+
+  private boolean find(String key) {
+    if (combined != null && combined.matcher(key).find()) {
+      return true;
+    }
+    for (Pattern pattern : separate) {
+      if (pattern.matcher(key).find()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** Checks each pattern on its own, as the extension does. Tests compare it with matches(). */
+  boolean matchesEachPattern(String key) {
     if (maskAll) {
       return true;
     }

@@ -36,3 +36,9 @@ dependencies {
   testImplementation("com.fasterxml.jackson.core:jackson-databind:${versions.jackson}")
   testImplementation("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure")
 }
+
+// Prints what masking costs per span; see MaskingBenchmark.
+tasks.register("maskingBenchmark", JavaExec) {
+  classpath = sourceSets.test.runtimeClasspath
+  mainClass = "io.dash0.javaagent.masking.MaskingBenchmark"
+}

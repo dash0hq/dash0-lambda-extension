@@ -29,6 +29,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -136,5 +137,79 @@ class MaskingRulesTest {
   @ValueSource(strings = {"", " "})
   void blankValuesAreIgnored(String value) {
     assertNull(MaskingRules.parse("DASH0_MASK_RULES", value));
+  }
+
+  // matches() joins the patterns into one regex and strips .* around them; it must agree with
+  // checking every pattern on its own.
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "[\".*pass.*\",\".*key.*\",\".*secret.*\",\".*credential.*\",\".*passphrase.*\",\".*token.*\",\".*signature.*\",\".*authorization.*\"]",
+        "[\"email\",\"^email$\",\"^x-.*\"]",
+        "[\".*\"]",
+        "[\".*?id\",\".*+key\",\"order.*?\"]",
+        "[\"a|b\",\".*c|d.*\"]",
+        "[\"\\\\.*\",\"\\\\\\\\.*\"]",
+        "[\"\\\\Qa.*\"]",
+        "[\"(a)\\\\1\",\"(?<x>b)\\\\k<x>\",\"(p)ass\"]",
+        "[\"(?-i)Email\",\"token\"]",
+        "[\"(?x)pass # a comment\",\"email\"]",
+        "[]"
+      })
+  void combinedPatternAgreesWithEachPattern(String value) {
+    MaskingRules rules = MaskingRules.parse("DASH0_MASK_RULES", value);
+    List<String> keys =
+        Arrays.asList(
+            "",
+            "password",
+            "PASSWORD",
+            "x-password",
+            "apiKey",
+            "email",
+            "x-email",
+            "Email",
+            "EMAIL",
+            "orderId",
+            "order",
+            "id",
+            "a",
+            "b",
+            "c",
+            "d",
+            "aa",
+            "bb",
+            "pass",
+            "x.y",
+            "x\\y",
+            "a.z",
+            "secret_token",
+            "authorization",
+            "x-orderid",
+            "line\nbreak",
+            "key" + new String(new char[200]).replace('\0', 'k'));
+    for (String key : keys) {
+      // twice, to cover the cache
+      assertEquals(rules.matchesEachPattern(key), rules.matches(key), value + " / " + key);
+      assertEquals(rules.matchesEachPattern(key), rules.matches(key), value + " / " + key);
+    }
+  }
+
+  @Test
+  void wildcardsAreStrippedOnlyWhenTheyAreWildcards() {
+    assertEquals("pass", MaskingRules.stripWildcards(".*pass.*"));
+    assertEquals("", MaskingRules.stripWildcards(".*"));
+    assertEquals(".*?id", MaskingRules.stripWildcards(".*?id"));
+    assertEquals("a\\.*", MaskingRules.stripWildcards("a\\.*"));
+    assertEquals("a\\\\", MaskingRules.stripWildcards("a\\\\.*"));
+    assertEquals("\\Qa.*", MaskingRules.stripWildcards("\\Qa.*"));
+  }
+
+  @Test
+  void cacheIsBounded() {
+    MaskingRules rules = MaskingRules.parse("DASH0_MASK_RULES", "[\".*pass.*\"]");
+    for (int i = 0; i < MaskingRules.MAX_CACHED_KEYS + 100; i++) {
+      assertFalse(rules.matches("key" + i));
+    }
+    assertTrue(rules.matches("password"));
   }
 }
