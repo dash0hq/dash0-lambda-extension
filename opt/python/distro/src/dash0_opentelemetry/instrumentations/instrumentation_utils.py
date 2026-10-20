@@ -28,10 +28,10 @@ def add_body_attribute(
                     span.set_attribute(attr_name, "0x" + body.hex()[:PAYLOAD_MAX_SIZE])
                 return
         if isinstance(body, str):
-            value = mask_text(body, context)
+            value = mask_text(body, context, PAYLOAD_MAX_SIZE)
         elif isinstance(body, (Mapping, list, tuple)):
             value = mask_and_dump(body, context, PAYLOAD_MAX_SIZE)
         else:
-            value = mask_text(str(body), context)
+            value = mask_text(str(body), context, PAYLOAD_MAX_SIZE)
 
         span.set_attribute(attr_name, value[:PAYLOAD_MAX_SIZE])

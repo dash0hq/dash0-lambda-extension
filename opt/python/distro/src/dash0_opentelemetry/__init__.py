@@ -113,7 +113,6 @@ def init() -> Dict[str, Any]:
     from dash0_opentelemetry.libs.general_utils import get_max_size
     from opentelemetry.instrumentation.aws_lambda import AwsLambdaInstrumentor
 
-
     tracer_provider = TracerProvider(
         span_limits=(SpanLimits(max_span_attribute_length=(get_max_size()))),
     )

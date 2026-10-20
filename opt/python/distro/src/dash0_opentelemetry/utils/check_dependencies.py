@@ -25,7 +25,10 @@ def check_dependency_conflicts(requirements_file):
         return False
 
     # Build a map of installed packages and their versions once
-    installed = {dist.metadata["Name"].lower(): dist.metadata["Version"] for dist in distributions()}
+    installed = {
+        dist.metadata["Name"].lower(): dist.metadata["Version"]
+        for dist in distributions()
+    }
 
     visited = set()
 
@@ -77,7 +80,11 @@ def check_dependency_conflicts(requirements_file):
     # Read top-level requirements from file
     try:
         with open(requirements_file) as f:
-            top_level_requirements = [line.strip() for line in f if line.strip() and not line.startswith(("#", "-"))]
+            top_level_requirements = [
+                line.strip()
+                for line in f
+                if line.strip() and not line.startswith(("#", "-"))
+            ]
     except Exception as e:
         logger.warning(f"Could not read requirements file {requirements_file}: {e}")
         return True

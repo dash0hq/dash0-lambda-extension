@@ -5,7 +5,6 @@ from unittest.mock import Mock, patch
 
 from dash0_opentelemetry.instrumentations.botocore.parsers import SqsParser, AwsParser
 
-
 EMPTY_SQS_RESULT_1 = {}
 EMPTY_SQS_RESULT_2 = {"Messages": []}
 NON_EMPTY_SQS_RESULT = {"Messages": [{"MessageId": "1234", "Body": "test"}]}

@@ -9,7 +9,9 @@ from opentelemetry.sdk.trace import SpanProcessor
 
 from dash0_opentelemetry import init
 
-VersionInfo = namedtuple("version_info", ["major", "minor", "micro", "releaselevel", "serial"])
+VersionInfo = namedtuple(
+    "version_info", ["major", "minor", "micro", "releaselevel", "serial"]
+)
 
 
 class TestDistroInit(unittest.TestCase):
