@@ -6,12 +6,22 @@ import {
     checkMetrics,
     checkOverheadSpan,
     checkHttpSpan,
-    getAttributesMap,
+    attributesToObject,
     LogToCheck,
     invokeFunction,
     runAllTests,
 } from "./utils";
 
+
+// The SDK records a captured header as a string array. Accept a plain or JSON-encoded string as
+// well, in case the backend returns it that way.
+const requestHeader = (attributes: Record<string, any>, name: string): unknown => {
+    let value = attributes[`http.request.header.${name}`];
+    if (typeof value === 'string' && value.startsWith('[')) {
+        try { value = JSON.parse(value); } catch { /* keep the string */ }
+    }
+    return Array.isArray(value) ? value[0] : value;
+};
 
 const verifySuccessInvocation = async (functionName: string, invocationEnd: boolean, traced: boolean) => {
     const invocationId = await invokeFunction(functionName, invocationEnd, false);
@@ -33,9 +43,10 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
             // The header is captured through OTEL_INSTRUMENTATION_HTTP_CLIENT_CAPTURE_REQUEST_HEADERS
             // and masked by the Java distro, because its name matches DASH0_MASK_RULES.
             checkSpan: (span) => {
-                const httpAttributes = getAttributesMap(span.attributes);
-                expect(httpAttributes['http.request.header.x-masked-field']?.arrayValue?.values?.[0]?.stringValue).toEqual('****');
-                expect(httpAttributes['http.request.header.content-type']?.arrayValue?.values?.[0]?.stringValue).toEqual('application/json');
+                const httpAttributes = attributesToObject(span.attributes);
+                const capturedHeaders = Object.keys(httpAttributes).filter((key) => key.startsWith('http.'));
+                expect(requestHeader(httpAttributes, 'x-masked-field'), `http.* attributes: ${capturedHeaders.join(', ')}`).toEqual('****');
+                expect(requestHeader(httpAttributes, 'content-type')).toEqual('application/json');
             },
         });
     }
