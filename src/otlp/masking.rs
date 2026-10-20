@@ -10,6 +10,8 @@ pub struct MaskingRules {
     pub global: Vec<Regex>,
 }
 
+// Must match DASH0_DEFAULT_MASK_RULES in opt/shared.sh, which applies the same defaults to
+// the language distros (checked by opt/test/shared.test.sh).
 static DEFAULT_MASKING_PATTERNS: &[&str] = &[
     ".*pass.*",
     ".*key.*",
@@ -17,6 +19,8 @@ static DEFAULT_MASKING_PATTERNS: &[&str] = &[
     ".*credential.*",
     ".*passphrase.*",
     ".*token.*",
+    ".*signature.*",
+    ".*authorization.*",
 ];
 
 static MASKING_RULES: OnceCell<MaskingRules> = OnceCell::new();
@@ -144,9 +148,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_default_masking_rules_has_five_patterns() {
+    fn test_default_masking_rules_has_eight_patterns() {
         let rules = default_masking_rules();
-        assert_eq!(rules.global.len(), 6);
+        assert_eq!(rules.global.len(), 8);
     }
 
     #[test]
@@ -161,6 +165,8 @@ mod tests {
             "passphrase",
             "PASSWORD",
             "API_KEY",
+            "Authorization",
+            "x-amz-signature",
         ];
 
         for key in sensitive_keys {
