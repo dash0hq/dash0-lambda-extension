@@ -136,19 +136,19 @@ Masking applies to Lambda event and response payloads and to environment variabl
 |---|---|---|---|
 | Lambda event and response payloads | ✅ | ✅ | ✅ |
 | Environment variables (`DASH0_MASK_ENV_VARS`) | ✅ | ✅ | ✅ |
-| Payloads captured by the auto-instrumentation (`DASH0_MASK_RULES`) | ✅ | ⚠️ ¹ | ❌ |
-| `DASH0_MASK_RULES=all` | ✅ | ❌ | ❌ |
-| `DASH0_MASK_REQUEST_BODY` | ✅ | ⚠️ ¹ | ❌ |
-| `DASH0_MASK_RESPONSE_BODY` | ✅ | ⚠️ ¹ | ❌ |
-| `DASH0_MASK_REQUEST_HEADERS` | ✅ | ⚠️ ¹ | ❌ |
-| `DASH0_MASK_RESPONSE_HEADERS` | ✅ | ⚠️ ¹ | ❌ |
-| `DASH0_MASK_QUERY_PARAMS` | ✅ | ❌ | ❌ |
-| Kafka and RabbitMQ messages sent (masked with `DASH0_MASK_QUERY_PARAMS`) | ✅ | ❌ | ❌ |
-| Keys inside a JSON string body, e.g. an SQS `MessageBody` | ⚠️ JSON HTTP bodies only | ✅ strings starting with `{` | ❌ |
+| Payloads captured by the auto-instrumentation (`DASH0_MASK_RULES`) | ✅ | ✅ ¹ | ❌ |
+| `DASH0_MASK_RULES=all` | ✅ | ✅ | ❌ |
+| `DASH0_MASK_REQUEST_BODY` | ✅ | ✅ ¹ | ❌ |
+| `DASH0_MASK_RESPONSE_BODY` | ✅ | ✅ ¹ | ❌ |
+| `DASH0_MASK_REQUEST_HEADERS` | ✅ | ✅ | ❌ |
+| `DASH0_MASK_RESPONSE_HEADERS` | ✅ | ✅ | ❌ |
+| `DASH0_MASK_QUERY_PARAMS` | ✅ | ✅ Flask, FastAPI, Django | ❌ |
+| Kafka and RabbitMQ messages sent (masked with `DASH0_MASK_QUERY_PARAMS`) | ✅ | ✅ | ❌ |
+| Keys inside a JSON string body, e.g. an SQS `MessageBody` | ⚠️ JSON HTTP bodies only | ✅ any string payload that holds a JSON object or array | ❌ |
 
-¹ Python masks HTTP headers (except from `requests` and Django), AWS SDK payloads, FastAPI bodies, and MongoDB and PostgreSQL results. Bodies from `requests`, `httpx` and Django, and Redis, Kafka and RabbitMQ payloads, are not masked.
+¹ Flask captures no bodies, and `httpx` no response bodies.
 
-In Python, patterns must match from the start of the key, so write `.*email.*`, not `email`. Some payloads are never masked, such as gRPC messages and PostgreSQL query parameters in Node.js. [Secret masking by example](docs/masking.md) lists them for each runtime.
+Some payloads are never masked, such as gRPC messages and PostgreSQL query parameters in Node.js. [Secret masking by example](docs/masking.md) lists them for each runtime.
 
 Masking matches keys. Where a body is a string that is not parsed, such as an SQS `MessageBody` in Node.js, mask it as a whole (see `all` below) or by its key (e.g. `.*MessageBody.*`).
 
