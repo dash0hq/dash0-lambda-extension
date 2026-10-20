@@ -94,6 +94,16 @@ function createLambdas(
               environment["DASH0_MASK_RULES"] = '[".*masked_field.*"]';
               environment["MASKED_FIELD"] = 'sensitive information';
             }
+            if (runtime.family === lambda.RuntimeFamily.JAVA) {
+              // The defaults plus masked_field, so DASH0_TOKEN stays masked as well. `.` matches
+              // both masked_field (body) and x-masked-field (header).
+              environment["DASH0_MASK_RULES"] = '[".*pass.*",".*key.*",".*secret.*",".*credential.*",".*passphrase.*",".*token.*",".*signature.*",".*authorization.*",".*masked.field.*"]';
+              environment["MASKED_FIELD"] = 'sensitive information';
+              if (scenario === "success") {
+                environment["POST_MASKED_FIELD"] = "true";
+                environment["OTEL_INSTRUMENTATION_HTTP_CLIENT_CAPTURE_REQUEST_HEADERS"] = "x-masked-field,content-type";
+              }
+            }
 
             const functionName = `${prefix}${runtimeName}-${scenario}-${traced}-invocation-end-${invocationEnd}-${architecture.name}`;
             const handler = overrides?.handler ?? `${scenario}.handler`;
