@@ -53,13 +53,15 @@ try {
         return originalOnRequire.call(this, module, makeExportsConfigurable(exports), name, basedir);
     };
 
-    const tracerProvider = (await dash0.init).tracerProvider;
+    const {tracerProvider, meterProvider} = await dash0.init;
 
+    // Passing the meter provider makes the instrumentation force-flush it at handler exit.
     registerInstrumentations({
         instrumentations: [
             awsLambdaInstrumentation
         ],
-        tracerProvider
+        tracerProvider,
+        meterProvider
     });
 
     register('import-in-the-middle/hook.mjs', import.meta.url);

@@ -313,6 +313,33 @@ class NodeStack extends cdk.NestedStack {
       });
     }
 
+    // Custom (user-defined) OpenTelemetry API metrics. Bundled with NodejsFunction because the
+    // handler ships its own @opentelemetry/api, as customers do; the layer's copy is bundled into
+    // init.mjs and not resolvable from user code.
+    for (const runtime of runtimes) {
+      const runtimeName = runtime.name.replace(/\./g, '-');
+      new lambdaNodejs.NodejsFunction(this, `custommetrics-${runtimeName}`, {
+        functionName: `${props.prefix}custommetrics-${runtimeName}`,
+        runtime,
+        memorySize: 128,
+        entry: path.join(__dirname, '../lambdas/node/custom_metrics.ts'),
+        handler: 'handler',
+        architecture: lambda.Architecture.X86_64,
+        timeout: cdk.Duration.seconds(10),
+        layers: [props.layer],
+        role: props.role,
+        environment: {
+          AWS_LAMBDA_EXEC_WRAPPER: "/opt/wrapper",
+          DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
+          DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
+          DASH0_EXTENSION_LOG_LEVEL: "info",
+          DASH0_SEND_ON_INVOCATION_END: 'true',
+        },
+        logGroup: props.logGroup,
+        loggingFormat: lambda.LoggingFormat.TEXT,
+      });
+    }
+
     /*
      * Functions whose handler string carries a directory prefix that the deployment
      * package does not have -- the shape a bundler leaves behind when it flattens its

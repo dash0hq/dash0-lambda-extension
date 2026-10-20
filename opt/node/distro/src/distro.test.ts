@@ -23,8 +23,9 @@ describe('Distro initialization', () => {
 
     // Unregister Otel globals
     jest.isolateModules(() => {
-      const { context, diag, propagation, trace } = require('@opentelemetry/api');
+      const { context, diag, metrics, propagation, trace } = require('@opentelemetry/api');
       context.disable();
+      metrics.disable();
       propagation.disable();
       trace.disable();
       diag.disable();
