@@ -38,31 +38,35 @@ Masking of the Lambda event, the return value and environment variables is done 
 - **Strings are not parsed.** When a payload is a string, such as an SQS `MessageBody`, a Kafka message or a Redis command, nothing inside it is checked, even when it holds JSON. See [Payloads that are strings](#payloads-that-are-strings).
   - **Node.js:** HTTP bodies sent as `application/json` are parsed and masked by key. Other strings are not parsed.
   - **Python:** any string that starts with `{` is parsed and masked by key.
+  - **Java:** HTTP bodies that are a JSON object or array are parsed and masked by key, whatever their content type. Other strings are not parsed.
 - **`all` replaces the whole payload** with `"****"`.
+- **Java records each HTTP header as its own attribute**, `http.request.header.<name>` or `http.response.header.<name>`, and only the headers you list in `OTEL_INSTRUMENTATION_HTTP_CLIENT_CAPTURE_REQUEST_HEADERS` and the other `OTEL_INSTRUMENTATION_HTTP_*_CAPTURE_*_HEADERS` variables. Patterns are checked against the header name; a match sets the attribute to `["****"]`. `all` does this for every header attribute.
 - **Your list replaces the defaults.** `DASH0_MASK_RULES` replaces the [default patterns](#defaults-nothing-configured). A per-payload variable replaces the rules for its own payload type. To add to the defaults, list them too.
 
 ## Where each payload ends up
 
 | Payload | Span attribute | Controlled by | Node.js | Python | Java |
 |---|---|---|---|---|---|
-| Query string of requests your app receives | `http.request.query` | `DASH0_MASK_QUERY_PARAMS`, then `DASH0_MASK_RULES` | ✅ Express, Fastify | ❌ | ❌ |
-| HTTP request headers | `http.request.headers` | `DASH0_MASK_REQUEST_HEADERS`, then `DASH0_MASK_RULES` | ✅ `http`/`https`, `fetch`, Express, Fastify | ⚠️ not `requests` or Django | ❌ |
-| HTTP request body | `http.request.body` ¹ | `DASH0_MASK_REQUEST_BODY`, then `DASH0_MASK_RULES` | ✅ `http`/`https`, `fetch`, Express, Fastify | ⚠️ FastAPI and AWS SDK only; not `requests`, `httpx` or Django | ❌ |
-| HTTP response headers | `http.response.headers` | `DASH0_MASK_RESPONSE_HEADERS`, then `DASH0_MASK_RULES` | ✅ `http`/`https`, `fetch`, Express; Fastify captures none | ⚠️ not Flask | ❌ |
-| HTTP response body | `http.response.body` ¹ | `DASH0_MASK_RESPONSE_BODY`, then `DASH0_MASK_RULES` | ✅ `http`/`https`, Express; `fetch` and Fastify capture none | ⚠️ depends on the library | ❌ |
-| SQS `SendMessage` / `SendMessageBatch` input | `messaging.publish.body` | `DASH0_MASK_REQUEST_BODY`, then `DASH0_MASK_RULES` | ✅ | ⚠️ `SendMessage` captures only `MessageBody`, in `http.request.body` | ❌ |
-| SQS `ReceiveMessage` output | `messaging.consume.body` | `DASH0_MASK_RESPONSE_BODY`, then `DASH0_MASK_RULES` | ✅ | not captured | ❌ |
-| Kafka message sent | `messaging.produce.body` | `DASH0_MASK_QUERY_PARAMS`, then `DASH0_MASK_RULES` ² | ✅ `kafkajs` | ❌ | ❌ |
-| RabbitMQ message published | `messaging.publish.body` | `DASH0_MASK_QUERY_PARAMS`, then `DASH0_MASK_RULES` ² | ✅ `amqplib` | ❌ | ❌ |
-| Kafka or RabbitMQ message received | `messaging.consume.body` | `DASH0_MASK_RESPONSE_BODY`, then `DASH0_MASK_RULES` | ✅ | ❌ | ❌ |
-| Redis command | `db.statement` | `DASH0_MASK_REQUEST_BODY`, then `DASH0_MASK_RULES` | ✅ `redis`, `ioredis` | ❌ | ❌ |
-| Redis reply | `db.response.body` | `DASH0_MASK_RESPONSE_BODY`, then `DASH0_MASK_RULES` | ✅ `redis`, `ioredis` | ❌ | ❌ |
+| Query string of requests your app receives | `http.request.query` | `DASH0_MASK_QUERY_PARAMS`, then `DASH0_MASK_RULES` | ✅ Express, Fastify | ❌ | ✅ in `url.query`, and in the query of `url.full` of requests your app sends |
+| HTTP request headers | `http.request.headers` | `DASH0_MASK_REQUEST_HEADERS`, then `DASH0_MASK_RULES` | ✅ `http`/`https`, `fetch`, Express, Fastify | ⚠️ not `requests` or Django | ✅ in `http.request.header.<name>`, for the headers you capture |
+| HTTP request body | `http.request.body` ¹ | `DASH0_MASK_REQUEST_BODY`, then `DASH0_MASK_RULES` | ✅ `http`/`https`, `fetch`, Express, Fastify | ⚠️ FastAPI and AWS SDK only; not `requests`, `httpx` or Django | ✅ `HttpClient`, Apache HttpClient 5, AWS SDK, servlet, Netty |
+| HTTP response headers | `http.response.headers` | `DASH0_MASK_RESPONSE_HEADERS`, then `DASH0_MASK_RULES` | ✅ `http`/`https`, `fetch`, Express; Fastify captures none | ⚠️ not Flask | ✅ in `http.response.header.<name>`, for the headers you capture |
+| HTTP response body | `http.response.body` ¹ | `DASH0_MASK_RESPONSE_BODY`, then `DASH0_MASK_RULES` | ✅ `http`/`https`, Express; `fetch` and Fastify capture none | ⚠️ depends on the library | ✅ `HttpClient`, Apache HttpClient 5, AWS SDK, servlet, Netty |
+| SQS `SendMessage` / `SendMessageBatch` input | `messaging.publish.body` | `DASH0_MASK_REQUEST_BODY`, then `DASH0_MASK_RULES` | ✅ | ⚠️ `SendMessage` captures only `MessageBody`, in `http.request.body` | ⚠️ in `http.request.body`; masked by key with AWS SDK 2.21 or later only ³ |
+| SQS `ReceiveMessage` output | `messaging.consume.body` | `DASH0_MASK_RESPONSE_BODY`, then `DASH0_MASK_RULES` | ✅ | not captured | ⚠️ in `http.response.body`; masked by key with AWS SDK 2.21 or later only ³ |
+| Kafka message sent | `messaging.produce.body` | `DASH0_MASK_QUERY_PARAMS`, then `DASH0_MASK_RULES` ² | ✅ `kafkajs` | ❌ | ✅ in `messaging.message.payload` |
+| RabbitMQ message published | `messaging.publish.body` | `DASH0_MASK_QUERY_PARAMS`, then `DASH0_MASK_RULES` ² | ✅ `amqplib` | ❌ | ✅ in `messaging.message.payload` |
+| Kafka or RabbitMQ message received | `messaging.consume.body` | `DASH0_MASK_RESPONSE_BODY`, then `DASH0_MASK_RULES` | ✅ | ❌ | ✅ in `messaging.message.payload` |
+| Redis command | `db.statement` | `DASH0_MASK_REQUEST_BODY`, then `DASH0_MASK_RULES` | ✅ `redis`, `ioredis` | ❌ | ✅ Lettuce, Jedis |
+| Redis reply | `db.response.body` | `DASH0_MASK_RESPONSE_BODY`, then `DASH0_MASK_RULES` | ✅ `redis`, `ioredis` | ❌ | ✅ Lettuce |
 | Lambda event and return value | `dash0_payload` log records | `DASH0_MASK_RULES` | ✅ | ✅ | ✅ |
 | Environment variables | `process.environment_variable.*` resource attributes | `DASH0_MASK_ENV_VARS`, then `DASH0_MASK_RULES` | ✅ | ✅ | ✅ |
 
-¹ The extension moves HTTP bodies off the span into a `dash0_payload` log record of type `http_request_body` or `http_response_body`. It doesn't mask them again, so what you see below is what the log record contains. In Java, these records contain the bodies unmasked.
+¹ The extension moves HTTP bodies off the span into a `dash0_payload` log record of type `http_request_body` or `http_response_body`. It doesn't mask them again, so what you see below is what the log record contains.
 
 ² Messages sent to Kafka and RabbitMQ are masked with the query-parameter rules, not the request-body rules.
+
+³ Java records the SQS payloads as the body of the SQS call. The AWS SDK for Java 2.21 and later sends them as JSON, with the same keys as the examples below, so they are masked by key. Older 2.x versions and the AWS SDK 1.x send form-encoded requests and XML responses, which only `all` masks. Received messages also get a span each, with the message as a string in `messaging.message.body`; only `DASH0_MASK_RESPONSE_BODY=all` masks it.
 
 Some payloads are captured but not masked at all. See [Payloads that are not masked](#payloads-that-are-not-masked).
 
@@ -152,9 +156,9 @@ All examples use the same payloads. Each one has three kinds of keys:
 
 ## Defaults: nothing configured
 
-> **Node.js** ✅ · **Python** ⚠️ · **Java** ❌
+> **Node.js** ✅ · **Python** ⚠️ · **Java** ✅
 
-Python applies the defaults only to the payloads it masks (see the [table](#where-each-payload-ends-up)). Java applies them to the Lambda event, the return value and environment variables only.
+Python applies the defaults only to the payloads it masks (see the [table](#where-each-payload-ends-up)).
 
 ```bash
 # no DASH0_MASK_* variables
@@ -212,9 +216,9 @@ Sets the patterns for every payload. It replaces the defaults.
 
 ### Only your own patterns
 
-> **Node.js** ✅ · **Python** ⚠️ · **Java** ⚠️
+> **Node.js** ✅ · **Python** ⚠️ · **Java** ✅
 
-Python applies the rules only to the payloads it masks. Java applies them to the Lambda event, the return value and environment variables only.
+Python applies the rules only to the payloads it masks.
 
 ```bash
 DASH0_MASK_RULES='[".*email.*"]'
@@ -248,9 +252,9 @@ The email address is masked everywhere. The password, token and `authorization` 
 
 ### Your patterns plus the defaults
 
-> **Node.js** ✅ · **Python** ⚠️ · **Java** ⚠️
+> **Node.js** ✅ · **Python** ⚠️ · **Java** ✅
 
-Python applies the rules only to the payloads it masks, and doesn't capture the SQS receive below. Java applies them to the Lambda event, the return value and environment variables only.
+Python applies the rules only to the payloads it masks, and doesn't capture the SQS receive below. Java masks the SQS receive below in `http.response.body` (see ³ in the [table](#where-each-payload-ends-up)).
 
 ```bash
 DASH0_MASK_RULES='[".*pass.*",".*key.*",".*secret.*",".*credential.*",".*passphrase.*",".*token.*",".*signature.*",".*authorization.*",".*email.*"]'
@@ -285,7 +289,7 @@ This is the setting to use when you want to mask more than the defaults.
 
 ### `all`
 
-> **Node.js** ✅ · **Python** ❌ · **Java** ❌
+> **Node.js** ✅ · **Python** ❌ · **Java** ✅
 
 In Python, `DASH0_MASK_RULES=all` breaks masking and the payloads are sent unmasked. Use `all` in the per-payload variables instead.
 
@@ -293,7 +297,7 @@ In Python, `DASH0_MASK_RULES=all` breaks masking and the payloads are sent unmas
 DASH0_MASK_RULES=all
 ```
 
-Every payload the Node.js distro masks becomes `"****"`:
+Every payload the Node.js and Java distros mask becomes `"****"`:
 
 ```diff
 -{ "email": "jane@example.com", "password": "b-pw", "apiToken": "t", "orderId": "42" }
@@ -311,9 +315,9 @@ Sets the patterns for request bodies: `http.request.body`, the SQS `messaging.pu
 
 ### Patterns
 
-> **Node.js** ✅ · **Python** ⚠️ · **Java** ❌
+> **Node.js** ✅ · **Python** ⚠️ · **Java** ✅
 
-Python applies it to FastAPI and AWS SDK request bodies only. Its SQS `SendMessage` capture contains only `MessageBody`, so the `MessageAttributes` example below doesn't apply.
+Python applies it to FastAPI and AWS SDK request bodies only. Its SQS `SendMessage` capture contains only `MessageBody`, so the `MessageAttributes` example below doesn't apply. Java masks the SQS payload in `http.request.body` (see ³ in the [table](#where-each-payload-ends-up)).
 
 ```bash
 DASH0_MASK_REQUEST_BODY='[".*email.*"]'
@@ -352,7 +356,7 @@ The password in the request body is no longer masked, because the per-payload li
 
 ### `all`
 
-> **Node.js** ✅ · **Python** ⚠️ · **Java** ❌
+> **Node.js** ✅ · **Python** ⚠️ · **Java** ✅
 
 Python applies it to FastAPI and AWS SDK request bodies only.
 
@@ -382,9 +386,9 @@ Sets the patterns for response bodies: `http.response.body`, the SQS, Kafka and 
 
 ### Patterns
 
-> **Node.js** ✅ · **Python** ⚠️ · **Java** ❌
+> **Node.js** ✅ · **Python** ⚠️ · **Java** ✅
 
-Python applies it only to the response bodies it masks, and doesn't capture SQS receives.
+Python applies it only to the response bodies it masks, and doesn't capture SQS receives. Java masks the SQS payload in `http.response.body` (see ³ in the [table](#where-each-payload-ends-up)).
 
 ```bash
 DASH0_MASK_RESPONSE_BODY='[".*email.*"]'
@@ -416,7 +420,7 @@ DASH0_MASK_RESPONSE_BODY='[".*email.*"]'
 
 ### `all`
 
-> **Node.js** ✅ · **Python** ⚠️ · **Java** ❌
+> **Node.js** ✅ · **Python** ⚠️ · **Java** ✅
 
 Same coverage as the patterns above.
 
@@ -437,9 +441,17 @@ Sets the patterns for `http.request.headers`.
 
 ### Patterns
 
-> **Node.js** ✅ · **Python** ⚠️ · **Java** ❌
+> **Node.js** ✅ · **Python** ⚠️ · **Java** ✅
 
-Python doesn't mask headers sent with `requests` or received by Django.
+Python doesn't mask headers sent with `requests` or received by Django. Java masks each captured header attribute on its own:
+
+```diff
+ http.request.header.content-type = ["application/json"]
+-http.request.header.x-email      = ["jane@example.com"]
++http.request.header.x-email      = ["****"]
+ http.request.header.x-password   = ["h-pw"]
+ http.request.header.authorization = ["Bearer abc"]
+```
 
 ```bash
 DASH0_MASK_REQUEST_HEADERS='[".*email.*"]'
@@ -463,9 +475,9 @@ Be careful with this one: the `authorization` header is no longer masked. Includ
 
 ### `all`
 
-> **Node.js** ✅ · **Python** ⚠️ · **Java** ❌
+> **Node.js** ✅ · **Python** ⚠️ · **Java** ✅
 
-Same coverage as the patterns above.
+Same coverage as the patterns above. In Java, every `http.request.header.<name>` attribute becomes `["****"]`.
 
 ```bash
 DASH0_MASK_REQUEST_HEADERS=all
@@ -482,9 +494,9 @@ DASH0_MASK_REQUEST_HEADERS=all
 
 Sets the patterns for `http.response.headers`.
 
-> **Node.js** ✅ · **Python** ⚠️ · **Java** ❌
+> **Node.js** ✅ · **Python** ⚠️ · **Java** ✅
 
-Fastify captures no response headers. Python doesn't mask Flask response headers.
+Fastify captures no response headers. Python doesn't mask Flask response headers. Java masks each `http.response.header.<name>` attribute on its own, as for request headers.
 
 ```bash
 DASH0_MASK_RESPONSE_HEADERS='[".*email.*"]'
@@ -503,9 +515,16 @@ DASH0_MASK_RESPONSE_HEADERS='[".*email.*"]'
 
 Sets the patterns for `http.request.query`, and for messages sent to Kafka and RabbitMQ.
 
-> **Node.js** ✅ · **Python** ❌ · **Java** ❌
+> **Node.js** ✅ · **Python** ❌ · **Java** ✅
 
-Python doesn't mask query strings at all.
+Python doesn't mask query strings at all. Java masks the query string in `url.query` of requests your app receives and in `url.full` of requests it sends, and keeps the rest of the URL:
+
+```diff
+-url.full = "https://api.example.com/orders?email=jane%40example.com&password=q-pw&orderId=42"
++url.full = "https://api.example.com/orders?email=****&password=q-pw&orderId=42"
+```
+
+With `all`, Java replaces the whole query: `https://api.example.com/orders?****`.
 
 ```bash
 DASH0_MASK_QUERY_PARAMS='[".*email.*"]'
@@ -522,7 +541,7 @@ DASH0_MASK_QUERY_PARAMS='[".*email.*"]'
 
 A per-payload variable wins over `DASH0_MASK_RULES` for its own payloads. `DASH0_MASK_RULES` applies to the rest.
 
-> **Node.js** ✅ · **Python** ⚠️ · **Java** ❌
+> **Node.js** ✅ · **Python** ⚠️ · **Java** ✅
 
 Python follows the same order for the payloads it masks.
 
@@ -635,7 +654,7 @@ Function log:
 
 Values that look like an array but aren't a valid JSON array of strings, such as `[".*email.*",]`, `[.*email.*]` or `[null]`, are ignored in the same way.
 
-The wrapper doesn't check that each string is a valid regular expression. The extension drops such a pattern without a warning. `[]` is a valid value, and in the extension it turns masking off.
+The wrapper doesn't check that each string is a valid regular expression. The extension and the Java distro drop such a pattern without a warning. `[]` is a valid value, and in the extension and the Java distro it turns masking off for the payloads it applies to.
 
 ## Payloads that are strings
 
@@ -643,18 +662,18 @@ Patterns are checked against keys, so they never see inside a string. Several pa
 
 | Payload | Attribute | What works | Node.js | Python | Java |
 |---|---|---|---|---|---|
-| SQS message body | `MessageBody` and `Body` keys inside `messaging.publish.body` and `messaging.consume.body` | A pattern for the key, or `all` | ✅ | ❌ | ❌ |
+| SQS message body | `MessageBody` and `Body` keys inside `messaging.publish.body` and `messaging.consume.body` | A pattern for the key, or `all` | ✅ | ❌ | ⚠️ AWS SDK 2.21 or later |
 | API Gateway request body | `body` key inside the Lambda event | A pattern for the key | ✅ | ✅ | ✅ |
-| Kafka and RabbitMQ messages | the whole `messaging.produce.body`, `messaging.publish.body` or `messaging.consume.body` | `all` only | ✅ | ❌ | ❌ |
-| Redis commands and replies | the whole `db.statement` or `db.response.body` | `all` only ³ | ✅ | ❌ | ❌ |
+| Kafka and RabbitMQ messages | the whole `messaging.produce.body`, `messaging.publish.body` or `messaging.consume.body` | `all` only | ✅ | ❌ | ✅ |
+| Redis commands and replies | the whole `db.statement` or `db.response.body` | `all` only ⁴ | ✅ | ❌ | ✅ |
 
-³ Replies from `redis` that are objects, such as `HGETALL`, are masked by key. `ioredis` writes object replies as `"[object Object]"`.
+⁴ Replies from `redis` that are objects, such as `HGETALL`, are masked by key. `ioredis` writes object replies as `"[object Object]"`.
 
 ### SQS messages
 
-> **Node.js** ✅ · **Python** ❌ · **Java** ❌
+> **Node.js** ✅ · **Python** ❌ · **Java** ⚠️
 
-Python captures `SendMessage` as the bare `MessageBody` string and doesn't capture receives.
+Python captures `SendMessage` as the bare `MessageBody` string and doesn't capture receives. Java masks the same keys in the `http.request.body` and `http.response.body` of the SQS call, with the AWS SDK 2.21 or later only (see ³ in the [table](#where-each-payload-ends-up)). The `messaging.message.body` of each received message is a string, so only `DASH0_MASK_RESPONSE_BODY=all` masks it.
 
 The SQS attributes are JSON objects, so you can mask the key that holds the message:
 
@@ -702,9 +721,9 @@ To hide the whole SQS payload, including the queue URL and attributes, use `DASH
 
 ### Kafka and RabbitMQ messages
 
-> **Node.js** ✅ · **Python** ❌ · **Java** ❌
+> **Node.js** ✅ · **Python** ❌ · **Java** ✅
 
-Python and Java send Kafka and RabbitMQ messages unmasked.
+Python sends Kafka and RabbitMQ messages unmasked. Java records the message in `messaging.message.payload`, and Kafka headers in `messaging.message.headers` as `name=value` entries. The headers are masked by name, with the same rules as the message.
 
 The message is captured as a string. Even when it contains JSON, its keys are not checked:
 
@@ -736,9 +755,9 @@ DASH0_MASK_RESPONSE_BODY=all    # messages received from Kafka, RabbitMQ or SQS
 
 ### Redis commands
 
-> **Node.js** ✅ · **Python** ❌ · **Java** ❌
+> **Node.js** ✅ · **Python** ❌ · **Java** ✅
 
-Python and Java send Redis commands and replies unmasked.
+Python sends Redis commands and replies unmasked. Java masks the commands of Lettuce and Jedis, and the replies of Lettuce.
 
 The command and its arguments are captured as one string:
 
@@ -793,12 +812,10 @@ These attributes are captured as they are. None of the masking variables apply t
 
 **Java**
 
-Nothing the auto-instrumentation captures is masked. That includes:
-- HTTP headers and bodies
-- AWS SDK payloads
-- Kafka and RabbitMQ messages
-- gRPC messages
-- Redis (Lettuce) commands
-- JDBC results
+| Payload | Attribute |
+|---|---|
+| gRPC request and response messages | `rpc.grpc.request.payload`, `rpc.grpc.response.payload` |
+| JDBC query results | `db.results` |
+| Apache Storm tuple values | `storm.tuple.values` |
 
 If these can contain sensitive data, turn off auto-instrumentation for the function with `DASH0_DISABLE_AUTO_INSTRUMENTATION=true`. The extension still masks the Lambda event, the return value and environment variables. In Python, you can also turn off single instrumentations with `DASH0_DISABLE_INSTRUMENTATION=<names>`, or only gRPC payloads with `DASH0_INSTRUMENT_GRPC_PAYLOADS=false`.
