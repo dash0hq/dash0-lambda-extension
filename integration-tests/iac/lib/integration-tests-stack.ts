@@ -95,8 +95,9 @@ function createLambdas(
               environment["MASKED_FIELD"] = 'sensitive information';
             }
             if (runtime.family === lambda.RuntimeFamily.PYTHON) {
-              // The defaults plus masked_field, so DASH0_TOKEN stays masked as well.
-              environment["DASH0_MASK_RULES"] = '[".*pass.*",".*key.*",".*secret.*",".*credential.*",".*passphrase.*",".*token.*",".*signature.*",".*authorization.*",".*masked_field.*"]';
+              // The defaults plus masked_field (body key) and masked-field (header), so
+              // DASH0_TOKEN stays masked as well.
+              environment["DASH0_MASK_RULES"] = '[".*pass.*",".*key.*",".*secret.*",".*credential.*",".*passphrase.*",".*token.*",".*signature.*",".*authorization.*",".*masked[-_]field.*"]';
             }
 
             const functionName = `${prefix}${runtimeName}-${scenario}-${traced}-invocation-end-${invocationEnd}-${architecture.name}`;
