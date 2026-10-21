@@ -17,6 +17,7 @@
  */
 package io.opentelemetry.javaagent.instrumentation.lettuce.v5_1;
 
+import io.dash0.javaagent.masking.MaskingCanary;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.api.sync.RedisCommands;
@@ -27,6 +28,8 @@ import io.opentelemetry.instrumentation.testing.junit.InstrumentationExtension;
 import io.opentelemetry.sdk.testing.assertj.TracesAssert;
 import io.opentelemetry.semconv.incubating.DbIncubatingAttributes;
 import io.opentelemetry.semconv.incubating.NetworkIncubatingAttributes;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,6 +37,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.testcontainers.containers.GenericContainer;
 
+import static io.dash0.javaagent.masking.MaskingCanary.SECRET;
 import static io.opentelemetry.sdk.testing.assertj.OpenTelemetryAssertions.equalTo;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -70,6 +74,17 @@ class LettuceClientTest {
     connection.flushCommands();
     testing.waitForTraces(1);
     testing.clearData();
+  }
+
+  /** Fails when this instrumentation captures a payload that MaskingSpanExporter doesn't mask. */
+  @Test
+  void masksEverythingTheInstrumentationCaptures() {
+    commands.set("canary", SECRET);
+    commands.get("canary");
+
+    // Commands and replies are strings, so only all masks them
+    MaskingCanary.assertMaskedWithAll(
+        testing.waitForTraces(2).stream().flatMap(List::stream).collect(Collectors.toList()));
   }
 
   @Test

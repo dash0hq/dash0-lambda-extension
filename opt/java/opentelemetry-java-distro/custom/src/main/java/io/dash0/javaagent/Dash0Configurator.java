@@ -18,6 +18,8 @@
 package io.dash0.javaagent;
 
 import com.google.auto.service.AutoService;
+import io.dash0.javaagent.masking.MaskingConfig;
+import io.dash0.javaagent.masking.MaskingSpanExporter;
 import io.dash0.javaagent.utils.Strings;
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizer;
 import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizerProvider;
@@ -85,6 +87,8 @@ public class Dash0Configurator implements AutoConfigurationCustomizerProvider {
     autoConfiguration
         .addPropertiesCustomizer(this::propertiesCustomizer)
         .addTracerProviderCustomizer(this::tracerProviderCustomizer)
+        .addSpanExporterCustomizer(
+            (exporter, cfg) -> new MaskingSpanExporter(exporter, MaskingConfig.fromConfig(cfg)))
         .addMeterProviderCustomizer(this::meterProviderCustomizer)
         .addPropertiesSupplier(this::getDefaultProperties);
   }
@@ -115,7 +119,9 @@ public class Dash0Configurator implements AutoConfigurationCustomizerProvider {
       } else {
         try {
           tracerProvider.addSpanProcessor(
-              SimpleSpanProcessor.create(FileSpanExporter.create(debugSpanDump)));
+              SimpleSpanProcessor.create(
+                  new MaskingSpanExporter(
+                      FileSpanExporter.create(debugSpanDump), MaskingConfig.fromConfig(cfg))));
 
           LOGGER.finest("Dumping spans to '" + debugSpanDump + "' file");
         } catch (Exception e) {

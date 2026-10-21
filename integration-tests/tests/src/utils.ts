@@ -124,11 +124,14 @@ export const checkHttpSpan = async ({
      functionName,
      traceId,
      parentSpanId,
+     checkSpan,
  }: {
     invocationId: string,
     functionName: string,
     traceId: string,
     parentSpanId: string,
+    /** Extra assertions on the matching HTTP span, retried like the others. */
+    checkSpan?: (span: any) => void,
 }) => {
     const now = Date.now();
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -173,6 +176,7 @@ export const checkHttpSpan = async ({
             const matchingSpan = httpSpans.find((span: any) => span.traceId === traceId && span.parentSpanId === parentSpanId);
             expect(matchingSpan).toBeDefined();
             checkResourceAttributes(spanPayload.resourceSpans[0].resource.attributes, functionName);
+            checkSpan?.(matchingSpan);
             return matchingSpan.spanId;
         } catch (error) {
             console.error(`Error fetching spans on attempt ${attempt}:`, error);

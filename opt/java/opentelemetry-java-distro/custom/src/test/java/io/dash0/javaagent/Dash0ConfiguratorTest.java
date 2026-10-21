@@ -21,8 +21,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.opentelemetry.api.common.AttributeKey;
+import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizer;
 import io.opentelemetry.sdk.autoconfigure.spi.ConfigProperties;
 import io.opentelemetry.sdk.common.CompletableResultCode;
 import io.opentelemetry.sdk.metrics.InstrumentType;
@@ -39,19 +42,24 @@ import io.opentelemetry.sdk.logs.export.LogRecordExporter;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import io.opentelemetry.sdk.trace.data.SpanData;
 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
+import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 
 public class Dash0ConfiguratorTest {
   @Test
@@ -301,5 +309,53 @@ public class Dash0ConfiguratorTest {
     assertFalse(names.contains("queueSize"));
     assertFalse(names.contains("processedSpans"));
     assertFalse(names.contains("processedLogs"));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void spanExportersMaskPayloads() {
+    AutoConfigurationCustomizer customizer =
+        mock(AutoConfigurationCustomizer.class, Mockito.RETURNS_SELF);
+    new Dash0Configurator().customize(customizer);
+    ArgumentCaptor<BiFunction<SpanExporter, ConfigProperties, SpanExporter>> exporterCustomizer =
+        ArgumentCaptor.forClass(BiFunction.class);
+    verify(customizer).addSpanExporterCustomizer(exporterCustomizer.capture());
+
+    List<SpanData> exported = new ArrayList<>();
+    SpanExporter exporter =
+        exporterCustomizer
+            .getValue()
+            .apply(
+                new SpanExporter() {
+                  @Override
+                  public CompletableResultCode export(Collection<SpanData> spans) {
+                    exported.addAll(spans);
+                    return CompletableResultCode.ofSuccess();
+                  }
+
+                  @Override
+                  public CompletableResultCode flush() {
+                    return CompletableResultCode.ofSuccess();
+                  }
+
+                  @Override
+                  public CompletableResultCode shutdown() {
+                    return CompletableResultCode.ofSuccess();
+                  }
+                },
+                configOf(Collections.singletonMap("dash0.mask.rules", "[\".*masked_field.*\"]")));
+
+    try (SdkTracerProvider tracerProvider =
+        SdkTracerProvider.builder().addSpanProcessor(SimpleSpanProcessor.create(exporter)).build()) {
+      tracerProvider
+          .get("t")
+          .spanBuilder("s")
+          .setAttribute("http.request.body", "{\"title\":\"foo\",\"masked_field\":\"secret\"}")
+          .startSpan()
+          .end();
+    }
+    assertEquals(
+        "{\"title\":\"foo\",\"masked_field\":\"****\"}",
+        exported.get(0).getAttributes().get(AttributeKey.stringKey("http.request.body")));
   }
 }

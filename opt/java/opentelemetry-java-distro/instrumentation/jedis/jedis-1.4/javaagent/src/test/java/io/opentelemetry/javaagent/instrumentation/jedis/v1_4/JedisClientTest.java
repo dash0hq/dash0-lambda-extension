@@ -17,9 +17,11 @@
  */
 package io.opentelemetry.javaagent.instrumentation.jedis.v1_4;
 
+import static io.dash0.javaagent.masking.MaskingCanary.SECRET;
 import static io.opentelemetry.sdk.testing.assertj.OpenTelemetryAssertions.equalTo;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.dash0.javaagent.masking.MaskingCanary;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.instrumentation.testing.junit.AgentInstrumentationExtension;
@@ -27,6 +29,8 @@ import io.opentelemetry.instrumentation.testing.junit.InstrumentationExtension;
 import io.opentelemetry.sdk.testing.assertj.TracesAssert;
 import io.opentelemetry.semconv.ServerAttributes;
 import io.opentelemetry.semconv.incubating.DbIncubatingAttributes;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,6 +67,17 @@ class JedisClientTest {
   void setup() {
     jedis.flushAll();
     testing.clearData();
+  }
+
+  /** Fails when this instrumentation captures a payload that MaskingSpanExporter doesn't mask. */
+  @Test
+  void masksEverythingTheInstrumentationCaptures() {
+    jedis.set("canary", SECRET);
+    jedis.get("canary");
+
+    // Commands are strings, so only all masks them
+    MaskingCanary.assertMaskedWithAll(
+        testing.waitForTraces(2).stream().flatMap(List::stream).collect(Collectors.toList()));
   }
 
   @Test

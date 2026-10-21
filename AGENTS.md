@@ -24,7 +24,8 @@ Run these as CI does (`.github/workflows/ci.yml`):
   - `python -m venv opt/python/distro/.venv && opt/python/distro/.venv/bin/pip install -r opt/python/distro/requirements-dev.txt`
   - `cd opt/python/distro && .venv/bin/pytest`
 - sls-plugin: `cd sls-plugin && npm ci && npm run build && npm test`
-- Java distro: CI has no unit-test job. The only CI build is in `security.yml`: `cd opt/java/opentelemetry-java-distro && ./gradlew clean -Pversion=1.0.0-SNAPSHOT assemble -x javadoc`.
+- Java distro: `cd opt/java/opentelemetry-java-distro && AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test ./gradlew test --continue`. The SQS tests need the dummy keys. The Kafka, Redis and LocalStack tests need Docker; with Colima, also set `DOCKER_HOST=unix://$HOME/.colima/default/docker.sock TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock`.
+  - Build, as `security.yml` does: `./gradlew clean -Pversion=1.0.0-SNAPSHOT assemble -x javadoc`.
 - Layers: `make build/layer-dash0-<node|python|java|manual>.zip` builds a zip. It needs `cross` and Docker, and every `make` call also runs `aws sts get-caller-identity`. Bare `make` and `make node|python|java|manual` publish to AWS and push to ECR. Don't run them.
 - Integration tests run only in CI, on same-repo PRs, against stacks deployed with the `pr-<number>-` prefix. They can't run locally without AWS credentials and deployed layers.
 
@@ -54,5 +55,7 @@ This covers any of:
 - the extension: `src/otlp/masking.rs`, and the payload and env-var paths that call it
 - the wrapper mapping: `map_masking_env` in `opt/shared.sh`
 - what a distro captures or how it masks it: the instrumentations under `opt/node/distro`, `opt/python/distro` and `opt/java`
+
+When a Java instrumentation starts capturing a payload, add a `MaskingCanary` test to its module (see `opt/java/opentelemetry-java-distro/custom/src/testFixtures`). It fails when masking misses an attribute the instrumentation writes.
 
 Generate the examples by running the real code, not by hand. Use `opt/node/test/masking-env.test.ts` for Node.js and `opt/test/shared.test.sh` for the wrapper. Keep the default patterns in `src/otlp/masking.rs`, `opt/shared.sh` and the README identical.

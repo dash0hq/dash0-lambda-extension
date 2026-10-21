@@ -125,7 +125,7 @@ public class SnsTracingTest {
                                           AttributeKey.stringKey("aws.agent"), "java-aws-sdk");
                                   assertThat(attrs)
                                       .containsEntry(
-                                          AttributeKey.stringKey("aws.queue.url"), queueUrl);
+                                          AttributeKey.stringKey("aws.sqs.queue.url"), queueUrl);
                                   assertThat(attrs)
                                       .containsEntry(RpcIncubatingAttributes.RPC_SYSTEM, "aws-api");
                                   assertThat(attrs)
@@ -155,7 +155,7 @@ public class SnsTracingTest {
                                           AttributeKey.stringKey("aws.agent"), "java-aws-sdk");
                                   assertThat(attrs)
                                       .containsEntry(
-                                          AttributeKey.stringKey("aws.queue.url"), queueUrl);
+                                          AttributeKey.stringKey("aws.sqs.queue.url"), queueUrl);
                                   assertThat(attrs)
                                       .containsEntry(RpcIncubatingAttributes.RPC_SYSTEM, "aws-api");
                                   assertThat(attrs)
