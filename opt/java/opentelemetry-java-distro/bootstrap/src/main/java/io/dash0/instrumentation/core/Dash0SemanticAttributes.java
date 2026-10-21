@@ -22,17 +22,25 @@ import java.util.List;
 
 /** Semantic Attribute keys specific to Dash0. */
 public final class Dash0SemanticAttributes {
+  // Compile-time constants, so the masking in the custom module can use them without loading this
+  // class: the agent relocates it, and the instrumentation tests can't link against that copy.
+  public static final String HTTP_REQUEST_BODY_KEY = "http.request.body";
+  public static final String HTTP_RESPONSE_BODY_KEY = "http.response.body";
+  public static final String MESSAGING_PAYLOAD_KEY = "messaging.message.payload";
+  public static final String MESSAGING_HEADERS_KEY = "messaging.message.headers";
+  public static final String DB_RESPONSE_BODY_KEY = "db.response.body";
+
   public static final AttributeKey<String> HTTP_REQUEST_BODY =
-      AttributeKey.stringKey("http.request.body");
+      AttributeKey.stringKey(HTTP_REQUEST_BODY_KEY);
 
   public static final AttributeKey<String> HTTP_RESPONSE_BODY =
-      AttributeKey.stringKey("http.response.body");
+      AttributeKey.stringKey(HTTP_RESPONSE_BODY_KEY);
 
   public static final AttributeKey<String> MESSAGING_PAYLOAD =
-      AttributeKey.stringKey("messaging.message.payload");
+      AttributeKey.stringKey(MESSAGING_PAYLOAD_KEY);
 
   public static final AttributeKey<List<String>> MESSAGING_HEADERS =
-      AttributeKey.stringArrayKey("messaging.message.headers");
+      AttributeKey.stringArrayKey(MESSAGING_HEADERS_KEY);
 
   public static final AttributeKey<String> GRPC_REQUEST_BODY =
       AttributeKey.stringKey("rpc.grpc.request.payload");
@@ -41,5 +49,5 @@ public final class Dash0SemanticAttributes {
       AttributeKey.stringKey("rpc.grpc.response.payload");
 
   public static final AttributeKey<String> DB_RESPONSE_BODY =
-      AttributeKey.stringKey("db.response.body");
+      AttributeKey.stringKey(DB_RESPONSE_BODY_KEY);
 }

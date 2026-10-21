@@ -19,6 +19,7 @@ package io.dash0.javaagent.masking;
 
 import static io.dash0.javaagent.masking.MaskingRules.MASKED_VALUE;
 
+import io.dash0.instrumentation.core.Dash0SemanticAttributes;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.AttributeType;
 import io.opentelemetry.api.common.Attributes;
@@ -28,9 +29,14 @@ import io.opentelemetry.sdk.common.CompletableResultCode;
 import io.opentelemetry.sdk.trace.data.DelegatingSpanData;
 import io.opentelemetry.sdk.trace.data.SpanData;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
+import io.opentelemetry.semconv.DbAttributes;
+import io.opentelemetry.semconv.HttpAttributes;
+import io.opentelemetry.semconv.UrlAttributes;
+import io.opentelemetry.semconv.incubating.DbIncubatingAttributes;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
@@ -59,21 +65,46 @@ import javax.annotation.Nonnull;
  *       db.response.body}: DASH0_MASK_RESPONSE_BODY, {@code all} only.
  * </ul>
  */
+@SuppressWarnings("deprecation") // the instrumentations still write db.statement and db.system
 public final class MaskingSpanExporter implements SpanExporter {
-  static final String HTTP_REQUEST_BODY = "http.request.body";
-  static final String HTTP_RESPONSE_BODY = "http.response.body";
-  static final String HTTP_REQUEST_HEADER_PREFIX = "http.request.header.";
-  static final String HTTP_RESPONSE_HEADER_PREFIX = "http.response.header.";
-  static final String URL_QUERY = "url.query";
-  static final String URL_FULL = "url.full";
-  static final String MESSAGING_PAYLOAD = "messaging.message.payload";
-  static final String MESSAGING_HEADERS = "messaging.message.headers";
-  static final String SQS_MESSAGE_BODY = "messaging.message.body";
-  static final String DB_STATEMENT = "db.statement";
-  static final String DB_QUERY_TEXT = "db.query.text";
-  static final String DB_RESPONSE_BODY = "db.response.body";
-  static final AttributeKey<String> DB_SYSTEM = AttributeKey.stringKey("db.system");
-  static final AttributeKey<String> DB_SYSTEM_NAME = AttributeKey.stringKey("db.system.name");
+  // The keys come from the constants the instrumentations write with, so a rename breaks the build
+  // instead of silently turning masking off. MaskingCanary checks the payloads end to end.
+  static final String HTTP_REQUEST_HEADER_PREFIX =
+      HttpAttributes.HTTP_REQUEST_HEADER.getAttributeKey("").getKey();
+  static final String HTTP_RESPONSE_HEADER_PREFIX =
+      HttpAttributes.HTTP_RESPONSE_HEADER.getAttributeKey("").getKey();
+  // Written as a literal by SqsImpl in the aws-sdk-2.2 library, which can't see bootstrap.
+  static final AttributeKey<String> SQS_MESSAGE_BODY =
+      AttributeKey.stringKey("messaging.message.body");
+  static final AttributeKey<String> DB_SYSTEM = DbIncubatingAttributes.DB_SYSTEM;
+  static final AttributeKey<String> DB_SYSTEM_NAME = DbAttributes.DB_SYSTEM_NAME;
+
+  private enum Payload {
+    REQUEST_BODY,
+    RESPONSE_BODY,
+    URL_QUERY,
+    URL_FULL,
+    MESSAGING_PAYLOAD,
+    MESSAGING_HEADERS,
+    SQS_MESSAGE_BODY,
+    REDIS_COMMAND,
+    REDIS_REPLY
+  }
+
+  private static final Map<String, Payload> PAYLOADS = new HashMap<>();
+
+  static {
+    PAYLOADS.put(Dash0SemanticAttributes.HTTP_REQUEST_BODY_KEY, Payload.REQUEST_BODY);
+    PAYLOADS.put(Dash0SemanticAttributes.HTTP_RESPONSE_BODY_KEY, Payload.RESPONSE_BODY);
+    PAYLOADS.put(UrlAttributes.URL_QUERY.getKey(), Payload.URL_QUERY);
+    PAYLOADS.put(UrlAttributes.URL_FULL.getKey(), Payload.URL_FULL);
+    PAYLOADS.put(Dash0SemanticAttributes.MESSAGING_PAYLOAD_KEY, Payload.MESSAGING_PAYLOAD);
+    PAYLOADS.put(Dash0SemanticAttributes.MESSAGING_HEADERS_KEY, Payload.MESSAGING_HEADERS);
+    PAYLOADS.put(SQS_MESSAGE_BODY.getKey(), Payload.SQS_MESSAGE_BODY);
+    PAYLOADS.put(DbIncubatingAttributes.DB_STATEMENT.getKey(), Payload.REDIS_COMMAND);
+    PAYLOADS.put(DbAttributes.DB_QUERY_TEXT.getKey(), Payload.REDIS_COMMAND);
+    PAYLOADS.put(Dash0SemanticAttributes.DB_RESPONSE_BODY_KEY, Payload.REDIS_REPLY);
+  }
 
   private final SpanExporter delegate;
   private final MaskingConfig config;
@@ -147,7 +178,7 @@ public final class MaskingSpanExporter implements SpanExporter {
         return maskHeader(
             name.substring(HTTP_RESPONSE_HEADER_PREFIX.length()), list, config.responseHeaders);
       }
-      if (name.equals(MESSAGING_HEADERS)) {
+      if (PAYLOADS.get(name) == Payload.MESSAGING_HEADERS) {
         return maskMessagingHeaders(list, messagingRules);
       }
     }
@@ -156,26 +187,28 @@ public final class MaskingSpanExporter implements SpanExporter {
 
   private String maskStringAttribute(
       String name, String value, boolean redis, MaskingRules messagingRules) {
-    switch (name) {
-      case HTTP_REQUEST_BODY:
-        return PayloadMasker.maskJson(value, config.requestBody);
-      case HTTP_RESPONSE_BODY:
-        return PayloadMasker.maskJson(value, config.responseBody);
-      case URL_QUERY:
-        return PayloadMasker.maskQuery(value, config.queryParams);
-      case URL_FULL:
-        return PayloadMasker.maskUrl(value, config.queryParams);
-      case MESSAGING_PAYLOAD:
-        return PayloadMasker.maskString(value, messagingRules);
-      case SQS_MESSAGE_BODY:
-        return PayloadMasker.maskString(value, config.responseBody);
-      case DB_STATEMENT:
-      case DB_QUERY_TEXT:
-        return redis ? PayloadMasker.maskString(value, config.requestBody) : value;
-      case DB_RESPONSE_BODY:
-        return redis ? PayloadMasker.maskString(value, config.responseBody) : value;
-      default:
-        break;
+    Payload payload = PAYLOADS.get(name);
+    if (payload != null) {
+      switch (payload) {
+        case REQUEST_BODY:
+          return PayloadMasker.maskJson(value, config.requestBody);
+        case RESPONSE_BODY:
+          return PayloadMasker.maskJson(value, config.responseBody);
+        case URL_QUERY:
+          return PayloadMasker.maskQuery(value, config.queryParams);
+        case URL_FULL:
+          return PayloadMasker.maskUrl(value, config.queryParams);
+        case MESSAGING_PAYLOAD:
+          return PayloadMasker.maskString(value, messagingRules);
+        case SQS_MESSAGE_BODY:
+          return PayloadMasker.maskString(value, config.responseBody);
+        case REDIS_COMMAND:
+          return redis ? PayloadMasker.maskString(value, config.requestBody) : value;
+        case REDIS_REPLY:
+          return redis ? PayloadMasker.maskString(value, config.responseBody) : value;
+        default:
+          return value;
+      }
     }
     if (name.startsWith(HTTP_REQUEST_HEADER_PREFIX)) {
       String header = name.substring(HTTP_REQUEST_HEADER_PREFIX.length());

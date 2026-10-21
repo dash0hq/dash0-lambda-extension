@@ -20,7 +20,6 @@ package io.dash0.javaagent.masking;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
-import io.dash0.javaagent.utils.Strings;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -170,7 +169,7 @@ public final class MaskingRules {
    * logged at FINE level here.
    */
   static MaskingRules parse(String name, String value) {
-    if (Strings.isBlank(value)) {
+    if (value == null || value.trim().isEmpty()) {
       return null;
     }
     if (ALL.equals(value)) {
