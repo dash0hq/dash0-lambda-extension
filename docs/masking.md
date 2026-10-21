@@ -44,7 +44,7 @@ Masking of the Lambda event, the return value and environment variables is done 
 
 | Payload | Span attribute | Controlled by | Node.js | Python | Java |
 |---|---|---|---|---|---|
-| Query string of requests your app receives | `http.request.query` | `DASH0_MASK_QUERY_PARAMS`, then `DASH0_MASK_RULES` | ✅ Express, Fastify | ✅ Flask, FastAPI, Django | ❌ |
+| Query string of requests your app receives | `http.request.query` | `DASH0_MASK_QUERY_PARAMS`, then `DASH0_MASK_RULES` | ✅ Express, Fastify | ⚠️ Flask, FastAPI, Django; the query stays in `http.url` or `http.target` | ❌ |
 | HTTP request headers | `http.request.headers` | `DASH0_MASK_REQUEST_HEADERS`, then `DASH0_MASK_RULES` | ✅ `http`/`https`, `fetch`, Express, Fastify | ✅ Flask, FastAPI, Django, `requests`, `httpx` | ❌ |
 | HTTP request body | `http.request.body` ¹ | `DASH0_MASK_REQUEST_BODY`, then `DASH0_MASK_RULES` | ✅ `http`/`https`, `fetch`, Express, Fastify | ✅ FastAPI, Django, `requests`, `httpx`, AWS SDK; Flask captures none | ❌ |
 | HTTP response headers | `http.response.headers` | `DASH0_MASK_RESPONSE_HEADERS`, then `DASH0_MASK_RULES` | ✅ `http`/`https`, `fetch`, Express; Fastify captures none | ✅ Flask, FastAPI, Django, `requests`, `httpx`, AWS SDK | ❌ |
@@ -492,9 +492,9 @@ DASH0_MASK_RESPONSE_HEADERS='[".*email.*"]'
 
 Sets the patterns for `http.request.query`, and for messages sent to Kafka and RabbitMQ.
 
-> **Node.js** ✅ · **Python** ✅ · **Java** ❌
+> **Node.js** ✅ · **Python** ⚠️ · **Java** ❌
 
-Python captures the query string of requests to Flask, FastAPI and Django.
+Python captures the query string of requests to Flask, FastAPI and Django, and masks `http.request.query` as shown. The OpenTelemetry instrumentations of these frameworks also record the whole URL in `http.url` (FastAPI, Django) or `http.target` (Flask), query string included, and that copy is not masked. See [Payloads that are not masked](#payloads-that-are-not-masked).
 
 ```bash
 DASH0_MASK_QUERY_PARAMS='[".*email.*"]'
@@ -771,8 +771,12 @@ These attributes are captured as they are. None of the masking variables apply t
 
 | Payload | Attribute |
 |---|---|
+| Query strings, as part of the request URL (Flask, FastAPI, Django) | `http.url`, `http.target` |
 | PostgreSQL query parameters (`psycopg`) | `db.statement.parameters` |
+| SQL text, including values written into it (`pymysql`) | `db.statement` |
 | gRPC request and response messages | `rpc.grpc.*.payload` |
+| LLM prompts, completions and tool inputs and outputs (`langchain`) | `gen_ai.prompt.*`, `gen_ai.completion.*`, `traceloop.entity.input`, `traceloop.entity.output` |
+| Agent inputs and outputs (`agno`) | `input.value`, `output.value` |
 
 **Java**
 
@@ -784,4 +788,4 @@ Nothing the auto-instrumentation captures is masked. That includes:
 - Redis (Lettuce) commands
 - JDBC results
 
-If these can contain sensitive data, turn off auto-instrumentation for the function with `DASH0_DISABLE_AUTO_INSTRUMENTATION=true`. The extension still masks the Lambda event, the return value and environment variables. In Python, you can also turn off single instrumentations with `DASH0_DISABLE_INSTRUMENTATION=<names>`, or only gRPC payloads with `DASH0_INSTRUMENT_GRPC_PAYLOADS=false`.
+If these can contain sensitive data, turn off auto-instrumentation for the function with `DASH0_DISABLE_AUTO_INSTRUMENTATION=true`. The extension still masks the Lambda event, the return value and environment variables. In Python, you can also turn off single instrumentations with `DASH0_DISABLE_INSTRUMENTATION=<names>`, or only gRPC payloads with `DASH0_INSTRUMENT_GRPC_PAYLOADS=false`. `TRACELOOP_TRACE_CONTENT=false` stops `langchain` from recording prompts and completions, and `OPENINFERENCE_HIDE_INPUTS=true` and `OPENINFERENCE_HIDE_OUTPUTS=true` do the same for `agno`.

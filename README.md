@@ -142,7 +142,7 @@ Masking applies to Lambda event and response payloads and to environment variabl
 | `DASH0_MASK_RESPONSE_BODY` | ✅ | ✅ ¹ | ❌ |
 | `DASH0_MASK_REQUEST_HEADERS` | ✅ | ✅ | ❌ |
 | `DASH0_MASK_RESPONSE_HEADERS` | ✅ | ✅ | ❌ |
-| `DASH0_MASK_QUERY_PARAMS` | ✅ | ✅ Flask, FastAPI, Django | ❌ |
+| `DASH0_MASK_QUERY_PARAMS` | ✅ | ⚠️ Flask, FastAPI, Django; the query stays in `http.url` or `http.target` | ❌ |
 | Kafka and RabbitMQ messages sent (masked with `DASH0_MASK_QUERY_PARAMS`) | ✅ | ✅ | ❌ |
 | Keys inside a JSON string body, e.g. an SQS `MessageBody` | ⚠️ JSON HTTP bodies only | ✅ any string payload that holds a JSON object or array | ❌ |
 
