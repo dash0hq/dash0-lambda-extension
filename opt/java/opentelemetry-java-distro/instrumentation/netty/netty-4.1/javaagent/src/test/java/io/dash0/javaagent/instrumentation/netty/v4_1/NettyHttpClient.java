@@ -44,14 +44,21 @@ public class NettyHttpClient {
   }
 
   public FullHttpResponse sendGetRequest() throws InterruptedException {
-    return sendRequest(HttpMethod.GET, null);
+    return sendRequest(HttpMethod.GET, "/", null, null, null);
   }
 
   public FullHttpResponse sendPostRequest(String content) throws InterruptedException {
-    return sendRequest(HttpMethod.POST, content);
+    return sendRequest(HttpMethod.POST, "/", content, null, null);
   }
 
-  private FullHttpResponse sendRequest(HttpMethod method, String content)
+  public FullHttpResponse sendPostRequest(
+      String uri, String content, String headerName, String headerValue)
+      throws InterruptedException {
+    return sendRequest(HttpMethod.POST, uri, content, headerName, headerValue);
+  }
+
+  private FullHttpResponse sendRequest(
+      HttpMethod method, String uri, String content, String headerName, String headerValue)
       throws InterruptedException {
     ChannelFuture future = null;
     try {
@@ -92,12 +99,15 @@ public class NettyHttpClient {
         byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
         request =
             new DefaultFullHttpRequest(
-                HttpVersion.HTTP_1_1, method, "/", Unpooled.copiedBuffer(contentBytes));
+                HttpVersion.HTTP_1_1, method, uri, Unpooled.copiedBuffer(contentBytes));
         request.headers().set(HttpHeaderNames.CONTENT_LENGTH, contentBytes.length);
       } else {
-        request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, "/");
+        request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uri);
       }
       request.headers().set(HttpHeaderNames.HOST, host);
+      if (headerName != null) {
+        request.headers().set(headerName, headerValue);
+      }
 
       // Send the request and wait for the response
       future.channel().writeAndFlush(request).sync();

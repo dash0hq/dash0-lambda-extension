@@ -31,6 +31,12 @@ dependencies {
   testImplementation("io.opentelemetry:opentelemetry-sdk-testing")
   testImplementation("io.opentelemetry.semconv:opentelemetry-semconv-incubating:${versions.opentelemetrySemconvIncubating}")
   testImplementation("org.assertj:assertj-core:3.19.0")
+  // MaskingCanary. The agent provides bootstrap and utils, relocated; unrelocated copies on the
+  // test classpath make muzzle disable the instrumentation under test.
+  testImplementation(testFixtures(project(":custom"))) {
+    exclude module: "utils"
+    exclude group: "io.opentelemetry.contrib"
+  }
 
   add("codegen", "io.opentelemetry.javaagent:opentelemetry-javaagent-tooling:${versions.opentelemetryJavaagentAlpha}")
 
@@ -67,6 +73,12 @@ tasks.withType(Test).configureEach {
   // prevent sporadic gradle deadlocks, see SafeLogger for more details
   jvmArgs "-Dotel.javaagent.testing.transform-safe-logging.enabled=true"
   jvmArgs "-Dotel.metrics.exporter=otlp"
+  // MaskingCanary sends this header; the distro adds content-type and friends to the list
+  ["client", "server"].each { side ->
+    ["request", "response"].each { dir ->
+      jvmArgs "-Dotel.instrumentation.http.${side}.capture-${dir}-headers=x-masked-field"
+    }
+  }
 
   useJUnitPlatform()
 

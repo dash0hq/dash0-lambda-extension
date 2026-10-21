@@ -17,9 +17,12 @@
  */
 package io.dash0.javaagent.instrumentation.kafkaclients.v0_11;
 
+import static io.dash0.javaagent.masking.MaskingCanary.FIELD;
+import static io.dash0.javaagent.masking.MaskingCanary.SECRET;
 import static io.opentelemetry.sdk.testing.assertj.OpenTelemetryAssertions.equalTo;
 import static io.opentelemetry.sdk.testing.assertj.OpenTelemetryAssertions.satisfies;
 
+import io.dash0.javaagent.masking.MaskingCanary;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.instrumentation.testing.junit.AgentInstrumentationExtension;
@@ -242,6 +245,23 @@ public class KafkaClientTest {
     }
 
     return assertions;
+  }
+
+  /** Fails when this instrumentation captures a payload that MaskingSpanExporter doesn't mask. */
+  @Test
+  void masksEverythingTheInstrumentationCaptures() throws Exception {
+    String value = "{\"" + FIELD + "\":\"" + SECRET + "\"}";
+    ProducerRecord<Integer, String> record = new ProducerRecord<>(TOPIC, 1, value);
+    record.headers().add(FIELD, SECRET.getBytes(StandardCharsets.UTF_8));
+    instrumentation.runWithSpan("parent", () -> producer.send(record).get());
+
+    awaitUntilConsumerIsReady();
+    for (ConsumerRecord<?, ?> received : consumer.poll(Duration.ofSeconds(5).toMillis())) {
+      instrumentation.runWithSpan("processing", () -> received.value());
+    }
+
+    // The message is a string, so only all masks it
+    MaskingCanary.assertMaskedWithAll(instrumentation.waitForTraces(1).get(0));
   }
 
   @Test

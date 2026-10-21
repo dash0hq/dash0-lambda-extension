@@ -53,14 +53,21 @@ public class RequestsHandler extends SimpleChannelInboundHandler<FullHttpRequest
 
     } else if (request.getMethod() == HttpMethod.POST) {
       String requestBody = request.content().toString(StandardCharsets.UTF_8);
+      // MaskingCanaryTest: echo the body and the canary header
+      boolean canary = request.uri().startsWith("/canary");
       response =
           new DefaultFullHttpResponse(
               HttpVersion.HTTP_1_1,
               HttpResponseStatus.OK,
-              Unpooled.copiedBuffer("Hello, World!", StandardCharsets.UTF_8));
+              Unpooled.copiedBuffer(canary ? requestBody : "Hello, World!", StandardCharsets.UTF_8));
       response
           .headers()
-          .set(io.netty.handler.codec.http.HttpHeaderNames.CONTENT_TYPE, "text/plain");
+          .set(
+              io.netty.handler.codec.http.HttpHeaderNames.CONTENT_TYPE,
+              canary ? "application/json" : "text/plain");
+      if (canary) {
+        response.headers().set("x-masked-field", request.headers().get("x-masked-field"));
+      }
       response
           .headers()
           .set(

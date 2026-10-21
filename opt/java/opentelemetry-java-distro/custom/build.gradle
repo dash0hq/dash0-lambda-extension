@@ -1,5 +1,7 @@
 plugins {
   id "java"
+  // MaskingCanary, for the instrumentation tests
+  id "java-test-fixtures"
 }
 
 dependencies {
@@ -35,6 +37,15 @@ dependencies {
   testImplementation("org.mockito:mockito-core:${versions.mockito}")
   testImplementation("com.fasterxml.jackson.core:jackson-databind:${versions.jackson}")
   testImplementation("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure")
+
+  // The agent provides these at runtime; an instrumentation test that uses MaskingCanary needs them
+  // on its own classpath.
+  testFixturesApi(platform("io.opentelemetry:opentelemetry-bom:${versions.opentelemetrySdk}"))
+  testFixturesApi("io.opentelemetry:opentelemetry-sdk")
+  testFixturesImplementation("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure")
+  testFixturesImplementation("io.opentelemetry.semconv:opentelemetry-semconv:${versions.opentelemetrySemconv}")
+  testFixturesImplementation("io.opentelemetry.semconv:opentelemetry-semconv-incubating:${versions.opentelemetrySemconvIncubating}")
+  testFixturesImplementation("com.fasterxml.jackson.core:jackson-core:${versions.jackson}")
 }
 
 // Prints what masking costs per span; see MaskingBenchmark.

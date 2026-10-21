@@ -17,6 +17,11 @@
  */
 package io.dash0.javaagent.instrumentation.servlet.v3_0;
 
+import static io.dash0.javaagent.masking.MaskingCanary.FIELD;
+import static io.dash0.javaagent.masking.MaskingCanary.HEADER;
+import static io.dash0.javaagent.masking.MaskingCanary.SECRET;
+
+import io.dash0.javaagent.masking.MaskingCanary;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.instrumentation.testing.junit.AgentInstrumentationExtension;
@@ -32,6 +37,7 @@ import java.util.function.BiConsumer;
 import java.util.stream.Stream;
 import javax.servlet.Servlet;
 import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.aggregator.ArgumentsAccessor;
@@ -104,6 +110,22 @@ public abstract class AbstractServlet30Test {
   @MethodSource("servletPaths")
   void testServletInstrumentation(ArgumentsAccessor arguments) {
     assertInstrumentation(arguments.getString(1));
+  }
+
+  /** Fails when this instrumentation captures a payload that MaskingSpanExporter doesn't mask. */
+  @Test
+  void masksEverythingTheInstrumentationCaptures() throws Exception {
+    String body = "{\"" + FIELD + "\":\"" + SECRET + "\",\"orderId\":\"42\"}";
+    HttpRequest request =
+        HttpRequest.newBuilder(
+                URI.create(serverUrl + "/echo_reader_read_write?" + FIELD + "=" + SECRET))
+            .POST(HttpRequest.BodyPublishers.ofString(body))
+            .header("Content-Type", "application/json")
+            .header(HEADER, SECRET)
+            .build();
+    HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+
+    MaskingCanary.assertMaskedByKey(instrumentation.waitForTraces(1).get(0));
   }
 
   static Stream<Arguments> servletPaths() {
