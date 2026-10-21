@@ -392,3 +392,60 @@ class TestStringPayloads:
                 target,
                 attribute,
             )
+
+
+# Values from the fixtures in capture_payloads.py that no attribute may carry when every
+# payload is masked with `all`.
+SECRETS = ["q-pw", "h-pw", "b-pw", "r-pw", "m-pw", "Bearer abc", "jane@example.com"]
+
+# Attributes that still carry a secret with DASH0_MASK_RULES=all, by (target, attribute).
+# Each one must be listed under "Payloads that are not masked" in docs/masking.md.
+KNOWN_LEAKS = {
+    # The standard URL attributes, set by the OpenTelemetry instrumentations themselves,
+    # include the query string. Only http.request.query is masked.
+    ("flask", "http.target"): "query string in the request target",
+    ("fastapi", "http.url"): "query string in the request URL",
+    ("django", "http.url"): "query string in the request URL",
+}
+
+
+class TestNoPayloadEscapesMasking:
+    """
+    A canary for attributes no other test names: with DASH0_MASK_RULES=all, no attribute of
+    any span may carry a value from the fixtures. This catches payloads that a new hook, or
+    an OpenTelemetry instrumentation itself, adds without going through masking.
+    """
+
+    @staticmethod
+    def leaks() -> Dict[Tuple[str, str], List[str]]:
+        found: Dict[Tuple[str, str], List[str]] = {}
+        for span in capture(DASH0_MASK_RULES="all")["_spans"]:  # type: ignore[union-attr]
+            for key, value in [
+                ("<span name>", span["name"]),
+                *span["attributes"].items(),
+            ]:
+                hits = [secret for secret in SECRETS if secret in str(value)]
+                if hits:
+                    found[(span["target"], key)] = hits
+        return found
+
+    def test_no_attribute_carries_a_secret_except_the_documented_ones(self) -> None:
+        unexpected = {k: v for k, v in self.leaks().items() if k not in KNOWN_LEAKS}
+        assert not unexpected, (
+            "These attributes carry a payload value although DASH0_MASK_RULES=all. Mask "
+            "them, or list them in KNOWN_LEAKS and in docs/masking.md: "
+            f"{unexpected}"
+        )
+
+    def test_every_known_leak_still_happens(self) -> None:
+        # Remove an entry from KNOWN_LEAKS, and from the docs, once it is fixed.
+        assert set(KNOWN_LEAKS) <= set(self.leaks())
+
+    def test_every_known_leak_is_documented(self) -> None:
+        not_masked = (
+            (REPO_ROOT / "docs" / "masking.md")
+            .read_text()
+            .split("## Payloads that are not masked")[1]
+        )
+        for _, attribute in KNOWN_LEAKS:
+            assert f"`{attribute}`" in not_masked, attribute

@@ -256,6 +256,7 @@ def drive_string_payloads() -> Dict[str, Dict[str, Any]]:
     def capture(target: str, call: Callable[[Any], None]) -> None:
         span = tracer.start_span(target)
         call(span)
+        span.end()
         captured.setdefault(target, {}).update(span.attributes or {})
 
     class Record:
@@ -319,7 +320,17 @@ def main() -> None:
             # the first span wins: ASGI also records an `http.disconnect` receive
             attributes.setdefault(name, value)
     captured.update(drive_string_payloads())
-    json.dump(captured, sys.stdout)
+    # Every span, for the check that no payload escapes masking through an attribute
+    # the tests above don't name.
+    captured["_spans"] = [  # type: ignore[assignment]
+        {
+            "target": _target_of(span),
+            "name": span.name,
+            "attributes": dict(span.attributes or {}),
+        }
+        for span in exporter.get_finished_spans()
+    ]
+    json.dump(captured, sys.stdout, default=str)
 
 
 if __name__ == "__main__":
