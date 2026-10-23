@@ -17,7 +17,8 @@ use super::masking::DEFAULT_MASKING_PATTERNS;
 pub const MASKED: &str = "****";
 const ENABLE_ENV: &str = "DASH0_MASK_IN_EXTENSION";
 
-/// The rules for one payload type.
+/// The rules for one payload type. Cloning shares the compiled regex.
+#[derive(Clone)]
 pub enum Rule {
     All,
     /// All patterns joined into one alternation: one regex gets literal prefilters that a
@@ -97,10 +98,26 @@ impl PayloadRules {
     /// Resolve like `map_masking_env` in `opt/shared.sh`: the per-payload variable if valid,
     /// else `DASH0_MASK_RULES` if valid, else the defaults.
     pub fn from_lookup(get: impl Fn(&str) -> Option<String>) -> PayloadRules {
+        // Most variables resolve to the same list (the defaults, or DASH0_MASK_RULES); compile
+        // each distinct value once. Cold compile of six identical sets was 4.7 ms.
+        let compiled = std::cell::RefCell::new(Vec::<(Option<String>, Rule)>::new());
+        let compile = |value: Option<&str>| -> Option<Rule> {
+            let key = value.map(str::to_string);
+            if let Some((_, rule)) = compiled.borrow().iter().find(|(k, _)| *k == key) {
+                return Some(rule.clone());
+            }
+            let rule = match value {
+                Some(v) => Rule::parse(v)?,
+                None => Rule::from_patterns(DEFAULT_MASKING_PATTERNS)
+                    .expect("default patterns are valid"),
+            };
+            compiled.borrow_mut().push((key, rule.clone()));
+            Some(rule)
+        };
         let resolve = |name: &str| -> Rule {
             for var in [name, "DASH0_MASK_RULES"] {
                 if let Some(value) = get(var) {
-                    match Rule::parse(&value) {
+                    match compile(Some(&value)) {
                         Some(rule) => return rule,
                         None => tracing::warn!(
                             "[DASH0] Ignoring {}: expected a JSON array of regular expressions or \"all\"",
@@ -109,7 +126,7 @@ impl PayloadRules {
                     }
                 }
             }
-            Rule::from_patterns(DEFAULT_MASKING_PATTERNS).expect("default patterns are valid")
+            compile(None).expect("default patterns are valid")
         };
         PayloadRules {
             request_body: resolve("DASH0_MASK_REQUEST_BODY"),

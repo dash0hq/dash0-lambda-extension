@@ -85,9 +85,9 @@ fn json_body(target_len: usize, secret: bool) -> String {
 }
 
 /// The payload shapes from the attribute inventory.
-fn payloads() -> Vec<(&'static str, String)> {
+fn payloads() -> Vec<(String, String)> {
     let big = json_body(4096, true);
-    vec![
+    let list: Vec<(&str, String)> = vec![
         ("small_json", json_body(120, true)),
         ("json_4k", big.clone()),
         ("truncated_json_4k", big[..4000].to_string()),
@@ -97,7 +97,8 @@ fn payloads() -> Vec<(&'static str, String)> {
         ),
         ("non_matching_json_4k", json_body(4096, false)),
         ("plain_text", "SET session:42 some-opaque-value".to_string()),
-    ]
+    ];
+    list.into_iter().map(|(k, v)| (k.to_string(), v)).collect()
 }
 
 /// A Node-like HTTP client span: headers as JSON, bodies, URL with query.
@@ -182,6 +183,22 @@ fn defaults() -> PayloadRules {
 }
 
 fn print_allocations() {
+    // Cold cost: first rule compile and first 20-span mask in this process (AOT code, so no
+    // JIT warm-up; only the regex is built lazily).
+    let t = std::time::Instant::now();
+    let cold_rules = defaults();
+    let compile = t.elapsed();
+    let mut req = trace_request(&json_body(4096, true));
+    let t = std::time::Instant::now();
+    pm::mask_resource_spans(&mut req.resource_spans, &cold_rules);
+    let first = t.elapsed();
+    let mut req = trace_request(&json_body(4096, true));
+    let t = std::time::Instant::now();
+    pm::mask_resource_spans(&mut req.resource_spans, &cold_rules);
+    println!(
+        "\ncold: rule compile {compile:?}, first mask of {SPANS_PER_INVOCATION} spans (4 KB) {first:?}, second {:?}",
+        t.elapsed()
+    );
     let rules = defaults();
     println!("\nallocations per operation (default rules)");
     println!("{:<24} {:>10} {:>12}", "payload", "scanner", "serde_tree");
@@ -205,19 +222,64 @@ fn print_allocations() {
         "export of {SPANS_PER_INVOCATION} spans (4 KB bodies): {base} allocs baseline, {masked} with masking (+{})\n",
         masked - base
     );
+    for (name, body) in [
+        ("small", json_body(120, true)),
+        ("4 KB", json_body(4096, true)),
+    ] {
+        let mut req = trace_request(&body);
+        let raw = req.encoded_len();
+        pm::mask_resource_spans(&mut req.resource_spans, &rules);
+        println!(
+            "OTLP size of {SPANS_PER_INVOCATION} spans ({name} bodies): {raw} B unmasked, {} B masked",
+            req.encoded_len()
+        );
+    }
+}
+
+/// `MASKING_FIXTURES_OUT=<file>` writes the payloads and span attributes used here as JSON, so
+/// the distro benchmarks (Node, Python, Java) measure exactly the same inputs.
+fn dump_fixtures(path: &str) {
+    let span_attrs = |body: &str| -> serde_json::Value {
+        http_span(0, body)
+            .attributes
+            .iter()
+            .map(|kv| match &kv.value {
+                Some(AnyValue {
+                    value: Some(Value::StringValue(v)),
+                }) => (kv.key.clone(), serde_json::Value::String(v.clone())),
+                _ => unreachable!(),
+            })
+            .collect::<serde_json::Map<_, _>>()
+            .into()
+    };
+    let fixtures = serde_json::json!({
+        "spans_per_invocation": SPANS_PER_INVOCATION,
+        "default_patterns": [".*pass.*", ".*key.*", ".*secret.*", ".*credential.*",
+                             ".*passphrase.*", ".*token.*", ".*signature.*", ".*authorization.*"],
+        "custom_rule": [".*email.*"],
+        "payloads": payloads().into_iter().map(|(k, v)| (k, serde_json::Value::String(v))).collect::<serde_json::Map<_, _>>(),
+        "span_attributes": {
+            "small_json": span_attrs(&json_body(120, true)),
+            "json_4k": span_attrs(&json_body(4096, true)),
+        },
+    });
+    std::fs::write(path, serde_json::to_string_pretty(&fixtures).unwrap()).unwrap();
 }
 
 fn bench_payloads(c: &mut Criterion) {
+    if let Ok(path) = std::env::var("MASKING_FIXTURES_OUT") {
+        dump_fixtures(&path);
+    }
     print_allocations();
     let rules = defaults();
     let mut g = c.benchmark_group("mask_payload");
     for (name, body) in payloads() {
         g.throughput(Throughput::Bytes(body.len() as u64));
-        g.bench_with_input(BenchmarkId::new("scanner", name), &body, |b, body| {
+        g.bench_with_input(BenchmarkId::new("scanner", &name), &body, |b, body| {
             b.iter(|| pm::mask_body(black_box(body), &rules.request_body).len())
         });
         // The current extension masking for the Lambda event: parse, mask, serialize.
-        g.bench_with_input(BenchmarkId::new("serde_tree", name), &body, |b, body| {
+        g.bench_with_input(BenchmarkId::new("serde_tree", &name), &body, |b, body| {
             b.iter(|| masking::mask_json_string(black_box(body)).len())
         });
     }
