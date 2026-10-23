@@ -366,18 +366,18 @@ describe('known masking gaps (Node distro, default patterns)', () => {
   });
 
   describe('GAP-NODE-8: database statements and parameters carry literal values', () => {
-    /** Runs a pg query against a server that drops the connection; the span still records it. */
+    /**
+     * Runs a pg query on a closed client. pg fails it on the next tick, without any network,
+     * and the instrumentation has already recorded the statement on the span by then.
+     */
     const pgQuery = async (text: string, values?: unknown[]) => {
-      const dropping = require('net').createServer((socket: any) => socket.destroy());
-      const port = await listen(dropping);
       const unpatch = instrument(new Dash0PgInstrumentation().getInstrumentation(), 'pg', pg);
       try {
-        const client = new pg.Client({ host: '127.0.0.1', port, user: 'app', database: 'app' });
-        await client.connect().catch(() => undefined);
-        await client.query(text, values).catch(() => undefined);
+        const client = new pg.Client({ host: '127.0.0.1', port: 5432, user: 'app', database: 'app' });
+        await client.end();
+        await expect(client.query(text, values)).rejects.toThrow('Client was closed');
       } finally {
         unpatch();
-        await new Promise((resolve) => dropping.close(resolve));
       }
       const span = finishedSpans().find((s) => s.attributes['db.system'] === 'postgresql' && s.name !== 'pg.connect');
       expect(span).toBeDefined();
