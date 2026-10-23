@@ -24,6 +24,9 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
     const logsToBeChecked: LogToCheck[] = [
         { message: 'START RequestId: ' },
         { message: 'END RequestId: ' },
+        // The extension leaves severity unset for unprefixed lines; the backend must
+        // infer ERROR from the JSON `level` field.
+        { message: JSON.stringify({ jsonSeverity: "inferred" }), isJson: true, severity: "error" },
         { message: JSON.stringify({ name: "dash0_payload", type: "lambda_event", message: { parameter1: "right" } }), isJson: true },
         { message: JSON.stringify({ name: "dash0_payload", type: "lambda_return_value", message: "Hello World from Java Lambda!" }), isJson: true },
     ]

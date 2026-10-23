@@ -47,6 +47,9 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
         // attributes (emptying the body); otherwise the JSON parse would fail and the
         // content would stay in the body. Asserted against the attributes accordingly.
         { message: JSON.stringify({ jsonLog: true, value: "parsed" }), isJson: true },
+        // The extension leaves severity unset for unprefixed lines; the backend must
+        // infer ERROR from the JSON `level` field.
+        { message: JSON.stringify({ jsonSeverity: "inferred" }), isJson: true, severity: "error" },
         { message: 'END RequestId: ' },
         { message: JSON.stringify({ name: "dash0_payload", type: "lambda_event", message: { parameter1: "right", masked_field: "****" } }), isJson: true, attributes: { "dash0.faas.payload_type": "lambda_event" } },
         { message: JSON.stringify({ name: "dash0_payload", type: "lambda_return_value", message: { statusCode: 200 } }), isJson: true, attributes: { "dash0.faas.payload_type": "lambda_return_value" } },

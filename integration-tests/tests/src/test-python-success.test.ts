@@ -43,6 +43,9 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
         { message: 'END RequestId: ' },
         { message: "response.status_code:", severity: "" },
         { message: "let's parse this as a warning", severity: "warning" },
+        // The extension leaves severity unset for unprefixed lines; the backend must
+        // infer ERROR from the JSON `level` field.
+        { message: JSON.stringify({ jsonSeverity: "inferred" }), isJson: true, severity: "error" },
         { message: JSON.stringify({ name: "dash0_payload", type: "lambda_event", message: { parameter1: "right" } }), isJson: true, attributes: { "dash0.faas.payload_type": "lambda_event" } },
         { message: JSON.stringify({ name: "dash0_payload", type: "lambda_return_value", message: { statusCode: 200,  body: '"Hello from Lambda!"' } }), isJson: true, attributes: { "dash0.faas.payload_type": "lambda_return_value" } },
     ]
