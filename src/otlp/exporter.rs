@@ -11,6 +11,7 @@ use prost::Message;
 
 use crate::config::{get_dash0_dataset, request_retries, request_timeout_ms};
 use crate::otlp::log_mutations::map_logs_to_otlp;
+use crate::otlp::payload_masking::PayloadRules;
 use crate::otlp::resources::get_resources_attributes;
 use crate::route::{ReqBody, HTTPS_CLIENT};
 use crate::state::invocation_data::{
@@ -35,10 +36,14 @@ pub async fn flush_logs(exclude_invocation_id: Option<&str>) {
 }
 
 pub async fn flush_telemetry_logs(exclude_invocation_id: Option<&str>) {
-    let logs = crate::state::invocation_entry::take_all_telemetry_logs(exclude_invocation_id);
+    let mut logs = crate::state::invocation_entry::take_all_telemetry_logs(exclude_invocation_id);
 
     if logs.is_empty() {
         return;
+    }
+
+    if let Some(rules) = crate::otlp::payload_masking::rules() {
+        mask_http_payload_logs(&mut logs, rules);
     }
 
     let log_records = map_logs_to_otlp(&logs);
@@ -85,7 +90,7 @@ pub async fn flush_otlp_logs() {
 
     let log_count = logs.len();
 
-    let body = match build_logs_request(logs) {
+    let body = match build_logs_request(logs, crate::otlp::payload_masking::rules()) {
         Some(req) => req,
         None => return,
     };
@@ -143,8 +148,8 @@ fn build_metrics_request(metrics: Vec<StoredMetric>) -> Option<Vec<u8>> {
     Some(combined_export.encode_to_vec())
 }
 
-fn build_logs_request(logs: Vec<StoredLog>) -> Option<Vec<u8>> {
-    let combined_resource_logs = combine_items(
+fn build_logs_request(logs: Vec<StoredLog>, rules: Option<&PayloadRules>) -> Option<Vec<u8>> {
+    let mut combined_resource_logs = combine_items(
         &logs,
         |l| &l.body,
         |b| ExportLogsServiceRequest::decode(b).map(|d| d.resource_logs),
@@ -153,6 +158,10 @@ fn build_logs_request(logs: Vec<StoredLog>) -> Option<Vec<u8>> {
 
     if combined_resource_logs.is_empty() {
         return None;
+    }
+
+    if let Some(rules) = rules {
+        crate::otlp::payload_masking::mask_resource_logs(&mut combined_resource_logs, rules);
     }
 
     let combined_export = ExportLogsServiceRequest {
@@ -169,7 +178,7 @@ pub async fn send_traces(traces: Vec<StoredTrace>) {
 
     let trace_count = traces.len();
 
-    let body = match _build_traces_request(traces) {
+    let body = match _build_traces_request(traces, crate::otlp::payload_masking::rules()) {
         Some(req) => req,
         None => return,
     };
@@ -184,7 +193,10 @@ pub async fn send_traces(traces: Vec<StoredTrace>) {
     .await;
 }
 
-fn _build_traces_request(traces: Vec<StoredTrace>) -> Option<Vec<u8>> {
+fn _build_traces_request(
+    traces: Vec<StoredTrace>,
+    rules: Option<&PayloadRules>,
+) -> Option<Vec<u8>> {
     let mut combined_resource_spans = combine_items(
         &traces,
         |t| &t.body,
@@ -197,6 +209,9 @@ fn _build_traces_request(traces: Vec<StoredTrace>) -> Option<Vec<u8>> {
     }
 
     add_env_vars(&mut combined_resource_spans);
+    if let Some(rules) = rules {
+        crate::otlp::payload_masking::mask_resource_spans(&mut combined_resource_spans, rules);
+    }
 
     let combined_export = ExportTraceServiceRequest {
         resource_spans: combined_resource_spans,
@@ -278,6 +293,16 @@ async fn send_request(
     item_count: usize,
     item_type: &str,
 ) -> Result<(), ()> {
+    // Test seam for tests/masking_e2e.rs: debug builds only, never in a released layer.
+    #[cfg(debug_assertions)]
+    if let Ok(dir) = std::env::var("DASH0_TEST_EXPORT_DIR") {
+        static SEQ: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let name = format!("{seq:06}-{}.pb", path.trim_start_matches("/v1/"));
+        let _ = std::fs::write(std::path::Path::new(&dir).join(name), &body);
+        return Ok(());
+    }
+
     if crate::config::get_dash0_token().is_none() {
         return Ok(());
     }
@@ -386,6 +411,29 @@ fn gzip(body: &[u8]) -> std::io::Result<Vec<u8>> {
     let mut encoder = GzEncoder::new(Vec::new(), Compression::new(3));
     encoder.write_all(body)?;
     encoder.finish()
+}
+
+/// HTTP bodies are moved off their spans into `dash0_payload` logs on receive; mask them here,
+/// at export, so the receive handler that the distro's flush waits on does no masking work.
+fn mask_http_payload_logs(
+    logs: &mut [crate::state::invocation_data::TelemetryLog],
+    rules: &PayloadRules,
+) {
+    use crate::otlp::payload_masking::{mask_payload_log_body, Kind};
+    for log in logs.iter_mut() {
+        let kind = match log.custom_attributes.iter().find_map(|(k, v)| {
+            (k == crate::otlp::attributes::DASH0_FAAS_PAYLOAD_TYPE).then_some(v.as_str())
+        }) {
+            Some("http_request_body") => Kind::RequestBody,
+            Some("http_response_body") => Kind::ResponseBody,
+            _ => continue,
+        };
+        if let serde_json::Value::String(body) = &mut log.record {
+            if let std::borrow::Cow::Owned(masked) = mask_payload_log_body(body, rules.rule(kind)) {
+                *body = masked;
+            }
+        }
+    }
 }
 
 fn add_env_vars(resource_spans: &mut [opentelemetry_proto::tonic::trace::v1::ResourceSpans]) {
@@ -634,9 +682,261 @@ mod tests {
         let traces = vec![trace1, trace2];
 
         // Call _build_traces_request
-        let result = _build_traces_request(traces);
+        let result = _build_traces_request(traces, None);
 
         // Verify we got a result
         assert!(result.is_some());
+    }
+}
+
+/// Receive → store → export build for one invocation, per `DASH0_MASK_*` configuration,
+/// asserting on the bytes the exporter would send. The binary-level harness is
+/// `tests/masking_e2e.rs`.
+#[cfg(test)]
+mod pipeline {
+    use super::*;
+    use crate::otlp::payload_masking::MASKED;
+    use crate::otlp::span_mutations::process_trace_request;
+    use opentelemetry_proto::tonic::common::v1::any_value::Value;
+    use opentelemetry_proto::tonic::common::v1::{AnyValue, InstrumentationScope, KeyValue};
+    use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span};
+    use serial_test::serial;
+
+    const S: &str = "XQZSECRET";
+
+    fn kv(key: &str, value: &str) -> KeyValue {
+        KeyValue {
+            key: key.into(),
+            value: Some(AnyValue {
+                value: Some(Value::StringValue(value.into())),
+            }),
+        }
+    }
+
+    struct Exported {
+        attrs: Vec<(String, String)>,
+        request_body_log: String,
+        response_body_log: String,
+    }
+
+    impl Exported {
+        fn attr(&self, key: &str) -> &str {
+            &self.attrs.iter().find(|(k, _)| k == key).unwrap().1
+        }
+    }
+
+    fn export(vars: &[(&str, &str)], enabled: bool) -> Exported {
+        let rules = PayloadRules::from_lookup(|k| {
+            vars.iter()
+                .find(|(n, _)| *n == k)
+                .map(|(_, v)| v.to_string())
+        });
+        let id = "pipeline-masking-1";
+        crate::state::invocation_entry::remove(id);
+        crate::state::invocation_data::store_current_invocation_id(id);
+
+        let mut request = ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans {
+                scope_spans: vec![ScopeSpans {
+                    scope: Some(InstrumentationScope {
+                        name: "@opentelemetry/instrumentation-http".into(),
+                        ..Default::default()
+                    }),
+                    spans: vec![Span {
+                        trace_id: vec![1; 16],
+                        span_id: vec![2; 8],
+                        kind: 3,
+                        start_time_unix_nano: 10_000_000,
+                        end_time_unix_nano: 20_000_000,
+                        attributes: vec![
+                            kv(
+                                "url.full",
+                                &format!("https://h/p?token={S}&email=jane&page=1"),
+                            ),
+                            kv(
+                                "http.request.query",
+                                &format!(r#"{{"password":"{S}","email":"jane"}}"#),
+                            ),
+                            kv(
+                                "http.request.headers",
+                                &format!(r#"{{"authorization":"{S}","x-email":"jane"}}"#),
+                            ),
+                            kv(
+                                "http.response.headers",
+                                &format!(r#"{{"x-api-key":"{S}","x-email":"jane"}}"#),
+                            ),
+                            kv("http.request.header.authorization", S),
+                            kv(
+                                "http.request.body",
+                                &format!(r#"{{"password":"{S}","email":"jane","orderId":"42"}}"#),
+                            ),
+                            // Cut by the distro's attribute limit.
+                            kv(
+                                "http.response.body",
+                                &format!(r#"{{"email":"jane","sessionToken":"{S}"#),
+                            ),
+                            kv("gen_ai.usage.input_tokens", "12"),
+                        ],
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        let mut ids = Vec::new();
+        let mut body = Vec::new();
+        process_trace_request(&mut request, &mut ids, &mut body);
+
+        let trace = StoredTrace {
+            method: hyper::Method::POST,
+            path_and_query: "/v1/traces".into(),
+            headers: Default::default(),
+            body,
+            invocation_ids: vec![id.into()],
+        };
+        let rules = enabled.then_some(&rules);
+        let exported = ExportTraceServiceRequest::decode(
+            _build_traces_request(vec![trace], rules)
+                .unwrap()
+                .as_slice(),
+        )
+        .unwrap();
+
+        let mut logs = crate::state::invocation_entry::remove(id).unwrap().logs;
+        if let Some(rules) = rules {
+            mask_http_payload_logs(&mut logs, rules);
+        }
+        let log_of = |t: &str| {
+            logs.iter()
+                .find(|l| l.custom_attributes.iter().any(|(_, v)| v == t))
+                .and_then(|l| l.record.as_str().map(str::to_string))
+                .unwrap()
+        };
+        Exported {
+            attrs: exported.resource_spans[0].scope_spans[0].spans[0]
+                .attributes
+                .iter()
+                .filter_map(|kv| match &kv.value {
+                    Some(AnyValue {
+                        value: Some(Value::StringValue(v)),
+                    }) => Some((kv.key.clone(), v.clone())),
+                    _ => None,
+                })
+                .collect(),
+            request_body_log: log_of("http_request_body"),
+            response_body_log: log_of("http_response_body"),
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn disabled_exports_payloads_as_received() {
+        let e = export(&[], false);
+        assert!(e.attr("url.full").contains(S));
+        assert!(e.attr("http.request.header.authorization").contains(S));
+        assert!(e.request_body_log.contains(S));
+    }
+
+    #[test]
+    #[serial]
+    fn defaults_mask_every_payload_and_nothing_else() {
+        let e = export(&[], true);
+        for (k, v) in &e.attrs {
+            assert!(!v.contains(S), "{k} leaked: {v}");
+        }
+        assert!(!e.request_body_log.contains(S), "{}", e.request_body_log);
+        assert!(!e.response_body_log.contains(S), "{}", e.response_body_log);
+        assert_eq!(
+            e.attr("url.full"),
+            "https://h/p?token=****&email=jane&page=1"
+        );
+        assert_eq!(e.attr("gen_ai.usage.input_tokens"), "12");
+        // Personal data the defaults don't name is kept.
+        assert!(e.request_body_log.contains(r#""email":"jane""#));
+        assert!(e.attr("http.request.headers").contains("jane"));
+    }
+
+    #[test]
+    #[serial]
+    fn custom_mask_rules_replace_the_defaults_everywhere() {
+        let e = export(&[("DASH0_MASK_RULES", r#"[".*email.*"]"#)], true);
+        for (k, v) in &e.attrs {
+            assert!(!v.contains("jane"), "{k} kept personal data: {v}");
+        }
+        assert!(
+            e.attr("url.full").contains(S),
+            "defaults must no longer apply"
+        );
+        assert!(!e.request_body_log.contains("jane") && e.request_body_log.contains(S));
+    }
+
+    #[test]
+    #[serial]
+    fn each_variable_controls_only_its_payload() {
+        let cases: &[(&str, &str)] = &[
+            ("DASH0_MASK_QUERY_PARAMS", "url.full"),
+            ("DASH0_MASK_QUERY_PARAMS", "http.request.query"),
+            ("DASH0_MASK_REQUEST_HEADERS", "http.request.headers"),
+            (
+                "DASH0_MASK_REQUEST_HEADERS",
+                "http.request.header.authorization",
+            ),
+            ("DASH0_MASK_RESPONSE_HEADERS", "http.response.headers"),
+        ];
+        for (var, key) in cases {
+            // `[]` turns masking off for this payload type only.
+            let e = export(&[(var, "[]")], true);
+            assert!(e.attr(key).contains(S), "{var}=[] should leave {key}");
+            for (k, v) in &e.attrs {
+                if !cases.iter().any(|(cv, ck)| cv == var && ck == k) {
+                    assert!(!v.contains(S), "{var}=[] unmasked {k}: {v}");
+                }
+            }
+        }
+        let e = export(&[("DASH0_MASK_REQUEST_BODY", "[]")], true);
+        assert!(e.request_body_log.contains(S));
+        assert!(!e.response_body_log.contains(S));
+        let e = export(&[("DASH0_MASK_RESPONSE_BODY", "[]")], true);
+        assert!(!e.request_body_log.contains(S));
+        assert!(e.response_body_log.contains(S));
+    }
+
+    #[test]
+    #[serial]
+    fn all_hides_whole_payloads() {
+        let e = export(
+            &[
+                ("DASH0_MASK_REQUEST_BODY", "all"),
+                ("DASH0_MASK_REQUEST_HEADERS", "all"),
+                ("DASH0_MASK_QUERY_PARAMS", "all"),
+            ],
+            true,
+        );
+        assert_eq!(e.attr("http.request.headers"), MASKED);
+        assert_eq!(e.attr("http.request.query"), MASKED);
+        assert_eq!(e.attr("url.full"), "https://h/p?****");
+        assert!(
+            e.request_body_log.starts_with(r#"{"message":"****""#),
+            "{}",
+            e.request_body_log
+        );
+        // DASH0_MASK_RULES=all reaches every payload type that has no own variable.
+        let e = export(&[("DASH0_MASK_RULES", "all")], true);
+        assert_eq!(e.attr("http.response.headers"), MASKED);
+    }
+
+    #[test]
+    #[serial]
+    fn invalid_values_fall_back_to_mask_rules() {
+        let e = export(
+            &[
+                ("DASH0_MASK_REQUEST_HEADERS", "{not json"),
+                ("DASH0_MASK_RULES", r#"[".*email.*"]"#),
+            ],
+            true,
+        );
+        assert!(!e.attr("http.request.headers").contains("jane"));
+        assert!(e.attr("http.request.headers").contains(S));
     }
 }

@@ -1,0 +1,3003 @@
+[
+ {
+  "runtime": "node",
+  "instrumentation": "http (Dash0 hooks on @opentelemetry/instrumentation-http 0.219.0)",
+  "library": "http/https",
+  "attribute": "http.request.headers",
+  "key": "http.request.headers",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_HEADERS"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "http",
+  "library": "http/https",
+  "attribute": "http.request.body",
+  "key": "http.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "http",
+  "library": "http/https",
+  "attribute": "http.response.headers",
+  "key": "http.response.headers",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_HEADERS"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "http",
+  "library": "http/https",
+  "attribute": "http.response.body",
+  "key": "http.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@opentelemetry/instrumentation-http 0.219.0 (old semconv default)",
+  "library": "http/https",
+  "attribute": "http.url",
+  "key": "http.url",
+  "shape": "url",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@opentelemetry/instrumentation-http 0.219.0",
+  "library": "http/https",
+  "attribute": "http.target",
+  "key": "http.target",
+  "shape": "target",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@opentelemetry/instrumentation-http 0.219.0",
+  "library": "http/https",
+  "attribute": "url.full",
+  "key": "url.full",
+  "shape": "url",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@opentelemetry/instrumentation-http 0.219.0",
+  "library": "http/https",
+  "attribute": "http.user_agent",
+  "key": "http.user_agent",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "client metadata (user agent, host), not a credential"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@opentelemetry/instrumentation-http 0.219.0",
+  "library": "http/https (incoming)",
+  "attribute": "http.url / http.target",
+  "key": "http.url",
+  "shape": "url",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@opentelemetry/instrumentation-http 0.219.0",
+  "library": "http/https (incoming)",
+  "attribute": "http.url / http.target",
+  "key": "http.target",
+  "shape": "target",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@opentelemetry/instrumentation-http 0.219.0",
+  "library": "http/https (incoming)",
+  "attribute": "http.client_ip",
+  "key": "http.client_ip",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "client or peer IP address, not a credential"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "undici (Dash0 hooks on @opentelemetry/instrumentation-undici 0.29.0)",
+  "library": "fetch/undici",
+  "attribute": "http.request.headers",
+  "key": "http.request.headers",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_HEADERS"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "undici",
+  "library": "fetch/undici",
+  "attribute": "http.request.body",
+  "key": "http.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "undici",
+  "library": "fetch/undici",
+  "attribute": "http.response.headers",
+  "key": "http.response.headers",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_HEADERS"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "undici",
+  "library": "fetch/undici",
+  "attribute": "http.response.body",
+  "key": "http.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@opentelemetry/instrumentation-undici 0.29.0",
+  "library": "fetch/undici",
+  "attribute": "url.full / url.query",
+  "key": "url.full",
+  "shape": "url",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@opentelemetry/instrumentation-undici 0.29.0",
+  "library": "fetch/undici",
+  "attribute": "url.full / url.query",
+  "key": "url.query",
+  "shape": "query",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "express (Dash0 requestHook on opentelemetry-instrumentation-express 0.41.0)",
+  "library": "express",
+  "attribute": "http.request.query",
+  "key": "http.request.query",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "express",
+  "library": "express",
+  "attribute": "http.request.headers",
+  "key": "http.request.headers",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_HEADERS"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "express",
+  "library": "express",
+  "attribute": "http.request.body",
+  "key": "http.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "express",
+  "library": "express",
+  "attribute": "http.response.headers",
+  "key": "http.response.headers",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_HEADERS"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "express",
+  "library": "express",
+  "attribute": "http.response.body",
+  "key": "http.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "opentelemetry-instrumentation-express 0.41.0 (includeHttpAttributes: true)",
+  "library": "express",
+  "attribute": "http.target",
+  "key": "http.target",
+  "shape": "target",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "opentelemetry-instrumentation-express 0.41.0",
+  "library": "express",
+  "attribute": "net.peer.ip",
+  "key": "net.peer.ip",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "client or peer IP address, not a credential"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "fastify (Dash0 requestHook on @opentelemetry/instrumentation-fastify 0.53.1)",
+  "library": "fastify",
+  "attribute": "http.request.headers",
+  "key": "http.request.headers",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_HEADERS"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "fastify",
+  "library": "fastify",
+  "attribute": "http.request.query",
+  "key": "http.request.query",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "fastify",
+  "library": "fastify",
+  "attribute": "http.request.body",
+  "key": "http.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "fastify",
+  "library": "fastify",
+  "attribute": "http.response.headers / http.response.body",
+  "key": "http.response.headers",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_HEADERS"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "fastify",
+  "library": "fastify",
+  "attribute": "http.response.headers / http.response.body",
+  "key": "http.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "aws-sdk (Dash0 preRequestHook on forked @opentelemetry/instrumentation-aws-sdk)",
+  "library": "@aws-sdk/client-sqs",
+  "attribute": "messaging.publish.body",
+  "key": "messaging.publish.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "aws-sdk (Dash0 preRequestHook on forked @opentelemetry/instrumentation-aws-sdk)",
+  "library": "@aws-sdk/client-sqs",
+  "attribute": "messaging.publish.body",
+  "key": "messaging.publish.body",
+  "shape": "sqs_body",
+  "expect": "gap",
+  "reason": "SQS message body is a string inside the payload; keys inside string values are not parsed"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "aws-sdk",
+  "library": "@aws-sdk/client-sqs",
+  "attribute": "messaging.consume.body",
+  "key": "messaging.consume.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "aws-sdk",
+  "library": "@aws-sdk/client-sqs",
+  "attribute": "messaging.consume.body",
+  "key": "messaging.consume.body",
+  "shape": "sqs_body",
+  "expect": "gap",
+  "reason": "SQS message body is a string inside the payload; keys inside string values are not parsed"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "aws-sdk",
+  "library": "@aws-sdk/client-sqs",
+  "attribute": "lumigoData",
+  "key": "lumigoData",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "trigger chain metadata (message IDs, ARNs), not the message content"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "aws-sdk",
+  "library": "@aws-sdk/client-sqs",
+  "attribute": "aws.resource.name / url.full",
+  "key": "aws.resource.name",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "resource identifier (name, ARN or URL), not payload content"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "aws-sdk",
+  "library": "@aws-sdk/client-sqs",
+  "attribute": "aws.resource.name / url.full",
+  "key": "url.full",
+  "shape": "url",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "forked @opentelemetry/instrumentation-aws-sdk 0.74.0",
+  "library": "@aws-sdk/client-sns",
+  "attribute": "messaging.destination / messaging.destination.name (and span name)",
+  "key": "messaging.destination",
+  "shape": "text",
+  "expect": "gap",
+  "reason": "SNS SMS recipient phone number in the destination name; not a payload attribute"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "forked @opentelemetry/instrumentation-aws-sdk 0.74.0",
+  "library": "@aws-sdk/client-sns",
+  "attribute": "messaging.destination / messaging.destination.name (and span name)",
+  "key": "messaging.destination.name",
+  "shape": "text",
+  "expect": "gap",
+  "reason": "SNS SMS recipient phone number in the destination name; not a payload attribute"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "forked @opentelemetry/instrumentation-aws-sdk 0.74.0",
+  "library": "@aws-sdk/client-dynamodb",
+  "attribute": "db.statement / db.query.text",
+  "key": "db.statement",
+  "shape": "json",
+  "siblings": {
+   "db.system": "dynamodb"
+  },
+  "expect": "gap",
+  "reason": "DynamoDB command input as db.statement (not captured today); only Redis and MongoDB statements are classified"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "forked @opentelemetry/instrumentation-aws-sdk 0.74.0",
+  "library": "@aws-sdk/client-dynamodb",
+  "attribute": "db.statement / db.query.text",
+  "key": "db.query.text",
+  "shape": "json",
+  "siblings": {
+   "db.system": "dynamodb"
+  },
+  "expect": "gap",
+  "reason": "DynamoDB command input as db.query.text (not captured today); only Redis and MongoDB statements are classified"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "forked @opentelemetry/instrumentation-aws-sdk 0.74.0",
+  "library": "@aws-sdk/client-dynamodb",
+  "attribute": "aws.dynamodb.projection / aws.dynamodb.*_secondary_indexes / attribute_definitions",
+  "key": "aws.dynamodb.projection",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "schema, expression or model parameter metadata without runtime values"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "forked @opentelemetry/instrumentation-aws-sdk 0.74.0",
+  "library": "@aws-sdk/client-dynamodb",
+  "attribute": "aws.dynamodb.projection / aws.dynamodb.*_secondary_indexes / attribute_definitions",
+  "key": "aws.dynamodb.global_secondary_indexes",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "schema, expression or model parameter metadata without runtime values"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "forked @opentelemetry/instrumentation-aws-sdk 0.74.0",
+  "library": "@aws-sdk/client-dynamodb",
+  "attribute": "aws.dynamodb.projection / aws.dynamodb.*_secondary_indexes / attribute_definitions",
+  "key": "aws.dynamodb.attribute_definitions",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "schema, expression or model parameter metadata without runtime values"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "forked @opentelemetry/instrumentation-aws-sdk 0.74.0",
+  "library": "@aws-sdk/client-bedrock-runtime",
+  "attribute": "gen_ai.* (request params, usage, finish reasons)",
+  "key": "gen_ai.request.model",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "schema, expression or model parameter metadata without runtime values"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "forked @opentelemetry/instrumentation-aws-sdk 0.74.0",
+  "library": "@aws-sdk/client-bedrock-runtime",
+  "attribute": "gen_ai.* (request params, usage, finish reasons)",
+  "key": "gen_ai.usage.input_tokens",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "schema, expression or model parameter metadata without runtime values"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "forked @opentelemetry/instrumentation-aws-sdk 0.74.0",
+  "library": "@aws-sdk/client-bedrock-runtime",
+  "attribute": "gen_ai.* (request params, usage, finish reasons)",
+  "key": "gen_ai.response.finish_reasons",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "schema, expression or model parameter metadata without runtime values"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "forked @opentelemetry/instrumentation-aws-sdk 0.74.0",
+  "library": "@aws-sdk/client-lambda",
+  "attribute": "faas.invoked_name / faas.invoked_region / faas.execution",
+  "key": "faas.invoked_name",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "resource identifier (name, ARN or URL), not payload content"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "forked @opentelemetry/instrumentation-aws-sdk 0.74.0",
+  "library": "@aws-sdk/client-lambda",
+  "attribute": "faas.invoked_name / faas.invoked_region / faas.execution",
+  "key": "faas.invoked_region",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "resource identifier (name, ARN or URL), not payload content"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "forked @opentelemetry/instrumentation-aws-sdk 0.74.0",
+  "library": "@aws-sdk/client-lambda",
+  "attribute": "faas.invoked_name / faas.invoked_region / faas.execution",
+  "key": "faas.execution",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "message or session identifier, not payload content"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "forked @opentelemetry/instrumentation-aws-sdk 0.74.0",
+  "library": "@aws-sdk/client-kinesis / s3 / sfn / secrets-manager",
+  "attribute": "aws.kinesis.stream_name, aws.s3.bucket, aws.step_functions.*_arn, aws.secretsmanager.secret.arn",
+  "key": "aws.kinesis.stream_name",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "resource identifier (name, ARN or URL), not payload content"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "forked @opentelemetry/instrumentation-aws-sdk 0.74.0",
+  "library": "@aws-sdk/client-kinesis / s3 / sfn / secrets-manager",
+  "attribute": "aws.kinesis.stream_name, aws.s3.bucket, aws.step_functions.*_arn, aws.secretsmanager.secret.arn",
+  "key": "aws.s3.bucket",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "resource identifier (name, ARN or URL), not payload content"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "forked @opentelemetry/instrumentation-aws-sdk 0.74.0",
+  "library": "@aws-sdk/client-kinesis / s3 / sfn / secrets-manager",
+  "attribute": "aws.kinesis.stream_name, aws.s3.bucket, aws.step_functions.*_arn, aws.secretsmanager.secret.arn",
+  "key": "aws.step_functions.state_machine.arn",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "resource identifier (name, ARN or URL), not payload content"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "forked @opentelemetry/instrumentation-aws-sdk 0.74.0",
+  "library": "@aws-sdk/client-kinesis / s3 / sfn / secrets-manager",
+  "attribute": "aws.kinesis.stream_name, aws.s3.bucket, aws.step_functions.*_arn, aws.secretsmanager.secret.arn",
+  "key": "aws.secretsmanager.secret.arn",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "resource identifier (name, ARN or URL), not payload content"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "http (child span of every AWS SDK v3 call)",
+  "library": "@aws-sdk/* via @smithy/node-http-handler",
+  "attribute": "http.request.body / http.response.body",
+  "key": "http.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "http (child span of every AWS SDK v3 call)",
+  "library": "@aws-sdk/* via @smithy/node-http-handler",
+  "attribute": "http.request.body / http.response.body",
+  "key": "http.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "http (child span of every AWS SDK v3 call)",
+  "library": "@aws-sdk/* via @smithy/node-http-handler",
+  "attribute": "http.request.body / http.response.body",
+  "key": "http.response.body",
+  "shape": "xml",
+  "expect": "gap",
+  "reason": "query/XML-protocol AWS bodies (STS, SNS, S3) are not JSON or form-encoded; only `all` masks them"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "kafkajs (Dash0 producerHook on opentelemetry-instrumentation-kafkajs 0.41.0)",
+  "library": "kafkajs",
+  "attribute": "messaging.produce.body",
+  "key": "messaging.produce.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "kafkajs",
+  "library": "kafkajs",
+  "attribute": "messaging.consume.body",
+  "key": "messaging.consume.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "amqplib (Dash0 publishHook on @opentelemetry/instrumentation-amqplib 0.66.0)",
+  "library": "amqplib",
+  "attribute": "messaging.publish.body",
+  "key": "messaging.publish.body",
+  "shape": "json",
+  "siblings": {
+   "messaging.system": "rabbitmq"
+  },
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "amqplib",
+  "library": "amqplib",
+  "attribute": "messaging.consume.body",
+  "key": "messaging.consume.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@opentelemetry/instrumentation-amqplib 0.66.0",
+  "library": "amqplib",
+  "attribute": "messaging.url",
+  "key": "messaging.url",
+  "shape": "userinfo_url",
+  "expect": "gap",
+  "reason": "credentials in URL userinfo; no masking shape handles userinfo"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "redis (Dash0 dbStatementSerializer on @opentelemetry/instrumentation-redis-4 0.49.0)",
+  "library": "redis",
+  "attribute": "db.statement",
+  "key": "db.statement",
+  "shape": "redis",
+  "siblings": {
+   "db.system": "redis"
+  },
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "redis",
+  "library": "redis",
+  "attribute": "db.response.body",
+  "key": "db.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "ioredis (Dash0 dbStatementSerializer on @opentelemetry/instrumentation-ioredis 0.67.0)",
+  "library": "ioredis",
+  "attribute": "db.statement",
+  "key": "db.statement",
+  "shape": "redis",
+  "siblings": {
+   "db.system": "redis"
+  },
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "ioredis",
+  "library": "ioredis",
+  "attribute": "db.response.body",
+  "key": "db.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@opentelemetry/instrumentation-redis-4 / ioredis",
+  "library": "redis, ioredis",
+  "attribute": "db.connection_string",
+  "key": "db.connection_string",
+  "shape": "userinfo_url",
+  "expect": "gap",
+  "reason": "credentials in URL userinfo; no masking shape handles userinfo"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "pg (@opentelemetry/instrumentation-pg 0.71.0, enhancedDatabaseReporting: true)",
+  "library": "pg",
+  "attribute": "db.postgresql.values",
+  "key": "db.postgresql.values",
+  "shape": "params",
+  "expect": "gap",
+  "reason": "bound query parameters are positional values with no keys to match"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "pg",
+  "library": "pg",
+  "attribute": "db.statement",
+  "key": "db.statement",
+  "shape": "sql",
+  "expect": "gap",
+  "reason": "SQL text; there are no keys to match and `all` would hide every query"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "mysql2 (Dash0MySQL2Instrumentation on @opentelemetry/instrumentation-mysql2 0.65.0)",
+  "library": "mysql2",
+  "attribute": "db.statement",
+  "key": "db.statement",
+  "shape": "sql",
+  "expect": "gap",
+  "reason": "SQL text; there are no keys to match and `all` would hide every query"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "mongodb (@opentelemetry/instrumentation-mongodb 0.72.0, enhancedDatabaseReporting: true)",
+  "library": "mongodb",
+  "attribute": "db.statement (db.query.text with stable semconv)",
+  "key": "db.statement",
+  "shape": "json",
+  "siblings": {
+   "db.system": "mongodb"
+  },
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "mongodb (@opentelemetry/instrumentation-mongodb 0.72.0, enhancedDatabaseReporting: true)",
+  "library": "mongodb",
+  "attribute": "db.statement (db.query.text with stable semconv)",
+  "key": "db.query.text",
+  "shape": "json",
+  "siblings": {
+   "db.system.name": "mongodb"
+  },
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@prisma/instrumentation 6.19.2",
+  "library": "@prisma/client",
+  "attribute": "db.query.text / db.statement (engine spans)",
+  "key": "db.query.text",
+  "shape": "sql",
+  "expect": "gap",
+  "reason": "SQL text; there are no keys to match and `all` would hide every query"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@prisma/instrumentation 6.19.2",
+  "library": "@prisma/client",
+  "attribute": "db.query.text / db.statement (engine spans)",
+  "key": "db.statement",
+  "shape": "sql",
+  "expect": "gap",
+  "reason": "SQL text; there are no keys to match and `all` would hide every query"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@opentelemetry/instrumentation-nestjs-core 0.65.0",
+  "library": "@nestjs/core",
+  "attribute": "nestjs.* / http.url",
+  "key": "nestjs.controller",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "request path or route template; no key=value pairs to mask"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@opentelemetry/instrumentation-nestjs-core 0.65.0",
+  "library": "@nestjs/core",
+  "attribute": "nestjs.* / http.url",
+  "key": "nestjs.callback",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "request path or route template; no key=value pairs to mask"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@opentelemetry/instrumentation-nestjs-core 0.65.0",
+  "library": "@nestjs/core",
+  "attribute": "nestjs.* / http.url",
+  "key": "http.url",
+  "shape": "url",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@grpc/grpc-js (Dash0 wrapClient on @opentelemetry/instrumentation-grpc 0.219.0)",
+  "library": "@grpc/grpc-js client",
+  "attribute": "rpc.request.payload",
+  "key": "rpc.request.payload",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@grpc/grpc-js client",
+  "library": "@grpc/grpc-js client",
+  "attribute": "rpc.response.payload",
+  "key": "rpc.response.payload",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@grpc/grpc-js (Dash0 wrapServer)",
+  "library": "@grpc/grpc-js server",
+  "attribute": "rpc.request.payload / rpc.response.payload",
+  "key": "rpc.request.payload",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@grpc/grpc-js (Dash0 wrapServer)",
+  "library": "@grpc/grpc-js server",
+  "attribute": "rpc.request.payload / rpc.response.payload",
+  "key": "rpc.response.payload",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "extension runtime proxy (all runtimes)",
+  "library": "Lambda Runtime API",
+  "attribute": "dash0_payload log, type lambda_event",
+  "key": "dash0_payload lambda_event",
+  "shape": "json",
+  "expect": "elsewhere",
+  "reason": "Lambda event and return value payload logs are masked when captured by the extension's runtime proxy, not by export-time payload masking"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "extension runtime proxy",
+  "library": "Lambda Runtime API",
+  "attribute": "dash0_payload log, type lambda_return_value",
+  "key": "dash0_payload lambda_return_value",
+  "shape": "json",
+  "expect": "elsewhere",
+  "reason": "Lambda event and return value payload logs are masked when captured by the extension's runtime proxy, not by export-time payload masking"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "extension (API Gateway / ALB)",
+  "library": "Lambda event",
+  "attribute": "http.request.header.<name>",
+  "key": "http.request.header.authorization",
+  "shape": "named",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_HEADERS"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "extension (API Gateway / ALB)",
+  "library": "Lambda event",
+  "attribute": "http.request.header.<name>",
+  "key": "http.request.header.x-api-key",
+  "shape": "named",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_HEADERS"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "extension (API Gateway / ALB)",
+  "library": "Lambda event",
+  "attribute": "url.query",
+  "key": "url.query",
+  "shape": "query",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "extension (API Gateway / ALB)",
+  "library": "Lambda return value",
+  "attribute": "http.response.header.<name>",
+  "key": "http.response.header.x-api-key",
+  "shape": "named",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_HEADERS"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "extension (API Gateway / ALB)",
+  "library": "Lambda event",
+  "attribute": "url.path / http.route / client.address",
+  "key": "url.path",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "request path or route template; no key=value pairs to mask"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "extension (API Gateway / ALB)",
+  "library": "Lambda event",
+  "attribute": "url.path / http.route / client.address",
+  "key": "http.route",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "request path or route template; no key=value pairs to mask"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "extension (API Gateway / ALB)",
+  "library": "Lambda event",
+  "attribute": "url.path / http.route / client.address",
+  "key": "client.address",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "client or peer IP address, not a credential"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@opentelemetry/instrumentation-aws-lambda 0.71.0",
+  "library": "Lambda handler",
+  "attribute": "faas.* / cloud.*",
+  "key": "faas.invocation_id",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "message or session identifier, not payload content"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@opentelemetry/instrumentation-aws-lambda 0.71.0",
+  "library": "Lambda handler",
+  "attribute": "faas.* / cloud.*",
+  "key": "cloud.account.id",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "resource identifier (name, ARN or URL), not payload content"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "extension (all runtimes)",
+  "library": "process env",
+  "attribute": "process.environment_variable.<NAME> (resource attributes)",
+  "key": "process.environment_variable.AWS_SECRET_ACCESS_KEY",
+  "shape": "json",
+  "expect": "elsewhere",
+  "reason": "environment variable resource attributes are masked by the extension's env-var masking, not by payload masking"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "Node distro processDetector",
+  "library": "Node process",
+  "attribute": "process.command_args / process.executable.path",
+  "key": "process.command_args",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "process metadata set by the Lambda runtime"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "Node distro processDetector",
+  "library": "Node process",
+  "attribute": "process.command_args / process.executable.path",
+  "key": "process.executable.path",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "process metadata set by the Lambda runtime"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "flask",
+  "library": "flask",
+  "attribute": "http.request.query",
+  "key": "http.request.query",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "flask",
+  "library": "flask",
+  "attribute": "http.request.headers",
+  "key": "http.request.headers",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_HEADERS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "flask",
+  "library": "flask",
+  "attribute": "http.response.headers",
+  "key": "http.response.headers",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_HEADERS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "flask",
+  "library": "flask",
+  "attribute": "http.request.body",
+  "key": "http.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "flask",
+  "library": "flask",
+  "attribute": "http.response.body",
+  "key": "http.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "flask (upstream wsgi)",
+  "library": "flask",
+  "attribute": "http.target",
+  "key": "http.target",
+  "shape": "target",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "flask (upstream wsgi)",
+  "library": "flask",
+  "attribute": "http.url",
+  "key": "http.url",
+  "shape": "url",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "django",
+  "library": "django",
+  "attribute": "http.request.query",
+  "key": "http.request.query",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "django",
+  "library": "django",
+  "attribute": "http.request.headers",
+  "key": "http.request.headers",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_HEADERS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "django",
+  "library": "django",
+  "attribute": "http.request.body",
+  "key": "http.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "django",
+  "library": "django",
+  "attribute": "http.response.headers",
+  "key": "http.response.headers",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_HEADERS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "django",
+  "library": "django",
+  "attribute": "http.response.body",
+  "key": "http.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "django (upstream wsgi/asgi)",
+  "library": "django",
+  "attribute": "http.url",
+  "key": "http.url",
+  "shape": "url",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "fastapi",
+  "library": "fastapi",
+  "attribute": "http.request.query",
+  "key": "http.request.query_string",
+  "shape": "quoted_query",
+  "expect": "gap",
+  "reason": "the FastAPI hook writes the query as `http.request.query_string` (a JSON-quoted raw query string), which is not classified"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "fastapi",
+  "library": "fastapi",
+  "attribute": "http.request.headers",
+  "key": "http.request.headers",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_HEADERS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "fastapi",
+  "library": "fastapi",
+  "attribute": "http.request.path",
+  "key": "http.request.path",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "request path or route template; no key=value pairs to mask"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "fastapi",
+  "library": "fastapi",
+  "attribute": "http.request.body",
+  "key": "http.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "fastapi",
+  "library": "fastapi",
+  "attribute": "http.response.headers",
+  "key": "http.response.headers",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_HEADERS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "fastapi",
+  "library": "fastapi",
+  "attribute": "http.response.body",
+  "key": "http.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "fastapi (upstream asgi)",
+  "library": "fastapi",
+  "attribute": "http.url",
+  "key": "http.url",
+  "shape": "url",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "flask, django, fastapi (upstream, OTEL_SEMCONV_STABILITY_OPT_IN=http|http/dup)",
+  "library": "flask/django/fastapi",
+  "attribute": "url.query",
+  "key": "url.query",
+  "shape": "query",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "flask, django, fastapi (upstream)",
+  "library": "flask/django/fastapi",
+  "attribute": "http.request.header.<name> / http.response.header.<name>",
+  "key": "http.request.header.authorization",
+  "shape": "named",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_HEADERS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "flask, django, fastapi (upstream)",
+  "library": "flask/django/fastapi",
+  "attribute": "http.request.header.<name> / http.response.header.<name>",
+  "key": "http.response.header.x-api-key",
+  "shape": "named",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_HEADERS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "requests",
+  "library": "requests",
+  "attribute": "http.request.headers",
+  "key": "http.request.headers",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_HEADERS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "requests",
+  "library": "requests",
+  "attribute": "http.request.body",
+  "key": "http.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "requests",
+  "library": "requests",
+  "attribute": "http.response.headers",
+  "key": "http.response.headers",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_HEADERS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "requests",
+  "library": "requests",
+  "attribute": "http.response.body",
+  "key": "http.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "requests (upstream)",
+  "library": "requests",
+  "attribute": "http.url",
+  "key": "http.url",
+  "shape": "url",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "httpx",
+  "library": "httpx",
+  "attribute": "http.request.headers",
+  "key": "http.request.headers",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_HEADERS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "httpx",
+  "library": "httpx",
+  "attribute": "http.request.body",
+  "key": "http.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "httpx",
+  "library": "httpx",
+  "attribute": "http.response.headers",
+  "key": "http.response.headers",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_HEADERS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "httpx",
+  "library": "httpx",
+  "attribute": "http.response.body",
+  "key": "http.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "httpx (upstream)",
+  "library": "httpx",
+  "attribute": "http.url",
+  "key": "http.url",
+  "shape": "url",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "requests, httpx (upstream)",
+  "library": "requests/httpx",
+  "attribute": "http.request.header.<name> / http.response.header.<name>",
+  "key": "http.request.header.authorization",
+  "shape": "named",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_HEADERS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "requests, httpx (upstream)",
+  "library": "requests/httpx",
+  "attribute": "http.request.header.<name> / http.response.header.<name>",
+  "key": "http.response.header.x-api-key",
+  "shape": "named",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_HEADERS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "botocore (AwsParser)",
+  "library": "boto3/botocore - every service without a specific parser (S3, EventBridge, Step Functions, Kinesis, SSM, Secrets Manager, KMS, STS, Cognito, Bedrock, ...)",
+  "attribute": "http.request.body",
+  "key": "http.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "botocore (AwsParser)",
+  "library": "boto3/botocore - every service except SQS",
+  "attribute": "http.response.body",
+  "key": "http.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "botocore (AwsParser)",
+  "library": "boto3/botocore",
+  "attribute": "http.response.headers",
+  "key": "http.response.headers",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_HEADERS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "botocore (SqsParser)",
+  "library": "boto3 SQS SendMessage / SendMessageBatch",
+  "attribute": "messaging.publish.body",
+  "key": "messaging.publish.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "botocore (SqsParser)",
+  "library": "boto3 SQS SendMessage / SendMessageBatch",
+  "attribute": "messaging.publish.body",
+  "key": "messaging.publish.body",
+  "shape": "sqs_body",
+  "expect": "gap",
+  "reason": "SQS message body is a string inside the payload; keys inside string values are not parsed"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "botocore (SqsParser)",
+  "library": "boto3 SQS (other ops)",
+  "attribute": "http.request.body",
+  "key": "http.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "botocore (SqsParser)",
+  "library": "boto3 SQS ReceiveMessage",
+  "attribute": "messaging.consume.body",
+  "key": "messaging.consume.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "botocore (SqsParser)",
+  "library": "boto3 SQS ReceiveMessage",
+  "attribute": "messaging.consume.body",
+  "key": "messaging.consume.body",
+  "shape": "sqs_body",
+  "expect": "gap",
+  "reason": "SQS message body is a string inside the payload; keys inside string values are not parsed"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "botocore (SqsParser)",
+  "library": "boto3 SQS ReceiveMessage",
+  "attribute": "dash0Data",
+  "key": "dash0Data",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "trigger metadata (message IDs, ARNs), not the message content"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "botocore (SnsParser)",
+  "library": "boto3 SNS Publish",
+  "attribute": "http.request.body",
+  "key": "http.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "botocore (LambdaParser)",
+  "library": "boto3 Lambda Invoke",
+  "attribute": "http.request.body",
+  "key": "http.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "botocore (DynamoParser)",
+  "library": "boto3 DynamoDB",
+  "attribute": "http.request.body",
+  "key": "http.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "botocore (DynamoParser)",
+  "library": "boto3 DynamoDB",
+  "attribute": "http.response.body",
+  "key": "http.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "botocore (upstream dynamodb extension)",
+  "library": "boto3 DynamoDB",
+  "attribute": "aws.dynamodb.item_collection_metrics",
+  "key": "aws.dynamodb.item_collection_metrics",
+  "shape": "json",
+  "expect": "gap",
+  "reason": "partition key values serialized into a metadata attribute, not a payload attribute"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "botocore (upstream dynamodb extension)",
+  "library": "boto3 DynamoDB",
+  "attribute": "aws.dynamodb.projection / aws.dynamodb.exclusive_start_table",
+  "key": "aws.dynamodb.projection",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "schema, expression or model parameter metadata without runtime values"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "botocore (upstream dynamodb extension)",
+  "library": "boto3 DynamoDB",
+  "attribute": "aws.dynamodb.projection / aws.dynamodb.exclusive_start_table",
+  "key": "aws.dynamodb.exclusive_start_table",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "resource identifier (name, ARN or URL), not payload content"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "botocore (upstream bedrock extension)",
+  "library": "boto3 bedrock-runtime",
+  "attribute": "gen_ai.* events (prompt/choice content)",
+  "key": "gen_ai.user.message",
+  "shape": "prompt",
+  "expect": "gap",
+  "reason": "LLM prompt or completion text; key-based masking can't find secrets in free text"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "botocore (upstream bedrock extension)",
+  "library": "boto3 bedrock-runtime",
+  "attribute": "gen_ai.* events (prompt/choice content)",
+  "key": "gen_ai.choice",
+  "shape": "prompt",
+  "expect": "gap",
+  "reason": "LLM prompt or completion text; key-based masking can't find secrets in free text"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "botocore (upstream sns/sqs/secretsmanager/sfn/lambda extensions)",
+  "library": "boto3",
+  "attribute": "messaging.destination(.name), aws.secretsmanager.secret.arn, faas.invoked_name, aws.step_functions.*.arn",
+  "key": "messaging.destination",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "queue or topic name; the upstream SNS extension redacts phone numbers"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "botocore (upstream sns/sqs/secretsmanager/sfn/lambda extensions)",
+  "library": "boto3",
+  "attribute": "messaging.destination(.name), aws.secretsmanager.secret.arn, faas.invoked_name, aws.step_functions.*.arn",
+  "key": "messaging.destination.name",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "queue or topic name; the upstream SNS extension redacts phone numbers"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "botocore (upstream sns/sqs/secretsmanager/sfn/lambda extensions)",
+  "library": "boto3",
+  "attribute": "messaging.destination(.name), aws.secretsmanager.secret.arn, faas.invoked_name, aws.step_functions.*.arn",
+  "key": "aws.secretsmanager.secret.arn",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "resource identifier (name, ARN or URL), not payload content"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "botocore (upstream sns/sqs/secretsmanager/sfn/lambda extensions)",
+  "library": "boto3",
+  "attribute": "messaging.destination(.name), aws.secretsmanager.secret.arn, faas.invoked_name, aws.step_functions.*.arn",
+  "key": "faas.invoked_name",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "resource identifier (name, ARN or URL), not payload content"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "botocore (upstream sns/sqs/secretsmanager/sfn/lambda extensions)",
+  "library": "boto3",
+  "attribute": "messaging.destination(.name), aws.secretsmanager.secret.arn, faas.invoked_name, aws.step_functions.*.arn",
+  "key": "aws.step_functions.state_machine.arn",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "resource identifier (name, ARN or URL), not payload content"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "kafka_python",
+  "library": "kafka-python",
+  "attribute": "messaging.produce.body",
+  "key": "messaging.produce.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "kafka_python",
+  "library": "kafka-python",
+  "attribute": "messaging.consume.body",
+  "key": "messaging.consume.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "pika",
+  "library": "pika",
+  "attribute": "messaging.publish.body",
+  "key": "messaging.publish.body",
+  "shape": "json",
+  "siblings": {
+   "messaging.system": "rabbitmq"
+  },
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "pika",
+  "library": "pika",
+  "attribute": "messaging.consume.body",
+  "key": "messaging.consume.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "pika (upstream)",
+  "library": "pika",
+  "attribute": "messaging.message_id / messaging.conversation_id",
+  "key": "messaging.message_id",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "message or session identifier, not payload content"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "pika (upstream)",
+  "library": "pika",
+  "attribute": "messaging.message_id / messaging.conversation_id",
+  "key": "messaging.conversation_id",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "message or session identifier, not payload content"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "redis",
+  "library": "redis",
+  "attribute": "db.statement",
+  "key": "db.statement",
+  "shape": "redis",
+  "siblings": {
+   "db.system": "redis"
+  },
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "redis",
+  "library": "redis",
+  "attribute": "db.response.body",
+  "key": "db.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "redis (upstream)",
+  "library": "redis (RediSearch)",
+  "attribute": "redis.search.query / redis.search.xdoc_<id>.<field>",
+  "key": "redis.search.query",
+  "shape": "text",
+  "expect": "gap",
+  "reason": "RediSearch query text and result fields are not payload attributes"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "redis (upstream)",
+  "library": "redis (RediSearch)",
+  "attribute": "redis.search.query / redis.search.xdoc_<id>.<field>",
+  "key": "redis.search.xdoc_0.password",
+  "shape": "text",
+  "expect": "gap",
+  "reason": "RediSearch query text and result fields are not payload attributes"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "pymongo",
+  "library": "pymongo",
+  "attribute": "db.request.body",
+  "key": "db.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "pymongo",
+  "library": "pymongo",
+  "attribute": "db.response.body",
+  "key": "db.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "pymongo",
+  "library": "pymongo",
+  "attribute": "db.statement",
+  "key": "db.statement",
+  "shape": "text",
+  "siblings": {
+   "db.system": "mongodb"
+  },
+  "expect": "not-sensitive",
+  "reason": "pymongo puts only the command name here; payloads go to db.request.body"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "psycopg / psycopg2 (upstream dbapi)",
+  "library": "psycopg, psycopg2",
+  "attribute": "db.statement",
+  "key": "db.statement",
+  "shape": "sql",
+  "expect": "gap",
+  "reason": "SQL text; there are no keys to match and `all` would hide every query"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "psycopg / psycopg2",
+  "library": "psycopg, psycopg2",
+  "attribute": "db.statement.parameters",
+  "key": "db.statement.parameters",
+  "shape": "params",
+  "expect": "gap",
+  "reason": "bound query parameters are positional values with no keys to match"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "psycopg / psycopg2",
+  "library": "psycopg, psycopg2",
+  "attribute": "db.response.body",
+  "key": "db.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "psycopg / psycopg2",
+  "library": "psycopg, psycopg2",
+  "attribute": "db.response.body",
+  "key": "db.response.body",
+  "shape": "rows",
+  "expect": "gap",
+  "reason": "default cursors return tuples, so the rows have no keys to match; only `all` masks them"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "pymysql (upstream dbapi)",
+  "library": "pymysql",
+  "attribute": "db.statement",
+  "key": "db.statement",
+  "shape": "sql",
+  "expect": "gap",
+  "reason": "SQL text; there are no keys to match and `all` would hide every query"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "pymysql (upstream dbapi)",
+  "library": "pymysql",
+  "attribute": "db.statement.parameters",
+  "key": "db.statement.parameters",
+  "shape": "params",
+  "expect": "gap",
+  "reason": "bound query parameters are positional values with no keys to match"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "pymysql",
+  "library": "pymysql",
+  "attribute": "db.response.body",
+  "key": "db.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "all instrumentations (span.record_exception)",
+  "library": "psycopg, pymysql, botocore, requests, ...",
+  "attribute": "exception.message / exception.stacktrace (span events)",
+  "key": "exception.message",
+  "shape": "text",
+  "expect": "gap",
+  "reason": "free-form exception text; payload masking only touches payload attributes"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "all instrumentations (span.record_exception)",
+  "library": "psycopg, pymysql, botocore, requests, ...",
+  "attribute": "exception.message / exception.stacktrace (span events)",
+  "key": "exception.stacktrace",
+  "shape": "text",
+  "expect": "gap",
+  "reason": "free-form exception text; payload masking only touches payload attributes"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "grpcio (client)",
+  "library": "grpcio",
+  "attribute": "rpc.grpc.request.payload",
+  "key": "rpc.grpc.request.payload",
+  "shape": "protobuf_text",
+  "expect": "gap",
+  "reason": "Python str() of a protobuf (text format) is neither JSON nor form-encoded"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "grpcio (client)",
+  "library": "grpcio",
+  "attribute": "rpc.grpc.response.payload",
+  "key": "rpc.grpc.response.payload",
+  "shape": "protobuf_text",
+  "expect": "gap",
+  "reason": "Python str() of a protobuf (text format) is neither JSON nor form-encoded"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "grpcio (server)",
+  "library": "grpcio",
+  "attribute": "rpc.grpc.request.payload",
+  "key": "rpc.grpc.request.payload",
+  "shape": "protobuf_text",
+  "expect": "gap",
+  "reason": "Python str() of a protobuf (text format) is neither JSON nor form-encoded"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "langchain (OpenLLMetry)",
+  "library": "langchain",
+  "attribute": "gen_ai.prompt.<i>.content / .role / .tool_calls.*",
+  "key": "gen_ai.prompt.0.content",
+  "shape": "text",
+  "expect": "gap",
+  "reason": "LLM prompt or completion text; key-based masking can't find secrets in free text"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "langchain (OpenLLMetry)",
+  "library": "langchain",
+  "attribute": "gen_ai.prompt.<i>.content / .role / .tool_calls.*",
+  "key": "gen_ai.prompt.0.role",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "message role (user, assistant)"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "langchain (OpenLLMetry)",
+  "library": "langchain",
+  "attribute": "gen_ai.prompt.<i>.content / .role / .tool_calls.*",
+  "key": "gen_ai.prompt.0.tool_calls.0.arguments",
+  "shape": "json",
+  "expect": "gap",
+  "reason": "LLM prompt or completion text; key-based masking can't find secrets in free text"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "langchain (OpenLLMetry)",
+  "library": "langchain",
+  "attribute": "gen_ai.completion.<i>.content / .tool_calls.<n>.arguments",
+  "key": "gen_ai.completion.0.content",
+  "shape": "text",
+  "expect": "gap",
+  "reason": "LLM prompt or completion text; key-based masking can't find secrets in free text"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "langchain (OpenLLMetry)",
+  "library": "langchain",
+  "attribute": "gen_ai.completion.<i>.content / .tool_calls.<n>.arguments",
+  "key": "gen_ai.completion.0.tool_calls.0.arguments",
+  "shape": "json",
+  "expect": "gap",
+  "reason": "LLM prompt or completion text; key-based masking can't find secrets in free text"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "langchain (OpenLLMetry)",
+  "library": "langchain",
+  "attribute": "traceloop.entity.input / traceloop.entity.output",
+  "key": "traceloop.entity.input",
+  "shape": "json",
+  "expect": "gap",
+  "reason": "LLM prompt or completion text; key-based masking can't find secrets in free text"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "langchain (OpenLLMetry)",
+  "library": "langchain",
+  "attribute": "traceloop.entity.input / traceloop.entity.output",
+  "key": "traceloop.entity.output",
+  "shape": "json",
+  "expect": "gap",
+  "reason": "LLM prompt or completion text; key-based masking can't find secrets in free text"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "langchain (OpenLLMetry)",
+  "library": "langchain",
+  "attribute": "llm.request.functions.<i>.parameters / .description",
+  "key": "llm.request.functions.0.parameters",
+  "shape": "json",
+  "expect": "not-sensitive",
+  "reason": "schema, expression or model parameter metadata without runtime values"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "langchain (OpenLLMetry)",
+  "library": "langchain",
+  "attribute": "llm.request.functions.<i>.parameters / .description",
+  "key": "llm.request.functions.0.description",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "schema, expression or model parameter metadata without runtime values"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "langchain (OpenLLMetry)",
+  "library": "langchain",
+  "attribute": "traceloop.association.properties.<key>",
+  "key": "traceloop.association.properties.user_note",
+  "shape": "text",
+  "expect": "gap",
+  "reason": "app-provided run metadata; free-form values with no payload kind"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "agno (OpenInference)",
+  "library": "agno",
+  "attribute": "input.value / output.value",
+  "key": "input.value",
+  "shape": "json",
+  "expect": "gap",
+  "reason": "LLM prompt or completion text; key-based masking can't find secrets in free text"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "agno (OpenInference)",
+  "library": "agno",
+  "attribute": "input.value / output.value",
+  "key": "output.value",
+  "shape": "json",
+  "expect": "gap",
+  "reason": "LLM prompt or completion text; key-based masking can't find secrets in free text"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "agno (OpenInference)",
+  "library": "agno",
+  "attribute": "llm.input_messages.<i>.message.content / llm.output_messages.<i>.message.content (+ tool_calls.*.function.arguments)",
+  "key": "llm.input_messages.0.message.content",
+  "shape": "text",
+  "expect": "gap",
+  "reason": "LLM prompt or completion text; key-based masking can't find secrets in free text"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "agno (OpenInference)",
+  "library": "agno",
+  "attribute": "llm.input_messages.<i>.message.content / llm.output_messages.<i>.message.content (+ tool_calls.*.function.arguments)",
+  "key": "llm.output_messages.0.message.content",
+  "shape": "text",
+  "expect": "gap",
+  "reason": "LLM prompt or completion text; key-based masking can't find secrets in free text"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "agno (OpenInference)",
+  "library": "agno",
+  "attribute": "llm.input_messages.<i>.message.content / llm.output_messages.<i>.message.content (+ tool_calls.*.function.arguments)",
+  "key": "llm.output_messages.0.message.tool_calls.0.tool_call.function.arguments",
+  "shape": "json",
+  "expect": "gap",
+  "reason": "LLM prompt or completion text; key-based masking can't find secrets in free text"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "agno (OpenInference)",
+  "library": "agno",
+  "attribute": "tool.parameters / llm.invocation_parameters / session.id / user.id",
+  "key": "tool.parameters",
+  "shape": "json",
+  "expect": "gap",
+  "reason": "LLM prompt or completion text; key-based masking can't find secrets in free text"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "agno (OpenInference)",
+  "library": "agno",
+  "attribute": "tool.parameters / llm.invocation_parameters / session.id / user.id",
+  "key": "llm.invocation_parameters",
+  "shape": "json",
+  "expect": "not-sensitive",
+  "reason": "schema, expression or model parameter metadata without runtime values"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "agno (OpenInference)",
+  "library": "agno",
+  "attribute": "tool.parameters / llm.invocation_parameters / session.id / user.id",
+  "key": "session.id",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "message or session identifier, not payload content"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "agno (OpenInference)",
+  "library": "agno",
+  "attribute": "tool.parameters / llm.invocation_parameters / session.id / user.id",
+  "key": "user.id",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "message or session identifier, not payload content"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "aws_lambda (upstream, always on)",
+  "library": "opentelemetry-instrumentation-aws-lambda",
+  "attribute": "http.target",
+  "key": "http.target",
+  "shape": "target",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "aws_lambda (upstream)",
+  "library": "opentelemetry-instrumentation-aws-lambda",
+  "attribute": "http.user_agent / net.host.name / http.route",
+  "key": "http.user_agent",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "client metadata (user agent, host), not a credential"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "aws_lambda (upstream)",
+  "library": "opentelemetry-instrumentation-aws-lambda",
+  "attribute": "http.user_agent / net.host.name / http.route",
+  "key": "net.host.name",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "client metadata (user agent, host), not a credential"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "aws_lambda (upstream)",
+  "library": "opentelemetry-instrumentation-aws-lambda",
+  "attribute": "http.user_agent / net.host.name / http.route",
+  "key": "http.route",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "request path or route template; no key=value pairs to mask"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "extension",
+  "library": "Dash0 extension",
+  "attribute": "dash0_payload log: lambda_event / lambda_response",
+  "key": "dash0_payload lambda_event",
+  "shape": "json",
+  "expect": "elsewhere",
+  "reason": "Lambda event and return value payload logs are masked when captured by the extension's runtime proxy, not by export-time payload masking"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "extension",
+  "library": "Dash0 extension",
+  "attribute": "dash0_payload log: lambda_event / lambda_response",
+  "key": "dash0_payload lambda_return_value",
+  "shape": "json",
+  "expect": "elsewhere",
+  "reason": "Lambda event and return value payload logs are masked when captured by the extension's runtime proxy, not by export-time payload masking"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "extension",
+  "library": "Dash0 extension",
+  "attribute": "url.query / http.request.header.<name>",
+  "key": "url.query",
+  "shape": "query",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "extension",
+  "library": "Dash0 extension",
+  "attribute": "url.query / http.request.header.<name>",
+  "key": "http.request.header.authorization",
+  "shape": "named",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_HEADERS"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "extension",
+  "library": "Dash0 extension",
+  "attribute": "process.environment_variable.<NAME> (resource)",
+  "key": "process.environment_variable.AWS_SECRET_ACCESS_KEY",
+  "shape": "json",
+  "expect": "elsewhere",
+  "reason": "environment variable resource attributes are masked by the extension's env-var masking, not by payload masking"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0-java-http-client (java11)",
+  "library": "java.net.http.HttpClient",
+  "attribute": "http.request.body",
+  "key": "http.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0-java-http-client (java11)",
+  "library": "java.net.http.HttpClient",
+  "attribute": "http.response.body",
+  "key": "http.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0-java-http-client (java11)",
+  "library": "java.net.http.HttpClient",
+  "attribute": "url.full",
+  "key": "url.full",
+  "shape": "url",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0-java-http-client (java11)",
+  "library": "java.net.http.HttpClient",
+  "attribute": "http.request.header.<name>",
+  "key": "http.request.header.authorization",
+  "shape": "named",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_HEADERS"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0-java-http-client (java11)",
+  "library": "java.net.http.HttpClient",
+  "attribute": "http.response.header.<name>",
+  "key": "http.response.header.x-api-key",
+  "shape": "named",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_HEADERS"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 apache-httpclient-5.0",
+  "library": "Apache HttpClient 5",
+  "attribute": "http.request.body",
+  "key": "http.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 apache-httpclient-5.0",
+  "library": "Apache HttpClient 5",
+  "attribute": "http.response.body",
+  "key": "http.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 apache-httpclient-5.0",
+  "library": "Apache HttpClient 5",
+  "attribute": "url.full",
+  "key": "url.full",
+  "shape": "url",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 apache-httpclient-5.0",
+  "library": "Apache HttpClient 5",
+  "attribute": "http.request.header.<name> / http.response.header.<name>",
+  "key": "http.request.header.authorization",
+  "shape": "named",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_HEADERS"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 apache-httpclient-5.0",
+  "library": "Apache HttpClient 5",
+  "attribute": "http.request.header.<name> / http.response.header.<name>",
+  "key": "http.response.header.x-api-key",
+  "shape": "named",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_HEADERS"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream apache-httpclient-4.0 + dash0 aws-sdk-1.11 BHttpConnectionBase hook",
+  "library": "Apache HttpClient 4",
+  "attribute": "http.request.body / http.response.body",
+  "key": "http.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream apache-httpclient-4.0 + dash0 aws-sdk-1.11 BHttpConnectionBase hook",
+  "library": "Apache HttpClient 4",
+  "attribute": "http.request.body / http.response.body",
+  "key": "http.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream (apache-httpclient-4, okhttp-3, http-url-connection, netty client, reactor-netty, jetty-client, spring-webclient, …)",
+  "library": "various",
+  "attribute": "url.full",
+  "key": "url.full",
+  "shape": "url",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream HTTP clients",
+  "library": "OkHttp, HttpURLConnection, etc.",
+  "attribute": "http.request.body / http.response.body",
+  "key": "http.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream HTTP clients",
+  "library": "OkHttp, HttpURLConnection, etc.",
+  "attribute": "http.request.body / http.response.body",
+  "key": "http.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 servlet-3.0 (+spring-webmvc-3.1)",
+  "library": "Servlet 3+/Spring MVC (e.g. aws-serverless-java-container)",
+  "attribute": "http.request.body",
+  "key": "http.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 servlet-3.0",
+  "library": "Servlet 3+/Spring MVC",
+  "attribute": "http.response.body",
+  "key": "http.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream servlet / netty / spring / Lambda API Gateway",
+  "library": "various",
+  "attribute": "url.query",
+  "key": "url.query",
+  "shape": "query",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream servlet / netty",
+  "library": "various",
+  "attribute": "http.request.header.<name> / http.response.header.<name>",
+  "key": "http.request.header.authorization",
+  "shape": "named",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_HEADERS"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream servlet / netty",
+  "library": "various",
+  "attribute": "http.request.header.<name> / http.response.header.<name>",
+  "key": "http.response.header.x-api-key",
+  "shape": "named",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_HEADERS"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream servlet / netty / spring",
+  "library": "various",
+  "attribute": "url.path / http.route",
+  "key": "url.path",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "request path or route template; no key=value pairs to mask"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream servlet / netty / spring",
+  "library": "various",
+  "attribute": "url.path / http.route",
+  "key": "http.route",
+  "shape": "text",
+  "expect": "not-sensitive",
+  "reason": "request path or route template; no key=value pairs to mask"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 netty-4.1 (also Spring WebFlux / Reactor Netty server)",
+  "library": "Netty 4.1",
+  "attribute": "http.request.body",
+  "key": "http.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 netty-4.1",
+  "library": "Netty 4.1",
+  "attribute": "http.response.body",
+  "key": "http.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 aws-sdk-2.2 (fork; upstream disabled)",
+  "library": "AWS SDK v2 (all services)",
+  "attribute": "http.request.body",
+  "key": "http.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 aws-sdk-2.2",
+  "library": "AWS SDK v2 (all services)",
+  "attribute": "http.response.body",
+  "key": "http.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 aws-sdk-2.2",
+  "library": "AWS SDK v2 (all services)",
+  "attribute": "http.response.body",
+  "key": "http.response.body",
+  "shape": "xml",
+  "expect": "gap",
+  "reason": "query/XML-protocol AWS bodies (STS, SNS, S3) are not JSON or form-encoded; only `all` masks them"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 aws-sdk-2.2",
+  "library": "SQS (SendMessage/SendMessageBatch)",
+  "attribute": "http.request.body",
+  "key": "http.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 aws-sdk-2.2",
+  "library": "SQS (SendMessage/SendMessageBatch)",
+  "attribute": "http.request.body",
+  "key": "http.request.body",
+  "shape": "sqs_body",
+  "expect": "gap",
+  "reason": "SQS message body is a string inside the payload; keys inside string values are not parsed"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 aws-sdk-2.2",
+  "library": "SQS (ReceiveMessage)",
+  "attribute": "http.response.body",
+  "key": "http.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 aws-sdk-2.2",
+  "library": "SQS (ReceiveMessage)",
+  "attribute": "http.response.body",
+  "key": "http.response.body",
+  "shape": "sqs_body",
+  "expect": "gap",
+  "reason": "SQS message body is a string inside the payload; keys inside string values are not parsed"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 aws-sdk-2.2 SqsImpl",
+  "library": "SQS (ReceiveMessage → per-message process span)",
+  "attribute": "messaging.message.body",
+  "key": "messaging.message.body",
+  "shape": "aws_tostring",
+  "span_kind": 5,
+  "expect": "gap",
+  "reason": "Java toString() output is neither JSON nor form-encoded; only `all` masks it"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 aws-sdk-2.2",
+  "library": "SNS (Publish/PublishBatch)",
+  "attribute": "http.request.body",
+  "key": "http.request.body",
+  "shape": "sns_form",
+  "expect": "gap",
+  "reason": "SNS query protocol: the secret is URL-encoded JSON inside the `Message` field; form fields are matched by name, values are not parsed"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 aws-sdk-2.2",
+  "library": "Kinesis (PutRecord/PutRecords/GetRecords)",
+  "attribute": "http.request.body / http.response.body",
+  "key": "http.request.body",
+  "shape": "base64_json",
+  "expect": "gap",
+  "reason": "Kinesis record content is base64 in `Data`; only the key `Data` or `all` can mask it"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 aws-sdk-2.2",
+  "library": "Kinesis (PutRecord/PutRecords/GetRecords)",
+  "attribute": "http.request.body / http.response.body",
+  "key": "http.response.body",
+  "shape": "base64_json",
+  "expect": "gap",
+  "reason": "Kinesis record content is base64 in `Data`; only the key `Data` or `all` can mask it"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 aws-sdk-2.2",
+  "library": "DynamoDB",
+  "attribute": "http.request.body / http.response.body",
+  "key": "http.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 aws-sdk-2.2",
+  "library": "DynamoDB",
+  "attribute": "http.request.body / http.response.body",
+  "key": "http.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "aws-sdk-2.2 library FieldMapper",
+  "library": "DynamoDB",
+  "attribute": "aws.dynamodb.item_collection_metrics",
+  "key": "aws.dynamodb.item_collection_metrics",
+  "shape": "json",
+  "expect": "gap",
+  "reason": "partition key values serialized into a metadata attribute, not a payload attribute"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 aws-sdk-2.2",
+  "library": "S3 (PutObject/GetObject)",
+  "attribute": "http.request.body / http.response.body",
+  "key": "http.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 aws-sdk-2.2",
+  "library": "S3 (PutObject/GetObject)",
+  "attribute": "http.request.body / http.response.body",
+  "key": "http.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 aws-sdk-2.2",
+  "library": "Lambda Invoke",
+  "attribute": "http.request.body / http.response.body",
+  "key": "http.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 aws-sdk-2.2",
+  "library": "Lambda Invoke",
+  "attribute": "http.request.body / http.response.body",
+  "key": "http.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 aws-sdk-2.2 (upstream Bedrock/gen_ai support not present in fork)",
+  "library": "Bedrock Runtime (InvokeModel/Converse)",
+  "attribute": "http.request.body / http.response.body",
+  "key": "http.request.body",
+  "shape": "prompt",
+  "expect": "gap",
+  "reason": "LLM prompt or completion text; key-based masking can't find secrets in free text"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 aws-sdk-2.2 (upstream Bedrock/gen_ai support not present in fork)",
+  "library": "Bedrock Runtime (InvokeModel/Converse)",
+  "attribute": "http.request.body / http.response.body",
+  "key": "http.response.body",
+  "shape": "prompt",
+  "expect": "gap",
+  "reason": "LLM prompt or completion text; key-based masking can't find secrets in free text"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "aws-sdk-2.2 library",
+  "library": "AWS SDK v2",
+  "attribute": "aws.http.error_message",
+  "key": "aws.http.error_message",
+  "shape": "text",
+  "expect": "gap",
+  "reason": "service error text can echo input values; not a payload attribute"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 aws-sdk-1.11 (+ upstream aws-sdk-1.11)",
+  "library": "AWS SDK v1",
+  "attribute": "http.request.body",
+  "key": "http.request.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 aws-sdk-1.11",
+  "library": "AWS SDK v1",
+  "attribute": "http.response.body",
+  "key": "http.response.body",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 kafka-clients-0.11",
+  "library": "Kafka producer",
+  "attribute": "messaging.message.payload",
+  "key": "messaging.message.payload",
+  "shape": "json",
+  "span_kind": 4,
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 kafka-clients-0.11",
+  "library": "Kafka producer",
+  "attribute": "messaging.message.headers",
+  "key": "messaging.message.headers",
+  "shape": "kafka_headers",
+  "span_kind": 4,
+  "expect": "gap",
+  "reason": "Java renders Kafka header values as byte arrays (`name=[83, 51, …]`); only `all` masks them"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 kafka-clients-0.11",
+  "library": "Kafka consumer (process span)",
+  "attribute": "messaging.message.payload",
+  "key": "messaging.message.payload",
+  "shape": "json",
+  "span_kind": 5,
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 kafka-clients-0.11",
+  "library": "Kafka consumer",
+  "attribute": "messaging.message.headers",
+  "key": "messaging.message.headers",
+  "shape": "kafka_headers",
+  "span_kind": 5,
+  "expect": "gap",
+  "reason": "Java renders Kafka header values as byte arrays (`name=[83, 51, …]`); only `all` masks them"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream kafka-clients",
+  "library": "Kafka producer/consumer",
+  "attribute": "messaging.kafka.message.key",
+  "key": "messaging.kafka.message.key",
+  "shape": "text",
+  "expect": "gap",
+  "reason": "record key is not a payload attribute"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 rabbitmq-2.7 (fork; upstream disabled)",
+  "library": "RabbitMQ basicPublish",
+  "attribute": "messaging.message.payload",
+  "key": "messaging.message.payload",
+  "shape": "json",
+  "span_kind": 4,
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 rabbitmq-2.7",
+  "library": "RabbitMQ handleDelivery (consumer)",
+  "attribute": "messaging.message.payload",
+  "key": "messaging.message.payload",
+  "shape": "json",
+  "span_kind": 5,
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 rabbitmq-2.7",
+  "library": "RabbitMQ basicGet",
+  "attribute": "messaging.message.payload",
+  "key": "messaging.message.payload",
+  "shape": "json",
+  "span_kind": 5,
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream messaging (kafka, rabbitmq, sqs, jms…)",
+  "library": "various",
+  "attribute": "messaging.header.<name>",
+  "key": "messaging.header.authorization",
+  "shape": "named",
+  "expect": "gap",
+  "reason": "message headers have no request/response direction in the key; not classified"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 storm",
+  "library": "Apache Storm bolt/executor",
+  "attribute": "storm.tuple.values",
+  "key": "storm.tuple.values",
+  "shape": "text",
+  "expect": "gap",
+  "reason": "Storm tuple values are not a payload attribute"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 lettuce-5.1 (fork; upstream disabled)",
+  "library": "Lettuce",
+  "attribute": "db.statement (db.query.text under stable semconv)",
+  "key": "db.statement",
+  "shape": "redis",
+  "siblings": {
+   "db.system": "redis"
+  },
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 lettuce-5.1 (fork; upstream disabled)",
+  "library": "Lettuce",
+  "attribute": "db.statement (db.query.text under stable semconv)",
+  "key": "db.query.text",
+  "shape": "redis",
+  "siblings": {
+   "db.system.name": "redis"
+  },
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 lettuce-5.1",
+  "library": "Lettuce",
+  "attribute": "db.response.body",
+  "key": "db.response.body",
+  "shape": "map_tostring",
+  "expect": "gap",
+  "reason": "Java toString() output is neither JSON nor form-encoded; only `all` masks it"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream jedis-1.4/3.0/4.0 (sanitizer disabled by dash0)",
+  "library": "Jedis",
+  "attribute": "db.statement / db.query.text",
+  "key": "db.statement",
+  "shape": "redis",
+  "siblings": {
+   "db.system": "redis"
+  },
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream jedis-1.4/3.0/4.0 (sanitizer disabled by dash0)",
+  "library": "Jedis",
+  "attribute": "db.statement / db.query.text",
+  "key": "db.query.text",
+  "shape": "redis",
+  "siblings": {
+   "db.system.name": "redis"
+  },
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream redisson / vertx-redis / spymemcached etc.",
+  "library": "other Redis/cache clients",
+  "attribute": "db.statement / db.query.text",
+  "key": "db.statement",
+  "shape": "redis",
+  "siblings": {
+   "db.system": "redis"
+  },
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream redisson / vertx-redis / spymemcached etc.",
+  "library": "other Redis/cache clients",
+  "attribute": "db.statement / db.query.text",
+  "key": "db.query.text",
+  "shape": "redis",
+  "siblings": {
+   "db.system.name": "redis"
+  },
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream redisson / vertx-redis / spymemcached etc.",
+  "library": "other Redis/cache clients",
+  "attribute": "db.statement / db.query.text",
+  "key": "db.statement",
+  "shape": "text",
+  "siblings": {
+   "db.system": "memcached"
+  },
+  "expect": "gap",
+  "reason": "memcached and other non-Redis cache commands are not classified"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream jdbc (+dash0 JdbcConfigCustomizer)",
+  "library": "JDBC",
+  "attribute": "db.statement / db.query.text",
+  "key": "db.statement",
+  "shape": "sql",
+  "expect": "gap",
+  "reason": "SQL text; there are no keys to match and `all` would hide every query"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream jdbc (+dash0 JdbcConfigCustomizer)",
+  "library": "JDBC",
+  "attribute": "db.statement / db.query.text",
+  "key": "db.query.text",
+  "shape": "sql",
+  "expect": "gap",
+  "reason": "SQL text; there are no keys to match and `all` would hide every query"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 jdbc",
+  "library": "JDBC ResultSet.next",
+  "attribute": "db.results",
+  "key": "db.results",
+  "shape": "json",
+  "expect": "gap",
+  "reason": "JDBC result rows are not a payload attribute"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream jdbc",
+  "library": "JDBC PreparedStatement",
+  "attribute": "db.query.parameter.<index>",
+  "key": "db.query.parameter.0",
+  "shape": "text",
+  "expect": "gap",
+  "reason": "bound query parameters are positional values with no keys to match"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream mongo / cassandra / couchbase / r2dbc / hibernate / vertx-sql …",
+  "library": "various",
+  "attribute": "db.statement / db.query.text",
+  "key": "db.statement",
+  "shape": "json",
+  "siblings": {
+   "db.system": "mongodb"
+  },
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream mongo / cassandra / couchbase / r2dbc / hibernate / vertx-sql …",
+  "library": "various",
+  "attribute": "db.statement / db.query.text",
+  "key": "db.query.text",
+  "shape": "json",
+  "siblings": {
+   "db.system.name": "mongodb"
+  },
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream mongo / cassandra / couchbase / r2dbc / hibernate / vertx-sql …",
+  "library": "various",
+  "attribute": "db.statement / db.query.text",
+  "key": "db.statement",
+  "shape": "sql",
+  "siblings": {
+   "db.system": "cassandra"
+  },
+  "expect": "gap",
+  "reason": "CQL and other query languages; only Redis and MongoDB statements are classified"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream elasticsearch / opensearch",
+  "library": "Elasticsearch/OpenSearch",
+  "attribute": "db.query.text (search body)",
+  "key": "db.query.text",
+  "shape": "json",
+  "siblings": {
+   "db.system.name": "elasticsearch"
+  },
+  "expect": "gap",
+  "reason": "search body; only Redis and MongoDB statements are classified"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 grpc-1.6",
+  "library": "gRPC client",
+  "attribute": "rpc.grpc.request.payload",
+  "key": "rpc.grpc.request.payload",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 grpc-1.6",
+  "library": "gRPC client",
+  "attribute": "rpc.grpc.response.payload",
+  "key": "rpc.grpc.response.payload",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 grpc-1.6",
+  "library": "gRPC server",
+  "attribute": "rpc.grpc.request.payload",
+  "key": "rpc.grpc.request.payload",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 grpc-1.6",
+  "library": "gRPC server",
+  "attribute": "rpc.grpc.response.payload",
+  "key": "rpc.grpc.response.payload",
+  "shape": "json",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_BODY"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream grpc-1.6",
+  "library": "gRPC",
+  "attribute": "rpc.grpc.request.metadata.<key> / rpc.grpc.response.metadata.<key>",
+  "key": "rpc.grpc.request.metadata.authorization",
+  "shape": "named",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_HEADERS"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream grpc-1.6",
+  "library": "gRPC",
+  "attribute": "rpc.grpc.request.metadata.<key> / rpc.grpc.response.metadata.<key>",
+  "key": "rpc.grpc.response.metadata.x-api-key",
+  "shape": "named",
+  "expect": "masked",
+  "variable": "DASH0_MASK_RESPONSE_HEADERS"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream aws-lambda-events-2.2 / core-1.0",
+  "library": "Lambda handler (API Gateway)",
+  "attribute": "url.full",
+  "key": "url.full",
+  "shape": "url",
+  "expect": "masked",
+  "variable": "DASH0_MASK_QUERY_PARAMS"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream aws-lambda-events",
+  "library": "Lambda handler (API Gateway)",
+  "attribute": "http.request.header.<name>",
+  "key": "http.request.header.authorization",
+  "shape": "named",
+  "expect": "masked",
+  "variable": "DASH0_MASK_REQUEST_HEADERS"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "Dash0 extension (not Java distro)",
+  "library": "Lambda runtime",
+  "attribute": "dash0_payload log records (event, return value)",
+  "key": "dash0_payload lambda_event",
+  "shape": "json",
+  "expect": "elsewhere",
+  "reason": "Lambda event and return value payload logs are masked when captured by the extension's runtime proxy, not by export-time payload masking"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "Dash0 extension (not Java distro)",
+  "library": "Lambda runtime",
+  "attribute": "dash0_payload log records (event, return value)",
+  "key": "dash0_payload lambda_return_value",
+  "shape": "json",
+  "expect": "elsewhere",
+  "reason": "Lambda event and return value payload logs are masked when captured by the extension's runtime proxy, not by export-time payload masking"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "Dash0 extension",
+  "library": "process",
+  "attribute": "process.environment_variable.*",
+  "key": "process.environment_variable.AWS_SECRET_ACCESS_KEY",
+  "shape": "json",
+  "expect": "elsewhere",
+  "reason": "environment variable resource attributes are masked by the extension's env-var masking, not by payload masking"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "all span producers",
+  "library": "OTel SDK",
+  "attribute": "span events: exception.message / exception.stacktrace",
+  "key": "exception.message",
+  "shape": "text",
+  "expect": "gap",
+  "reason": "free-form exception text; payload masking only touches payload attributes"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "all span producers",
+  "library": "OTel SDK",
+  "attribute": "span events: exception.message / exception.stacktrace",
+  "key": "exception.stacktrace",
+  "shape": "text",
+  "expect": "gap",
+  "reason": "free-form exception text; payload masking only touches payload attributes"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream logback/log4j appender instrumentations",
+  "library": "application logs",
+  "attribute": "log record body / attributes",
+  "key": "password",
+  "shape": "text",
+  "expect": "gap",
+  "reason": "application log attributes are not payload attributes; only map or JSON log bodies are masked, by key with DASH0_MASK_RULES"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "Dash0Configurator spandump",
+  "library": "FileSpanExporter (debug)",
+  "attribute": "all span attributes",
+  "key": "dash0.debug.spandump",
+  "shape": "json",
+  "expect": "elsewhere",
+  "reason": "local debug file written by the Java distro (masked there); never exported through the extension"
+ }
+]

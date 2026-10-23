@@ -1,0 +1,144 @@
+== defaults small_json changed=true inLen=116 outLen=112
+{"orderId":"42","email":"jane@example.com","password":"****","apiToken":"****","items":[{"sku":"last","qty":1}]}
+== defaults json_4k changed=true inLen=4111 outLen=4107
+{"orderId":"42","email":"jane@example.com","password":"****","apiToken":"****","items":[{"sku":"SKU-00000","qty":0,"note":"gift wrap"},{"sku":"SKU-00001","qty":1,"note":"gift wrap"},{"sku":"SKU-00002","qty":2,"note":"gift wrap"},{"sku":"SKU-00003","qty":3,"note":"gift wrap"},{"sku":"SKU-00004","qty" ... ,"qty":6,"note":"gift wrap"},{"sku":"SKU-00084","qty":0,"note":"gift wrap"},{"sku":"last","qty":1}]}
+== defaults truncated_json_4k changed=true inLen=4000 outLen=3993
+{"orderId":"42","email":"jane@example.com","password":"****","apiToken":"****","items":[{"sku":"SKU-00000","qty":0,"note":"gift wrap"},{"sku":"SKU-00001","qty":1,"note":"gift wrap"},{"sku":"SKU-00002","qty":2,"note":"gift wrap"},{"sku":"SKU-00003","qty":3,"note":"gift wrap"},{"sku":"SKU-00004","qty" ... },{"sku":"SKU-00081","qty":4,"note":"gift wrap"},{"sku":"SKU-00082","qty":5,"note":"gift wrap"},{}]}
+== defaults form_encoded changed=false inLen=51 outLen=51
+user=bob&password=hunter2&remember=1&csrf_token=abc
+== defaults non_matching_json_4k changed=false inLen=4118 outLen=4118
+{"orderId":"42","email":"jane@example.com","items":[{"sku":"SKU-00000","qty":0,"note":"gift wrap"},{"sku":"SKU-00001","qty":1,"note":"gift wrap"},{"sku":"SKU-00002","qty":2,"note":"gift wrap"},{"sku":"SKU-00003","qty":3,"note":"gift wrap"},{"sku":"SKU-00004","qty":4,"note":"gift wrap"},{"sku":"SKU-0 ... ,"qty":0,"note":"gift wrap"},{"sku":"SKU-00085","qty":1,"note":"gift wrap"},{"sku":"last","qty":1}]}
+== defaults plain_text changed=false inLen=32 outLen=32
+SET session:42 some-opaque-value
+== span defaults small_json limit=1024
+  gen_ai.usage.input_tokens = 12
+  http.method = POST
+  http.request.body = {"orderId":"42","email":"jane@example.com","password":"****","apiToken":"****","items":[{"sku":"last","qty":1}]}
+  http.request.header.authorization = [****]
+  http.request.header.content-type = [application/json]
+  http.request.header.user-agent = [node]
+  http.request.header.x-request-id = [r-1]
+  http.response.body = {"ok":true,"sessionToken":"****"}
+  http.response.header.content-type = [application/json]
+  http.response.header.set-cookie = [s=1]
+  http.response.header.x-amzn-requestid = [a-1]
+  http.status_code = 200
+  net.peer.name = api.example.com
+  url.full = https://api.example.com/v1/orders?api_key=****&page=2
+== span defaults small_json limit=2147483647
+  gen_ai.usage.input_tokens = 12
+  http.method = POST
+  http.request.body = {"orderId":"42","email":"jane@example.com","password":"****","apiToken":"****","items":[{"sku":"last","qty":1}]}
+  http.request.header.authorization = [****]
+  http.request.header.content-type = [application/json]
+  http.request.header.user-agent = [node]
+  http.request.header.x-request-id = [r-1]
+  http.response.body = {"ok":true,"sessionToken":"****"}
+  http.response.header.content-type = [application/json]
+  http.response.header.set-cookie = [s=1]
+  http.response.header.x-amzn-requestid = [a-1]
+  http.status_code = 200
+  net.peer.name = api.example.com
+  url.full = https://api.example.com/v1/orders?api_key=****&page=2
+== span defaults json_4k limit=1024
+  gen_ai.usage.input_tokens = 12
+  http.method = POST
+  http.request.body = {"orderId":"42","email":"jane@example.com","password":"****","apiToken":"****","items":[{"sku":"SKU-00000","qty":0,"note ... 8","qty":4,"note":"gift wrap"},{"sku":"SKU-00019","qty":5}]} [len 1010]
+  http.request.header.authorization = [****]
+  http.request.header.content-type = [application/json]
+  http.request.header.user-agent = [node]
+  http.request.header.x-request-id = [r-1]
+  http.response.body = {"ok":true,"sessionToken":"****"}
+  http.response.header.content-type = [application/json]
+  http.response.header.set-cookie = [s=1]
+  http.response.header.x-amzn-requestid = [a-1]
+  http.status_code = 200
+  net.peer.name = api.example.com
+  url.full = https://api.example.com/v1/orders?api_key=****&page=2
+== span defaults json_4k limit=2147483647
+  gen_ai.usage.input_tokens = 12
+  http.method = POST
+  http.request.body = {"orderId":"42","email":"jane@example.com","password":"****","apiToken":"****","items":[{"sku":"SKU-00000","qty":0,"note ... -00084","qty":0,"note":"gift wrap"},{"sku":"last","qty":1}]} [len 4107]
+  http.request.header.authorization = [****]
+  http.request.header.content-type = [application/json]
+  http.request.header.user-agent = [node]
+  http.request.header.x-request-id = [r-1]
+  http.response.body = {"ok":true,"sessionToken":"****"}
+  http.response.header.content-type = [application/json]
+  http.response.header.set-cookie = [s=1]
+  http.response.header.x-amzn-requestid = [a-1]
+  http.status_code = 200
+  net.peer.name = api.example.com
+  url.full = https://api.example.com/v1/orders?api_key=****&page=2
+== custom small_json changed=true inLen=116 outLen=104
+{"orderId":"42","email":"****","password":"hunter2","apiToken":"t-123","items":[{"sku":"last","qty":1}]}
+== custom json_4k changed=true inLen=4111 outLen=4099
+{"orderId":"42","email":"****","password":"hunter2","apiToken":"t-123","items":[{"sku":"SKU-00000","qty":0,"note":"gift wrap"},{"sku":"SKU-00001","qty":1,"note":"gift wrap"},{"sku":"SKU-00002","qty":2,"note":"gift wrap"},{"sku":"SKU-00003","qty":3,"note":"gift wrap"},{"sku":"SKU-00004","qty":4,"note ... ,"qty":6,"note":"gift wrap"},{"sku":"SKU-00084","qty":0,"note":"gift wrap"},{"sku":"last","qty":1}]}
+== custom truncated_json_4k changed=true inLen=4000 outLen=3985
+{"orderId":"42","email":"****","password":"hunter2","apiToken":"t-123","items":[{"sku":"SKU-00000","qty":0,"note":"gift wrap"},{"sku":"SKU-00001","qty":1,"note":"gift wrap"},{"sku":"SKU-00002","qty":2,"note":"gift wrap"},{"sku":"SKU-00003","qty":3,"note":"gift wrap"},{"sku":"SKU-00004","qty":4,"note ... },{"sku":"SKU-00081","qty":4,"note":"gift wrap"},{"sku":"SKU-00082","qty":5,"note":"gift wrap"},{}]}
+== custom form_encoded changed=false inLen=51 outLen=51
+user=bob&password=hunter2&remember=1&csrf_token=abc
+== custom non_matching_json_4k changed=true inLen=4118 outLen=4106
+{"orderId":"42","email":"****","items":[{"sku":"SKU-00000","qty":0,"note":"gift wrap"},{"sku":"SKU-00001","qty":1,"note":"gift wrap"},{"sku":"SKU-00002","qty":2,"note":"gift wrap"},{"sku":"SKU-00003","qty":3,"note":"gift wrap"},{"sku":"SKU-00004","qty":4,"note":"gift wrap"},{"sku":"SKU-00005","qty": ... ,"qty":0,"note":"gift wrap"},{"sku":"SKU-00085","qty":1,"note":"gift wrap"},{"sku":"last","qty":1}]}
+== custom plain_text changed=false inLen=32 outLen=32
+SET session:42 some-opaque-value
+== span custom small_json limit=1024
+  gen_ai.usage.input_tokens = 12
+  http.method = POST
+  http.request.body = {"orderId":"42","email":"****","password":"hunter2","apiToken":"t-123","items":[{"sku":"last","qty":1}]}
+  http.request.header.authorization = [Bearer abc]
+  http.request.header.content-type = [application/json]
+  http.request.header.user-agent = [node]
+  http.request.header.x-request-id = [r-1]
+  http.response.body = {"ok":true,"sessionToken":"s-1"}
+  http.response.header.content-type = [application/json]
+  http.response.header.set-cookie = [s=1]
+  http.response.header.x-amzn-requestid = [a-1]
+  http.status_code = 200
+  net.peer.name = api.example.com
+  url.full = https://api.example.com/v1/orders?api_key=k-1&page=2
+== span custom small_json limit=2147483647
+  gen_ai.usage.input_tokens = 12
+  http.method = POST
+  http.request.body = {"orderId":"42","email":"****","password":"hunter2","apiToken":"t-123","items":[{"sku":"last","qty":1}]}
+  http.request.header.authorization = [Bearer abc]
+  http.request.header.content-type = [application/json]
+  http.request.header.user-agent = [node]
+  http.request.header.x-request-id = [r-1]
+  http.response.body = {"ok":true,"sessionToken":"s-1"}
+  http.response.header.content-type = [application/json]
+  http.response.header.set-cookie = [s=1]
+  http.response.header.x-amzn-requestid = [a-1]
+  http.status_code = 200
+  net.peer.name = api.example.com
+  url.full = https://api.example.com/v1/orders?api_key=k-1&page=2
+== span custom json_4k limit=1024
+  gen_ai.usage.input_tokens = 12
+  http.method = POST
+  http.request.body = {"orderId":"42","email":"****","password":"hunter2","apiToken":"t-123","items":[{"sku":"SKU-00000","qty":0,"note":"gift  ... 8","qty":4,"note":"gift wrap"},{"sku":"SKU-00019","qty":5}]} [len 1002]
+  http.request.header.authorization = [Bearer abc]
+  http.request.header.content-type = [application/json]
+  http.request.header.user-agent = [node]
+  http.request.header.x-request-id = [r-1]
+  http.response.body = {"ok":true,"sessionToken":"s-1"}
+  http.response.header.content-type = [application/json]
+  http.response.header.set-cookie = [s=1]
+  http.response.header.x-amzn-requestid = [a-1]
+  http.status_code = 200
+  net.peer.name = api.example.com
+  url.full = https://api.example.com/v1/orders?api_key=k-1&page=2
+== span custom json_4k limit=2147483647
+  gen_ai.usage.input_tokens = 12
+  http.method = POST
+  http.request.body = {"orderId":"42","email":"****","password":"hunter2","apiToken":"t-123","items":[{"sku":"SKU-00000","qty":0,"note":"gift  ... -00084","qty":0,"note":"gift wrap"},{"sku":"last","qty":1}]} [len 4099]
+  http.request.header.authorization = [Bearer abc]
+  http.request.header.content-type = [application/json]
+  http.request.header.user-agent = [node]
+  http.request.header.x-request-id = [r-1]
+  http.response.body = {"ok":true,"sessionToken":"s-1"}
+  http.response.header.content-type = [application/json]
+  http.response.header.set-cookie = [s=1]
+  http.response.header.x-amzn-requestid = [a-1]
+  http.status_code = 200
+  net.peer.name = api.example.com
+  url.full = https://api.example.com/v1/orders?api_key=k-1&page=2

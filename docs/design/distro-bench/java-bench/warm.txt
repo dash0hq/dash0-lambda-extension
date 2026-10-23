@@ -1,0 +1,36 @@
+### defaults
+| case                                         |     p50 ns |     p99 ns |   bytes/op |
+|---|---:|---:|---:|
+| payload small_json (http.request.body, maskJson) |        688 |       9618 |       1568 |
+| payload json_4k (http.request.body, maskJson) |      14708 |      53291 |      23160 |
+| payload truncated_json_4k (http.request.body, maskJson) |      14417 |      21042 |      23456 |
+| payload form_encoded (http.request.body, maskJson) |        862 |       1095 |       2512 |
+| payload non_matching_json_4k (http.request.body, maskJson) |      13125 |      17417 |      19176 |
+| payload plain_text (http.request.body, maskJson) |        811 |       1212 |       2512 |
+| url.full query (maskUrl)                     |        497 |        793 |        790 |
+| span small_json (distro limit 1024)          |       1742 |       2604 |       5784 |
+| invocation 20x small_json (distro limit 1024) |      35791 |      54417 |     115776 |
+| span small_json (no length limit)            |       1552 |       2198 |       5760 |
+| invocation 20x small_json (no length limit)  |      32541 |      47625 |     115296 |
+| span json_4k (distro limit 1024)             |       5069 |       7500 |      11520 |
+| invocation 20x json_4k (distro limit 1024)   |     102167 |     146167 |     230496 |
+| span json_4k (no length limit)               |      14833 |      21084 |      27352 |
+| invocation 20x json_4k (no length limit)     |     308750 |    1036958 |     547136 |
+### custom
+| case                                         |     p50 ns |     p99 ns |   bytes/op |
+|---|---:|---:|---:|
+| payload small_json (http.request.body, maskJson) |        672 |       1262 |       1600 |
+| payload json_4k (http.request.body, maskJson) |      12958 |      17750 |      23192 |
+| payload truncated_json_4k (http.request.body, maskJson) |      13000 |      18875 |      23488 |
+| payload form_encoded (http.request.body, maskJson) |        844 |       1112 |       2512 |
+| payload non_matching_json_4k (http.request.body, maskJson) |      13125 |      21167 |      23272 |
+| payload plain_text (http.request.body, maskJson) |        816 |       1116 |       2512 |
+| url.full query (maskUrl)                     |        371 |        495 |        476 |
+| span small_json (distro limit 1024)          |       1486 |       2181 |       5088 |
+| invocation 20x small_json (distro limit 1024) |      30541 |      45250 |     101856 |
+| span small_json (no length limit)            |       1462 |       2183 |       5064 |
+| invocation 20x small_json (no length limit)  |      29792 |      59000 |     101376 |
+| span json_4k (distro limit 1024)             |       4930 |       7945 |      10824 |
+| invocation 20x json_4k (distro limit 1024)   |      99458 |     160875 |     216576 |
+| span json_4k (no length limit)               |      14208 |      25667 |      26656 |
+| invocation 20x json_4k (no length limit)     |     290042 |     356875 |     533216 |

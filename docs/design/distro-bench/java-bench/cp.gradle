@@ -1,0 +1,10 @@
+allprojects {
+  if (name == 'custom') {
+    afterEvaluate {
+      tasks.register('printBenchCp') {
+        dependsOn 'testClasses'
+        doLast { new File(System.getenv('CP_OUT')).text = sourceSets.test.runtimeClasspath.asPath }
+      }
+    }
+  }
+}

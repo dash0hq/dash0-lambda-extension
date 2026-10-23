@@ -21,10 +21,11 @@ pub async fn traces(req: Request<Incoming>) -> Result<Response<ResBody>, hyper::
     let mut invocation_ids: Vec<String> = Vec::new();
     let mut converted_from_json = false;
 
+    // Sizes only: the body is unmasked until export.
     tracing::trace!(
-        "[{}] /v1/traces body: {}",
+        "[{}] /v1/traces body: {} bytes",
         crate::log_prefix(),
-        String::from_utf8_lossy(&encoded_body)
+        encoded_body.len()
     );
 
     match ExportTraceServiceRequest::decode(body_bytes.as_ref()) {
