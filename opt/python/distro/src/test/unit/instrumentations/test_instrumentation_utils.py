@@ -51,3 +51,30 @@ def test_add_body_attribute_non_string_or_bytes():
     add_body_attribute(span_mock, None, "attribute")
     assert len(span_mock.set_attribute.call_args_list) == 1
     assert span_mock.set_attribute.call_args_list[0][0] == ("attribute", "None")
+
+
+def test_add_body_attribute_non_utf8_binary_with_all(monkeypatch):
+    monkeypatch.setenv("LUMIGO_SECRET_MASKING_REGEX_HTTP_REQUEST_BODIES", "all")
+    span_mock = Mock(Span)
+    add_body_attribute(span_mock, b"\x80\x81\x82", "attribute", "requestBody")
+    assert span_mock.set_attribute.call_args_list[0][0] == ("attribute", '"****"')
+
+
+def test_add_body_attribute_masks_json_text_by_key():
+    span_mock = Mock(Span)
+    add_body_attribute(
+        span_mock, b'{"password": "pw", "id": 1}', "attribute", "requestBody"
+    )
+    assert span_mock.set_attribute.call_args_list[0][0] == (
+        "attribute",
+        '{"password": "****", "id": 1}',
+    )
+
+
+def test_add_body_attribute_masks_objects_by_key():
+    span_mock = Mock(Span)
+    add_body_attribute(span_mock, {"apiKey": "k", "id": 1}, "attribute", "responseBody")
+    assert span_mock.set_attribute.call_args_list[0][0] == (
+        "attribute",
+        '{"apiKey": "****", "id": 1}',
+    )

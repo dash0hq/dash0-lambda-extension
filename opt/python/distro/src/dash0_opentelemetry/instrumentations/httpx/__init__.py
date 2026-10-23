@@ -27,7 +27,7 @@ class HttpxInstrumentorWrapper(AbstractInstrumentor):
                     "http.request.headers",
                     dump_with_context("requestHeaders", dict(headers)),
                 )
-                add_body_attribute(span, body, "http.request.body")
+                add_body_attribute(span, body, "http.request.body", "requestBody")
                 request = (method, url, headers, httpx.ByteStream(body), extensions)
                 return request
 

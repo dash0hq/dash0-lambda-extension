@@ -19,11 +19,12 @@ class PikaInstrumentor(AbstractInstrumentor):
 
         def publish_hook(span: Span, body: bytes, properties: BasicProperties) -> None:
             with dash0_safe_execute("pika_publish_hook"):
-                add_body_attribute(span, body, "messaging.publish.body")
+                # The Node distro masks published messages with the query-parameter rules.
+                add_body_attribute(span, body, "messaging.publish.body", "queryParams")
 
         def consume_hook(span: Span, body: bytes, properties: BasicProperties) -> None:
             with dash0_safe_execute("pika_consume_hook"):
-                add_body_attribute(span, body, "messaging.consume.body")
+                add_body_attribute(span, body, "messaging.consume.body", "responseBody")
 
         PikaInstrumentor().instrument(
             publish_hook=publish_hook,

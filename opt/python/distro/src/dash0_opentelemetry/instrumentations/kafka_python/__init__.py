@@ -25,13 +25,16 @@ class KafkaPythonInstrumentor(AbstractInstrumentor):
                 value = kwargs.get("value")
                 if value is None and len(args) > 1:
                     value = args[1]
-                add_body_attribute(span, value, "messaging.produce.body")
+                # The Node distro masks sent messages with the query-parameter rules.
+                add_body_attribute(span, value, "messaging.produce.body", "queryParams")
 
         def _consume_hook(
             span: Span, record: ABCRecord, args: List[Any], kwargs: Dict[Any, Any]
         ) -> None:
             with dash0_safe_execute("kafka _consume_hook"):
-                add_body_attribute(span, record.value, "messaging.consume.body")
+                add_body_attribute(
+                    span, record.value, "messaging.consume.body", "responseBody"
+                )
 
         KafkaInstrumentor().instrument(
             produce_hook=_produce_hook, consume_hook=_consume_hook

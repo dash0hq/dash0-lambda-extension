@@ -1,2 +1,14 @@
 -r requirements.txt
 pytest
+# Frameworks the masking scenarios in src/test/unit/masking drive
+boto3
+django
+fastapi
+flask
+grpcio
+httpx
+kafka-python
+pika
+psycopg2-binary
+redis
+requests
