@@ -5,8 +5,10 @@ boto3
 django
 fastapi
 flask
+grpcio
 httpx
 kafka-python
 pika
+psycopg2-binary
 redis
 requests
