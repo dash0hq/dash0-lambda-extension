@@ -50,6 +50,9 @@ const verifySuccessInvocation = async (functionName: string, invocationEnd: bool
         // The extension leaves severity unset for unprefixed lines; the backend infers
         // ERROR (17) from the JSON `level` field but sets only the number, not the text.
         { message: JSON.stringify({ jsonSeverity: "inferred" }), isJson: true, severity: "", severityNumber: 17 },
+        // console.error's ERROR prefix wins over the JSON `level: "info"`, matching how
+        // CloudWatch classifies the line.
+        { message: JSON.stringify({ consoleMethod: "error" }), isJson: true, severity: "error", severityNumber: 17 },
         { message: 'END RequestId: ' },
         { message: JSON.stringify({ name: "dash0_payload", type: "lambda_event", message: { parameter1: "right", masked_field: "****" } }), isJson: true, attributes: { "dash0.faas.payload_type": "lambda_event" } },
         { message: JSON.stringify({ name: "dash0_payload", type: "lambda_return_value", message: { statusCode: 200 } }), isJson: true, attributes: { "dash0.faas.payload_type": "lambda_return_value" } },

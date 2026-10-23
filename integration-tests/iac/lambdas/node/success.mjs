@@ -33,6 +33,8 @@ export async function handler(event) {
     console.log(JSON.stringify({ jsonLog: true, value: "parsed" }));
     // Raw stdout skips the Node runtime's level prefix, so only the JSON `level` field carries severity.
     process.stdout.write(JSON.stringify({ level: "error", jsonSeverity: "inferred" }) + "\n");
+    // The console method sets the level (as CloudWatch shows it); a JSON `level` inside is ignored.
+    console.error(JSON.stringify({ level: "info", consoleMethod: "error" }));
 
     return {
         statusCode: 200,
