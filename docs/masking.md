@@ -28,6 +28,7 @@ Masking of the Lambda event, the return value and environment variables is done 
 - [Invalid values](#invalid-values)
 - [Payloads that are strings](#payloads-that-are-strings)
 - [Payloads that are not masked](#payloads-that-are-not-masked)
+- [Masking in the extension (experimental)](#masking-in-the-extension-experimental)
 
 ## How masking works
 
@@ -802,3 +803,40 @@ Nothing the auto-instrumentation captures is masked. That includes:
 - JDBC results
 
 If these can contain sensitive data, turn off auto-instrumentation for the function with `DASH0_DISABLE_AUTO_INSTRUMENTATION=true`. The extension still masks the Lambda event, the return value and environment variables. In Python, you can also turn off single instrumentations with `DASH0_DISABLE_INSTRUMENTATION=<names>`, or only gRPC payloads with `DASH0_INSTRUMENT_GRPC_PAYLOADS=false`.
+
+## Masking in the extension (experimental)
+
+> **Node.js** ✅ · **Python** ✅ · **Java** ✅ — only with `DASH0_MASK_IN_EXTENSION=true`
+
+```bash
+DASH0_MASK_IN_EXTENSION=true
+```
+
+The extension applies the same variables to the span attributes and log records it exports, in every runtime. It masks after your function has responded, so it adds no latency to the response. The language distros keep masking too; a value they already masked stays `"****"`.
+
+Differences from the per-runtime behaviour above:
+
+- **Bodies cut off by the attribute length limit are masked.** A key whose value was cut is masked up to the cut.
+- **Form-encoded bodies are masked by field name**, not only by `all`.
+- **Query strings in URLs are masked by parameter name** in `url.full`, `http.url`, `http.target` and `url.query`. With `DASH0_MASK_QUERY_PARAMS=all`, the query string is replaced and the rest of the URL kept.
+- **Per-header attributes** such as `http.request.header.authorization` are masked by the header name.
+- **Key order and numbers are kept**; only the masked values change.
+- **`[]`** turns masking off for that payload type. **`all`** in `DASH0_MASK_RULES` applies to every payload type that has no variable of its own set.
+- **OTLP log records** sent to the extension are masked too: payload attributes as on spans, and map or JSON bodies by key with `DASH0_MASK_RULES`.
+
+`url.full`, default patterns:
+
+```diff
+-https://h/p?token=XQZSECRET&email=jane&page=1
++https://h/p?token=****&email=jane&page=1
+```
+
+`http.response.body` cut off by the attribute limit, default patterns:
+
+```diff
+-{"email":"jane","sessionToken":"XQZSECRET
++{"email":"jane","sessionToken":"****"
+```
+
+Still not masked with this setting: exception messages and stack traces, LLM prompts and completions, SQL statements and query parameters, `messaging.header.*`, credentials in connection URLs, and function output to stdout.
+

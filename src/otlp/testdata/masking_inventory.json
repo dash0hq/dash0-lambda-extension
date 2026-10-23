@@ -1,0 +1,439 @@
+[
+ {
+  "runtime": "node",
+  "instrumentation": "http (Dash0 hooks on @opentelemetry/instrumentation-http 0.219.0)",
+  "key": "http.request.headers",
+  "variable": "DASH0_MASK_REQUEST_HEADERS",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "http",
+  "key": "http.request.body",
+  "variable": "DASH0_MASK_REQUEST_BODY",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "http",
+  "key": "http.response.headers",
+  "variable": "DASH0_MASK_RESPONSE_HEADERS",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "http",
+  "key": "http.response.body",
+  "variable": "DASH0_MASK_RESPONSE_BODY",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@opentelemetry/instrumentation-http 0.219.0 (old semconv default)",
+  "key": "http.url",
+  "variable": "DASH0_MASK_QUERY_PARAMS",
+  "shape": "url",
+  "expect": "masked"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@opentelemetry/instrumentation-http 0.219.0",
+  "key": "http.target",
+  "variable": "DASH0_MASK_QUERY_PARAMS",
+  "shape": "target",
+  "expect": "masked"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@opentelemetry/instrumentation-undici 0.29.0",
+  "key": "url.full",
+  "variable": "DASH0_MASK_QUERY_PARAMS",
+  "shape": "url",
+  "expect": "masked"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@opentelemetry/instrumentation-undici 0.29.0",
+  "key": "url.query",
+  "variable": "DASH0_MASK_QUERY_PARAMS",
+  "shape": "query",
+  "expect": "masked"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "express (Dash0 requestHook on opentelemetry-instrumentation-express 0.41.0)",
+  "key": "http.request.query",
+  "variable": "DASH0_MASK_QUERY_PARAMS",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "aws-sdk (Dash0 preRequestHook on forked @opentelemetry/instrumentation-aws-sdk)",
+  "key": "messaging.publish.body",
+  "variable": "DASH0_MASK_REQUEST_BODY",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "aws-sdk",
+  "key": "messaging.consume.body",
+  "variable": "DASH0_MASK_RESPONSE_BODY",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "kafkajs (Dash0 producerHook on opentelemetry-instrumentation-kafkajs 0.41.0)",
+  "key": "messaging.produce.body",
+  "variable": "DASH0_MASK_QUERY_PARAMS",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "redis (Dash0 dbStatementSerializer on @opentelemetry/instrumentation-redis-4 0.49.0)",
+  "key": "db.statement",
+  "variable": "DASH0_MASK_REQUEST_BODY",
+  "shape": "redis",
+  "expect": "masked"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "redis",
+  "key": "db.response.body",
+  "variable": "DASH0_MASK_RESPONSE_BODY",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@grpc/grpc-js (Dash0 wrapClient on @opentelemetry/instrumentation-grpc 0.219.0)",
+  "key": "rpc.request.payload",
+  "variable": "DASH0_MASK_REQUEST_BODY",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "@grpc/grpc-js client",
+  "key": "rpc.response.payload",
+  "variable": "DASH0_MASK_RESPONSE_BODY",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "extension (API Gateway / ALB)",
+  "key": "http.request.header.authorization",
+  "variable": "DASH0_MASK_REQUEST_HEADERS",
+  "shape": "named",
+  "expect": "masked"
+ },
+ {
+  "runtime": "node",
+  "instrumentation": "extension (API Gateway / ALB)",
+  "key": "http.response.header.x-api-key",
+  "variable": "DASH0_MASK_RESPONSE_HEADERS",
+  "shape": "named",
+  "expect": "masked"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "flask",
+  "key": "http.request.query",
+  "variable": "DASH0_MASK_QUERY_PARAMS",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "flask",
+  "key": "http.request.headers",
+  "variable": "DASH0_MASK_REQUEST_HEADERS",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "flask",
+  "key": "http.response.headers",
+  "variable": "DASH0_MASK_RESPONSE_HEADERS",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "flask (upstream wsgi)",
+  "key": "http.target",
+  "variable": "DASH0_MASK_QUERY_PARAMS",
+  "shape": "target",
+  "expect": "masked"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "flask (upstream wsgi)",
+  "key": "http.url",
+  "variable": "DASH0_MASK_QUERY_PARAMS",
+  "shape": "url",
+  "expect": "masked"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "django",
+  "key": "http.request.body",
+  "variable": "DASH0_MASK_REQUEST_BODY",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "django",
+  "key": "http.response.body",
+  "variable": "DASH0_MASK_RESPONSE_BODY",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "flask, django, fastapi (upstream, OTEL_SEMCONV_STABILITY_OPT_IN=http|http/dup)",
+  "key": "url.query",
+  "variable": "DASH0_MASK_QUERY_PARAMS",
+  "shape": "query",
+  "expect": "masked"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "flask, django, fastapi (upstream)",
+  "key": "http.request.header.authorization",
+  "variable": "DASH0_MASK_REQUEST_HEADERS",
+  "shape": "named",
+  "expect": "masked"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "flask, django, fastapi (upstream)",
+  "key": "http.response.header.x-api-key",
+  "variable": "DASH0_MASK_RESPONSE_HEADERS",
+  "shape": "named",
+  "expect": "masked"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "botocore (SqsParser)",
+  "key": "messaging.publish.body",
+  "variable": "DASH0_MASK_REQUEST_BODY",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "botocore (SqsParser)",
+  "key": "messaging.consume.body",
+  "variable": "DASH0_MASK_RESPONSE_BODY",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "kafka_python",
+  "key": "messaging.produce.body",
+  "variable": "DASH0_MASK_QUERY_PARAMS",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "redis",
+  "key": "db.statement",
+  "variable": "DASH0_MASK_REQUEST_BODY",
+  "shape": "redis",
+  "expect": "masked"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "redis",
+  "key": "db.response.body",
+  "variable": "DASH0_MASK_RESPONSE_BODY",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "pymongo",
+  "key": "db.request.body",
+  "variable": "DASH0_MASK_REQUEST_BODY",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "grpcio (client)",
+  "key": "rpc.grpc.request.payload",
+  "variable": "DASH0_MASK_REQUEST_BODY",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "python",
+  "instrumentation": "grpcio (client)",
+  "key": "rpc.grpc.response.payload",
+  "variable": "DASH0_MASK_RESPONSE_BODY",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0-java-http-client (java11)",
+  "key": "http.request.body",
+  "variable": "DASH0_MASK_REQUEST_BODY",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0-java-http-client (java11)",
+  "key": "http.response.body",
+  "variable": "DASH0_MASK_RESPONSE_BODY",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0-java-http-client (java11)",
+  "key": "url.full",
+  "variable": "DASH0_MASK_QUERY_PARAMS",
+  "shape": "url",
+  "expect": "masked"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0-java-http-client (java11)",
+  "key": "http.request.header.authorization",
+  "variable": "DASH0_MASK_REQUEST_HEADERS",
+  "shape": "named",
+  "expect": "masked"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0-java-http-client (java11)",
+  "key": "http.response.header.x-api-key",
+  "variable": "DASH0_MASK_RESPONSE_HEADERS",
+  "shape": "named",
+  "expect": "masked"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream servlet / netty / spring / Lambda API Gateway",
+  "key": "url.query",
+  "variable": "DASH0_MASK_QUERY_PARAMS",
+  "shape": "query",
+  "expect": "masked"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 aws-sdk-2.2 SqsImpl",
+  "key": "messaging.message.body",
+  "variable": "DASH0_MASK_RESPONSE_BODY",
+  "shape": "json",
+  "expect": "gap",
+  "reason": "direction (send vs receive) is not in the attribute key; the extension does not guess"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 kafka-clients-0.11",
+  "key": "messaging.message.payload",
+  "variable": "DASH0_MASK_QUERY_PARAMS",
+  "shape": "json",
+  "expect": "gap",
+  "reason": "direction (send vs receive) is not in the attribute key; the extension does not guess"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 kafka-clients-0.11",
+  "key": "messaging.message.headers",
+  "variable": "DASH0_MASK_QUERY_PARAMS",
+  "shape": "json",
+  "expect": "gap",
+  "reason": "direction (send vs receive) is not in the attribute key; the extension does not guess"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 kafka-clients-0.11",
+  "key": "messaging.message.payload",
+  "variable": "DASH0_MASK_RESPONSE_BODY",
+  "shape": "json",
+  "expect": "gap",
+  "reason": "direction (send vs receive) is not in the attribute key; the extension does not guess"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 kafka-clients-0.11",
+  "key": "messaging.message.headers",
+  "variable": "DASH0_MASK_RESPONSE_BODY",
+  "shape": "json",
+  "expect": "gap",
+  "reason": "direction (send vs receive) is not in the attribute key; the extension does not guess"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 lettuce-5.1 (fork; upstream disabled)",
+  "key": "db.statement",
+  "variable": "DASH0_MASK_REQUEST_BODY",
+  "shape": "redis",
+  "expect": "masked"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 lettuce-5.1",
+  "key": "db.response.body",
+  "variable": "DASH0_MASK_RESPONSE_BODY",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream jedis-1.4/3.0/4.0 (sanitizer disabled by dash0)",
+  "key": "db.query.text",
+  "variable": "DASH0_MASK_REQUEST_BODY",
+  "shape": "redis",
+  "expect": "masked"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 grpc-1.6",
+  "key": "rpc.grpc.request.payload",
+  "variable": "DASH0_MASK_REQUEST_BODY",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "dash0 grpc-1.6",
+  "key": "rpc.grpc.response.payload",
+  "variable": "DASH0_MASK_RESPONSE_BODY",
+  "shape": "json",
+  "expect": "masked"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream grpc-1.6",
+  "key": "rpc.grpc.request.metadata.authorization",
+  "variable": "DASH0_MASK_REQUEST_HEADERS",
+  "shape": "named",
+  "expect": "masked"
+ },
+ {
+  "runtime": "java",
+  "instrumentation": "upstream grpc-1.6",
+  "key": "rpc.grpc.response.metadata.x-api-key",
+  "variable": "DASH0_MASK_RESPONSE_HEADERS",
+  "shape": "named",
+  "expect": "masked"
+ }
+]

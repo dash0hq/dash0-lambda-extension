@@ -55,4 +55,6 @@ This covers any of:
 - the wrapper mapping: `map_masking_env` in `opt/shared.sh`
 - what a distro captures or how it masks it: the instrumentations under `opt/node/distro`, `opt/python/distro` and `opt/java`
 
+Extension-side payload masking (`DASH0_MASK_IN_EXTENSION`, `src/otlp/payload_masking.rs`) runs in the export builders in `src/otlp/exporter.rs`, never in the receivers: the distros' `forceFlush` waits for `/v1/traces` to return, so receive-time work delays the function's response. Its attribute table is tested against `src/otlp/testdata/masking_inventory.json`, generated from the per-distro attribute inventory. When a distro starts capturing a new payload attribute, add it there. `tests/masking_e2e.rs` runs the binary against a fake Lambda API; `cargo bench --bench masking` measures the cost.
+
 Generate the examples by running the real code, not by hand. Use `opt/node/test/masking-env.test.ts` for Node.js and `opt/test/shared.test.sh` for the wrapper. Keep the default patterns in `src/otlp/masking.rs`, `opt/shared.sh` and the README identical.
