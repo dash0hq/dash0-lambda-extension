@@ -6,6 +6,7 @@
     "benchmark": "npx tsx run-benchmark.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-cloudwatch-logs": "^3.1154.0",
     "@aws-sdk/client-lambda": "^3.943.0"
   },
   "devDependencies": {

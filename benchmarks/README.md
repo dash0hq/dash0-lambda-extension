@@ -49,3 +49,17 @@ npx cdk destroy --force
 ## Results
 
 Results are saved as JSON in `results/`. The script also prints a comparison table to stdout showing init duration and memory overhead per runtime.
+
+## Masking benchmark (distro vs extension)
+
+`iac/lib/masking-benchmark-stack.ts` and `scripts/run-masking-benchmark.ts` compare where secret masking runs: in the language distro, or in the extension (`DASH0_MASK_IN_EXTENSION=true`). Node.js 22, Python 3.13 and Java 21, arm64, at 128, 512 and 1024 MB. Each function makes five HTTP POSTs with ~4 KB JSON bodies to a sink Function URL in the same stack, which also receives the extension's OTLP export and logs how many secrets reach it. Results and method: [`docs/design/central-masking-aws-benchmark.md`](../docs/design/central-masking-aws-benchmark.md).
+
+```bash
+export RESOURCE_PREFIX=cmask-bench-
+# Publish one layer per runtime (make build/layer-dash0-<rt>.zip, then aws lambda publish-layer-version)
+export MASKING_LAYER_NODE=<arn> MASKING_LAYER_PYTHON=<arn> MASKING_LAYER_JAVA=<arn>
+cd benchmarks/iac && npx cdk deploy --app "npx ts-node --prefer-ts-exts bin/masking-benchmark.ts"
+cd ../scripts && npx tsx run-masking-benchmark.ts           # COLD_START_INVOCATIONS, WARM_INVOCATIONS
+npx tsx run-masking-benchmark.ts ../results/<file>.json      # print the tables again
+cd ../iac && npx cdk destroy --app "npx ts-node --prefer-ts-exts bin/masking-benchmark.ts" --force
+```
