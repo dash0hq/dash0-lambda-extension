@@ -172,6 +172,67 @@ fn severity_text_to_number(severity: &str) -> i32 {
     }
 }
 
+// Ordered from explicit telemetry conventions to common logging-library names.
+// `level` is also the field AWS emits for Lambda's JSON log format.
+const STRUCTURED_SEVERITY_FIELDS: &[&str] = &[
+    "severityText",
+    "severity_text",
+    "log.level",
+    "level",
+    "severity",
+    "logLevel",
+    "log_level",
+];
+
+fn structured_severity_from_object(
+    record: &serde_json::Map<String, serde_json::Value>,
+) -> Option<String> {
+    let recognized_severity = |value: Option<&serde_json::Value>| {
+        value
+            .and_then(serde_json::Value::as_str)
+            .map(str::trim)
+            .filter(|severity| severity_text_to_number(severity) != 0)
+            .map(str::to_string)
+    };
+
+    for field in STRUCTURED_SEVERITY_FIELDS {
+        if let Some(severity) = recognized_severity(record.get(*field)) {
+            return Some(severity);
+        }
+
+        // ECS-compatible JSON can represent `log.level` either as a flat dotted
+        // key or as nested objects. An invalid flat value must not hide a valid
+        // nested one.
+        if *field == "log.level" {
+            let nested_level = record
+                .get("log")
+                .and_then(serde_json::Value::as_object)
+                .and_then(|log| log.get("level"));
+            if let Some(severity) = recognized_severity(nested_level) {
+                return Some(severity);
+            }
+        }
+    }
+    None
+}
+
+/// Derives severity from JSON records delivered as objects by current Lambda
+/// Telemetry API schemas or as strings by older schemas.
+fn parse_structured_log_severity(record: &serde_json::Value) -> Option<String> {
+    match record {
+        serde_json::Value::Object(record) => structured_severity_from_object(record),
+        serde_json::Value::String(message) if message.trim_start().starts_with('{') => {
+            serde_json::from_str::<serde_json::Value>(message)
+                .ok()
+                .and_then(|value| match value {
+                    serde_json::Value::Object(record) => structured_severity_from_object(&record),
+                    _ => None,
+                })
+        }
+        _ => None,
+    }
+}
+
 /// Dash0 rejects log records whose string body exceeds 1 MiB, so a payload
 /// log body must never grow past this, wrapper and JSON escaping included.
 pub const MAX_LOG_BODY_BYTES: usize = 1024 * 1024;
@@ -293,6 +354,7 @@ pub fn map_logs_to_otlp(logs: &[TelemetryLog]) -> Vec<LogRecord> {
         let body_message = if log.r#type == "function" {
             match &log.record {
                 serde_json::Value::String(s) => Some(s.clone()),
+                serde_json::Value::Object(_) => Some(log.record.to_string()),
                 _ => None,
             }
         } else if log.r#type == "platform.report" {
@@ -400,12 +462,13 @@ pub fn map_logs_to_otlp(logs: &[TelemetryLog]) -> Vec<LogRecord> {
         }
 
         // Platform logs and dash0_payload logs are synthetic entries emitted by the
-        // extension itself, so INFO is accurate for them. For actual user log
-        // lines, only set a severity when we could parse one from the message;
-        // otherwise leave it unset (UNSPECIFIED / empty text) rather than
-        // guessing INFO.
+        // extension itself, so INFO is accurate for them. For actual user logs,
+        // prefer structured metadata before trying the runtime text formats.
+        // Otherwise leave severity unset rather than guessing INFO.
         let severity: Option<String> = if is_platform_log || is_dash0_payload_log {
             Some("INFO".to_string())
+        } else if let Some(severity) = parse_structured_log_severity(&log.record) {
+            Some(severity)
         } else if let Some((sev, body)) = parse_node_lambda_log_message(&body_message)
             .or_else(|| parse_python_lambda_log_message(&body_message))
         {
@@ -595,11 +658,11 @@ mod tests {
     }
 
     #[test]
-    fn test_map_logs_ignores_non_string_record() {
+    fn test_map_logs_ignores_unsupported_record_shape() {
         let logs = vec![TelemetryLog {
             time: "2023-10-26T12:00:00.000Z".to_string(),
             r#type: "function".to_string(),
-            record: json!({"foo": "bar"}), // Object instead of string
+            record: json!(["array", "record"]),
             invocation_id: Some("inv-123".to_string()),
             trace_id: None,
             span_id: None,
@@ -1419,15 +1482,15 @@ mod tests {
     #[test]
     fn test_dash0_payload_log_has_info_severity() {
         // dash0_payload logs (built via build_payload_log) are synthetic entries the
-        // extension generates itself; they never carry a Lambda-runtime severity
-        // prefix, but they should still be reported as INFO rather than unset.
+        // extension generates itself; they remain INFO even if their captured payload
+        // contains structured severity metadata.
         let logs = vec![TelemetryLog {
             time: "2026-03-02T11:53:38.040Z".to_string(),
             r#type: "function".to_string(),
             record: json!(serde_json::json!({
                 "name": "dash0_payload",
                 "type": "lambda_event",
-                "message": {"foo": "bar"},
+                "message": {"level": "ERROR"},
             })
             .to_string()),
             invocation_id: Some("inv-payload".to_string()),
@@ -1476,13 +1539,13 @@ mod tests {
         assert_eq!(body, "just a plain log message");
     }
 
-    /// Runs a single "function" log body through `map_logs_to_otlp` and returns the
-    /// resulting (severity_number, severity_text).
-    fn severity_for_body(body: &str) -> (i32, String) {
+    /// Runs a single "function" log record through `map_logs_to_otlp` and returns
+    /// the resulting severity and string body.
+    fn severity_for_record(record: serde_json::Value) -> (i32, String, String) {
         let logs = vec![TelemetryLog {
             time: "2026-03-02T11:53:38.040Z".to_string(),
             r#type: "function".to_string(),
-            record: json!(body),
+            record,
             invocation_id: Some("inv-table".to_string()),
             trace_id: None,
             span_id: None,
@@ -1490,7 +1553,16 @@ mod tests {
         }];
         let result = map_logs_to_otlp(&logs);
         assert_eq!(result.len(), 1);
-        (result[0].severity_number, result[0].severity_text.clone())
+        (
+            result[0].severity_number,
+            result[0].severity_text.clone(),
+            get_string_value(&result[0].body).expect("log body should be a string"),
+        )
+    }
+
+    fn severity_for_body(body: &str) -> (i32, String) {
+        let (number, text, _) = severity_for_record(json!(body));
+        (number, text)
     }
 
     const KNOWN_LEVELS: &[(&str, i32)] = &[
@@ -1503,6 +1575,115 @@ mod tests {
         ("FATAL", 21),
         ("CRITICAL", 21),
     ];
+
+    #[test]
+    fn test_structured_severity_fields() {
+        let cases = [
+            (json!({"level": "error", "message": "aws"}), "ERROR", 17),
+            (json!({"severity": "warning"}), "WARNING", 13),
+            (json!({"severityText": "debug"}), "DEBUG", 5),
+            (json!({"severity_text": "critical"}), "CRITICAL", 21),
+            (json!({"log.level": "info"}), "INFO", 9),
+            (json!({"log": {"level": "trace"}}), "TRACE", 1),
+            (json!({"logLevel": "fatal"}), "FATAL", 21),
+            (json!({"log_level": "warn"}), "WARN", 13),
+        ];
+
+        for (record, expected_text, expected_number) in cases {
+            let (number, text, body) = severity_for_record(record.clone());
+            assert_eq!(number, expected_number, "record: {record}");
+            assert_eq!(text, expected_text, "record: {record}");
+            assert_eq!(
+                serde_json::from_str::<serde_json::Value>(&body).unwrap(),
+                record
+            );
+        }
+    }
+
+    #[test]
+    fn test_aws_json_format_telemetry_batch() {
+        let payload = json!([{
+            "time": "2026-03-02T11:53:38.040Z",
+            "type": "function",
+            "record": {
+                "timestamp": "2026-03-02T11:53:38.040Z",
+                "level": "ERROR",
+                "requestId": "f0ae1bc7-ae4b-4317-abf9-3a562e3127ef",
+                "message": "something failed"
+            }
+        }])
+        .to_string();
+        let logs: Vec<TelemetryLog> = serde_json::from_str(&payload).unwrap();
+        let expected_record = logs[0].record.clone();
+
+        let result = map_logs_to_otlp(&logs);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].severity_number, 17);
+        assert_eq!(result[0].severity_text, "ERROR");
+        let body = get_string_value(&result[0].body).unwrap();
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&body).unwrap(),
+            expected_record
+        );
+    }
+
+    #[test]
+    fn test_structured_severity_from_string_record() {
+        let body = r#"{"level":"ERROR","message":"something failed"}"#;
+        let (number, text, exported_body) = severity_for_record(json!(body));
+        assert_eq!(number, 17);
+        assert_eq!(text, "ERROR");
+        assert_eq!(exported_body, body);
+    }
+
+    #[test]
+    fn test_structured_severity_uses_first_recognized_field() {
+        for record in [
+            json!({"severityText": null, "level": "ERROR"}),
+            json!({"severityText": 5, "level": "ERROR"}),
+            json!({"severityText": "", "level": "ERROR"}),
+            json!({"severityText": "custom", "level": "ERROR"}),
+            json!({"log.level": "custom", "log": {"level": "ERROR"}}),
+        ] {
+            let (number, text, _) = severity_for_record(record);
+            assert_eq!(number, 17);
+            assert_eq!(text, "ERROR");
+        }
+
+        // When recognized fields conflict, the documented field order wins.
+        let (number, text, _) = severity_for_record(json!({
+            "severityText": "DEBUG",
+            "log.level": "WARN",
+            "level": "ERROR"
+        }));
+        assert_eq!(number, 5);
+        assert_eq!(text, "DEBUG");
+
+        // Flat ECS form wins over nested ECS form when both are recognized.
+        let (number, text, _) = severity_for_record(json!({
+            "log.level": "WARN",
+            "log": {"level": "ERROR"}
+        }));
+        assert_eq!(number, 13);
+        assert_eq!(text, "WARN");
+    }
+
+    #[test]
+    fn test_unknown_structured_severity_remains_unset() {
+        for record in [
+            json!({"level": "NOTICE", "message": "custom level"}),
+            json!({"level": 50, "message": "ambiguous numeric scheme"}),
+            json!({"message": "no level"}),
+        ] {
+            let (number, text, body) = severity_for_record(record.clone());
+            assert_eq!(number, 0, "record: {record}");
+            assert_eq!(text, "", "record: {record}");
+            assert_eq!(
+                serde_json::from_str::<serde_json::Value>(&body).unwrap(),
+                record
+            );
+        }
+    }
 
     #[test]
     fn test_node_severity_levels_table() {
