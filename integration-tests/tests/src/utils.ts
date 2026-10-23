@@ -13,7 +13,9 @@ import {InvokeCommand, LambdaClient} from "@aws-sdk/client-lambda";
 
 // `severity` defaults to "info" when omitted. Pass `severity: ""` explicitly to expect an
 // unset severity (severityNumber 0, empty severityText) -- e.g. an unparsed log line.
-export type LogToCheck = { message: string; severity?: string; isJson?: boolean; spanId?: string; attributes?: Record<string, string> };
+// `severityNumber`, when set, is also asserted (the backend sets only the number when it
+// infers severity from a JSON body).
+export type LogToCheck = { message: string; severity?: string; severityNumber?: number; isJson?: boolean; spanId?: string; attributes?: Record<string, string> };
 
 export const RESOURCE_PREFIX = process.env.RESOURCE_PREFIX ?? '';
 
@@ -293,6 +295,9 @@ export const checkLogs = async ({
                     expectedSeverity = jsonSeverity ?? "info";
                 }
                 expect(logRecord.severityText.toLowerCase(), `Wrong severity: ${JSON.stringify(logRecord)}`).toEqual(expectedSeverity);
+                if (matchedCheck?.severityNumber !== undefined) {
+                    expect(logRecord.severityNumber, `Wrong severity number: ${JSON.stringify(logRecord)}`).toEqual(matchedCheck.severityNumber);
+                }
 
                 // Verify custom attributes if specified
                 if (matchedCheck?.attributes) {
