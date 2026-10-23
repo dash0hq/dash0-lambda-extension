@@ -226,8 +226,11 @@ fn classify<'a>(
             (Kind::QueryParams, Shape::Body)
         }
         "messaging.publish.body" => (Kind::RequestBody, Shape::Body),
-        // Redis commands only: masking SQL statements with `all` would hide every query.
-        "db.statement" | "db.query.text" if is_redis(span_attrs) => {
+        // Redis commands and MongoDB command JSON only: masking SQL statements with `all`
+        // would hide every query.
+        "db.statement" | "db.query.text"
+            if matches!(db_system(span_attrs), Some("redis" | "mongodb")) =>
+        {
             (Kind::RequestBody, Shape::Body)
         }
         _ => {
@@ -252,11 +255,8 @@ fn string_attr<'a>(attrs: &'a [KeyValue], key: &str) -> Option<&'a str> {
         })
 }
 
-fn is_redis(attrs: &[KeyValue]) -> bool {
-    matches!(
-        string_attr(attrs, "db.system").or_else(|| string_attr(attrs, "db.system.name")),
-        Some("redis")
-    )
+fn db_system<'a>(attrs: &'a [KeyValue]) -> Option<&'a str> {
+    string_attr(attrs, "db.system").or_else(|| string_attr(attrs, "db.system.name"))
 }
 
 /// Mask the payload attributes in place. Allocates only for values that change. `span_kind` is
@@ -675,15 +675,23 @@ pub fn mask_resource_logs(resource_logs: &mut [ResourceLogs], rules: &PayloadRul
 }
 
 #[cfg(test)]
+#[path = "payload_masking_inventory_tests.rs"]
+mod inventory_tests;
+
+#[cfg(test)]
+#[path = "payload_masking_docs_tests.rs"]
+mod docs_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use opentelemetry_proto::tonic::common::v1::{ArrayValue, KeyValueList};
     use opentelemetry_proto::tonic::logs::v1::{LogRecord, ScopeLogs};
     use opentelemetry_proto::tonic::trace::v1::{span::Event, ScopeSpans, Span};
 
-    const SECRET: &str = "S3CR3T";
+    pub(super) const SECRET: &str = "S3CR3T";
 
-    fn rules(vars: &[(&str, &str)]) -> PayloadRules {
+    pub(super) fn rules(vars: &[(&str, &str)]) -> PayloadRules {
         PayloadRules::from_lookup(|k| {
             vars.iter()
                 .find(|(name, _)| *name == k)
@@ -691,7 +699,7 @@ mod tests {
         })
     }
 
-    fn kv(key: &str, value: &str) -> KeyValue {
+    pub(super) fn kv(key: &str, value: &str) -> KeyValue {
         KeyValue {
             key: key.to_string(),
             value: Some(AnyValue {
@@ -700,18 +708,18 @@ mod tests {
         }
     }
 
-    fn get<'a>(attrs: &'a [KeyValue], key: &str) -> &'a str {
+    pub(super) fn get<'a>(attrs: &'a [KeyValue], key: &str) -> &'a str {
         string_attr(attrs, key).unwrap()
     }
 
-    fn masked(attrs: Vec<KeyValue>, rules: &PayloadRules, key: &str) -> String {
+    pub(super) fn masked(attrs: Vec<KeyValue>, rules: &PayloadRules, key: &str) -> String {
         let mut attrs = attrs;
         mask_attributes(&mut attrs, rules, 0);
         get(&attrs, key).to_string()
     }
 
     /// A value of the given shape with a secret under `password` and personal data under `email`.
-    fn sample(shape: &str) -> String {
+    pub(super) fn sample(shape: &str) -> String {
         match shape {
             "json" => format!(r#"{{"user":"bob","password":"{SECRET}","email":"jane@example.com"}}"#),
             "url" => format!("https://example.com/orders?password={SECRET}&email=jane%40example.com&user=bob#top"),
@@ -720,115 +728,6 @@ mod tests {
             "named" => format!("Bearer {SECRET}"),
             "redis" => format!("SET session {SECRET}"),
             other => panic!("unknown shape {other}"),
-        }
-    }
-
-    #[derive(serde::Deserialize)]
-    struct Row {
-        runtime: String,
-        instrumentation: String,
-        key: String,
-        variable: String,
-        shape: String,
-        expect: String,
-    }
-
-    fn inventory() -> Vec<Row> {
-        serde_json::from_str(include_str!("testdata/masking_inventory.json")).unwrap()
-    }
-
-    fn attrs_for(row: &Row) -> Vec<KeyValue> {
-        let mut attrs = vec![kv(&row.key, &sample(&row.shape))];
-        if row.shape == "redis" {
-            attrs.push(kv("db.system", "redis"));
-        }
-        attrs
-    }
-
-    #[test]
-    fn inventory_secrets_are_masked_with_defaults() {
-        for row in inventory().iter().filter(|r| r.expect == "masked") {
-            // Redis commands are plain strings: only `all` masks them.
-            let vars: Vec<(&str, &str)> = if row.shape == "redis" {
-                vec![(row.variable.as_str(), "all")]
-            } else {
-                vec![]
-            };
-            let out = masked(attrs_for(row), &rules(&vars), &row.key);
-            let ctx = format!("{} / {} / {}", row.runtime, row.instrumentation, row.key);
-            assert!(!out.contains(SECRET), "{ctx}: secret leaked: {out}");
-            if row.shape != "named" && row.shape != "redis" {
-                assert!(out.contains("bob"), "{ctx}: non-secret data lost: {out}");
-                assert!(out.contains("email"), "{ctx}: non-matching key lost: {out}");
-            }
-        }
-    }
-
-    #[test]
-    fn inventory_custom_rule_replaces_defaults_for_its_variable() {
-        for row in inventory()
-            .iter()
-            .filter(|r| r.expect == "masked" && r.shape != "redis")
-        {
-            let ctx = format!("{} / {} / {}", row.runtime, row.instrumentation, row.key);
-            if row.shape == "named" {
-                // The header name is the key suffix; a rule that doesn't name it keeps the value.
-                let r = rules(&[(row.variable.as_str(), r#"["^x-custom$"]"#)]);
-                assert_eq!(
-                    masked(attrs_for(row), &r, &row.key),
-                    sample("named"),
-                    "{ctx}"
-                );
-                continue;
-            }
-            let r = rules(&[(row.variable.as_str(), r#"[".*email.*"]"#)]);
-            let out = masked(attrs_for(row), &r, &row.key);
-            assert!(
-                !out.contains("jane"),
-                "{ctx}: custom rule not applied: {out}"
-            );
-            assert!(out.contains(SECRET), "{ctx}: defaults still applied: {out}");
-        }
-    }
-
-    #[test]
-    fn inventory_variable_all_masks_whole_value() {
-        for row in inventory().iter().filter(|r| r.expect == "masked") {
-            let out = masked(
-                attrs_for(row),
-                &rules(&[(row.variable.as_str(), "all")]),
-                &row.key,
-            );
-            let expected = match row.shape.as_str() {
-                // `all` on a URL hides the query string only.
-                "url" | "target" => {
-                    let v = sample(&row.shape);
-                    format!("{}?{MASKED}", &v[..v.find('?').unwrap()])
-                }
-                _ => MASKED.to_string(),
-            };
-            assert_eq!(out, expected, "{} / {}", row.runtime, row.key);
-        }
-    }
-
-    #[test]
-    fn inventory_variable_empty_list_masks_nothing() {
-        for row in inventory().iter().filter(|r| r.expect == "masked") {
-            let out = masked(
-                attrs_for(row),
-                &rules(&[(row.variable.as_str(), "[]")]),
-                &row.key,
-            );
-            assert_eq!(out, sample(&row.shape), "{} / {}", row.runtime, row.key);
-        }
-    }
-
-    /// Known gaps: kept as tests so a change in coverage is a deliberate decision.
-    #[test]
-    fn inventory_expected_gaps_are_left_alone() {
-        for row in inventory().iter().filter(|r| r.expect == "gap") {
-            let out = masked(attrs_for(row), &rules(&[]), &row.key);
-            assert_eq!(out, sample(&row.shape), "{} / {}", row.runtime, row.key);
         }
     }
 

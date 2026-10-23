@@ -293,6 +293,16 @@ async fn send_request(
     item_count: usize,
     item_type: &str,
 ) -> Result<(), ()> {
+    // Test seam for tests/masking_e2e.rs: debug builds only, never in a released layer.
+    #[cfg(debug_assertions)]
+    if let Ok(dir) = std::env::var("DASH0_TEST_EXPORT_DIR") {
+        static SEQ: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let name = format!("{seq:06}-{}.pb", path.trim_start_matches("/v1/"));
+        let _ = std::fs::write(std::path::Path::new(&dir).join(name), &body);
+        return Ok(());
+    }
+
     if crate::config::get_dash0_token().is_none() {
         return Ok(());
     }

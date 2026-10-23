@@ -23,11 +23,10 @@ pub async fn telemetry(req: Request<Incoming>) -> Result<Response<ResBody>, hype
     let error_invocation_ids = extract_error_invocation_ids(&body_bytes, body_text.as_ref());
 
     tracing::info!(
-        "[{}] telemetry event path={} len={} body={}",
+        "[{}] telemetry event path={} len={}",
         crate::log_prefix(),
         parts.uri.path(),
-        body_bytes.len(),
-        body_text
+        body_bytes.len()
     );
 
     if let Ok(mut logs) =
@@ -74,10 +73,9 @@ pub async fn telemetry(req: Request<Incoming>) -> Result<Response<ResBody>, hype
 
     if !error_invocation_ids.is_empty() {
         tracing::info!(
-            "[{}] telemetry runtimeDone error detected for invocations: {:?} body={}",
+            "[{}] telemetry runtimeDone error detected for invocations: {:?}",
             crate::log_prefix(),
-            error_invocation_ids,
-            body_text
+            error_invocation_ids
         );
 
         let mut traces_to_send = invocation_entry::take_all_traces();
