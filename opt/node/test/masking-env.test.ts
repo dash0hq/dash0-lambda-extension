@@ -2,16 +2,16 @@
  * SIG-695 / SIG-699: the documented DASH0_MASK_* env vars must control masking of the
  * payload attributes the Node distro captures.
  *
- * The distro masks through @lumigo/node-core, which only reads LUMIGO_SECRET_MASKING_REGEX*
- * and only once, when it is first required. `opt/shared.sh` therefore maps DASH0_MASK_*
- * onto those variables in the exec wrapper, before the runtime starts.
+ * Most hooks mask through @lumigo/node-core, which reads LUMIGO_SECRET_MASKING_REGEX*
+ * only once, when it is first required. The bounded fetch response masker reads the
+ * same variables. `opt/shared.sh` maps DASH0_MASK_* before the runtime starts.
  *
  * The mapping itself is tested, language-neutrally, in opt/test/shared.test.sh. This suite
  * checks the Node side: each scenario runs the real `map_masking_env` in bash, loads the
- * resulting environment into a fresh module registry, and drives the real express and
- * aws-sdk hooks. The express hook covers every HTTP context (query, request/response
- * headers, request/response body); the aws-sdk hooks cover the SQS publish and consume
- * bodies.
+ * resulting environment into a fresh module registry, and drives the real express,
+ * aws-sdk and undici hooks. The express hook covers every HTTP context (query,
+ * request/response headers and bodies); undici covers the fetch response body;
+ * aws-sdk covers the SQS publish and consume bodies.
  */
 
 import { execFileSync } from 'child_process';
@@ -23,7 +23,7 @@ const SHARED_SH = path.join(REPO_ROOT, 'opt', 'shared.sh');
 
 const MASKED = '****';
 
-const MASKING_ENV = /^(DASH0_MASK_|LUMIGO_SECRET_MASKING_REGEX|LUMIGO_BLACKLIST_REGEX)/;
+const MASKING_ENV = /^(DASH0_MASK_|LUMIGO_SECRET_MASKING_REGEX|LUMIGO_BLACKLIST_REGEX|LUMIGO_WHITELIST_KEYS_REGEXES)/;
 
 /** Runs `map_masking_env` from opt/shared.sh and returns the masking-related result. */
 const mapMaskingEnv = (input: Record<string, string>): Record<string, string> => {
@@ -47,6 +47,7 @@ type Captured = {
   'http.request.body': string;
   'http.response.headers': string;
   'http.response.body': string;
+  'fetch.response.body': string;
   'messaging.publish.body': string;
   'messaging.consume.body': string;
 };
@@ -61,6 +62,7 @@ const HTTP_ATTRIBUTES: Attribute[] = [
 ];
 const ALL_ATTRIBUTES: Attribute[] = [
   ...HTTP_ATTRIBUTES,
+  'fetch.response.body',
   'messaging.publish.body',
   'messaging.consume.body',
 ];
@@ -116,7 +118,7 @@ const span = (attributes: Record<string, string> = {}): Span =>
  * Applies the mapped environment, loads the distro in a fresh module registry so
  * node-core builds its scrubbers from that environment, and captures every attribute.
  */
-const captureWith = (input: Record<string, string>): Captured => {
+const captureWith = (input: Record<string, string>, responseBody: unknown = fixtures.responseBody): Captured => {
   const mapped = mapMaskingEnv(input);
   const saved = { ...process.env };
   for (const key of Object.keys(process.env)) if (MASKING_ENV.test(key)) delete process.env[key];
@@ -138,7 +140,7 @@ const captureWith = (input: Record<string, string>): Captured => {
         req: { query: fixtures.query, headers: fixtures.requestHeaders, body: fixtures.requestBody },
         res,
       });
-      res.send(JSON.stringify(fixtures.responseBody));
+      res.send(JSON.stringify(responseBody));
       res.end();
 
       const sqsAttributes = { 'rpc.service': 'SQS', 'messaging.destination.name': 'orders' };
@@ -150,8 +152,24 @@ const captureWith = (input: Record<string, string>): Captured => {
         moduleVersion: 'x',
       });
 
+      const Undici = require('../distro/src/instrumentations/undici/UndiciInstrumentation').default;
+      const undici = new Undici().getInstrumentation();
+      const fetchSpan = span();
+      const request = Object.create({ onData() {}, onComplete() {}, onError() {} });
+      try {
+        undici.getConfig().responseHook(fetchSpan, {
+          request,
+          response: { headers: [Buffer.from('content-type'), Buffer.from('application/graphql-response+json')] },
+        });
+        request.onData(Buffer.from(JSON.stringify(responseBody)));
+        request.onComplete();
+      } finally {
+        undici.disable();
+      }
+
       captured = {
         ...(Object.fromEntries(HTTP_ATTRIBUTES.map((a) => [a, httpSpan.attributes[a]])) as any),
+        'fetch.response.body': fetchSpan.attributes['http.response.body'],
         'messaging.publish.body': publishSpan.attributes['messaging.publish.body'],
         'messaging.consume.body': consumeSpan.attributes['messaging.consume.body'],
       };
@@ -272,7 +290,7 @@ describe('DASH0_MASK_* env vars → Node distro masking', () => {
 
   describe.each<[string, Attribute[]]>([
     ['DASH0_MASK_REQUEST_BODY', ['http.request.body', 'messaging.publish.body']],
-    ['DASH0_MASK_RESPONSE_BODY', ['http.response.body', 'messaging.consume.body']],
+    ['DASH0_MASK_RESPONSE_BODY', ['http.response.body', 'fetch.response.body', 'messaging.consume.body']],
     ['DASH0_MASK_REQUEST_HEADERS', ['http.request.headers']],
     ['DASH0_MASK_RESPONSE_HEADERS', ['http.response.headers']],
     ['DASH0_MASK_QUERY_PARAMS', ['http.request.query']],
@@ -307,8 +325,45 @@ describe('DASH0_MASK_* env vars → Node distro masking', () => {
     test('DASH0_MASK_RESPONSE_BODY=all replaces response and SQS consume bodies with ****', () => {
       const captured = captureWith({ DASH0_MASK_RESPONSE_BODY: 'all' });
       expect(captured['http.response.body']).toBe(JSON.stringify(MASKED));
+      expect(captured['fetch.response.body']).toBe(JSON.stringify(MASKED));
       expect(captured['messaging.consume.body']).toBe(JSON.stringify(MASKED));
     });
+  });
+
+  test.each([
+    {
+      name: 'general regex alternative', input: { DASH0_MASK_RULES: '["email|password"]' },
+      body: { email: 'hidden', password: 'hidden', orderId: 42 },
+      legacy: '{"email":"****","password":"****","orderId":42}', fetch: undefined,
+    },
+    {
+      name: 'invalid effective legacy config', input: { LUMIGO_SECRET_MASKING_REGEX_HTTP_RESPONSE_BODIES: '[' },
+      body: { password: 'hidden' }, legacy: '{"password":"****"}', fetch: undefined,
+    },
+    {
+      name: 'legacy allow-list', input: { LUMIGO_WHITELIST_KEYS_REGEXES: '["password"]' },
+      body: { password: 'configured-clear' }, legacy: '{"password":"configured-clear"}', fetch: undefined,
+    },
+    {
+      name: 'all before size reduction', input: { DASH0_MASK_RESPONSE_BODY: 'all' },
+      body: { password: 'x'.repeat(5000) }, legacy: '"****"', fetch: undefined,
+    },
+    {
+      name: 'UTF-8 bytes versus characters', input: {}, body: { note: 'é'.repeat(2500) },
+      legacy: JSON.stringify({ note: 'é'.repeat(2500) }), fetch: undefined,
+    },
+    {
+      name: 'matched null', input: {}, body: { password: null },
+      legacy: '{"password":null}', fetch: '{"password":"****"}',
+    },
+    {
+      name: 'all with null', input: { DASH0_MASK_RESPONSE_BODY: 'all' },
+      body: null, legacy: 'null', fetch: '"****"',
+    },
+  ])('documents the fetch/legacy masking difference: $name', ({ input, body, legacy, fetch }) => {
+    const captured = captureWith(input, body);
+    expect(captured['http.response.body']).toBe(legacy);
+    expect(captured['fetch.response.body']).toBe(fetch);
   });
 
   describe('legacy LUMIGO_* variables', () => {

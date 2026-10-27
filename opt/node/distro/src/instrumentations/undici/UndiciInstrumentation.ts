@@ -5,6 +5,7 @@ import type { UndiciRequest, UndiciResponse } from '@opentelemetry/instrumentati
 import { scrubHttpPayload } from '../../tools/payloads';
 import { getSpanAttributeMaxLength, safeExecute } from '../../utils';
 import { TracingInstrumentor } from '../instrumentor';
+import { captureResponseBody } from './responseBody';
 
 function parseRequestHeaders(headers: UndiciRequest['headers']): Record<string, string> {
   const result: Record<string, string> = {};
@@ -125,10 +126,12 @@ export default class Dash0UndiciInstrumentation extends TracingInstrumentor<Undi
 
       responseHook(
         span: Span,
-        { response }: { request: UndiciRequest; response: UndiciResponse }
+        { request, response }: { request: UndiciRequest; response: UndiciResponse }
       ) {
         safeExecute(() => {
           const headers = parseResponseHeaders(response.headers);
+          // Capture has its own no-throw, no-logging boundary.
+          captureResponseBody(request, span, headers);
           span.setAttribute(
             'http.response.headers',
             CommonUtils.payloadStringify(

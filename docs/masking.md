@@ -36,7 +36,7 @@ Masking of the Lambda event, the return value and environment variables is done 
 - **A matching key masks its whole value.** The value becomes `"****"`, even when it is an object or an array.
 - **Values are never checked.** A key named `note` that contains an email address is left alone.
 - **Strings are not parsed.** When a payload is a string, such as an SQS `MessageBody`, a Kafka message or a Redis command, nothing inside it is checked, even when it holds JSON. See [Payloads that are strings](#payloads-that-are-strings).
-  - **Node.js:** HTTP bodies sent as `application/json` are parsed and masked by key. Other strings are not parsed.
+  - **Node.js:** HTTP bodies sent as `application/json` are parsed and masked by key. The bounded `fetch` response capture also parses `application/graphql-response+json`. Other strings are not parsed.
   - **Python:** any string that starts with `{` is parsed and masked by key.
 - **`all` replaces the whole payload** with `"****"`.
 - **Your list replaces the defaults.** `DASH0_MASK_RULES` replaces the [default patterns](#defaults-nothing-configured). A per-payload variable replaces the rules for its own payload type. To add to the defaults, list them too.
@@ -49,7 +49,7 @@ Masking of the Lambda event, the return value and environment variables is done 
 | HTTP request headers | `http.request.headers` | `DASH0_MASK_REQUEST_HEADERS`, then `DASH0_MASK_RULES` | ✅ `http`/`https`, `fetch`, Express, Fastify | ⚠️ not `requests` or Django | ❌ |
 | HTTP request body | `http.request.body` ¹ | `DASH0_MASK_REQUEST_BODY`, then `DASH0_MASK_RULES` | ✅ `http`/`https`, `fetch`, Express, Fastify | ⚠️ FastAPI and AWS SDK only; not `requests`, `httpx` or Django | ❌ |
 | HTTP response headers | `http.response.headers` | `DASH0_MASK_RESPONSE_HEADERS`, then `DASH0_MASK_RULES` | ✅ `http`/`https`, `fetch`, Express; Fastify captures none | ⚠️ not Flask | ❌ |
-| HTTP response body | `http.response.body` ¹ | `DASH0_MASK_RESPONSE_BODY`, then `DASH0_MASK_RULES` | ✅ `http`/`https`, Express; `fetch` and Fastify capture none | ⚠️ depends on the library | ❌ |
+| HTTP response body | `http.response.body` ¹ | `DASH0_MASK_RESPONSE_BODY`, then `DASH0_MASK_RULES` | ✅ `http`/`https`, Express; bounded JSON capture for `fetch` (see below); Fastify captures none | ⚠️ depends on the library | ❌ |
 | SQS `SendMessage` / `SendMessageBatch` input | `messaging.publish.body` | `DASH0_MASK_REQUEST_BODY`, then `DASH0_MASK_RULES` | ✅ | ⚠️ `SendMessage` captures only `MessageBody`, in `http.request.body` | ❌ |
 | SQS `ReceiveMessage` output | `messaging.consume.body` | `DASH0_MASK_RESPONSE_BODY`, then `DASH0_MASK_RULES` | ✅ | not captured | ❌ |
 | Kafka message sent | `messaging.produce.body` | `DASH0_MASK_QUERY_PARAMS`, then `DASH0_MASK_RULES` ² | ✅ `kafkajs` | ❌ | ❌ |
@@ -69,6 +69,86 @@ Some payloads are captured but not masked at all. See [Payloads that are not mas
 "Then" means: the per-payload variable applies if it is set and valid; otherwise `DASH0_MASK_RULES` applies; otherwise the defaults.
 
 Attribute values are stored as compact JSON strings. They are pretty-printed here for readability.
+
+### Bounded Node.js `fetch` responses
+
+> **Node.js** ✅ · **Python** ❌ · **Java** ❌
+
+On Node.js 20 and 22 with bundled Undici 6, and Node.js 24 with bundled Undici 7,
+the layer captures complete `application/json` and `application/graphql-response+json`
+responses, including gzip, **by default**. No response-capture opt-in is required.
+The small JSON/GraphQL canaries in the real-fetch regression suite remain captured
+and masked under default settings for both identity and gzip encoding. Unsupported
+callback implementations pass through without body capture. Brotli, deflate, binary,
+multipart and indefinite streams are not captured.
+
+Capture is limited to 32 KiB encoded, 64 KiB decoded, and 16 simultaneous responses.
+Retained encoded buffers total at most 512 KiB. This is not a limit on the function's
+overall memory. Identity responses cannot exceed 32 KiB; gzip responses can reach
+64 KiB decoded only when the configured attribute limit permits it. Bodies that exceed
+the span attribute limit (4 KiB by default) are omitted before masking, even if masking
+could make them smaller. The decoded-byte limit is also capped by that attribute
+limit. Bodies are never truncated. Invalid JSON, invalid UTF-8, corrupt gzip and
+incomplete bodies cause omission. Key-based
+traversal stops after 2,048 visited keys, a key longer than 128 UTF-16 code units,
+or unmasked object nesting beyond 32 levels. Replaced values are not traversed.
+The application still receives its original response. Gzip metadata is only an
+early rejection hint: accepted streams must finish decoding within an enforced
+output bound, including concatenated members.
+
+Capture adds synchronous copying, optional gzip decoding, masking and serialization
+to response completion on the invocation thread. It increases CPU work and exported
+data, even when the application also decodes the response. The size and traversal
+bounds do not promise a hard completion time or a ceiling on process RSS.
+
+To avoid running arbitrary regexes on response-controlled keys, this capture accepts
+at most 32 patterns of up to 128 UTF-16 code units each, with at most 4,096 code units
+in the complete effective configuration string. Patterns can contain a literal name
+(ASCII letters, numbers, spaces, `_` and `-`), optional `^` and `$` anchors, and optional
+leading or trailing `.*`. For example, `.*email.*`, `^password$`, `token` and `^x-`
+work. These patterns are compiled into a case-insensitive JavaScript literal matcher
+with optional anchors, without customer-supplied quantifiers or other regex syntax.
+An empty list disables masking, and `all` masks the whole body. If the effective
+masking configuration contains a malformed or more complex pattern, or a legacy
+Lumigo allow-list, the body is omitted rather than exported without reliable
+masking. Any nonempty `LUMIGO_WHITELIST_KEYS_REGEXES` environment
+value, including `[]`, causes omission. These restrictions apply only to the new
+`fetch` response capture, not to other payloads.
+
+#### Differences from existing Node.js HTTP masking
+
+This is **not compatibility-equivalent** to the existing Express and other HTTP
+body maskers. Existing request/header masking and other libraries are unchanged.
+The following differences are exercised through the real wrapper mapping and hooks
+in `opt/node/test/masking-env.test.ts`:
+
+| Input or configuration | Existing Express response masking | New `fetch` response capture |
+|---|---|---|
+| Default small JSON body with `password` | Replaces its value with `"****"` | Same, for identity and gzip |
+| `DASH0_MASK_RULES='["email\|password"]'` | Supports the general regex alternative | Omits the response body |
+| Malformed effective legacy response rule, such as `[` | Falls back to defaults | Omits the response body |
+| Legacy allow-list permits `password` | Leaves its value clear | Omits the response body |
+| Default limit: more than 4 KiB before masking, but `all` would make it tiny | Can export `"****"` after masking | Omits the response body, for identity and gzip |
+| 2,500 `é` characters fit the character limit but exceed the UTF-8 byte limit | Can export the complete body | Omits the response body |
+| A matching `password` value is `null` | Leaves `null` unchanged | Replaces it with `"****"` |
+| The complete payload is `null` and the rule is `all` | Leaves `null` unchanged | Exports `"****"` |
+
+Invalid `DASH0_MASK_*` values that the wrapper rejects never become effective rules;
+the wrapper's existing warning and fallback behavior is unchanged. `[]` explicitly
+allows unmasked values, but does not remove the size, completeness or traversal
+bounds. The new capture also applies the configured attribute limit to decoded
+UTF-8 **bytes**, not only JSON character count, so multibyte text can be omitted even
+when its character count fits. Unlike truncating HTTP maskers, it never exports an
+incomplete prefix. These limits do not guarantee protection from process-wide OOM
+or bound work in the application's own response handling.
+
+This example comes from the real gzip GraphQL fixture and packaged-distro OTLP
+collector check in `benchmarks/scripts/undici-safety.mjs`, with default rules:
+
+```diff
+-{"data":{"product":{"id":42,"name":"Coffee","password":"http-canary"}}}
++{"data":{"product":{"id":42,"name":"Coffee","password":"****"}}}
+```
 
 ## The example payloads
 
