@@ -8,6 +8,7 @@ pub mod logs_receiver;
 pub mod masking;
 pub mod metrics_creation;
 pub mod metrics_receiver;
+pub mod payload_masking;
 pub mod receiver;
 pub mod resources;
 pub mod span_creation;

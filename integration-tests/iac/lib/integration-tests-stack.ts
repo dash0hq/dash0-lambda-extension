@@ -131,6 +131,42 @@ function createLambdas(
   }
 }
 
+/**
+ * A function with DASH0_MASK_IN_EXTENSION=true that sends payloads its distro does not mask, so
+ * a `****` in Dash0 can only come from the extension (test-masking-in-extension.test.ts).
+ * Masking is runtime-agnostic in the extension, so one runtime and architecture per family.
+ */
+function createMaskingInExtensionLambda(
+    scope: Construct,
+    props: SubStackProps,
+    family: string,
+    runtime: lambda.Runtime,
+    handler: string,
+    code: lambda.Code,
+    memorySize = 128,
+) {
+  new lambda.Function(scope, `masking-in-extension-${family}`, {
+    functionName: `${props.prefix}masking-in-extension-${family}`,
+    runtime,
+    memorySize,
+    handler,
+    architecture: lambda.Architecture.X86_64,
+    timeout: cdk.Duration.seconds(15),
+    code,
+    layers: [props.layer],
+    role: props.role,
+    environment: {
+      AWS_LAMBDA_EXEC_WRAPPER: '/opt/wrapper',
+      DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
+      DASH0_ENDPOINT: 'https://ingress.eu-west-1.aws.dash0-dev.com:4318',
+      DASH0_EXTENSION_LOG_LEVEL: 'info',
+      DASH0_MASK_IN_EXTENSION: 'true',
+    },
+    logGroup: props.logGroup,
+    loggingFormat: lambda.LoggingFormat.TEXT,
+  });
+}
+
 class PythonStack extends cdk.NestedStack {
   constructor(scope: Construct, id: string, props: SubStackProps) {
     super(scope, id, props);
@@ -143,6 +179,10 @@ class PythonStack extends cdk.NestedStack {
       code: pythonCode,
       dash0TokenSecretArn: props.dash0TokenSecretArn,
     });
+
+    createMaskingInExtensionLambda(
+        this, props, 'python', runtimes[runtimes.length - 1], 'masking_in_extension.handler', pythonCode,
+    );
 
     // Dependency conflict test lambdas
     const dependencyConflictCode = lambda.Code.fromAsset(
@@ -261,6 +301,11 @@ class NodeStack extends cdk.NestedStack {
     createLambdas(this, runtimes, props.layer, props.role, props.logGroup, props.prefix, {
       dash0TokenSecretArn: props.dash0TokenSecretArn,
     });
+
+    createMaskingInExtensionLambda(
+        this, props, 'node', runtimes[runtimes.length - 1], 'masking_in_extension.handler',
+        lambda.Code.fromAsset(path.join(__dirname, '../lambdas/node')),
+    );
 
     for (const runtime of runtimes) {
       const runtimeName = runtime.name.replace(/\./g, '-');
@@ -406,6 +451,11 @@ class JavaStack extends cdk.NestedStack {
     const runtimes = JAVA_CDK_RUNTIMES;
 
     createLambdas(this, runtimes, props.layer, props.role, props.logGroup, props.prefix, overrides);
+
+    createMaskingInExtensionLambda(
+        this, props, 'java', runtimes[runtimes.length - 1],
+        'org.example.MaskingInExtensionHandler::handleRequest', javaCode, 512,
+    );
 
     // Custom (user-defined) OpenTelemetry API metrics. Kept as a separate loop instead of a
     // createLambdas scenario to avoid multiplying the function count. OTEL_METRICS_EXPORTER is
