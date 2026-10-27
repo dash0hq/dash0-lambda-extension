@@ -49,3 +49,15 @@ npx cdk destroy --force
 ## Results
 
 Results are saved as JSON in `results/`. The script also prints a comparison table to stdout showing init duration and memory overhead per runtime.
+
+## Masking micro-benchmark (Rust)
+
+`benchmarks/masking/` holds a criterion bench of the extension's payload masking (`DASH0_MASK_IN_EXTENSION`), run locally with no AWS:
+
+```bash
+cargo bench --bench masking
+# rewrite the shared fixtures the distro comparisons use
+MASKING_FIXTURES_OUT=$PWD/benchmarks/masking/fixtures/masking-payloads.json cargo bench --bench masking
+```
+
+Results and the distro comparison: `docs/design/central-masking-analysis.md` and `docs/design/central-masking-distro-comparison.md`.
