@@ -814,7 +814,9 @@ If these can contain sensitive data, turn off auto-instrumentation for the funct
 DASH0_MASK_IN_EXTENSION=true
 ```
 
-The extension applies the same variables to the span attributes and log records it exports, in every runtime. It masks after your function has responded, so it adds no latency to the response. The language distros keep masking too; a value they already masked stays `"****"`.
+The extension applies the same variables to the span attributes and log records it exports, in every runtime. It masks after your function has responded, so it adds no latency to the response.
+
+With this setting the Node.js and Python distros stop masking, so all masking happens in the extension. The legacy `LUMIGO_SECRET_MASKING_REGEX*` variables are ignored. The distros still cut payloads to the attribute length limit. The Java distro never masked payloads, so nothing changes there.
 
 Differences from the per-runtime behaviour above:
 
@@ -880,4 +882,4 @@ Still not masked with this setting: exception messages and stack traces, LLM pro
 > [!WARNING]
 > **CloudWatch Logs are never masked**, with or without this setting. What your function writes to stdout or stderr goes to CloudWatch as written, and the extension forwards the same lines to Dash0 as log records, unmasked. Don't log secrets. The extension's own log lines contain no payload content at any `DASH0_EXTENSION_LOG_LEVEL`.
 >
-> `DASH0_DEBUG_SPANDUMP` makes the Node.js, Python and Java distros write every span to the file it names. The spans are written before they reach the extension, so they contain only what the distro masked. Today the distros still mask; if distro masking is ever turned off in favour of the extension, the dump contains the raw values. Use it only for debugging, and never point it at `/dev/stdout`.
+> `DASH0_DEBUG_SPANDUMP` makes the Node.js, Python and Java distros write every span to the file it names. The spans are written before they reach the extension, so they contain only what the distro masked. With `DASH0_MASK_IN_EXTENSION=true` the distros mask nothing, so the dump contains the raw values. Use it only for debugging, and never point it at `/dev/stdout`.

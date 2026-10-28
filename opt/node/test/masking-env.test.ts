@@ -15,6 +15,7 @@
  */
 
 import { execFileSync } from 'child_process';
+import * as fs from 'fs';
 import * as path from 'path';
 import { BasicTracerProvider, Span } from '@opentelemetry/sdk-trace-base';
 
@@ -116,7 +117,7 @@ const span = (attributes: Record<string, string> = {}): Span =>
  * Applies the mapped environment, loads the distro in a fresh module registry so
  * node-core builds its scrubbers from that environment, and captures every attribute.
  */
-const captureWith = (input: Record<string, string>): Captured => {
+const captureWith = (input: Record<string, string>, f: typeof fixtures = fixtures): Captured => {
   const mapped = mapMaskingEnv(input);
   const saved = { ...process.env };
   for (const key of Object.keys(process.env)) if (MASKING_ENV.test(key)) delete process.env[key];
@@ -132,21 +133,21 @@ const captureWith = (input: Record<string, string>): Captured => {
       const res: any = {
         end: () => undefined,
         send: () => undefined,
-        getHeaders: () => fixtures.responseHeaders,
+        getHeaders: () => f.responseHeaders,
       };
       ExpressHooks.requestHook(httpSpan, {
-        req: { query: fixtures.query, headers: fixtures.requestHeaders, body: fixtures.requestBody },
+        req: { query: f.query, headers: f.requestHeaders, body: f.requestBody },
         res,
       });
-      res.send(JSON.stringify(fixtures.responseBody));
+      res.send(JSON.stringify(f.responseBody));
       res.end();
 
       const sqsAttributes = { 'rpc.service': 'SQS', 'messaging.destination.name': 'orders' };
       const publishSpan = span({ ...sqsAttributes, 'rpc.method': 'SendMessage' });
-      preRequestHook(publishSpan, { request: { commandInput: fixtures.sqsPublish } });
+      preRequestHook(publishSpan, { request: { commandInput: f.sqsPublish } });
       const consumeSpan = span({ ...sqsAttributes, 'rpc.method': 'ReceiveMessage' });
       responseHook(consumeSpan, {
-        response: { request: { commandInput: {} }, requestId: 'r', data: fixtures.sqsConsume },
+        response: { request: { commandInput: {} }, requestId: 'r', data: f.sqsConsume },
         moduleVersion: 'x',
       });
 
@@ -308,6 +309,71 @@ describe('DASH0_MASK_* env vars → Node distro masking', () => {
       const captured = captureWith({ DASH0_MASK_RESPONSE_BODY: 'all' });
       expect(captured['http.response.body']).toBe(JSON.stringify(MASKED));
       expect(captured['messaging.consume.body']).toBe(JSON.stringify(MASKED));
+    });
+  });
+
+  describe('DASH0_MASK_IN_EXTENSION=true (the extension masks instead)', () => {
+    test('masks nothing in the distro with the default rules', () => {
+      const captured = captureWith({ DASH0_MASK_IN_EXTENSION: 'true' });
+      expectClear(captured, ALL_ATTRIBUTES, 'password');
+      expectClear(captured, ['http.request.body'], 'apiToken');
+      expectClear(captured, ['http.request.headers'], 'authorization');
+    });
+
+    test('ignores DASH0_MASK_* and LUMIGO_* rules, which only the extension applies', () => {
+      const captured = captureWith({
+        DASH0_MASK_IN_EXTENSION: 'true',
+        DASH0_MASK_RULES: '[".*email.*"]',
+        DASH0_MASK_REQUEST_BODY: 'all',
+        LUMIGO_SECRET_MASKING_REGEX_HTTP_RESPONSE_BODIES: '[".*email.*"]',
+      });
+      expectClear(captured, ALL_ATTRIBUTES, 'email');
+      expectClear(captured, ALL_ATTRIBUTES, 'password');
+    });
+
+    // tests/masking_e2e.rs sends these exact captures through the extension and checks it masks
+    // them. Regenerate with UPDATE_FIXTURES=1 when the distro's capture changes.
+    test('captures what tests/testdata/distro_captured_node.json holds', () => {
+      const secret = 'XQZ-E2E-SECRET';
+      // A JSON message body is a string to both maskers, so the secret goes in an attribute.
+      const message = 'order 42 for jane';
+      const attributes = {
+        email: { DataType: 'String', StringValue: 'jane' },
+        password: { DataType: 'String', StringValue: secret },
+      };
+      const captured = captureWith(
+        { DASH0_MASK_IN_EXTENSION: 'true' },
+        {
+          query: { email: 'jane', password: secret, orderId: '42' },
+          requestHeaders: { 'content-type': 'application/json', 'x-email': 'jane', authorization: `Bearer ${secret}` },
+          requestBody: { email: 'jane', apiToken: secret, orderId: 42 },
+          responseHeaders: { 'content-type': 'application/json', 'x-email': 'jane', 'x-api-key': secret },
+          responseBody: { email: 'jane', sessionToken: secret },
+          sqsPublish: { QueueUrl: 'https://sqs.eu-west-1.amazonaws.com/123456789012/orders', MessageBody: message, MessageAttributes: attributes },
+          sqsConsume: { Messages: [{ MessageId: 'm1', Body: message, MessageAttributes: attributes }] },
+        } as any
+      );
+      const file = path.join(REPO_ROOT, 'tests', 'testdata', 'distro_captured_node.json');
+      if (process.env.UPDATE_FIXTURES) fs.writeFileSync(file, JSON.stringify(captured, null, 2) + '\n');
+      expect(captured).toEqual(JSON.parse(fs.readFileSync(file, 'utf8')));
+      for (const value of Object.values(captured)) expect(value).toContain(secret);
+    });
+
+    test('still cuts bodies to the attribute limit as valid JSON', () => {
+      const saved = { ...process.env };
+      Object.assign(process.env, mapMaskingEnv({ DASH0_MASK_IN_EXTENSION: 'true' }));
+      try {
+        jest.isolateModules(() => {
+          const { scrubHttpPayload } = require('../distro/src/tools/payloads');
+          const { ScrubContext } = require('@lumigo/node-core');
+          const body = { password: 'b-pw', items: Array.from({ length: 200 }, (_, i) => ({ id: i })) };
+          const cut = scrubHttpPayload(body, 'application/json', ScrubContext.HTTP_REQUEST_BODY, 200);
+          expect(cut.length).toBeLessThan(JSON.stringify(body).length);
+          expect(JSON.parse(cut).password).toBe('b-pw');
+        });
+      } finally {
+        process.env = saved;
+      }
     });
   });
 

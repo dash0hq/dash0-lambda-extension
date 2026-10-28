@@ -130,6 +130,33 @@ for valid in '[]' '[ ]' '[".*a.*", ".*b.*"]' $'[\n  ".*a.*",\n  ".*b.*"\n]' '["^
     "$valid" "$(mapped LUMIGO_SECRET_MASKING_REGEX DASH0_MASK_RULES="$valid")"
 done
 
+# --- DASH0_MASK_IN_EXTENSION ------------------------------------------------------------
+
+lumigo_vars=(LUMIGO_SECRET_MASKING_REGEX LUMIGO_SECRET_MASKING_REGEX_HTTP_REQUEST_BODIES
+  LUMIGO_SECRET_MASKING_REGEX_HTTP_RESPONSE_BODIES LUMIGO_SECRET_MASKING_REGEX_HTTP_REQUEST_HEADERS
+  LUMIGO_SECRET_MASKING_REGEX_HTTP_RESPONSE_HEADERS LUMIGO_SECRET_MASKING_REGEX_HTTP_QUERY_PARAMS
+  LUMIGO_SECRET_MASKING_REGEX_ENVIRONMENT)
+
+for flag in true TRUE True 1 yes y Y; do
+  for lumigo_var in "${lumigo_vars[@]}"; do
+    assert_eq "DASH0_MASK_IN_EXTENSION=$flag turns off distro masking: $lumigo_var=[]" \
+      "[]" "$(mapped "$lumigo_var" DASH0_MASK_IN_EXTENSION="$flag")"
+  done
+done
+
+assert_eq "DASH0_MASK_IN_EXTENSION=true ignores DASH0_MASK_* for the distros" \
+  "[]" "$(mapped LUMIGO_SECRET_MASKING_REGEX_HTTP_REQUEST_BODIES DASH0_MASK_IN_EXTENSION=true \
+    DASH0_MASK_RULES=all DASH0_MASK_REQUEST_BODY='[".*email.*"]')"
+
+assert_eq "DASH0_MASK_IN_EXTENSION=true overrides a user-set LUMIGO_* variable" \
+  "[]" "$(mapped LUMIGO_SECRET_MASKING_REGEX_HTTP_QUERY_PARAMS DASH0_MASK_IN_EXTENSION=true \
+    LUMIGO_SECRET_MASKING_REGEX_HTTP_QUERY_PARAMS=all)"
+
+for flag in false 0 no '' on; do
+  assert_eq "DASH0_MASK_IN_EXTENSION=$flag keeps distro masking as before" \
+    "$DEFAULT_RULES" "$(mapped LUMIGO_SECRET_MASKING_REGEX DASH0_MASK_IN_EXTENSION="$flag")"
+done
+
 # --- wiring -----------------------------------------------------------------------------
 
 assert_eq "runs as part of setup_otel_env, which every language wrapper calls" \

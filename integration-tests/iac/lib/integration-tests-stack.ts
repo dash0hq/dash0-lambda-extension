@@ -132,8 +132,8 @@ function createLambdas(
 }
 
 /**
- * A function with DASH0_MASK_IN_EXTENSION=true that sends payloads its distro does not mask, so
- * a `****` in Dash0 can only come from the extension (test-masking-in-extension.test.ts).
+ * A function with DASH0_MASK_IN_EXTENSION=true, which turns off masking in its distro, so a
+ * `****` in Dash0 can only come from the extension (test-masking-in-extension.test.ts).
  * Masking is runtime-agnostic in the extension, so one runtime and architecture per family.
  */
 function createMaskingInExtensionLambda(

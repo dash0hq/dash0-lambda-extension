@@ -1,18 +1,19 @@
 import https from 'https';
 
 // Payloads the Node distro does not mask: the URL query (upstream redacts only a fixed list of
-// signature parameters) and a form-encoded body (written as a quoted string). With
-// DASH0_MASK_IN_EXTENSION=true the extension masks both with the default patterns.
+// signature parameters) and a form-encoded body (written as a quoted string). Plus a JSON body and
+// an Authorization header, which the distro masks unless DASH0_MASK_IN_EXTENSION=true hands
+// masking to the extension. The extension masks all of them with the default patterns.
 const SECRET = 'XQZ-IT-SECRET';
 
-export async function handler() {
-    const body = `email=jane%40example.com&password=${SECRET}`;
-    const status = await new Promise((resolve, reject) => {
-        const req = https.request(`https://jsonplaceholder.typicode.com/posts?api_token=${SECRET}&page=1`, {
+const post = (url, contentType, body, headers = {}) =>
+    new Promise((resolve, reject) => {
+        const req = https.request(url, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Type': contentType,
                 'Content-Length': Buffer.byteLength(body),
+                ...headers,
             },
         }, (res) => {
             res.resume();
@@ -22,5 +23,18 @@ export async function handler() {
         req.write(body);
         req.end();
     });
+
+export async function handler() {
+    const status = await post(
+        `https://jsonplaceholder.typicode.com/posts?api_token=${SECRET}&page=1`,
+        'application/x-www-form-urlencoded',
+        `email=jane%40example.com&password=${SECRET}`,
+    );
+    await post(
+        'https://jsonplaceholder.typicode.com/posts',
+        'application/json',
+        JSON.stringify({ email: 'jane@example.com', password: SECRET }),
+        { Authorization: `Bearer ${SECRET}` },
+    );
     return { statusCode: status };
 }

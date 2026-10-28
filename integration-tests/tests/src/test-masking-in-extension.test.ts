@@ -4,8 +4,9 @@ import fetch from 'node-fetch';
 import { DASH0_ENDPOINT, DASH0_LAMBDA_TESTS_DATASET, DASH0_TOKEN, MAX_ATTEMPTS, RETRY_DELAY_MS, TEST_TIMEOUT_MS } from './config';
 import { checkMainSpans, getRequestPayload, invokeFunction, RESOURCE_PREFIX } from './utils';
 
-// Sent by every masking_in_extension handler, only in places its distro does not mask. With
-// DASH0_MASK_IN_EXTENSION=true, none of it may reach Dash0.
+// Sent by every masking_in_extension handler. With DASH0_MASK_IN_EXTENSION=true the distros
+// mask nothing, so a `****` in Dash0 can only come from the extension, and none of it may
+// reach Dash0.
 const SECRET = 'XQZ-IT-SECRET';
 // `"key":"****"`, `key=****`, `\"key\":\"****\"` or Python's `'key': '****'`, whichever way the
 // value was serialized.
@@ -104,6 +105,10 @@ const cases: {
             expect(body, 'http_request_body log').toBeDefined();
             expect(JSON.stringify(body)).toMatch(maskedKey('password'));
             expect(JSON.stringify(body)).toContain('jane%40example.com');
+            // The JSON body and Authorization header, which the distro no longer masks.
+            const json = spans.find((s) => /^https:\/\/[^?]*\/posts$/.test(urlOf(s) ?? ''));
+            expect(json, 'JSON POST span').toBeDefined();
+            expect(attr(json, 'http.request.headers')).toMatch(maskedKey('authorization'));
         },
     },
     {
@@ -118,6 +123,8 @@ const cases: {
             expect(body, 'http_request_body log').toBeDefined();
             expect(JSON.stringify(body)).toMatch(maskedKey('password'));
             expect(JSON.stringify(body)).toContain('jane@example.com');
+            // The AWS SDK request body, which the distro no longer masks.
+            expect(JSON.stringify([spans, logs])).toMatch(maskedKey('apiToken'));
         },
     },
     {

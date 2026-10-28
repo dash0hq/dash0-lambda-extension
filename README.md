@@ -182,7 +182,7 @@ Examples:
 - Never capture outgoing HTTP request bodies or sent SQS messages: `DASH0_MASK_REQUEST_BODY=all`. Received messages need `DASH0_MASK_RESPONSE_BODY=all`. The bodies of SQS messages that trigger your function are part of the Lambda event, which only `DASH0_MASK_RULES` covers.
 - Keep the defaults and also mask SQS message bodies: `DASH0_MASK_RULES='[".*pass.*", ".*key.*", ".*secret.*", ".*credential.*", ".*passphrase.*", ".*token.*", ".*signature.*", ".*authorization.*", ".*MessageBody.*"]'`
 
-**Experimental: masking in the extension.** Set `DASH0_MASK_IN_EXTENSION=true` to have the extension apply the `DASH0_MASK_*` variables to the payload attributes of every runtime (HTTP bodies, headers and query strings, messaging and RPC payloads, MongoDB commands, OTLP log records) when it exports them, after your function has responded. The language distros keep masking as well. Function output to CloudWatch is never masked. See [Masking in the extension](docs/masking.md#masking-in-the-extension-experimental).
+**Experimental: masking in the extension.** Set `DASH0_MASK_IN_EXTENSION=true` to have the extension apply the `DASH0_MASK_*` variables to the payload attributes of every runtime (HTTP bodies, headers and query strings, messaging and RPC payloads, MongoDB commands, OTLP log records) when it exports them, after your function has responded. The Node.js and Python distros then stop masking, so all masking happens in the extension. Function output to CloudWatch is never masked. See [Masking in the extension](docs/masking.md#masking-in-the-extension-experimental).
 
 ## Manual Instrumentation
 
