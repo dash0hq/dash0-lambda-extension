@@ -8,8 +8,8 @@ and the two reviews, [`review-codex.md`](review-codex.md) (performance, freeze, 
 ## Decision
 
 **Option (c): mask at export time, on the structs the exporter has already decoded**, behind
-`DASH0_MASK_IN_EXTENSION=true` (default off). Distros keep masking until a per-runtime switch-off
-is gated on the inventory conformance tests.
+`DASH0_MASK_IN_EXTENSION=true` (default off). With the flag on, the distros stop masking (see
+[Handover from the distros](#handover-from-the-distros)).
 
 - Spans and span events: `exporter::_build_traces_request`, after `add_env_vars`, before
   `encode_to_vec`. Every trace export goes through it, including the error path in
@@ -99,13 +99,60 @@ Telemetry API, log attributes with user-chosen keys.
 | Codex 5 | With `SEND_ON_INVOCATION_END=false` CPU contends with the next handler. | Documented above; measured cost is ~5 µs per span with 4 KB bodies on a laptop core, ~70 µs at 128 MB. |
 | Codex 8 | Drain-before-send loses batches on failure; eviction; no byte cap. | **Pre-existing, out of scope.** No raw requeue path was added. |
 
-## What the distros must still do
+## Handover from the distros
 
-- Keep their capture limits. Node should keep calling the Lumigo scrubber (with empty rules once
-  the extension masks) so bodies stay structurally truncated rather than cut mid-token.
-- Stop masking one runtime at a time, after the inventory conformance test for that runtime
-  passes against recorded attribute values.
-- Debug span dumps (`DASH0_DEBUG_SPANDUMP`) bypass the extension; they stay unmasked.
+With `DASH0_MASK_IN_EXTENSION` truthy (`1`, `true`, `yes`, `y`, any case, as in
+`payload_masking::rules()`), `map_masking_env` in `opt/shared.sh` exports
+`LUMIGO_SECRET_MASKING_REGEX` and every `LUMIGO_SECRET_MASKING_REGEX_*` as `[]` and skips the
+`DASH0_MASK_*` mapping. Both Lumigo libraries read `[]` as "no rules"; an unset variable would
+fall back to their built-in defaults. User-set `LUMIGO_*` values are overridden. No distro code
+reads the flag.
+
+| Runtime | Masked before | With the flag on |
+|---|---|---|
+| Node.js | every Dash0 hook through `@lumigo/node-core` `payloadStringify` / `scrubHttpPayload` | nothing masked; `payloadStringify` still truncates structurally (`✂`, valid JSON) |
+| Python | every Dash0 hook through `lumigo_core` `lumigo_dumps*` (`libs/json_utils.py`) | nothing masked; `lumigo_dumps` still truncates (`...[too long]`) |
+| Java | nothing (`SecretScrubber` and `ProcessEnvironmentScrubber` had no caller) | unchanged; the dead scrubbers are removed |
+
+Nothing is lost: every Node and Python attribute the inventory marks as distro-masked is
+`expect: masked` in `masking_inventory.json`. Its `gap` rows for those runtimes (SQS bodies
+holding JSON strings, non-JSON AWS SDK bodies, psycopg row tuples, the FastAPI
+`http.request.query_string`) are not masked by the distros either. Lumigo does not parse JSON
+inside string values or masks plain strings by key.
+
+Tested by `opt/test/shared.test.sh` (mapping), `opt/node/test/masking-env.test.ts` and
+`opt/python/distro/src/test/unit/libs/test_masking_env.py` (distro output unmasked, still cut),
+`tests/masking_e2e.rs` `extension_masks_what_the_distros_leave_unmasked` (the distros' real
+captures, `tests/testdata/distro_captured_{node,python}.json`, go through the binary and come out
+masked), and the `masking-in-extension-*` integration functions.
+
+Node cost of the scrubber, 20 JSON bodies of 3.5 KB cut at 2048 B, laptop: default rules
+1.4 ms, `[]` 0.75 ms, `JSON.parse` + `JSON.stringify` + slice 0.21 ms, slicing a string that is
+already serialized ~0. Keeping Lumigo with `[]` halves the in-handler cost with no distro change.
+Replacing it with plain serialization and a cut saves another ~0.5 ms per 20 bodies. That is part
+of the follow-up below, because it changes every hook and the cut shape (the extension's scanner
+handles mid-token cuts).
+
+Debug span dumps (`DASH0_DEBUG_SPANDUMP`) bypass the extension; with the flag on they are
+unmasked.
+
+### Dead once the flag defaults on
+
+The follow-up PR that flips the default can delete:
+
+- `opt/shared.sh`: `map_masking_env`, `is_valid_mask_value`, `valid_mask_value_of`,
+  `DASH0_DEFAULT_MASK_RULES` (keep exporting the `LUMIGO_*` variables as `[]` while the Lumigo
+  libraries stay), and their tests in `opt/test/shared.test.sh`.
+- Node: the `ScrubContext` arguments and masking semantics of `payloadStringify` /
+  `scrubHttpPayload` in `tools/payloads.ts`, `https/http.ts`, `express`, `fastify`, `undici`,
+  `aws-sdk/hooks.ts`, `amqplib`, `kafkajs`, `redis`, `ioredis`. Replace them with serialization
+  plus a cut at the attribute limit. Drop `opt/node/test/masking-env.test.ts`, apart from the
+  capture fixture.
+- Python: the `context` parameter and `dump_with_context` in `libs/json_utils.py` and its callers
+  (botocore parsers, django, fastapi, flask, httpx, pymongo, requests). Replace them with
+  `dump`. The `lumigo_core` dependency stays for `parse_triggers`.
+- Docs: the per-runtime sections of `docs/masking.md` that describe distro masking, and the
+  "Payloads that are not masked" lists.
 
 ## Follow-ups (not in this prototype)
 
