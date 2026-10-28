@@ -5,29 +5,35 @@ use hyper::{Method, Request};
 use hyper_rustls::HttpsConnectorBuilder;
 use hyper_util::client::legacy::Client;
 use hyper_util::rt::TokioExecutor;
-use once_cell::sync::OnceCell;
 use sha2::{Digest, Sha256};
+use tokio::sync::OnceCell;
 
-static DASH0_TOKEN: OnceCell<Option<String>> = OnceCell::new();
+static DASH0_TOKEN: OnceCell<Option<String>> = OnceCell::const_new();
 
-/// Initialize the Dash0 token, fetching from Secrets Manager if configured.
-/// Must be called once at startup from an async context.
-pub async fn init_dash0_token() {
-    let token = resolve_token().await;
-    if token.is_none() {
-        tracing::warn!(
-            "[{}] No Dash0 token configured, no telemetry will be collected",
-            crate::log_prefix()
-        );
-    }
-    if DASH0_TOKEN.set(token).is_err() {
-        tracing::warn!("[{}] Dash0 token already initialized", crate::log_prefix());
-    }
-}
-
-/// Returns the cached Dash0 token, if any.
-pub fn get_dash0_token() -> Option<String> {
-    DASH0_TOKEN.get().and_then(|t| t.clone())
+/// Resolves the Dash0 token (from Secrets Manager if configured, otherwise the
+/// plain `DASH0_TOKEN` env var), caching the result.
+///
+/// Single-flight: this is called from two places -- a background prefetch
+/// task kicked off shortly after cold start, and the first telemetry export
+/// that actually needs the token -- and both may race. `OnceCell::get_or_init`
+/// guarantees only one of them actually performs the resolution (including
+/// the real network call to Secrets Manager); the other simply awaits that
+/// same in-flight future. Callers never need to check "is a fetch already
+/// running" themselves.
+pub async fn get_dash0_token() -> Option<String> {
+    DASH0_TOKEN
+        .get_or_init(|| async {
+            let token = resolve_token().await;
+            if token.is_none() {
+                tracing::warn!(
+                    "[{}] No Dash0 token configured, no telemetry will be collected",
+                    crate::log_prefix()
+                );
+            }
+            token
+        })
+        .await
+        .clone()
 }
 
 async fn resolve_token() -> Option<String> {
