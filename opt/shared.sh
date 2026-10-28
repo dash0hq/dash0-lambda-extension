@@ -64,7 +64,36 @@ valid_mask_value_of() {
   fi
 }
 
+LUMIGO_MASK_VARS=(
+  LUMIGO_SECRET_MASKING_REGEX
+  LUMIGO_SECRET_MASKING_REGEX_HTTP_REQUEST_BODIES
+  LUMIGO_SECRET_MASKING_REGEX_HTTP_RESPONSE_BODIES
+  LUMIGO_SECRET_MASKING_REGEX_HTTP_REQUEST_HEADERS
+  LUMIGO_SECRET_MASKING_REGEX_HTTP_RESPONSE_HEADERS
+  LUMIGO_SECRET_MASKING_REGEX_HTTP_QUERY_PARAMS
+  LUMIGO_SECRET_MASKING_REGEX_ENVIRONMENT
+)
+
+# Same truthy values as payload_masking::rules() in src/otlp/payload_masking.rs.
+masks_in_extension() {
+  case "$DASH0_MASK_IN_EXTENSION" in
+    1 | [Tt][Rr][Uu][Ee] | [Yy] | [Yy][Ee][Ss]) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 map_masking_env() {
+  # The extension masks at export time, so the distros must not: '[]' means "no rules" to both
+  # Lumigo libraries (unset would fall back to their own defaults), and they still truncate.
+  # This also overrides any LUMIGO_* masking variable the user set.
+  if masks_in_extension; then
+    local var
+    for var in "${LUMIGO_MASK_VARS[@]}"; do
+      export "$var=[]"
+    done
+    return
+  fi
+
   if valid_mask_value_of DASH0_MASK_RULES; then
     export LUMIGO_SECRET_MASKING_REGEX="$DASH0_MASK_RULES"
   elif [[ -z "$LUMIGO_SECRET_MASKING_REGEX" && -z "$LUMIGO_BLACKLIST_REGEX" ]]; then

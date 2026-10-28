@@ -241,7 +241,20 @@ struct Run {
 }
 
 async fn run(env: &[(&str, &str)], invocations: usize) -> Run {
-    let lambda_port = free_port();
+    run_with(env, invocations, &distro_traces).await
+}
+
+/// `run`, with the spans the fake distro flushes per invocation built by `traces`.
+async fn run_with(
+    env: &[(&str, &str)],
+    invocations: usize,
+    traces: &(dyn Fn(&str) -> Vec<u8> + Sync),
+) -> Run {
+    // Bound here, not via free_port(), so parallel tests can't take it in between.
+    let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+        .await
+        .unwrap();
+    let lambda_port = listener.local_addr().unwrap().port();
     let ext_port = free_port();
     let (ext_tx, ext_rx) = mpsc::unbounded_channel::<String>();
     let (inv_tx, inv_rx) = mpsc::unbounded_channel::<(String, String)>();
@@ -251,9 +264,6 @@ async fn run(env: &[(&str, &str)], invocations: usize) -> Run {
         ext_next_calls: Mutex::new(VecDeque::new()),
     });
 
-    let listener = tokio::net::TcpListener::bind(("127.0.0.1", lambda_port))
-        .await
-        .unwrap();
     let server_state = state.clone();
     tokio::spawn(async move {
         loop {
@@ -341,13 +351,7 @@ async fn run(env: &[(&str, &str)], invocations: usize) -> Run {
         .await;
 
         let t = Instant::now();
-        send(
-            "POST",
-            "/v1/traces",
-            distro_traces(&id),
-            "application/x-protobuf",
-        )
-        .await;
+        send("POST", "/v1/traces", traces(&id), "application/x-protobuf").await;
         out.traces_ack.push(t.elapsed());
 
         // The function's own stdout, as the Telemetry API delivers it.
@@ -517,11 +521,9 @@ fn read_exports(dir: &Path) -> Exported {
                         out.env.insert(n.into(), str_value(&kv.value).unwrap());
                     }
                 }
-                let http = rs
-                    .scope_spans
-                    .iter()
-                    .flat_map(|ss| &ss.spans)
-                    .find(|s| s.attributes.iter().any(|kv| kv.key == "url.full"));
+                let http = rs.scope_spans.iter().flat_map(|ss| &ss.spans).find(|s| {
+                    s.name == CAPTURED_SPAN || s.attributes.iter().any(|kv| kv.key == "url.full")
+                });
                 if let (Some(span), true) = (http, out.attrs.is_empty()) {
                     for kv in &span.attributes {
                         if let Some(v) = str_value(&kv.value) {
@@ -809,4 +811,81 @@ async fn every_mask_variable_shapes_the_exported_payloads() {
         assert_no_secret_in_log(&r.stdout, &name);
     }
     let _ = std::fs::remove_file("/tmp/dash0_env_vars");
+}
+
+#[cfg(debug_assertions)]
+const CAPTURED_SPAN: &str = "distro-capture";
+
+/// The aws-lambda span plus one span carrying `attributes` as a distro captured them.
+#[cfg(debug_assertions)]
+fn captured_traces(invocation_id: &str, attributes: &HashMap<String, String>) -> Vec<u8> {
+    let span = |name: &str, attributes: Vec<KeyValue>| Span {
+        trace_id: vec![7; 16],
+        span_id: vec![name.len() as u8; 8],
+        name: name.into(),
+        kind: 3,
+        attributes,
+        ..Default::default()
+    };
+    ExportTraceServiceRequest {
+        resource_spans: vec![ResourceSpans {
+            scope_spans: vec![ScopeSpans {
+                spans: vec![
+                    span("f", vec![kv("faas.invocation_id", invocation_id)]),
+                    span(
+                        CAPTURED_SPAN,
+                        attributes.iter().map(|(k, v)| kv(k, v)).collect(),
+                    ),
+                ],
+                ..Default::default()
+            }],
+            ..Default::default()
+        }],
+    }
+    .encode_to_vec()
+}
+
+/// What the Node and Python distros capture with `DASH0_MASK_IN_EXTENSION=true`: unmasked, as
+/// their own suites assert when they write `tests/testdata/distro_captured_*.json`. With the
+/// flag on, the extension must mask every secret in them and keep everything else.
+#[cfg(debug_assertions)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn extension_masks_what_the_distros_leave_unmasked() {
+    const DISTRO_SECRET: &str = "XQZ-E2E-SECRET";
+    let root = Path::new(env!("CARGO_TARGET_TMPDIR")).join("masking-e2e-distro-captures");
+    for distro in ["node", "python"] {
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join(format!("tests/testdata/distro_captured_{distro}.json"));
+        let captured: HashMap<String, String> =
+            serde_json::from_str(&std::fs::read_to_string(&fixture).unwrap()).unwrap();
+        assert!(!captured.is_empty(), "{distro}: empty fixture");
+        for flag in ["true", "false"] {
+            let dir = root.join(format!("{distro}-{flag}"));
+            let _ = std::fs::remove_dir_all(&dir);
+            std::fs::create_dir_all(&dir).unwrap();
+            let dir_str = dir.to_string_lossy().to_string();
+            let env = [
+                ("DASH0_MASK_IN_EXTENSION", flag),
+                ("DASH0_TEST_EXPORT_DIR", dir_str.as_str()),
+            ];
+            run_with(&env, 1, &|id| captured_traces(id, &captured)).await;
+            let exported = read_exports(&dir);
+            for (key, before) in &captured {
+                let ctx = format!("{distro}, DASH0_MASK_IN_EXTENSION={flag}: {key}");
+                assert!(before.contains(DISTRO_SECRET), "{ctx}: distro masked it");
+                // HTTP bodies leave the span as `dash0_payload` logs (`http_request_body`, ...).
+                let after = exported
+                    .attrs
+                    .get(key)
+                    .or_else(|| exported.logs.get(&key.replace('.', "_")))
+                    .unwrap_or_else(|| panic!("{ctx} not exported"));
+                assert!(after.contains("jane"), "{ctx} = {after}");
+                assert_eq!(
+                    after.contains(DISTRO_SECRET),
+                    flag == "false",
+                    "{ctx} = {after}"
+                );
+            }
+        }
+    }
 }

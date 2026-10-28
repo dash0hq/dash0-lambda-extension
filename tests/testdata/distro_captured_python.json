@@ -1,0 +1,5 @@
+{
+  "http.request.body": "{\"TableName\": \"orders\", \"Item\": {\"email\": \"jane\", \"password\": \"XQZ-E2E-SECRET\"}}",
+  "http.response.body": "{\"Item\": {\"email\": \"jane\", \"apiToken\": \"XQZ-E2E-SECRET\"}, \"ResponseMetadata\": {\"HTTPStatusCode\": 200, \"HTTPHeaders\": {\"x-email\": \"jane\", \"x-api-key\": \"XQZ-E2E-SECRET\"}}}",
+  "http.response.headers": "{\"x-email\": \"jane\", \"x-api-key\": \"XQZ-E2E-SECRET\"}"
+}

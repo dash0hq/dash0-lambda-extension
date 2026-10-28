@@ -1,0 +1,9 @@
+{
+  "http.request.query": "{\"email\":\"jane\",\"password\":\"XQZ-E2E-SECRET\",\"orderId\":\"42\"}",
+  "http.request.headers": "{\"content-type\":\"application/json\",\"x-email\":\"jane\",\"authorization\":\"Bearer XQZ-E2E-SECRET\"}",
+  "http.request.body": "{\"email\":\"jane\",\"apiToken\":\"XQZ-E2E-SECRET\",\"orderId\":42}",
+  "http.response.headers": "{\"content-type\":\"application/json\",\"x-email\":\"jane\",\"x-api-key\":\"XQZ-E2E-SECRET\"}",
+  "http.response.body": "{\"email\":\"jane\",\"sessionToken\":\"XQZ-E2E-SECRET\"}",
+  "messaging.publish.body": "{\"QueueUrl\":\"https://sqs.eu-west-1.amazonaws.com/123456789012/orders\",\"MessageBody\":\"order 42 for jane\",\"MessageAttributes\":{\"email\":{\"DataType\":\"String\",\"StringValue\":\"jane\"},\"password\":{\"DataType\":\"String\",\"StringValue\":\"XQZ-E2E-SECRET\"}}}",
+  "messaging.consume.body": "{\"Messages\":[{\"MessageId\":\"m1\",\"Body\":\"order 42 for jane\",\"MessageAttributes\":{\"email\":{\"DataType\":\"String\",\"StringValue\":\"jane\"},\"password\":{\"DataType\":\"String\",\"StringValue\":\"XQZ-E2E-SECRET\"}}}]}"
+}
