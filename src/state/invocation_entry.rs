@@ -35,6 +35,12 @@ pub struct InvocationEntry {
     pub handler_status: Option<Status>,
     pub traces: Vec<StoredTrace>,
     pub logs: Vec<TelemetryLog>,
+    /// Approximate bytes held by `logs`. Kept in step by `push_log` and the
+    /// telemetry log take functions.
+    pub logs_bytes: usize,
+    /// (trace ID, parent span ID) of child spans that were flushed before the
+    /// invocation ended. See `remember_flushed_span_ids`.
+    pub flushed_span_ids: Option<(Vec<u8>, Vec<u8>)>,
     /// HTTP semconv attributes extracted from an API Gateway v1/v2 or ALB
     /// event before secret masking runs on the stored `event_payload`. Masking
     /// (default rule `.*key.*`, case-insensitive) corrupts structural fields
@@ -68,10 +74,30 @@ impl Default for InvocationEntry {
             handler_status: None,
             traces: Vec::new(),
             logs: Vec::new(),
+            logs_bytes: 0,
+            flushed_span_ids: None,
             http_request_attributes: Vec::new(),
             http_span_name: None,
         }
     }
+}
+
+impl InvocationEntry {
+    pub fn push_log(&mut self, log: TelemetryLog) {
+        self.logs_bytes += telemetry_log_size(&log);
+        self.logs.push(log);
+    }
+}
+
+/// Approximate encoded size of a telemetry log, used for buffer accounting
+/// and for splitting log exports into chunks.
+pub fn telemetry_log_size(log: &TelemetryLog) -> usize {
+    let record = match &log.record {
+        serde_json::Value::String(s) => s.len(),
+        other => other.to_string().len(),
+    };
+    // timestamp, ids and per-record overhead
+    record + 128
 }
 
 static INVOCATION_STORE: Lazy<Mutex<HashMap<String, InvocationEntry>>> =
@@ -111,6 +137,22 @@ pub fn get_http_request_data(invocation_id: &str) -> (Vec<KeyValue>, Option<Stri
         .get(invocation_id)
         .map(|e| (e.http_request_attributes.clone(), e.http_span_name.clone()))
         .unwrap_or_default()
+}
+
+/// Lightweight getter: whether IDs of early-flushed child spans are recorded.
+pub fn has_flushed_span_ids(invocation_id: &str) -> bool {
+    INVOCATION_STORE
+        .lock()
+        .get(invocation_id)
+        .is_some_and(|e| e.flushed_span_ids.is_some())
+}
+
+/// Lightweight getter: returns the IDs of early-flushed child spans.
+pub fn get_flushed_span_ids(invocation_id: &str) -> Option<(Vec<u8>, Vec<u8>)> {
+    INVOCATION_STORE
+        .lock()
+        .get(invocation_id)
+        .and_then(|e| e.flushed_span_ids.clone())
 }
 
 /// Lightweight getter: returns only the start_time.
@@ -292,7 +334,7 @@ pub fn store_telemetry_logs(logs: Vec<TelemetryLog>) {
             .invocation_id
             .clone()
             .unwrap_or_else(|| "__unknown__".to_string());
-        store.entry(key).or_default().logs.push(log);
+        store.entry(key).or_default().push_log(log);
     }
 }
 
@@ -306,6 +348,7 @@ pub fn take_all_telemetry_logs(exclude_invocation_id: Option<&str>) -> Vec<Telem
             continue;
         }
         all_logs.append(&mut entry.logs);
+        entry.logs_bytes = 0;
     }
     all_logs
 }
@@ -356,6 +399,30 @@ pub fn take_all_traces() -> Vec<StoredTrace> {
         all_traces.append(&mut entry.traces);
     }
     all_traces
+}
+
+/// Take the traces that may be sent while the invocation is still running:
+/// everything except requests that carry the Lambda handler span.
+pub fn take_flushable_traces() -> Vec<StoredTrace> {
+    let mut store = INVOCATION_STORE.lock();
+    let mut taken = Vec::new();
+    for entry in store.values_mut() {
+        let (pinned, flushable) = std::mem::take(&mut entry.traces)
+            .into_iter()
+            .partition(|t| t.contains_handler_span);
+        entry.traces = pinned;
+        taken.extend::<Vec<StoredTrace>>(flushable);
+    }
+    taken
+}
+
+/// Bytes of buffered traces and telemetry logs across all invocations.
+pub fn buffered_bytes() -> usize {
+    INVOCATION_STORE
+        .lock()
+        .values()
+        .map(|e| e.traces.iter().map(|t| t.body.len()).sum::<usize>() + e.logs_bytes)
+        .sum()
 }
 
 /// Snapshot all traces from every invocation entry (non-destructive).
@@ -439,6 +506,7 @@ mod tests {
             headers: hyper::HeaderMap::new(),
             body: vec![],
             invocation_ids: invocation_ids.into_iter().map(String::from).collect(),
+            contains_handler_span: false,
         }
     }
 

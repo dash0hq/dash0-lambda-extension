@@ -212,7 +212,7 @@ pub async fn invocation_response_proxy(
             None,
         ) {
             invocation_entry::update(&id, |entry| {
-                entry.logs.push(log);
+                entry.push_log(log);
             });
         }
 
@@ -338,7 +338,7 @@ async fn validate_and_mangle_next_event(
         entry.http_request_attributes = http_request_attributes;
         entry.http_span_name = http_span_name;
         if let Some(log) = event_log {
-            entry.logs.push(log);
+            entry.push_log(log);
         }
     });
 

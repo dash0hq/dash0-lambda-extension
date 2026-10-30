@@ -137,6 +137,7 @@ pub fn build_synthetic_trace(
         headers,
         body: export.encode_to_vec(),
         invocation_ids: vec![invocation_id.to_string()],
+        contains_handler_span: true,
     })
 }
 
@@ -349,7 +350,7 @@ fn extract_http_body_logs(span: &mut Span) {
                 Some(span_id_hex.clone()),
             ) {
                 invocation_entry::update(&invocation_id, |entry| {
-                    entry.logs.push(log);
+                    entry.push_log(log);
                 });
             }
         }
@@ -1189,6 +1190,7 @@ mod tests {
             headers: hyper::HeaderMap::new(),
             body: request.encode_to_vec(),
             invocation_ids: vec![invocation_id.to_string()],
+            contains_handler_span: false,
         };
         store_trace(invocation_id, trace);
 
@@ -1309,6 +1311,31 @@ mod tests {
 
         assert_eq!(stored.trace_id.unwrap(), expected_trace_id);
         assert_eq!(stored.span_id.unwrap(), expected_span_id);
+    }
+
+    /// The receiver marks a request as carrying the handler span (and keeps it
+    /// buffered until the invocation ends) only when this returns invocation
+    /// IDs. A child span that also has faas.invocation_id must not count.
+    #[test]
+    #[serial]
+    fn process_trace_request_reports_ids_only_for_handler_scope() {
+        let invocation_id = "inv-child-scope";
+        let mut request = make_request_with_scope(
+            "io.opentelemetry.aws-sdk-2.2",
+            make_span_with_invocation(invocation_id),
+        );
+        let mut invocation_ids = Vec::new();
+        let mut encoded_body = Vec::new();
+        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+        assert!(invocation_ids.is_empty());
+
+        let mut request = make_request_with_scope(
+            "io.opentelemetry.aws-lambda-events-2.2",
+            make_span_with_invocation(invocation_id),
+        );
+        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+        assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
+        invocation_entry::remove(invocation_id);
     }
 
     #[test]
@@ -1689,6 +1716,7 @@ mod tests {
             headers: hyper::HeaderMap::new(),
             body: request.encode_to_vec(),
             invocation_ids: vec![invocation_id.to_string()],
+            contains_handler_span: false,
         }
     }
 
@@ -1730,6 +1758,48 @@ mod tests {
 
         assert_eq!(hex::encode(&got_trace), trace_id_hex);
         assert_eq!(hex::encode(&got_span), span_id_hex);
+    }
+
+    /// Timeout path: the child spans were flushed early, so they are no longer
+    /// buffered when the synthetic handler span is built. It must still use the
+    /// trace ID and parent span ID they point to, not the X-Ray/hash fallback.
+    #[test]
+    #[serial]
+    fn synthetic_handler_span_parents_child_spans_flushed_early() {
+        let invocation_id = "inv-flushed-early";
+        invocation_entry::remove(invocation_id);
+        // X-Ray header handling already stored a different span id.
+        invocation_entry::update(invocation_id, |entry| {
+            entry.trace_id = Some("dd".repeat(16));
+            entry.span_id = Some("ee".repeat(8));
+        });
+        let trace_id = vec![0xAA; 16];
+        let handler_span_id = vec![0xCC; 8];
+        invocation_entry::store_trace_by_id(
+            invocation_id,
+            build_stored_trace_with_ids(
+                invocation_id,
+                trace_id.clone(),
+                vec![0xBB; 8],
+                handler_span_id.clone(),
+            ),
+        );
+
+        // Early flush while the invocation runs.
+        let flushed = invocation_entry::take_flushable_traces();
+        super::remember_flushed_span_ids(invocation_id, &flushed);
+
+        let synthetic = build_synthetic_trace(invocation_id, Some("timeout"), None, &[])
+            .expect("synthetic trace");
+        invocation_entry::remove(invocation_id);
+        let span = ExportTraceServiceRequest::decode(synthetic.body.as_slice())
+            .unwrap()
+            .resource_spans[0]
+            .scope_spans[0]
+            .spans[0]
+            .clone();
+        assert_eq!(span.trace_id, trace_id);
+        assert_eq!(span.span_id, handler_span_id);
     }
 
     #[test]
@@ -1835,6 +1905,7 @@ mod tests {
             headers: hyper::HeaderMap::new(),
             body: request.encode_to_vec(),
             invocation_ids: vec![invocation_id.to_string()],
+            contains_handler_span: false,
         }
     }
 
@@ -2330,6 +2401,7 @@ mod tests {
                 headers: hyper::HeaderMap::new(),
                 body,
                 invocation_ids: vec![invocation_id.to_string()],
+                contains_handler_span: false,
             },
         );
     }
@@ -2519,6 +2591,7 @@ mod tests {
                 headers: hyper::HeaderMap::new(),
                 body,
                 invocation_ids: vec![invocation_id.to_string()],
+                contains_handler_span: false,
             },
         );
 
@@ -2536,7 +2609,12 @@ mod tests {
     }
 }
 
-fn get_trace_span_ids(invocation_id: &str, existing_traces: &[StoredTrace]) -> (Vec<u8>, Vec<u8>) {
+/// Trace ID and handler span ID that the invocation's buffered spans point
+/// to: the trace ID and parent span ID of a span whose parent is not among them.
+fn ids_from_traces(
+    invocation_id: &str,
+    existing_traces: &[StoredTrace],
+) -> (Option<Vec<u8>>, Option<Vec<u8>>) {
     let mut trace_id: Option<Vec<u8>> = None;
     let mut span_id: Option<Vec<u8>> = None;
 
@@ -2575,6 +2653,38 @@ fn get_trace_span_ids(invocation_id: &str, existing_traces: &[StoredTrace]) -> (
                     span_id = Some(span.parent_span_id.clone());
                 }
             }
+        }
+    }
+    (trace_id, span_id)
+}
+
+/// Called before child spans are flushed while the invocation still runs.
+/// Keeps the IDs they point to, so a synthetic handler span built later (on
+/// timeout or crash) still becomes their parent.
+pub fn remember_flushed_span_ids(invocation_id: &str, traces: &[StoredTrace]) {
+    if invocation_entry::has_flushed_span_ids(invocation_id) {
+        return;
+    }
+    // Decode one request at a time and stop at the first hit: decoding every
+    // flushed request cost ~8% of the extension's CPU on large invocations.
+    for trace in traces {
+        if let (Some(trace_id), Some(span_id)) =
+            ids_from_traces(invocation_id, std::slice::from_ref(trace))
+        {
+            invocation_entry::update(invocation_id, |entry| {
+                entry.flushed_span_ids.get_or_insert((trace_id, span_id));
+            });
+            return;
+        }
+    }
+}
+
+fn get_trace_span_ids(invocation_id: &str, existing_traces: &[StoredTrace]) -> (Vec<u8>, Vec<u8>) {
+    let (mut trace_id, mut span_id) = ids_from_traces(invocation_id, existing_traces);
+    if trace_id.is_none() || span_id.is_none() {
+        if let Some((t, s)) = invocation_entry::get_flushed_span_ids(invocation_id) {
+            trace_id = trace_id.or(Some(t));
+            span_id = span_id.or(Some(s));
         }
     }
 

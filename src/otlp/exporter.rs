@@ -6,6 +6,7 @@ use flate2::write::GzEncoder;
 use flate2::Compression;
 use http_body_util::Full;
 use hyper::{header, Request, Uri};
+use once_cell::sync::Lazy;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use prost::Message;
 
@@ -16,11 +17,44 @@ use crate::route::{ReqBody, HTTPS_CLIENT};
 use crate::state::invocation_data::{
     take_logs, take_metrics, StoredLog, StoredMetric, StoredTrace,
 };
+use crate::state::invocation_entry::telemetry_log_size;
 use crate::util::parsers::parse_otlp_endpoint;
 
+/// Upper bound for the uncompressed body of one export request. Dash0 ingress
+/// rejects bodies above ~20 MiB (decompressed) with `400 request body too
+/// large`. Building a request also holds about 3x its size in decoded
+/// structs, so this bounds the flush memory too.
+const MAX_REQUEST_BYTES: usize = 4 * 1024 * 1024;
+
+/// Serializes flushes, so a flush at invocation end waits for an early flush
+/// that is still sending.
+static FLUSH_LOCK: Lazy<tokio::sync::Mutex<()>> = Lazy::new(|| tokio::sync::Mutex::new(()));
+
 pub async fn flush_traces() {
+    let _guard = FLUSH_LOCK.lock().await;
     let traces = crate::state::invocation_entry::take_all_traces();
     send_traces(traces).await;
+}
+
+/// Early flush while the invocation is still running: everything buffered,
+/// except the request with the handler span, which is still changed when the
+/// return value is captured.
+pub async fn flush_while_running() {
+    let _guard = FLUSH_LOCK.lock().await;
+    let traces = crate::state::invocation_entry::take_flushable_traces();
+    let mut ids: Vec<&String> = traces
+        .iter()
+        .filter_map(|t| t.invocation_ids.first())
+        .collect();
+    ids.sort();
+    ids.dedup();
+    for id in ids {
+        crate::otlp::span_mutations::remember_flushed_span_ids(id, &traces);
+    }
+    send_traces(traces).await;
+    flush_otlp_logs().await;
+    flush_telemetry_logs(None).await;
+    flush_metrics().await;
 }
 
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
@@ -29,19 +63,42 @@ use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequ
 use opentelemetry_proto::tonic::logs::v1::{ResourceLogs, ScopeLogs};
 
 pub async fn flush_logs(exclude_invocation_id: Option<&str>) {
+    let _guard = FLUSH_LOCK.lock().await;
     flush_otlp_logs().await;
     flush_telemetry_logs(exclude_invocation_id).await;
     flush_metrics().await;
 }
 
+/// Splits `items` into consecutive chunks of at most MAX_REQUEST_BYTES. An
+/// item larger than the limit gets a chunk of its own.
+fn chunk_by_size<T>(items: Vec<T>, size: impl Fn(&T) -> usize) -> Vec<Vec<T>> {
+    let mut chunks = Vec::new();
+    let mut current = Vec::new();
+    let mut current_bytes = 0;
+    for item in items {
+        let item_bytes = size(&item);
+        if !current.is_empty() && current_bytes + item_bytes > MAX_REQUEST_BYTES {
+            chunks.push(std::mem::take(&mut current));
+            current_bytes = 0;
+        }
+        current_bytes += item_bytes;
+        current.push(item);
+    }
+    if !current.is_empty() {
+        chunks.push(current);
+    }
+    chunks
+}
+
 pub async fn flush_telemetry_logs(exclude_invocation_id: Option<&str>) {
     let logs = crate::state::invocation_entry::take_all_telemetry_logs(exclude_invocation_id);
-
-    if logs.is_empty() {
-        return;
+    for chunk in chunk_by_size(logs, telemetry_log_size) {
+        send_telemetry_logs(&chunk).await;
     }
+}
 
-    let log_records = map_logs_to_otlp(&logs);
+async fn send_telemetry_logs(logs: &[crate::state::invocation_data::TelemetryLog]) {
+    let log_records = map_logs_to_otlp(logs);
 
     if log_records.is_empty() {
         return;
@@ -77,51 +134,35 @@ pub async fn flush_telemetry_logs(exclude_invocation_id: Option<&str>) {
 }
 
 pub async fn flush_otlp_logs() {
-    let logs = take_logs();
-
-    if logs.is_empty() {
-        return;
+    for chunk in chunk_by_size(take_logs(), |l| l.body.len()) {
+        let log_count = chunk.len();
+        if let Some(body) = build_logs_request(chunk) {
+            let _ = send_request(
+                "/v1/logs",
+                hyper::Method::POST,
+                body,
+                log_count,
+                "otlp logs",
+            )
+            .await;
+        }
     }
-
-    let log_count = logs.len();
-
-    let body = match build_logs_request(logs) {
-        Some(req) => req,
-        None => return,
-    };
-
-    let _ = send_request(
-        "/v1/logs",
-        hyper::Method::POST,
-        body,
-        log_count,
-        "otlp logs",
-    )
-    .await;
 }
 
 pub async fn flush_metrics() {
-    let metrics = take_metrics();
-
-    if metrics.is_empty() {
-        return;
+    for chunk in chunk_by_size(take_metrics(), |m| m.body.len()) {
+        let metric_count = chunk.len();
+        if let Some(body) = build_metrics_request(chunk) {
+            let _ = send_request(
+                "/v1/metrics",
+                hyper::Method::POST,
+                body,
+                metric_count,
+                "otlp metrics",
+            )
+            .await;
+        }
     }
-
-    let metric_count = metrics.len();
-
-    let body = match build_metrics_request(metrics) {
-        Some(req) => req,
-        None => return,
-    };
-
-    let _ = send_request(
-        "/v1/metrics",
-        hyper::Method::POST,
-        body,
-        metric_count,
-        "otlp metrics",
-    )
-    .await;
 }
 
 fn build_metrics_request(metrics: Vec<StoredMetric>) -> Option<Vec<u8>> {
@@ -163,25 +204,19 @@ fn build_logs_request(logs: Vec<StoredLog>) -> Option<Vec<u8>> {
 }
 
 pub async fn send_traces(traces: Vec<StoredTrace>) {
-    if traces.is_empty() {
-        return;
+    for chunk in chunk_by_size(traces, |t| t.body.len()) {
+        let trace_count = chunk.len();
+        if let Some(body) = _build_traces_request(chunk) {
+            let _ = send_request(
+                "/v1/traces",
+                hyper::Method::POST,
+                body,
+                trace_count,
+                "buffered traces",
+            )
+            .await;
+        }
     }
-
-    let trace_count = traces.len();
-
-    let body = match _build_traces_request(traces) {
-        Some(req) => req,
-        None => return,
-    };
-
-    let _ = send_request(
-        "/v1/traces",
-        hyper::Method::POST,
-        body,
-        trace_count,
-        "buffered traces",
-    )
-    .await;
 }
 
 fn _build_traces_request(traces: Vec<StoredTrace>) -> Option<Vec<u8>> {
@@ -441,6 +476,7 @@ mod tests {
             headers: header::HeaderMap::new(),
             body: export_request.encode_to_vec(),
             invocation_ids,
+            contains_handler_span: false,
         }
     }
 
@@ -451,6 +487,7 @@ mod tests {
             headers: header::HeaderMap::new(),
             body: vec![0xFF, 0xFF, 0xFF], // Invalid protobuf
             invocation_ids,
+            contains_handler_span: false,
         }
     }
 
@@ -619,6 +656,96 @@ mod tests {
         );
         let body_bytes = req.into_body().collect().await.unwrap().to_bytes();
         assert_eq!(body_bytes.as_ref(), body.as_slice());
+    }
+
+    /// Regression for a long, high-volume invocation (Java agent posting
+    /// 512-span batches): the flush must split into requests below the ingress
+    /// limit (~20 MiB uncompressed) instead of one merged request, keep every
+    /// span, and an early flush must leave the handler span buffered.
+    #[test]
+    #[serial_test::serial]
+    fn flush_splits_large_invocation_and_keeps_handler_span_pinned() {
+        use crate::state::invocation_entry;
+        use opentelemetry_proto::tonic::common::v1::any_value::Value;
+        use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue};
+        use opentelemetry_proto::tonic::trace::v1::{ScopeSpans, Span};
+
+        let invocation_id = "inv-large";
+        let _ = invocation_entry::take_all_traces();
+
+        let batch = |first: usize| {
+            let spans = (first..first + 512)
+                .map(|i| Span {
+                    span_id: (i as u64).to_be_bytes().to_vec(),
+                    attributes: vec![KeyValue {
+                        key: "url.full".to_string(),
+                        value: Some(AnyValue {
+                            value: Some(Value::StringValue("x".repeat(400))),
+                        }),
+                    }],
+                    ..Default::default()
+                })
+                .collect();
+            ExportTraceServiceRequest {
+                resource_spans: vec![ResourceSpans {
+                    scope_spans: vec![ScopeSpans {
+                        spans,
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }],
+            }
+            .encode_to_vec()
+        };
+        let store = |body: Vec<u8>, contains_handler_span: bool| {
+            invocation_entry::store_trace_by_id(
+                invocation_id,
+                StoredTrace {
+                    method: Method::POST,
+                    path_and_query: "/v1/traces".to_string(),
+                    headers: header::HeaderMap::new(),
+                    body,
+                    invocation_ids: vec![invocation_id.to_string()],
+                    contains_handler_span,
+                },
+            )
+        };
+
+        // ~24 MiB of child spans: over the ingress limit as a single request.
+        let batches = 100;
+        for b in 0..batches {
+            store(batch(b * 512), false);
+        }
+        store(batch(1_000_000), true);
+
+        let flushable = invocation_entry::take_flushable_traces();
+        assert_eq!(flushable.len(), batches);
+        let remaining = invocation_entry::take_all_traces();
+        assert_eq!(remaining.len(), 1);
+        assert!(remaining[0].contains_handler_span);
+
+        let total: usize = flushable.iter().map(|t| t.body.len()).sum();
+        assert!(total > 20 * 1024 * 1024);
+
+        let mut spans = 0;
+        let chunks = chunk_by_size(flushable, |t| t.body.len());
+        assert!(chunks.len() > 1);
+        for chunk in chunks {
+            let body = _build_traces_request(chunk).expect("body");
+            assert!(
+                body.len() <= MAX_REQUEST_BYTES,
+                "request of {} bytes",
+                body.len()
+            );
+            spans += ExportTraceServiceRequest::decode(body.as_slice())
+                .unwrap()
+                .resource_spans
+                .iter()
+                .flat_map(|rs| &rs.scope_spans)
+                .map(|ss| ss.spans.len())
+                .sum::<usize>();
+        }
+        assert_eq!(spans, batches * 512);
     }
 
     #[test]

@@ -83,6 +83,9 @@ The extension layers are published to the following AWS regions:
 
 * `DASH0_DISTRO_DEBUG` - When set to true, additional logs related to tracing and auto-instrumentation will be emitted. Default: `false`.
 
+* `DASH0_FLUSH_THRESHOLD` - Buffered telemetry (traces, logs and metrics together), in KB, that triggers a send while the invocation is still running. Default: `2048`.
+* `DASH0_FLUSH_INTERVAL` - Longest time, in milliseconds, that buffered telemetry waits while the invocation is still running. `0` turns off time-based flushing. Default: `10000`. Short invocations reach neither limit and are sent once at invocation end.
+* `DASH0_MAX_BUFFER_SIZE` - Hard limit, in KB, for buffered telemetry. Telemetry received while the buffer is full is dropped and the extension logs a warning, so telemetry cannot make the function run out of memory. Default: 10% of the function memory, between 8 MiB and 64 MiB.
 * `DASH0_REQUEST_TIMEOUT` - Timeout in milliseconds for HTTP requests to the backend. Default: `2000`.
 
 * `DASH0_CREATE_PAYLOAD_LOG_RECORDS` - When set to `true` (the default), the extension creates log records containing the request and response payloads for the lambda invocation and each client call. Set to `false` to disable. Default: `true`.

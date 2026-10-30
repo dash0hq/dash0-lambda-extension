@@ -226,6 +226,7 @@ pub fn create_spans(
         headers,
         body: export.encode_to_vec(),
         invocation_ids: vec![invocation_id.to_string()],
+        contains_handler_span: false,
     })
 }
 
