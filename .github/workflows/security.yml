@@ -107,11 +107,10 @@ jobs:
             module-details-from-path \
             debug \
             ms \
-            acorn \
+            es-module-lexer \
             cjs-module-lexer; do
             cp -r "opt/node/node_modules/$pkg" build/stage-node/node_modules/
           done
-          cp -r opt/node/node_modules/acorn-import-attributes build/stage-node/node_modules/ 2>/dev/null || true
           cp opt/node/dist/init.mjs build/stage-node/
       - name: Install Grype
         run: curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin

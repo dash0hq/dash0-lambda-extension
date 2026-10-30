@@ -13,7 +13,8 @@ const decoder = new TextDecoder('utf-8', { fatal: true });
 const nodeMajor = Number(process.versions.node.split('.')[0]);
 const undiciVersion = process.versions.undici;
 const supported = ([20, 22].includes(nodeMajor) && undiciVersion?.startsWith('6.')) ||
-  (nodeMajor === 24 && undiciVersion?.startsWith('7.'));
+  (nodeMajor === 24 && undiciVersion?.startsWith('7.')) ||
+  (nodeMajor === 26 && undiciVersion?.startsWith('8.'));
 let cachedSetting: string | undefined;
 type MaskingRules = RegExp | 'all' | null;
 let cachedRules: MaskingRules | undefined;
@@ -77,11 +78,12 @@ function maskBody(bytes: Buffer, rules: MaskingRules): string | undefined {
   return result.length <= Math.min(getSpanAttributeMaxLength(), DECODED_LIMIT) ? result : undefined;
 }
 
-type RequestCallbacks = {
-  onData: (...args: any[]) => any;
-  onComplete: (...args: any[]) => any;
-  onError: (...args: any[]) => any;
-};
+// Undici 8 renamed the Request callbacks. Their arguments (chunk, trailers, error) are unchanged.
+const callbackNames = undiciVersion?.startsWith('8.')
+  ? ['onResponseData', 'onResponseEnd', 'onResponseError'] as const
+  : ['onData', 'onComplete', 'onError'] as const;
+const [DATA, COMPLETE, ERROR] = callbackNames;
+type RequestCallbacks = Record<(typeof callbackNames)[number], (...args: any[]) => any>;
 
 type CaptureState = {
   span?: Span;
@@ -96,8 +98,8 @@ type CaptureState = {
   callbacks: PropertyDescriptorMap;
 };
 const states = new WeakMap<RequestCallbacks, CaptureState>();
-const callbackNames = ['onData', 'onComplete', 'onError'] as const;
-const callbackCache = new WeakMap<object, { originals: RequestCallbacks; callbacks: PropertyDescriptorMap }>();
+type Callback = (...args: any[]) => any;
+const callbackCache = new WeakMap<object, { originals: Callback[]; callbacks: PropertyDescriptorMap }>();
 
 function releaseCapture(target: RequestCallbacks, state: CaptureState): void {
   if (state.released) return;
@@ -118,15 +120,15 @@ function releaseCapture(target: RequestCallbacks, state: CaptureState): void {
 // and arguments. An unsupported receiver simply receives the original callback.
 function callbackDescriptors(target: RequestCallbacks): PropertyDescriptorMap | undefined {
   const prototype = Object.getPrototypeOf(target);
-  const { onData, onComplete, onError } = target;
+  const onData = target[DATA], onComplete = target[COMPLETE], onError = target[ERROR];
   const cached = callbackCache.get(prototype);
   if (cached) {
-    if (cached.originals.onData !== onData || cached.originals.onComplete !== onComplete ||
-      cached.originals.onError !== onError) return;
+    if (cached.originals[0] !== onData || cached.originals[1] !== onComplete ||
+      cached.originals[2] !== onError) return;
     return cached.callbacks;
   }
   const callbacks = {
-    onData: { configurable: true, writable: true, value: function captureOnData(this: RequestCallbacks) {
+    [DATA]: { configurable: true, writable: true, value: function captureOnData(this: RequestCallbacks) {
       let state: CaptureState | undefined;
       try {
         state = states.get(this);
@@ -150,7 +152,7 @@ function callbackDescriptors(target: RequestCallbacks): PropertyDescriptorMap | 
       try { return onData.apply(this, arguments); }
       catch (error) { if (state) releaseCapture(this, state); throw error; }
     } },
-    onComplete: { configurable: true, writable: true, value: function captureOnComplete(this: RequestCallbacks) {
+    [COMPLETE]: { configurable: true, writable: true, value: function captureOnComplete(this: RequestCallbacks) {
       let state: CaptureState | undefined;
       try {
         state = states.get(this);
@@ -171,7 +173,7 @@ function callbackDescriptors(target: RequestCallbacks): PropertyDescriptorMap | 
       // The original publishes trailers and ends the OTel span synchronously.
       return onComplete.apply(this, arguments);
     } },
-    onError: { configurable: true, writable: true, value: function captureOnError(this: RequestCallbacks) {
+    [ERROR]: { configurable: true, writable: true, value: function captureOnError(this: RequestCallbacks) {
       try {
         const state = states.get(this);
         if (state) releaseCapture(this, state);
@@ -179,7 +181,7 @@ function callbackDescriptors(target: RequestCallbacks): PropertyDescriptorMap | 
       return onError.apply(this, arguments);
     } },
   };
-  callbackCache.set(prototype, { originals: { onData, onComplete, onError }, callbacks });
+  callbackCache.set(prototype, { originals: [onData, onComplete, onError], callbacks });
   return callbacks;
 }
 

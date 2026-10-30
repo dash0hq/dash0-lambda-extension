@@ -319,6 +319,20 @@ describe('Dash0UndiciInstrumentation', () => {
       expect(headers['x-request-id']).toBe('abc123');
     });
 
+    test('parses HTTP/2 object headers (undici 8)', () => {
+      const { responseHook } = getHooks();
+      const span = createMockSpan();
+
+      responseHook(span, {
+        request: {},
+        response: { headers: { 'Content-Type': 'application/json', 'set-cookie': ['a=1', 'b=2'] } },
+      });
+
+      const headers = JSON.parse(span.attributes['http.response.headers']);
+      expect(headers['content-type']).toBe('application/json');
+      expect(headers['set-cookie']).toBe('a=1, b=2');
+    });
+
     test('handles empty headers array', () => {
       const { responseHook } = getHooks();
       const span = createMockSpan();

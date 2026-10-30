@@ -155,14 +155,18 @@ const captureWith = (input: Record<string, string>, responseBody: unknown = fixt
       const Undici = require('../distro/src/instrumentations/undici/UndiciInstrumentation').default;
       const undici = new Undici().getInstrumentation();
       const fetchSpan = span();
-      const request = Object.create({ onData() {}, onComplete() {}, onError() {} });
+      // Undici 8 (Node 26) renamed the Request callbacks; fake the ones the running Node uses.
+      const [onData, onComplete, onError] = process.versions.undici?.startsWith('8.')
+        ? ['onResponseData', 'onResponseEnd', 'onResponseError']
+        : ['onData', 'onComplete', 'onError'];
+      const request = Object.create({ [onData]() {}, [onComplete]() {}, [onError]() {} });
       try {
         undici.getConfig().responseHook(fetchSpan, {
           request,
           response: { headers: [Buffer.from('content-type'), Buffer.from('application/graphql-response+json')] },
         });
-        request.onData(Buffer.from(JSON.stringify(responseBody)));
-        request.onComplete();
+        request[onData](Buffer.from(JSON.stringify(responseBody)));
+        request[onComplete]();
       } finally {
         undici.disable();
       }
