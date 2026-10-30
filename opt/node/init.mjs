@@ -64,7 +64,13 @@ try {
         meterProvider
     });
 
-    register('import-in-the-middle/hook.mjs', import.meta.url);
+    if (Number(process.versions.node.split('.')[0]) >= 26) {
+        // Node.js 26 deprecates module.register() (DEP0205). Use the synchronous
+        // module.registerHooks() loader there; older runtimes keep the async loader.
+        (await import('import-in-the-middle/register-hooks.mjs')).register();
+    } else {
+        register('import-in-the-middle/hook.mjs', import.meta.url);
+    }
 
 } catch (err) {
     console.error('Error initializing Dash0 tracer:', err);
