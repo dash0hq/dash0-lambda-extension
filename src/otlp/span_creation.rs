@@ -183,10 +183,10 @@ pub fn create_spans(
 
     if spans.is_empty() {
         tracing::info!(
-            "[{}] No spans created for invocation {}, skipping trace creation. data: {:?}",
+            "[{}] No spans created for invocation {}, skipping trace creation. handler attributes: {}",
             crate::log_prefix(),
             invocation_id,
-            data
+            data.handler_attributes.len()
         );
         return None;
     }

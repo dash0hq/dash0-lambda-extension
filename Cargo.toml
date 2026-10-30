@@ -36,3 +36,9 @@ default = []
 [dev-dependencies]
 tokio-test = "0.4"
 serial_test = "3.0"
+criterion = { version = "0.5", default-features = false, features = ["cargo_bench_support"] }
+
+[[bench]]
+name = "masking"
+path = "benchmarks/masking/masking.rs"
+harness = false
