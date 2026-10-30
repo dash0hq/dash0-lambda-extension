@@ -55,7 +55,7 @@ Masking of the Lambda event, the return value and environment variables is done 
 | Kafka message sent | `messaging.produce.body` | `DASH0_MASK_QUERY_PARAMS`, then `DASH0_MASK_RULES` ² | ✅ `kafkajs` | ❌ | ❌ |
 | RabbitMQ message published | `messaging.publish.body` | `DASH0_MASK_QUERY_PARAMS`, then `DASH0_MASK_RULES` ² | ✅ `amqplib` | ❌ | ❌ |
 | Kafka or RabbitMQ message received | `messaging.consume.body` | `DASH0_MASK_RESPONSE_BODY`, then `DASH0_MASK_RULES` | ✅ | ❌ | ❌ |
-| Redis command | `db.statement` | `DASH0_MASK_REQUEST_BODY`, then `DASH0_MASK_RULES` | ✅ `redis`, `ioredis` | ❌ | ❌ |
+| Redis command | `db.statement` (`redis`), `db.query.text` (`ioredis`) | `DASH0_MASK_REQUEST_BODY`, then `DASH0_MASK_RULES` | ✅ `redis`, `ioredis` | ❌ | ❌ |
 | Redis reply | `db.response.body` | `DASH0_MASK_RESPONSE_BODY`, then `DASH0_MASK_RULES` | ✅ `redis`, `ioredis` | ❌ | ❌ |
 | Lambda event and return value | `dash0_payload` log records | `DASH0_MASK_RULES` | ✅ | ✅ | ✅ |
 | Environment variables | `process.environment_variable.*` resource attributes | `DASH0_MASK_ENV_VARS`, then `DASH0_MASK_RULES` | ✅ | ✅ | ✅ |
@@ -726,7 +726,7 @@ Patterns are checked against keys, so they never see inside a string. Several pa
 | SQS message body | `MessageBody` and `Body` keys inside `messaging.publish.body` and `messaging.consume.body` | A pattern for the key, or `all` | ✅ | ❌ | ❌ |
 | API Gateway request body | `body` key inside the Lambda event | A pattern for the key | ✅ | ✅ | ✅ |
 | Kafka and RabbitMQ messages | the whole `messaging.produce.body`, `messaging.publish.body` or `messaging.consume.body` | `all` only | ✅ | ❌ | ❌ |
-| Redis commands and replies | the whole `db.statement` or `db.response.body` | `all` only ³ | ✅ | ❌ | ❌ |
+| Redis commands and replies | the whole `db.statement`, `db.query.text` or `db.response.body` | `all` only ³ | ✅ | ❌ | ❌ |
 
 ³ Replies from `redis` that are objects, such as `HGETALL`, are masked by key. `ioredis` writes object replies as `"[object Object]"`.
 
@@ -820,7 +820,7 @@ DASH0_MASK_RESPONSE_BODY=all    # messages received from Kafka, RabbitMQ or SQS
 
 Python and Java send Redis commands and replies unmasked.
 
-The command and its arguments are captured as one string:
+The command and its arguments are captured as one string, in `db.statement` for `redis` and in `db.query.text` for `ioredis`:
 
 ```bash
 DASH0_MASK_RULES='[".*email.*"]'
@@ -857,8 +857,8 @@ These attributes are captured as they are. None of the masking variables apply t
 |---|---|
 | gRPC request and response messages (`@grpc/grpc-js`) | `rpc.request.payload`, `rpc.response.payload` |
 | PostgreSQL query parameters (`pg`) | `db.postgresql.values` |
-| MySQL queries, with the parameter values filled in (`mysql2`) | `db.statement` |
-| MongoDB commands, including the values in them (`mongodb`) | `db.statement` or `db.query.text` |
+| MySQL queries, with the parameter values filled in (`mysql2`) | `db.query.text` |
+| MongoDB commands, including the values in them (`mongodb`) | `db.query.text` |
 
 **Python**
 
