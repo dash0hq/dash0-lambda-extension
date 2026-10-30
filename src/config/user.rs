@@ -46,6 +46,42 @@ pub fn request_timeout_ms() -> u64 {
     }
 }
 
+/// Buffered telemetry (all signals) that triggers an early flush while an
+/// invocation is still running. DASH0_FLUSH_THRESHOLD in KB, default 2048 (2 MiB).
+pub fn flush_threshold_bytes() -> usize {
+    std::env::var("DASH0_FLUSH_THRESHOLD")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .unwrap_or(2048)
+        * 1024
+}
+
+/// Longest time buffered telemetry waits while an invocation is still running.
+/// DASH0_FLUSH_INTERVAL in ms, default 10000.
+pub fn flush_interval_ms() -> u64 {
+    std::env::var("DASH0_FLUSH_INTERVAL")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(10_000)
+}
+
+/// Hard limit for buffered telemetry (all signals). Incoming telemetry above it
+/// is dropped. DASH0_MAX_BUFFER_SIZE in KB; defaults to 10% of the function
+/// memory, clamped to 8–64 MiB.
+pub fn max_buffer_bytes() -> usize {
+    if let Some(kb) = std::env::var("DASH0_MAX_BUFFER_SIZE")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+    {
+        return kb * 1024;
+    }
+    let function_mb = std::env::var("AWS_LAMBDA_FUNCTION_MEMORY_SIZE")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .unwrap_or(1024);
+    (function_mb * 1024 * 1024 / 10).clamp(8 * 1024 * 1024, 64 * 1024 * 1024)
+}
+
 pub fn request_retries() -> usize {
     match std::env::var("DASH0_REQUEST_RETRIES") {
         Ok(val) => val.parse::<usize>().unwrap_or(1),
@@ -258,6 +294,48 @@ mod tests {
         assert!(is_auto_instrumented_disabled());
         std::env::remove_var("AWS_LAMBDA_EXEC_WRAPPER");
         std::env::remove_var("DASH0_DISABLE_AUTO_INSTRUMENTATION");
+    }
+
+    #[test]
+    #[serial]
+    fn flush_settings_parse_kb_and_ms_with_defaults() {
+        use super::{flush_interval_ms, flush_threshold_bytes};
+        std::env::remove_var("DASH0_FLUSH_THRESHOLD");
+        std::env::remove_var("DASH0_FLUSH_INTERVAL");
+        assert_eq!(flush_threshold_bytes(), 2048 * 1024);
+        assert_eq!(flush_interval_ms(), 10_000);
+
+        std::env::set_var("DASH0_FLUSH_THRESHOLD", "300");
+        std::env::set_var("DASH0_FLUSH_INTERVAL", "0");
+        assert_eq!(flush_threshold_bytes(), 300 * 1024);
+        assert_eq!(flush_interval_ms(), 0);
+
+        std::env::set_var("DASH0_FLUSH_THRESHOLD", "2MB");
+        std::env::set_var("DASH0_FLUSH_INTERVAL", "-1");
+        assert_eq!(flush_threshold_bytes(), 2048 * 1024);
+        assert_eq!(flush_interval_ms(), 10_000);
+        std::env::remove_var("DASH0_FLUSH_THRESHOLD");
+        std::env::remove_var("DASH0_FLUSH_INTERVAL");
+    }
+
+    #[test]
+    #[serial]
+    fn max_buffer_is_ten_percent_of_function_memory_clamped() {
+        use super::max_buffer_bytes;
+        const MIB: usize = 1024 * 1024;
+        std::env::remove_var("DASH0_MAX_BUFFER_SIZE");
+        for (memory_mb, expected) in [
+            ("128", 128 * MIB / 10), // 12.8 MiB, inside the bounds
+            ("2048", 64 * MIB),      // 204.8 MiB, clamped to 64 MiB
+            ("64", 8 * MIB),         // 6.4 MiB, clamped to 8 MiB
+        ] {
+            std::env::set_var("AWS_LAMBDA_FUNCTION_MEMORY_SIZE", memory_mb);
+            assert_eq!(max_buffer_bytes(), expected, "{} MB function", memory_mb);
+        }
+        std::env::set_var("DASH0_MAX_BUFFER_SIZE", "100");
+        assert_eq!(max_buffer_bytes(), 100 * 1024, "explicit KB value wins");
+        std::env::remove_var("DASH0_MAX_BUFFER_SIZE");
+        std::env::remove_var("AWS_LAMBDA_FUNCTION_MEMORY_SIZE");
     }
 
     #[test]

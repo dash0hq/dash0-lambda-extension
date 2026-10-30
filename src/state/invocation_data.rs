@@ -9,6 +9,10 @@ pub struct StoredTrace {
     pub headers: hyper::HeaderMap,
     pub body: Vec<u8>,
     pub invocation_ids: Vec<String>,
+    /// The request carries the Lambda handler span. It is changed again when
+    /// the return value is captured, so it is never flushed before
+    /// the invocation ends.
+    pub contains_handler_span: bool,
 }
 
 #[derive(Clone)]
@@ -56,6 +60,13 @@ pub fn snapshot_metrics() -> Vec<StoredMetric> {
 }
 
 static METRIC_STORE: Lazy<Mutex<Vec<StoredMetric>>> = Lazy::new(|| Mutex::new(Vec::new()));
+
+/// Bytes of buffered OTLP logs and metrics.
+pub fn buffered_bytes() -> usize {
+    let logs: usize = LOG_STORE.lock().iter().map(|l| l.body.len()).sum();
+    let metrics: usize = METRIC_STORE.lock().iter().map(|m| m.body.len()).sum();
+    logs + metrics
+}
 
 static CURRENT_INVOCATION_ID: Lazy<Mutex<Option<String>>> = Lazy::new(|| Mutex::new(None));
 

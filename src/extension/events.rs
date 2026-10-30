@@ -213,6 +213,7 @@ pub async fn get_next() {
 
                 if is_invoke {
                     handle_invoke_event(&json);
+                    crate::otlp::flusher::invocation_started();
                 }
 
                 let invocation_id = json.get("requestId").and_then(|v| v.as_str());

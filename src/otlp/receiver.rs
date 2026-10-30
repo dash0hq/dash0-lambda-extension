@@ -77,6 +77,9 @@ pub async fn traces(req: Request<Incoming>) -> Result<Response<ResBody>, hyper::
         }
     }
 
+    // process_trace_request only reports invocation IDs for handler spans.
+    let contains_handler_span = !invocation_ids.is_empty();
+
     if invocation_ids.is_empty() {
         if let Some(current) = crate::state::invocation_data::get_current_invocation_id() {
             invocation_ids.push(current);
@@ -97,6 +100,8 @@ pub async fn traces(req: Request<Incoming>) -> Result<Response<ResBody>, hyper::
             "[{}] /v1/traces has no invocation IDs, discarding trace",
             crate::log_prefix(),
         );
+    } else if !contains_handler_span && !crate::otlp::flusher::admit(encoded_body.len(), "traces") {
+        // Buffer full: dropped. The handler span is always kept.
     } else {
         if invocation_ids.len() > 1 {
             tracing::error!(
@@ -118,8 +123,10 @@ pub async fn traces(req: Request<Incoming>) -> Result<Response<ResBody>, hyper::
                 headers,
                 body: encoded_body,
                 invocation_ids,
+                contains_handler_span,
             },
         );
+        crate::otlp::flusher::stored();
     }
 
     tracing::info!(
