@@ -28,6 +28,16 @@ export default {
   resolve: {
     extensions: [".mjs", ".js", ".json"],
   },
+  module: {
+    parser: {
+      javascript: {
+        // Leave `createRequire(...)` to Node. webpack 5.112 rewrites
+        // `createRequire(file).resolve(...)` to `(void 0).resolve(...)` (5.104 did not),
+        // which breaks the bare-specifier handler lookup in lambdaHandlerResolution.mjs.
+        createRequire: false,
+      },
+    },
+  },
   externalsType: "module",
   externals: [
     // Node.js built-ins - use node: prefix for ESM
