@@ -10,8 +10,9 @@ const RUNTIME_MAP: Record<string, lambda.Runtime> = {
   'nodejs20-x': lambda.Runtime.NODEJS_20_X,
   'nodejs22-x': lambda.Runtime.NODEJS_22_X,
   'nodejs24-x': lambda.Runtime.NODEJS_24_X,
-  // aws-cdk-lib 2.231 has no NODEJS_26_X constant yet (nodejs26.x is in public preview), and
-  // there is no public.ecr.aws/sam/build-nodejs26.x image, so NodejsFunction bundles with the 24.x one.
+  // aws-cdk-lib has no NODEJS_26_X constant yet (checked up to 2.275.0; nodejs26.x is in public
+  // preview), and there is no public.ecr.aws/sam/build-nodejs26.x image, so NodejsFunction bundles
+  // with the 24.x one.
   'nodejs26-x': new lambda.Runtime('nodejs26.x', lambda.RuntimeFamily.NODEJS, {
     supportsInlineCode: true,
     bundlingDockerImage: 'public.ecr.aws/sam/build-nodejs24.x',
