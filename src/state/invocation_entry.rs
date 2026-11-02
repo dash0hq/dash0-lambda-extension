@@ -276,6 +276,20 @@ pub fn get_trace_span_ids_for_logs(
     })
 }
 
+/// Records the Lambda function segment from the `Lambda-Runtime-Trace-Id`
+/// header the runtime receives with the event. The handler span's parent in
+/// X-Ray mode. The INVOKE event's `Parent` is one level up, the Lambda
+/// service segment. AWS records segments only for sampled requests.
+pub fn record_runtime_trace_id(invocation_id: &str, header: &str) {
+    if let Some((trace_id, segment_id, true)) =
+        crate::otlp::span_link_extractor::parse_amzn_trace_id(header)
+    {
+        update(invocation_id, |entry| {
+            entry.xray_segment_ids = Some((hex::encode(trace_id), hex::encode(segment_id)));
+        });
+    }
+}
+
 /// Records the trace ID of a non-handler span; the first one wins.
 pub fn record_child_trace_id(invocation_id: &str, trace_id: &[u8]) {
     if trace_id.len() != 16 || trace_id.iter().all(|b| *b == 0) {

@@ -67,8 +67,10 @@ describe.concurrent('Logs sent while the invocation runs', () => {
             handlerScopeName: NODE_HANDLER_SCOPE,
         });
         // The handler continues the upstream trace, not the X-Ray trace from INVOKE.
-        expect(traceId).toEqual(upstreamTraceId);
-        expect(rootSpan.parentSpanId).toEqual(upstreamSpanId);
+        // The API returns IDs base64-encoded.
+        const base64 = (hex: string) => Buffer.from(hex, 'hex').toString('base64');
+        expect(traceId).toEqual(base64(upstreamTraceId));
+        expect(rootSpan.parentSpanId).toEqual(base64(upstreamSpanId));
 
         await checkLogs({
             invocationId,

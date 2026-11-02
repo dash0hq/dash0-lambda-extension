@@ -173,6 +173,13 @@ pub async fn proxy_invocation_next(
         crate::stats::event_start();
 
         store_current_invocation_id(aws_request_id.as_str());
+        if let Some(trace_id) = response
+            .headers()
+            .get("lambda-runtime-trace-id")
+            .and_then(|v| v.to_str().ok())
+        {
+            crate::state::invocation_entry::record_runtime_trace_id(&aws_request_id, trace_id);
+        }
 
         tracing::info!(
             "[{}] Got invocation next: {}",

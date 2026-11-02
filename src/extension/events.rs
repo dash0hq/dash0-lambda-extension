@@ -57,9 +57,6 @@ fn handle_invoke_event(json: &serde_json::Value) {
                 if let Some((trace_id_bytes, parent_span_id_bytes, sampled)) = parsed {
                     let parent_span_id = hex::encode(&parent_span_id_bytes);
                     entry.trace_id = Some(hex::encode(&trace_id_bytes));
-                    // AWS records the function segment only for sampled requests.
-                    entry.xray_segment_ids =
-                        sampled.then(|| (hex::encode(&trace_id_bytes), parent_span_id.clone()));
                     entry.span_id.get_or_insert_with(|| {
                         hex::encode(get_span_id_from_invocation_id(request_id))
                     });
@@ -299,15 +296,17 @@ mod tests {
 
     // ── IDs of logs sent by an early flush ───────────────────────────
     //
-    // `_X_AMZN_TRACE_ID` below carries trace X and function segment PX. The
-    // handler continues either the X-Ray context or an upstream traceparent
-    // with trace U and caller PU.
+    // The INVOKE event carries trace X and the Lambda service segment; the
+    // runtime's `Lambda-Runtime-Trace-Id` carries X and the function segment
+    // FS, the parent of the handler span in X-Ray mode. The handler continues
+    // either the X-Ray context or an upstream traceparent with trace U and
+    // caller PU.
 
     const X_HEADER: &str = "Root=1-11111111-111111111111111111111111;Parent=2222222222222222";
     const X: &str = "11111111111111111111111111111111";
-    const PX: &str = "2222222222222222";
+    const FS: &str = "3333333333333333";
     const X_BYTES: [u8; 16] = [0x11; 16];
-    const PX_BYTES: [u8; 8] = [0x22; 8];
+    const FS_BYTES: [u8; 8] = [0x33; 8];
     const U: [u8; 16] = [0xAA; 16];
     const PU: [u8; 8] = [0xBB; 8];
     const H: [u8; 8] = [0xCC; 8];
@@ -335,6 +334,11 @@ mod tests {
         state::invocation_entry::remove(request_id);
         let header = format!("{X_HEADER};Sampled={}", u8::from(sampled));
         handle_invoke_event(&invoke_event(request_id, &header));
+        let runtime_header = format!(
+            "Root=1-11111111-111111111111111111111111;Parent={FS};Sampled={}",
+            u8::from(sampled)
+        );
+        state::invocation_entry::record_runtime_trace_id(request_id, &runtime_header);
     }
 
     fn function_log(request_id: &str) {
@@ -462,16 +466,16 @@ mod tests {
         function_log(id);
         assert_eq!(
             early_flush(id, usize::MAX),
-            vec![(X.to_string(), PX.to_string())]
+            vec![(X.to_string(), FS.to_string())]
         );
 
         // Still the segment once the handler span is known, so all logs of
         // the invocation sit on the same span.
-        handler_span_arrives(id, X_BYTES, PX_BYTES);
+        handler_span_arrives(id, X_BYTES, FS_BYTES);
         function_log(id);
         assert_eq!(
             early_flush(id, usize::MAX),
-            vec![(X.to_string(), PX.to_string())]
+            vec![(X.to_string(), FS.to_string())]
         );
         state::invocation_entry::remove(id);
         reset_mode();
