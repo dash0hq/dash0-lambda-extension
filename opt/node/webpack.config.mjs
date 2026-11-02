@@ -52,6 +52,11 @@ export default {
         "module-details-from-path",
       ];
 
+      // ESM entry points of import-in-the-middle, loaded lazily from /opt/node_modules
+      if (request.startsWith("import-in-the-middle/")) {
+        return callback(null, `import ${request}`);
+      }
+
       if (requireExternals.includes(request)) {
         // Use commonjs for these since they're CJS modules
         return callback(null, `commonjs ${request}`);

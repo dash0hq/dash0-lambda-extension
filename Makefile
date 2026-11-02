@@ -113,8 +113,7 @@ build/$(ZIP_NAME_NODE): build/dash0_x86_64 build/dash0_aarch64 opt/entrypoint op
 	@cp -r opt/node/node_modules/module-details-from-path build/stage-node/node_modules/
 	@cp -r opt/node/node_modules/debug build/stage-node/node_modules/
 	@cp -r opt/node/node_modules/ms build/stage-node/node_modules/
-	@cp -r opt/node/node_modules/acorn build/stage-node/node_modules/
-	@cp -r opt/node/node_modules/acorn-import-attributes build/stage-node/node_modules/ 2>/dev/null || true
+	@cp -r opt/node/node_modules/es-module-lexer build/stage-node/node_modules/
 	@cp -r opt/node/node_modules/cjs-module-lexer build/stage-node/node_modules/
 	@git rev-parse HEAD > build/stage-node/dash0_git_hash
 	@cd build/stage-node && zip -r ../$(ZIP_NAME_NODE) *

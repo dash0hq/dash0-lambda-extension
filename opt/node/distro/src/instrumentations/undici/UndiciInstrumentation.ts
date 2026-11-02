@@ -27,9 +27,17 @@ function parseRequestHeaders(headers: UndiciRequest['headers']): Record<string, 
   return result;
 }
 
-function parseResponseHeaders(headers: Buffer[]): Record<string, string> {
+function parseResponseHeaders(headers: Buffer[] | Record<string, unknown>): Record<string, string> {
   const result: Record<string, string> = {};
-  if (!Array.isArray(headers)) return result;
+  if (!Array.isArray(headers)) {
+    // Undici 8 (Node 26) publishes HTTP/2 response headers as an object, not a raw array.
+    if (headers && typeof headers === 'object') {
+      for (const [key, value] of Object.entries(headers)) {
+        result[key.toLowerCase()] = Array.isArray(value) ? value.join(', ') : String(value);
+      }
+    }
+    return result;
+  }
   for (let i = 0; i < headers.length - 1; i += 2) {
     result[headers[i].toString().toLowerCase()] = headers[i + 1].toString();
   }
