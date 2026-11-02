@@ -17,7 +17,7 @@ Run these as CI does (`.github/workflows/ci.yml`):
 - Rust: `cargo fmt --all --check` and `cargo test --all-features`
 - Wrapper: `bash opt/test/shared.test.sh`
 - Node distro, from the repo root:
-  1. `bash opt/node/scripts/build-aws-sdk-tarball.sh` (builds the forked `@opentelemetry/instrumentation-aws-sdk` into `build/opentelemetry-instrumentation-aws-sdk.tgz`, which `opt/node/package.json` depends on; the `preinstall` hook runs it too, but CI calls it explicitly first)
+  1. `bash opt/node/scripts/build-aws-sdk-tarball.sh` (builds `@opentelemetry/instrumentation-aws-sdk` from an upstream release tag with the patches in `opt/node/scripts/patches/` applied, into `build/opentelemetry-instrumentation-aws-sdk.tgz`, which `opt/node/package.json` depends on; the `preinstall` hook runs it too, but CI calls it explicitly first)
   2. `cd opt/node && npm install && npm test`
   3. Build: `npm run build` (tsc + webpack into `opt/node/dist`)
 - Python distro:
@@ -38,7 +38,7 @@ Run these as CI does (`.github/workflows/ci.yml`):
 
 ## Gotchas
 
-- `build-aws-sdk-tarball.sh` exits early if the tarball already exists. After the fork branch changes, delete `build/opentelemetry-instrumentation-aws-sdk.tgz` to rebuild it.
+- `build-aws-sdk-tarball.sh` exits early if the tarball already exists. After you change the tag or a patch, delete `build/opentelemetry-instrumentation-aws-sdk.tgz` to rebuild it.
 - The wrappers source `/opt/shared.sh` by absolute path, the way it sits in the Lambda layer. To test it locally, use `opt/test/shared.test.sh`, which sources the repo copy.
 - Node `npm test` writes `opt/node/test-spans-*.json`, and `pytest` writes `__pycache__/` under `opt/python/distro/src`. Neither is gitignored, so delete them before you commit.
 

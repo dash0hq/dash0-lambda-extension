@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="https://github.com/mosheshaham-dash0/opentelemetry-js-contrib.git"
-BRANCH="instrument-kinesis-inject-context-v3"
+# Builds @opentelemetry/instrumentation-aws-sdk from an upstream release tag with
+# Dash0's patches applied (Kinesis PutRecord/PutRecords trace context injection,
+# originally from mosheshaham-dash0/opentelemetry-js-contrib@instrument-kinesis-inject-context-v3).
+REPO="https://github.com/open-telemetry/opentelemetry-js-contrib.git"
+TAG="instrumentation-aws-sdk-v0.78.0"
 
 # Resolve the target path relative to this script (opt/node/scripts -> ../../build)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -14,13 +17,14 @@ if [ -f "$TGZ_PATH" ]; then
   exit 0
 fi
 
-echo "Building @opentelemetry/instrumentation-aws-sdk from fork ($BRANCH)"
+echo "Building @opentelemetry/instrumentation-aws-sdk from $TAG with Dash0 patches"
 mkdir -p "$ROOT_DIR/build"
 CLONE_DIR="$ROOT_DIR/build/opentelemetry-js-contrib"
 rm -rf "$CLONE_DIR"
 
-git clone --depth 1 --branch "$BRANCH" "$REPO" "$CLONE_DIR"
+git clone --depth 1 --branch "$TAG" "$REPO" "$CLONE_DIR"
 cd "$CLONE_DIR"
+git apply "$SCRIPT_DIR"/patches/instrumentation-aws-sdk-*.patch
 npm install
 npm run compile -w packages/contrib-test-utils
 npm run version:update -w packages/instrumentation-aws-sdk
