@@ -131,6 +131,46 @@ function createLambdas(
   }
 }
 
+/**
+ * A function that runs about 4 s with DASH0_FLUSH_INTERVAL=1000, so the
+ * extension flushes logs while the invocation is still running.
+ * OTEL_BSP_SCHEDULE_DELAY makes the distro export the child span early.
+ */
+function createEarlyFlushLambda(
+    scope: Construct,
+    props: SubStackProps,
+    name: string,
+    runtime: lambda.Runtime,
+    options: { handler: string; code: lambda.Code; memorySize: number; xray?: boolean },
+) {
+  const environment: Record<string, string> = {
+    AWS_LAMBDA_EXEC_WRAPPER: "/opt/wrapper",
+    DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
+    DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
+    DASH0_EXTENSION_LOG_LEVEL: "info",
+    DASH0_FLUSH_INTERVAL: "1000",
+    OTEL_BSP_SCHEDULE_DELAY: "200",
+  };
+  if (options.xray) {
+    environment["DASH0_XRAY_TRACES_ENABLED"] = "true";
+  }
+  new lambda.Function(scope, name, {
+    functionName: `${props.prefix}${name}`,
+    runtime,
+    memorySize: options.memorySize,
+    handler: options.handler,
+    architecture: lambda.Architecture.X86_64,
+    timeout: cdk.Duration.seconds(30),
+    code: options.code,
+    layers: [props.layer],
+    role: props.role,
+    environment,
+    tracing: options.xray ? lambda.Tracing.ACTIVE : undefined,
+    logGroup: props.logGroup,
+    loggingFormat: lambda.LoggingFormat.TEXT,
+  });
+}
+
 class PythonStack extends cdk.NestedStack {
   constructor(scope: Construct, id: string, props: SubStackProps) {
     super(scope, id, props);
@@ -260,6 +300,16 @@ class NodeStack extends cdk.NestedStack {
 
     createLambdas(this, runtimes, props.layer, props.role, props.logGroup, props.prefix, {
       dash0TokenSecretArn: props.dash0TokenSecretArn,
+    });
+
+    const latestNode = runtimes[runtimes.length - 1];
+    const latestNodeName = latestNode.name.replace(/\./g, '-');
+    const nodeCode = lambda.Code.fromAsset(path.join(__dirname, '../lambdas/node'));
+    createEarlyFlushLambda(this, props, `early-flush-${latestNodeName}`, latestNode, {
+      handler: 'early_flush.handler', code: nodeCode, memorySize: 128,
+    });
+    createEarlyFlushLambda(this, props, `early-flush-xray-${latestNodeName}`, latestNode, {
+      handler: 'early_flush.handler', code: nodeCode, memorySize: 128, xray: true,
     });
 
     for (const runtime of runtimes) {
@@ -406,6 +456,11 @@ class JavaStack extends cdk.NestedStack {
     const runtimes = JAVA_CDK_RUNTIMES;
 
     createLambdas(this, runtimes, props.layer, props.role, props.logGroup, props.prefix, overrides);
+
+    const latestJava = runtimes[runtimes.length - 1];
+    createEarlyFlushLambda(this, props, `early-flush-${latestJava.name.replace(/\./g, '-')}`, latestJava, {
+      handler: 'org.example.EarlyFlushHandler::handleRequest', code: javaCode, memorySize: 512,
+    });
 
     // Custom (user-defined) OpenTelemetry API metrics. Kept as a separate loop instead of a
     // createLambdas scenario to avoid multiplying the function count. OTEL_METRICS_EXPORTER is

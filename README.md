@@ -84,7 +84,7 @@ The extension layers are published to the following AWS regions:
 * `DASH0_DISTRO_DEBUG` - When set to true, additional logs related to tracing and auto-instrumentation will be emitted. Default: `false`.
 
 * `DASH0_FLUSH_THRESHOLD` - Buffered telemetry (traces, logs and metrics together), in KB, that triggers a send while the invocation is still running. Default: `2048`.
-* `DASH0_FLUSH_INTERVAL` - Longest time, in milliseconds, that buffered telemetry waits while the invocation is still running. `0` turns off time-based flushing. Default: `10000`. Short invocations reach neither limit and are sent once at invocation end.
+* `DASH0_FLUSH_INTERVAL` - Longest time, in milliseconds, that buffered telemetry waits while the invocation is still running. `0` turns off time-based flushing. Default: `10000`. Short invocations reach neither limit and are sent once at invocation end. Function logs of a running invocation are sent once the extension knows the trace and span they link to (in the default mode, when the first span of the invocation arrives); until then they stay buffered, up to `DASH0_FLUSH_THRESHOLD`.
 * `DASH0_MAX_BUFFER_SIZE` - Hard limit, in KB, for buffered telemetry. Telemetry received while the buffer is full is dropped and the extension logs a warning, so telemetry cannot make the function run out of memory. Default: 10% of the function memory, between 8 MiB and 64 MiB.
 * `DASH0_REQUEST_TIMEOUT` - Timeout in milliseconds for HTTP requests to the backend. Default: `2000`.
 
@@ -98,7 +98,7 @@ The extension layers are published to the following AWS regions:
 
 * `DASH0_DATASET` - When set, the extension adds a `Dash0-Dataset` header to all OTLP export requests, routing telemetry to the specified dataset in the Dash0 backend.
 
-* `DASH0_XRAY_TRACES_ENABLED` - When set to `true`, the extension preserves the original X-Ray trace context instead of creating supplementary spans. Use this when AWS X-Ray active tracing is enabled on the Lambda function. Default: `false`.
+* `DASH0_XRAY_TRACES_ENABLED` - When set to `true`, the extension preserves the original X-Ray trace context instead of creating supplementary spans. Use this when AWS X-Ray active tracing is enabled on the Lambda function and X-Ray traces reach Dash0. Function logs then link to the Lambda function segment from X-Ray. Default: `false`.
 
 The four `API_GATEWAY` variables below also apply to Application Load Balancer-triggered invocations; the names are kept for backwards compatibility.
 

@@ -20,6 +20,7 @@ pub async fn traces(req: Request<Incoming>) -> Result<Response<ResBody>, hyper::
     let mut encoded_body: Vec<u8> = body_bytes.to_vec();
     let mut invocation_ids: Vec<String> = Vec::new();
     let mut converted_from_json = false;
+    let mut first_trace_id: Option<Vec<u8>> = None;
 
     tracing::trace!(
         "[{}] /v1/traces body: {}",
@@ -34,6 +35,7 @@ pub async fn traces(req: Request<Incoming>) -> Result<Response<ResBody>, hyper::
             }
 
             process_trace_request(&mut decoded, &mut invocation_ids, &mut encoded_body);
+            first_trace_id = get_first_trace_id(&decoded);
         }
         Err(err) => {
             tracing::info!(
@@ -64,6 +66,7 @@ pub async fn traces(req: Request<Incoming>) -> Result<Response<ResBody>, hyper::
                     encoded_body = decoded.encode_to_vec();
 
                     process_trace_request(&mut decoded, &mut invocation_ids, &mut encoded_body);
+                    first_trace_id = get_first_trace_id(&decoded);
                     converted_from_json = true;
                 }
                 Err(json_err) => {
@@ -93,6 +96,15 @@ pub async fn traces(req: Request<Incoming>) -> Result<Response<ResBody>, hyper::
             hyper::header::CONTENT_TYPE,
             hyper::header::HeaderValue::from_static("application/x-protobuf"),
         );
+    }
+
+    if let (false, Some(id), Some(trace_id)) = (
+        contains_handler_span,
+        invocation_ids.first(),
+        first_trace_id.as_deref(),
+    ) {
+        // Tells the trace of the invocation's logs before the handler span arrives.
+        invocation_entry::record_child_trace_id(id, trace_id);
     }
 
     if invocation_ids.is_empty() {
@@ -135,4 +147,14 @@ pub async fn traces(req: Request<Incoming>) -> Result<Response<ResBody>, hyper::
         start.elapsed().as_millis(),
     );
     Ok(Response::builder().status(200).body(empty_body()).unwrap())
+}
+
+fn get_first_trace_id(request: &ExportTraceServiceRequest) -> Option<Vec<u8>> {
+    request
+        .resource_spans
+        .iter()
+        .flat_map(|rs| &rs.scope_spans)
+        .flat_map(|ss| &ss.spans)
+        .map(|span| span.trace_id.clone())
+        .next()
 }

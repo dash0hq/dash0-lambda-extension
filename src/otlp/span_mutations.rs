@@ -768,6 +768,20 @@ fn store_span_ids(span: &Span, invocation_id: &str) {
             .trace_id
             .as_ref()
             .map_or(false, |existing| existing == &trace_id_hex);
+        if let Some(child_trace_id) = entry
+            .child_trace_id
+            .as_ref()
+            .filter(|t| **t != trace_id_hex)
+        {
+            tracing::warn!(
+                "[{}] Handler span is in trace {}, but an earlier span of invocation {} was in trace {}; logs flushed before the handler span may link to the latter",
+                crate::log_prefix(),
+                trace_id_hex,
+                invocation_id,
+                child_trace_id
+            );
+        }
+        entry.handler_seen = true;
         entry.trace_id = Some(trace_id_hex);
         entry.span_id = Some(span_id_hex);
         // we update parent span only if the lambda instrumentation extracted the context not from _X_AMZN_TRACE_ID

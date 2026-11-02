@@ -53,7 +53,10 @@ pub async fn flush_while_running() {
     }
     send_traces(traces).await;
     flush_otlp_logs().await;
-    flush_telemetry_logs(None).await;
+    let logs = crate::state::invocation_entry::take_telemetry_logs_while_running(
+        crate::config::flush_threshold_bytes(),
+    );
+    send_telemetry_logs_chunked(logs).await;
     flush_metrics().await;
 }
 
@@ -92,6 +95,10 @@ fn chunk_by_size<T>(items: Vec<T>, size: impl Fn(&T) -> usize) -> Vec<Vec<T>> {
 
 pub async fn flush_telemetry_logs(exclude_invocation_id: Option<&str>) {
     let logs = crate::state::invocation_entry::take_all_telemetry_logs(exclude_invocation_id);
+    send_telemetry_logs_chunked(logs).await;
+}
+
+async fn send_telemetry_logs_chunked(logs: Vec<crate::state::invocation_data::TelemetryLog>) {
     for chunk in chunk_by_size(logs, telemetry_log_size) {
         send_telemetry_logs(&chunk).await;
     }
