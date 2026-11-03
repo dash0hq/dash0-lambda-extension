@@ -1,0 +1,108 @@
+/*
+ * Reproduction and regression test for a customer report: a GraphQL client on the
+ * http/https modules (axios, node-fetch v2, got) received a gzip response, and the
+ * `http_response_body` payload log contained the gzip bytes decoded as UTF-8:
+ *
+ *   {"message":"\u001f�\b\u0000\u0000\u0000\u0000\u0000\u0004�lO�n�0\f~...","type":"http_response_body"}
+ *
+ * The response carried `content-type: application/json` and `content-encoding: gzip`.
+ * Node's http module never decompresses; clients pipe the response through zlib
+ * themselves. The http hook turned each raw chunk into a string, so the bytes were lost
+ * before JSON parsing and masking, and the garbage was exported unmasked.
+ *
+ * Each run is a separate process (see `http-payload/runner.mjs`): require-in-the-middle
+ * cannot patch `http` inside jest's module loader.
+ */
+
+import { execFileSync } from 'child_process';
+import * as path from 'path';
+import { brotliCompressSync, deflateSync, gzipSync } from 'zlib';
+
+const ROOT = path.join(__dirname, '..');
+const RUNNER = path.join(__dirname, 'http-payload', 'runner.mjs');
+
+interface Scenario {
+  encoding?: string;
+  wire: Buffer;
+  chunked?: boolean;
+  env?: Record<string, string>;
+}
+interface Result {
+  appBodyLength: number;
+  responseBody?: string;
+  responseHeaders: string;
+}
+
+function run(scenarios: Scenario[]): Result[] {
+  const stdout = execFileSync(
+    process.execPath,
+    [RUNNER, JSON.stringify(scenarios.map(s => ({ ...s, wire: s.wire.toString('base64') })))],
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], cwd: ROOT }
+  );
+  const line = stdout.split('\n').find(l => l.startsWith('RESULT '));
+  if (!line) throw new Error(`runner printed no result:\n${stdout}`);
+  return JSON.parse(line.slice('RESULT '.length));
+}
+
+const graphqlResponse = {
+  data: { order: { id: 'order-42', status: 'DELIVERED', items: [{ name: 'Chicken Bucket', qty: 1 }] } },
+  extensions: { accessToken: 'response-canary' },
+};
+const masked = JSON.stringify({ ...graphqlResponse, extensions: { accessToken: '****' } });
+const json = (value: unknown) => Buffer.from(JSON.stringify(value));
+const large = { items: Array.from({ length: 400 }, (_, i) => ({ id: i, name: 'Chicken Bucket' })), password: 'hidden' };
+
+const scenarios: [string, Scenario, (result: Result) => void][] = [
+  ['gzip GraphQL response (customer reproduction)', { encoding: 'gzip', wire: gzipSync(json(graphqlResponse)) },
+    result => {
+      expect(JSON.parse(result.responseHeaders)).toMatchObject({ 'content-encoding': 'gzip' });
+      expect(result.responseBody).toBe(masked);
+    }],
+  ...['gzip', 'x-gzip', 'deflate', 'br'].map((encoding): [string, Scenario, (result: Result) => void] => [
+    `${encoding} across several network chunks`,
+    {
+      encoding, chunked: true,
+      wire: (encoding === 'br' ? brotliCompressSync : encoding === 'deflate' ? deflateSync : gzipSync)(json(graphqlResponse)),
+    },
+    result => expect(result.responseBody).toBe(masked),
+  ]),
+  ['identity response, unchanged', { wire: json(graphqlResponse), chunked: true },
+    result => expect(result.responseBody).toBe(masked)],
+  ['large gzip response, decoded then truncated to the attribute limit', { encoding: 'gzip', wire: gzipSync(json(large)) },
+    result => {
+      expect(result.responseBody!.startsWith('{"items":[{"id":0,"name":"Chicken Bucket"},')).toBe(true);
+      expect(result.responseBody!.length).toBeLessThanOrEqual(4096 + 1);
+      expect(result.responseBody).not.toContain('hidden');
+    }],
+  ['corrupt gzip', { encoding: 'gzip', wire: Buffer.from([0x1f, 0x8b, 8, 0, 1, 2, 3, 4, 5, 6]) },
+    result => expect(result.responseBody).toBeUndefined()],
+  ['unsupported encoding', { encoding: 'zstd', wire: Buffer.from([0x28, 0xb5, 0x2f, 0xfd, 0, 1, 2, 3]) },
+    result => expect(result.responseBody).toBeUndefined()],
+  ['gzip bomb', { encoding: 'gzip', wire: gzipSync(json({ padding: 'x'.repeat(1024 * 1024) })) },
+    result => expect(result.responseBody).toBeUndefined()],
+];
+
+let results: Result[];
+
+beforeAll(() => {
+  // The runner loads the compiled distro; CI runs `npm test` without `npm run build`.
+  execFileSync(
+    process.execPath,
+    [require.resolve('typescript/bin/tsc'), '-p', 'distro/tsconfig.json', '--skipLibCheck'],
+    { cwd: ROOT, stdio: 'inherit' }
+  );
+  results = run(scenarios.map(([, scenario]) => scenario));
+}, 120_000);
+
+describe('http/https response payload capture', () => {
+  test.each(scenarios.map(([name], i) => [name, i] as const))('%s', (_name, i) => {
+    const [, scenario, check] = scenarios[i];
+    // The application still receives its response; capture never consumes it.
+    if (scenario.encoding !== 'zstd' && !scenario.wire.equals(Buffer.from([0x1f, 0x8b, 8, 0, 1, 2, 3, 4, 5, 6]))) {
+      expect(results[i].appBodyLength).toBeGreaterThan(0);
+    }
+    check(results[i]);
+    // Compressed bytes are never exported as text.
+    expect(results[i].responseBody ?? '').not.toMatch(/\u001f|�/);
+  });
+});
