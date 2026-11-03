@@ -11,7 +11,7 @@ compatible_runtimes = runpy.run_path(str(SCRIPT))["compatible_runtimes"]
 
 
 class LayerRuntimesTest(unittest.TestCase):
-    def test_publish_readback_contract(self):
+    def test_publish_response_contract(self):
         for layer in ("node", "python", "java", "manual"):
             with self.subTest(layer=layer):
                 result = subprocess.run(
@@ -21,9 +21,14 @@ class LayerRuntimesTest(unittest.TestCase):
                 for actual, success in ((runtimes[::-1], True), (None, False), (runtimes[:-1], False)):
                     checked = subprocess.run(
                         [sys.executable, str(SCRIPT), layer, "--check"],
-                        input=json.dumps(actual), capture_output=True, text=True,
+                        input=json.dumps({"Version": 76, "CompatibleRuntimes": actual}),
+                        capture_output=True, text=True,
                     )
                     self.assertEqual(checked.returncode == 0, success, checked.stderr)
+                    if success:
+                        self.assertEqual(checked.stdout, "76\n")
+                    else:
+                        self.assertEqual(checked.stdout, "")
 
     def test_family_selection_and_runtime_conversion(self):
         source = """

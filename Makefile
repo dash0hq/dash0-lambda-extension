@@ -171,9 +171,8 @@ $(LAMBDA_LAYER_MARKER_PYTHON): build/$(ZIP_NAME_PYTHON) integration-tests/runtim
 		LAYER_VERSION=$$(aws lambda publish-layer-version --layer-name $(LAYER_NAME_PYTHON) --zip-file fileb://build/$(ZIP_NAME_PYTHON) \
 		--description "$(LAYER_DESCRIPTION)" \
 		--compatible-runtimes $$RUNTIMES \
-		--compatible-architectures x86_64 arm64 --no-cli-pager --query Version --output text) && \
-		aws lambda get-layer-version --layer-name $(LAYER_NAME_PYTHON) --version-number $$LAYER_VERSION \
-		--query CompatibleRuntimes --output json --no-cli-pager | python3 tools/layer-runtimes.py python --check && \
+		--compatible-architectures x86_64 arm64 --no-cli-pager --output json \
+		| python3 tools/layer-runtimes.py python --check) && \
 		echo "Making $(LAYER_NAME_PYTHON) version $$LAYER_VERSION public" && \
 		aws lambda add-layer-version-permission --layer-name $(LAYER_NAME_PYTHON) --version-number $$LAYER_VERSION \
 		--statement-id public --action lambda:GetLayerVersion --principal "*" --no-cli-pager
@@ -185,9 +184,8 @@ $(LAMBDA_LAYER_MARKER_NODE): build/$(ZIP_NAME_NODE) integration-tests/runtimes.t
 		LAYER_VERSION=$$(aws lambda publish-layer-version --layer-name $(LAYER_NAME_NODE) --zip-file fileb://build/$(ZIP_NAME_NODE) \
 		--description "$(LAYER_DESCRIPTION)" \
 		--compatible-runtimes $$RUNTIMES \
-		--compatible-architectures x86_64 arm64 --no-cli-pager --query Version --output text) && \
-		aws lambda get-layer-version --layer-name $(LAYER_NAME_NODE) --version-number $$LAYER_VERSION \
-		--query CompatibleRuntimes --output json --no-cli-pager | python3 tools/layer-runtimes.py node --check && \
+		--compatible-architectures x86_64 arm64 --no-cli-pager --output json \
+		| python3 tools/layer-runtimes.py node --check) && \
 		echo "Making $(LAYER_NAME_NODE) version $$LAYER_VERSION public" && \
 		aws lambda add-layer-version-permission --layer-name $(LAYER_NAME_NODE) --version-number $$LAYER_VERSION \
 		--statement-id public --action lambda:GetLayerVersion --principal "*" --no-cli-pager
@@ -199,9 +197,8 @@ $(LAMBDA_LAYER_MARKER_JAVA): build/$(ZIP_NAME_JAVA) integration-tests/runtimes.t
 		LAYER_VERSION=$$(aws lambda publish-layer-version --layer-name $(LAYER_NAME_JAVA) --zip-file fileb://build/$(ZIP_NAME_JAVA) \
 		--description "$(LAYER_DESCRIPTION)" \
 		--compatible-runtimes $$RUNTIMES \
-		--compatible-architectures x86_64 arm64 --no-cli-pager --query Version --output text) && \
-		aws lambda get-layer-version --layer-name $(LAYER_NAME_JAVA) --version-number $$LAYER_VERSION \
-		--query CompatibleRuntimes --output json --no-cli-pager | python3 tools/layer-runtimes.py java --check && \
+		--compatible-architectures x86_64 arm64 --no-cli-pager --output json \
+		| python3 tools/layer-runtimes.py java --check) && \
 		echo "Making $(LAYER_NAME_JAVA) version $$LAYER_VERSION public" && \
 		aws lambda add-layer-version-permission --layer-name $(LAYER_NAME_JAVA) --version-number $$LAYER_VERSION \
 		--statement-id public --action lambda:GetLayerVersion --principal "*" --no-cli-pager
@@ -213,9 +210,8 @@ $(LAMBDA_LAYER_MARKER_MANUAL): build/$(ZIP_NAME_MANUAL) integration-tests/runtim
 		LAYER_VERSION=$$(aws lambda publish-layer-version --layer-name $(LAYER_NAME_MANUAL) --zip-file fileb://build/$(ZIP_NAME_MANUAL) \
 		--description "$(LAYER_DESCRIPTION)" \
 		--compatible-runtimes $$RUNTIMES \
-		--compatible-architectures x86_64 arm64 --no-cli-pager --query Version --output text) && \
-		aws lambda get-layer-version --layer-name $(LAYER_NAME_MANUAL) --version-number $$LAYER_VERSION \
-		--query CompatibleRuntimes --output json --no-cli-pager | python3 tools/layer-runtimes.py manual --check && \
+		--compatible-architectures x86_64 arm64 --no-cli-pager --output json \
+		| python3 tools/layer-runtimes.py manual --check) && \
 		echo "Making $(LAYER_NAME_MANUAL) version $$LAYER_VERSION public" && \
 		aws lambda add-layer-version-permission --layer-name $(LAYER_NAME_MANUAL) --version-number $$LAYER_VERSION \
 		--statement-id public --action lambda:GetLayerVersion --principal "*" --no-cli-pager
