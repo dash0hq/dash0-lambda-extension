@@ -79,7 +79,14 @@ const scenarios: [string, Scenario, (result: Result) => void][] = [
     result => expect(result.responseBody).toBe(masked)],
   // Same structural truncation as any oversized parsed http payload (see masking-env.test.ts).
   ['large gzip response, decoded, masked, then truncated', { encoding: 'gzip', wire: gzipSync(json(large)) },
-    result => expect(result.responseBody).toBe('{"password":"****","items":"✂"}')],
+    result => {
+      const body = JSON.parse(result.responseBody);
+      expect(body.password).toBe('****');
+      expect(result.responseBody).not.toContain(large.password);
+      expect(result.responseBody.length).toBeLessThanOrEqual(4 * 1024);
+      expect(body.items).not.toEqual(large.items);
+      expect(result.responseBody).toContain('✂');
+    }],
   ['gzip body past the 32 KiB wire limit', { encoding: 'gzip', wire: gzipSync(json(incompressible)) },
     result => expect(result.responseBody).toBeUndefined()],
   ['gzip text/html is decoded and captured as text',

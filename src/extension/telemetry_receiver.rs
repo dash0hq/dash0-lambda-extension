@@ -57,7 +57,6 @@ pub async fn telemetry(req: Request<Incoming>) -> Result<Response<ResBody>, hype
                     create_supplementary_metrics(id);
                     invocation_entry::update(id, |entry| {
                         entry.state = crate::state::invocation_entry::InvocationState::Done;
-                        entry.init_duration = 0.0;
                     });
                 }
             }
@@ -113,4 +112,171 @@ pub async fn telemetry(req: Request<Incoming>) -> Result<Response<ResBody>, hype
     }
 
     Ok(Response::builder().status(200).body(empty_body()).unwrap())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bytes::Bytes;
+    use http_body_util::Full;
+    use hyper::server::conn::http1;
+    use hyper::service::service_fn;
+    use hyper_util::client::legacy::Client;
+    use hyper_util::rt::{TokioExecutor, TokioIo};
+    use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
+    use prost::Message;
+    use serial_test::serial;
+    use tokio::net::TcpListener;
+
+    async fn post_telemetry(body: serde_json::Value) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            http1::Builder::new()
+                .serve_connection(TokioIo::new(stream), service_fn(telemetry))
+                .await
+                .unwrap();
+        });
+        let client: Client<_, Full<Bytes>> = Client::builder(TokioExecutor::new()).build_http();
+        let request = Request::post(format!("http://{address}/2018-06-01/telemetry"))
+            .body(Full::new(Bytes::from(body.to_string())))
+            .unwrap();
+        let response = client.request(request).await.unwrap();
+        assert_eq!(response.status(), 200);
+        response.into_body().collect().await.unwrap();
+        server.abort();
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn report_preserves_cold_start_data_for_supplementary_spans() {
+        for status in ["success", "error", "timeout"] {
+            for init_duration in [482.11, 0.0] {
+                let id = format!("report-init-{status}-{init_duration}");
+                invocation_entry::update(&id, |entry| {
+                    entry.trace_id = Some("aa".repeat(16));
+                    entry.root_span_id = Some("bb".repeat(8));
+                    entry.span_id = Some("cc".repeat(8));
+                });
+                let body = serde_json::json!([
+                    {
+                        "time": "2026-11-03T16:01:18.000Z",
+                        "type": "platform.start",
+                        "record": { "requestId": id }
+                    },
+                    {
+                        "time": "2026-11-03T16:01:28.000Z",
+                        "type": "platform.runtimeDone",
+                        "record": {
+                            "requestId": id, "status": status,
+                            "metrics": { "durationMs": 10000.0 }
+                        }
+                    },
+                    {
+                        "time": "2026-11-03T16:01:28.001Z",
+                        "type": "platform.report",
+                        "record": {
+                            "requestId": id,
+                            "metrics": {
+                                "durationMs": 10000.0, "billedDurationMs": 10483.0,
+                                "initDurationMs": init_duration, "maxMemoryUsedMB": 115
+                            }
+                        }
+                    }
+                ]);
+                post_telemetry(body).await;
+
+                let trace = crate::otlp::span_creation::create_spans(&id, true, false).unwrap();
+                let export = ExportTraceServiceRequest::decode(trace.body.as_slice()).unwrap();
+                let spans = &export.resource_spans[0].scope_spans[0].spans;
+                assert_eq!(
+                    spans
+                        .iter()
+                        .any(|span| span.name == "aws.lambda.initialization"),
+                    init_duration > 0.0,
+                    "status={status}, init_duration={init_duration}"
+                );
+                invocation_entry::remove(&id);
+            }
+        }
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn init_report_before_invocation_is_attached_to_first_start_only() {
+        use opentelemetry_proto::tonic::common::v1::any_value::Value;
+
+        for batched in [false, true] {
+            // Runtime /next and telemetry are independent HTTP streams.
+            crate::state::invocation_data::store_current_invocation_id("stale-invocation");
+            let init_report = serde_json::json!({
+                "time": "2026-11-03T15:43:49.000Z", "type": "platform.initReport",
+                "record": { "phase": "init", "metrics": { "durationMs": 1764.64 } }
+            });
+            if !batched {
+                post_telemetry(serde_json::json!([init_report])).await;
+            }
+            for cold in [true, false] {
+                let id = format!("init-before-start-{batched}-{cold}");
+                invocation_entry::update(&id, |entry| {
+                    entry.trace_id = Some("aa".repeat(16));
+                    entry.root_span_id = Some("bb".repeat(8));
+                    entry.span_id = Some("cc".repeat(8));
+                });
+                let mut logs = vec![];
+                if batched && cold {
+                    logs.push(init_report.clone());
+                }
+                logs.extend([
+                    serde_json::json!({
+                        "time": "2026-11-03T15:43:51.000Z", "type": "platform.start",
+                        "record": { "requestId": id }
+                    }),
+                    serde_json::json!({
+                        "time": "2026-11-03T15:43:51.254Z", "type": "platform.runtimeDone",
+                        "record": { "requestId": id, "status": "success", "metrics": { "durationMs": 253.88 } }
+                    }),
+                ]);
+                post_telemetry(serde_json::json!(logs)).await;
+                let traces = invocation_entry::take_traces_by_id(&id);
+                assert_eq!(traces.len(), 1);
+                let export = ExportTraceServiceRequest::decode(traces[0].body.as_slice()).unwrap();
+                let spans = &export.resource_spans[0].scope_spans[0].spans;
+                assert_eq!(
+                    spans.len(),
+                    if cold { 2 } else { 1 },
+                    "batched={batched}, cold={cold}"
+                );
+                let init = spans[0]
+                    .attributes
+                    .iter()
+                    .find(|attr| attr.key == "faas.init_duration");
+                if cold {
+                    assert_eq!(
+                        init.unwrap().value.as_ref().unwrap().value,
+                        Some(Value::DoubleValue(1764.64))
+                    );
+                    assert_eq!(spans[1].name, "aws.lambda.initialization");
+                    assert_eq!(spans[1].parent_span_id, spans[0].span_id);
+                } else {
+                    assert!(init.is_none());
+                }
+                // REPORT arrives later, and must not produce another root/init pair.
+                post_telemetry(serde_json::json!([{
+                    "time": "2026-11-03T15:43:51.255Z", "type": "platform.report",
+                    "record": { "requestId": id, "metrics": { "durationMs": 253.88, "billedDurationMs": 2019.0, "initDurationMs": if cold { 1764.64 } else { 0.0 } } }
+                }])).await;
+                for trace in invocation_entry::take_traces_by_id(&id) {
+                    let export = ExportTraceServiceRequest::decode(trace.body.as_slice()).unwrap();
+                    assert!(export.resource_spans[0].scope_spans[0]
+                        .spans
+                        .iter()
+                        .all(|span| span.name == "aws.lambda.overhead"));
+                }
+                invocation_entry::remove(&id);
+            }
+        }
+        invocation_entry::remove("stale-invocation");
+    }
 }
