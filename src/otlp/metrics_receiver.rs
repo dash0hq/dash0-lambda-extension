@@ -18,9 +18,9 @@ pub async fn metrics(req: Request<Incoming>) -> Result<Response<ResBody>, hyper:
     let mut converted_from_json = false;
 
     tracing::info!(
-        "[{}] /v1/metrics body: {}",
+        "[{}] /v1/metrics body: {} bytes",
         crate::log_prefix(),
-        String::from_utf8_lossy(&encoded_body)
+        encoded_body.len()
     );
 
     match ExportMetricsServiceRequest::decode(body_bytes.as_ref()) {

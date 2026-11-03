@@ -12,7 +12,7 @@ pub struct MaskingRules {
 
 // Must match DASH0_DEFAULT_MASK_RULES in opt/shared.sh, which applies the same defaults to
 // the language distros (checked by opt/test/shared.test.sh).
-static DEFAULT_MASKING_PATTERNS: &[&str] = &[
+pub(crate) static DEFAULT_MASKING_PATTERNS: &[&str] = &[
     ".*pass.*",
     ".*key.*",
     ".*secret.*",

@@ -17,10 +17,11 @@ pub async fn logs(req: Request<Incoming>) -> Result<Response<ResBody>, hyper::Er
     let mut encoded_body: Vec<u8> = body_bytes.to_vec();
     let mut converted_from_json = false;
 
+    // Sizes only: the body is unmasked until export.
     tracing::info!(
-        "[{}] /v1/logs body: {}",
+        "[{}] /v1/logs body: {} bytes",
         crate::log_prefix(),
-        String::from_utf8_lossy(&encoded_body)
+        encoded_body.len()
     );
 
     match ExportLogsServiceRequest::decode(body_bytes.as_ref()) {

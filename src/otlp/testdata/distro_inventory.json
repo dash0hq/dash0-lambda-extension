@@ -1,0 +1,2142 @@
+[
+ {
+  "runtime": "node",
+  "category": "HTTP client",
+  "instrumentation": "http (Dash0 hooks on @opentelemetry/instrumentation-http 0.219.0)",
+  "library": "http/https",
+  "attribute": "http.request.headers",
+  "content": "JSON of outgoing request headers (incl. authorization, x-amz-security-token, cookie)",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "node",
+  "category": "HTTP client",
+  "instrumentation": "http",
+  "library": "http/https",
+  "attribute": "http.request.body",
+  "content": "Outgoing request body (first write()/end()/socket chunk only)",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "node",
+  "category": "HTTP client",
+  "instrumentation": "http",
+  "library": "http/https",
+  "attribute": "http.response.headers",
+  "content": "JSON of response headers (incl. set-cookie)",
+  "direction": "response",
+  "status": "covered"
+ },
+ {
+  "runtime": "node",
+  "category": "HTTP client",
+  "instrumentation": "http",
+  "library": "http/https",
+  "attribute": "http.response.body",
+  "content": "Response body accumulated from 'data' events, cut at the attribute limit (4096 default) BEFORE parsing",
+  "direction": "response",
+  "status": "partial"
+ },
+ {
+  "runtime": "node",
+  "category": "HTTP client",
+  "instrumentation": "@opentelemetry/instrumentation-http 0.219.0 (old semconv default)",
+  "library": "http/https",
+  "attribute": "http.url",
+  "content": "Full outgoing URL incl. query string",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "HTTP client",
+  "instrumentation": "@opentelemetry/instrumentation-http 0.219.0",
+  "library": "http/https",
+  "attribute": "http.target",
+  "content": "Raw request path including the query string",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "HTTP client",
+  "instrumentation": "@opentelemetry/instrumentation-http 0.219.0",
+  "library": "http/https",
+  "attribute": "url.full",
+  "content": "Same as http.url (stable semconv)",
+  "direction": "request",
+  "status": "not captured"
+ },
+ {
+  "runtime": "node",
+  "category": "HTTP client",
+  "instrumentation": "@opentelemetry/instrumentation-http 0.219.0",
+  "library": "http/https",
+  "attribute": "http.user_agent",
+  "content": "User-Agent header value",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "HTTP server",
+  "instrumentation": "@opentelemetry/instrumentation-http 0.219.0",
+  "library": "http/https (incoming)",
+  "attribute": "http.url / http.target",
+  "content": "Incoming URL and path with query string",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "HTTP server",
+  "instrumentation": "@opentelemetry/instrumentation-http 0.219.0",
+  "library": "http/https (incoming)",
+  "attribute": "http.client_ip",
+  "content": "First x-forwarded-for hop",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "HTTP client",
+  "instrumentation": "undici (Dash0 hooks on @opentelemetry/instrumentation-undici 0.29.0)",
+  "library": "fetch/undici",
+  "attribute": "http.request.headers",
+  "content": "JSON of fetch request headers",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "node",
+  "category": "HTTP client",
+  "instrumentation": "undici",
+  "library": "fetch/undici",
+  "attribute": "http.request.body",
+  "content": "fetch init.body when string/Buffer/ArrayBuffer/Uint8Array/URLSearchParams",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "node",
+  "category": "HTTP client",
+  "instrumentation": "undici",
+  "library": "fetch/undici",
+  "attribute": "http.response.headers",
+  "content": "JSON of fetch response headers",
+  "direction": "response",
+  "status": "covered"
+ },
+ {
+  "runtime": "node",
+  "category": "HTTP client",
+  "instrumentation": "undici",
+  "library": "fetch/undici",
+  "attribute": "http.response.body",
+  "content": "fetch response body",
+  "direction": "response",
+  "status": "not captured"
+ },
+ {
+  "runtime": "node",
+  "category": "HTTP client",
+  "instrumentation": "@opentelemetry/instrumentation-undici 0.29.0",
+  "library": "fetch/undici",
+  "attribute": "url.full / url.query",
+  "content": "Full fetch URL and raw query string",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "HTTP server",
+  "instrumentation": "express (Dash0 requestHook on opentelemetry-instrumentation-express 0.41.0)",
+  "library": "express",
+  "attribute": "http.request.query",
+  "content": "JSON of req.query",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "node",
+  "category": "HTTP server",
+  "instrumentation": "express",
+  "library": "express",
+  "attribute": "http.request.headers",
+  "content": "JSON of req.headers",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "node",
+  "category": "HTTP server",
+  "instrumentation": "express",
+  "library": "express",
+  "attribute": "http.request.body",
+  "content": "req.body (only if a body parser populated it)",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "node",
+  "category": "HTTP server",
+  "instrumentation": "express",
+  "library": "express",
+  "attribute": "http.response.headers",
+  "content": "JSON of res.getHeaders()",
+  "direction": "response",
+  "status": "covered"
+ },
+ {
+  "runtime": "node",
+  "category": "HTTP server",
+  "instrumentation": "express",
+  "library": "express",
+  "attribute": "http.response.body",
+  "content": "First argument of res.send()",
+  "direction": "response",
+  "status": "partial"
+ },
+ {
+  "runtime": "node",
+  "category": "HTTP server",
+  "instrumentation": "opentelemetry-instrumentation-express 0.41.0 (includeHttpAttributes: true)",
+  "library": "express",
+  "attribute": "http.target",
+  "content": "req.originalUrl incl. raw query string",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "HTTP server",
+  "instrumentation": "opentelemetry-instrumentation-express 0.41.0",
+  "library": "express",
+  "attribute": "net.peer.ip",
+  "content": "req.ip",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "HTTP server",
+  "instrumentation": "fastify (Dash0 requestHook on @opentelemetry/instrumentation-fastify 0.53.1)",
+  "library": "fastify",
+  "attribute": "http.request.headers",
+  "content": "JSON of request headers",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "node",
+  "category": "HTTP server",
+  "instrumentation": "fastify",
+  "library": "fastify",
+  "attribute": "http.request.query",
+  "content": "JSON of request.query",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "node",
+  "category": "HTTP server",
+  "instrumentation": "fastify",
+  "library": "fastify",
+  "attribute": "http.request.body",
+  "content": "request.body",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "node",
+  "category": "HTTP server",
+  "instrumentation": "fastify",
+  "library": "fastify",
+  "attribute": "http.response.headers / http.response.body",
+  "content": "Response headers and body",
+  "direction": "response",
+  "status": "not captured"
+ },
+ {
+  "runtime": "node",
+  "category": "AWS SDK",
+  "instrumentation": "aws-sdk (Dash0 preRequestHook on forked @opentelemetry/instrumentation-aws-sdk)",
+  "library": "@aws-sdk/client-sqs",
+  "attribute": "messaging.publish.body",
+  "content": "Full SendMessage/SendMessageBatch command input (QueueUrl, MessageBody, MessageAttributes, Entries)",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "node",
+  "category": "AWS SDK",
+  "instrumentation": "aws-sdk",
+  "library": "@aws-sdk/client-sqs",
+  "attribute": "messaging.consume.body",
+  "content": "Full ReceiveMessage response (Messages[].Body, MessageAttributes, ReceiptHandle...)",
+  "direction": "response",
+  "status": "covered"
+ },
+ {
+  "runtime": "node",
+  "category": "AWS SDK",
+  "instrumentation": "aws-sdk",
+  "library": "@aws-sdk/client-sqs",
+  "attribute": "lumigoData",
+  "content": "JSON trigger chain parsed from the first received message Body when it wraps SNS/EventBridge etc. (ids, ARNs, resources)",
+  "direction": "response",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "AWS SDK",
+  "instrumentation": "aws-sdk",
+  "library": "@aws-sdk/client-sqs",
+  "attribute": "aws.resource.name / url.full",
+  "content": "SQS queue URL",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "AWS SDK",
+  "instrumentation": "forked @opentelemetry/instrumentation-aws-sdk 0.74.0",
+  "library": "@aws-sdk/client-sns",
+  "attribute": "messaging.destination / messaging.destination.name (and span name)",
+  "content": "Topic name, or the recipient PhoneNumber for SMS Publish",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "AWS SDK",
+  "instrumentation": "forked @opentelemetry/instrumentation-aws-sdk 0.74.0",
+  "library": "@aws-sdk/client-dynamodb",
+  "attribute": "db.statement / db.query.text",
+  "content": "Serialized command input",
+  "direction": "request",
+  "status": "not captured"
+ },
+ {
+  "runtime": "node",
+  "category": "AWS SDK",
+  "instrumentation": "forked @opentelemetry/instrumentation-aws-sdk 0.74.0",
+  "library": "@aws-sdk/client-dynamodb",
+  "attribute": "aws.dynamodb.projection / aws.dynamodb.*_secondary_indexes / attribute_definitions",
+  "content": "Expressions and schema from command input",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "GenAI",
+  "instrumentation": "forked @opentelemetry/instrumentation-aws-sdk 0.74.0",
+  "library": "@aws-sdk/client-bedrock-runtime",
+  "attribute": "gen_ai.* (request params, usage, finish reasons)",
+  "content": "Model id, max tokens, temperature, top_p, stop sequences, token counts",
+  "direction": "n/a",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "AWS SDK",
+  "instrumentation": "forked @opentelemetry/instrumentation-aws-sdk 0.74.0",
+  "library": "@aws-sdk/client-lambda",
+  "attribute": "faas.invoked_name / faas.invoked_region / faas.execution",
+  "content": "Invoked function name, region, request id",
+  "direction": "n/a",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "AWS SDK",
+  "instrumentation": "forked @opentelemetry/instrumentation-aws-sdk 0.74.0",
+  "library": "@aws-sdk/client-kinesis / s3 / sfn / secrets-manager",
+  "attribute": "aws.kinesis.stream_name, aws.s3.bucket, aws.step_functions.*_arn, aws.secretsmanager.secret.arn",
+  "content": "Resource identifiers",
+  "direction": "n/a",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "AWS SDK",
+  "instrumentation": "http (child span of every AWS SDK v3 call)",
+  "library": "@aws-sdk/* via @smithy/node-http-handler",
+  "attribute": "http.request.body / http.response.body",
+  "content": "Raw AWS API request/response bodies: DynamoDB items, SNS Message, SQS bodies, Kinesis Data, S3 objects, STS credentials (XML), SSM/KMS plaintext, Bedrock prompts",
+  "direction": "request/response",
+  "status": "partial"
+ },
+ {
+  "runtime": "node",
+  "category": "Messaging",
+  "instrumentation": "kafkajs (Dash0 producerHook on opentelemetry-instrumentation-kafkajs 0.41.0)",
+  "library": "kafkajs",
+  "attribute": "messaging.produce.body",
+  "content": "message.value.toString() of each produced message",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "node",
+  "category": "Messaging",
+  "instrumentation": "kafkajs",
+  "library": "kafkajs",
+  "attribute": "messaging.consume.body",
+  "content": "message.value.toString() of each consumed message",
+  "direction": "response",
+  "status": "partial"
+ },
+ {
+  "runtime": "node",
+  "category": "Messaging",
+  "instrumentation": "amqplib (Dash0 publishHook on @opentelemetry/instrumentation-amqplib 0.66.0)",
+  "library": "amqplib",
+  "attribute": "messaging.publish.body",
+  "content": "publishInfo.content.toString()",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "node",
+  "category": "Messaging",
+  "instrumentation": "amqplib",
+  "library": "amqplib",
+  "attribute": "messaging.consume.body",
+  "content": "consumeInfo.msg.content.toString()",
+  "direction": "response",
+  "status": "partial"
+ },
+ {
+  "runtime": "node",
+  "category": "Messaging",
+  "instrumentation": "@opentelemetry/instrumentation-amqplib 0.66.0",
+  "library": "amqplib",
+  "attribute": "messaging.url",
+  "content": "Broker connection URL",
+  "direction": "n/a",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "Cache",
+  "instrumentation": "redis (Dash0 dbStatementSerializer on @opentelemetry/instrumentation-redis-4 0.49.0)",
+  "library": "redis",
+  "attribute": "db.statement",
+  "content": "Command name plus ALL arguments joined by spaces (keys and values, incl. AUTH passwords)",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "node",
+  "category": "Cache",
+  "instrumentation": "redis",
+  "library": "redis",
+  "attribute": "db.response.body",
+  "content": "Command reply",
+  "direction": "response",
+  "status": "partial"
+ },
+ {
+  "runtime": "node",
+  "category": "Cache",
+  "instrumentation": "ioredis (Dash0 dbStatementSerializer on @opentelemetry/instrumentation-ioredis 0.67.0)",
+  "library": "ioredis",
+  "attribute": "db.statement",
+  "content": "Command name plus all arguments",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "node",
+  "category": "Cache",
+  "instrumentation": "ioredis",
+  "library": "ioredis",
+  "attribute": "db.response.body",
+  "content": "response?.toString() of the reply",
+  "direction": "response",
+  "status": "partial"
+ },
+ {
+  "runtime": "node",
+  "category": "Cache",
+  "instrumentation": "@opentelemetry/instrumentation-redis-4 / ioredis",
+  "library": "redis, ioredis",
+  "attribute": "db.connection_string",
+  "content": "redis://host:port",
+  "direction": "n/a",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "Database",
+  "instrumentation": "pg (@opentelemetry/instrumentation-pg 0.71.0, enhancedDatabaseReporting: true)",
+  "library": "pg",
+  "attribute": "db.postgresql.values",
+  "content": "Bound query parameter values",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "Database",
+  "instrumentation": "pg",
+  "library": "pg",
+  "attribute": "db.statement",
+  "content": "SQL text as passed to query()",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "Database",
+  "instrumentation": "mysql2 (Dash0MySQL2Instrumentation on @opentelemetry/instrumentation-mysql2 0.65.0)",
+  "library": "mysql2",
+  "attribute": "db.statement",
+  "content": "SQL with parameter values interpolated via mysql2 format()",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "Database",
+  "instrumentation": "mongodb (@opentelemetry/instrumentation-mongodb 0.72.0, enhancedDatabaseReporting: true)",
+  "library": "mongodb",
+  "attribute": "db.statement (db.query.text with stable semconv)",
+  "content": "JSON of the full command incl. filter values and inserted documents",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "Database",
+  "instrumentation": "@prisma/instrumentation 6.19.2",
+  "library": "@prisma/client",
+  "attribute": "db.query.text / db.statement (engine spans)",
+  "content": "SQL generated by the Prisma engine",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "HTTP server",
+  "instrumentation": "@opentelemetry/instrumentation-nestjs-core 0.65.0",
+  "library": "@nestjs/core",
+  "attribute": "nestjs.* / http.url",
+  "content": "Controller/handler names; http.url on request-handler spans",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "RPC",
+  "instrumentation": "@grpc/grpc-js (Dash0 wrapClient on @opentelemetry/instrumentation-grpc 0.219.0)",
+  "library": "@grpc/grpc-js client",
+  "attribute": "rpc.request.payload",
+  "content": "JSON.stringify of the request message",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "RPC",
+  "instrumentation": "@grpc/grpc-js client",
+  "library": "@grpc/grpc-js client",
+  "attribute": "rpc.response.payload",
+  "content": "JSON.stringify of the response (streams concatenated up to 2048 chars)",
+  "direction": "response",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "RPC",
+  "instrumentation": "@grpc/grpc-js (Dash0 wrapServer)",
+  "library": "@grpc/grpc-js server",
+  "attribute": "rpc.request.payload / rpc.response.payload",
+  "content": "Incoming request and outgoing response messages",
+  "direction": "request/response",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "Lambda",
+  "instrumentation": "extension runtime proxy (all runtimes)",
+  "library": "Lambda Runtime API",
+  "attribute": "dash0_payload log, type lambda_event",
+  "content": "Invocation event (API GW body, SQS/SNS/Kinesis records...)",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "node",
+  "category": "Lambda",
+  "instrumentation": "extension runtime proxy",
+  "library": "Lambda Runtime API",
+  "attribute": "dash0_payload log, type lambda_return_value",
+  "content": "Handler return value",
+  "direction": "response",
+  "status": "covered"
+ },
+ {
+  "runtime": "node",
+  "category": "Lambda",
+  "instrumentation": "extension (API Gateway / ALB)",
+  "library": "Lambda event",
+  "attribute": "http.request.header.<name>",
+  "content": "Allow-listed request headers from DASH0_API_GATEWAY_REQUEST_HEADERS_TO_CAPTURE",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "Lambda",
+  "instrumentation": "extension (API Gateway / ALB)",
+  "library": "Lambda event",
+  "attribute": "url.query",
+  "content": "Raw query string, when DASH0_CAPTURE_API_GATEWAY_QUERY_STRING=true",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "Lambda",
+  "instrumentation": "extension (API Gateway / ALB)",
+  "library": "Lambda return value",
+  "attribute": "http.response.header.<name>",
+  "content": "Allow-listed response headers from DASH0_API_GATEWAY_RESPONSE_HEADERS_TO_CAPTURE",
+  "direction": "response",
+  "status": "covered"
+ },
+ {
+  "runtime": "node",
+  "category": "Lambda",
+  "instrumentation": "extension (API Gateway / ALB)",
+  "library": "Lambda event",
+  "attribute": "url.path / http.route / client.address",
+  "content": "Request path, route, client IP",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "node",
+  "category": "Lambda",
+  "instrumentation": "@opentelemetry/instrumentation-aws-lambda 0.71.0",
+  "library": "Lambda handler",
+  "attribute": "faas.* / cloud.*",
+  "content": "Invocation metadata",
+  "direction": "n/a",
+  "status": "not captured"
+ },
+ {
+  "runtime": "node",
+  "category": "Env",
+  "instrumentation": "extension (all runtimes)",
+  "library": "process env",
+  "attribute": "process.environment_variable.<NAME> (resource attributes)",
+  "content": "Every function environment variable incl. AWS credentials",
+  "direction": "n/a",
+  "status": "covered"
+ },
+ {
+  "runtime": "node",
+  "category": "Env",
+  "instrumentation": "Node distro processDetector",
+  "library": "Node process",
+  "attribute": "process.command_args / process.executable.path",
+  "content": "Node process argv",
+  "direction": "n/a",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP server",
+  "instrumentation": "flask",
+  "library": "flask",
+  "attribute": "http.request.query",
+  "content": "Parsed query string of the incoming request (dict, repeated keys -> list)",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP server",
+  "instrumentation": "flask",
+  "library": "flask",
+  "attribute": "http.request.headers",
+  "content": "All incoming request headers from the WSGI environ (HTTP_*, content-type, content-length)",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP server",
+  "instrumentation": "flask",
+  "library": "flask",
+  "attribute": "http.response.headers",
+  "content": "Response headers",
+  "direction": "response",
+  "status": "covered"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP server",
+  "instrumentation": "flask",
+  "library": "flask",
+  "attribute": "http.request.body",
+  "content": "Request body",
+  "direction": "request",
+  "status": "not captured"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP server",
+  "instrumentation": "flask",
+  "library": "flask",
+  "attribute": "http.response.body",
+  "content": "Response body",
+  "direction": "response",
+  "status": "not captured"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP server",
+  "instrumentation": "flask (upstream wsgi)",
+  "library": "flask",
+  "attribute": "http.target",
+  "content": "RAW_URI/REQUEST_URI = path + raw query string",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP server",
+  "instrumentation": "flask (upstream wsgi)",
+  "library": "flask",
+  "attribute": "http.url",
+  "content": "Full request URI incl. query string (only redact_url: userinfo + AWSAccessKeyId/Signature/sig/X-Goog-Signature)",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP server",
+  "instrumentation": "django",
+  "library": "django",
+  "attribute": "http.request.query",
+  "content": "Parsed query string",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP server",
+  "instrumentation": "django",
+  "library": "django",
+  "attribute": "http.request.headers",
+  "content": "All request headers (request.headers)",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP server",
+  "instrumentation": "django",
+  "library": "django",
+  "attribute": "http.request.body",
+  "content": "Raw request body (request.body)",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP server",
+  "instrumentation": "django",
+  "library": "django",
+  "attribute": "http.response.headers",
+  "content": "Response headers",
+  "direction": "response",
+  "status": "covered"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP server",
+  "instrumentation": "django",
+  "library": "django",
+  "attribute": "http.response.body",
+  "content": "Response body (response.content)",
+  "direction": "response",
+  "status": "partial"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP server",
+  "instrumentation": "django (upstream wsgi/asgi)",
+  "library": "django",
+  "attribute": "http.url",
+  "content": "Full request URL incl. query string (redact_url only)",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP server",
+  "instrumentation": "fastapi",
+  "library": "fastapi",
+  "attribute": "http.request.query",
+  "content": "Parsed query string from ASGI scope",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP server",
+  "instrumentation": "fastapi",
+  "library": "fastapi",
+  "attribute": "http.request.headers",
+  "content": "All request headers from ASGI scope",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP server",
+  "instrumentation": "fastapi",
+  "library": "fastapi",
+  "attribute": "http.request.path",
+  "content": "Request path (may contain IDs, emails, tokens in path segments)",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP server",
+  "instrumentation": "fastapi",
+  "library": "fastapi",
+  "attribute": "http.request.body",
+  "content": "Each ASGI receive message body, on a separate child span `receive_body`",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP server",
+  "instrumentation": "fastapi",
+  "library": "fastapi",
+  "attribute": "http.response.headers",
+  "content": "Response headers (from http.response.start message)",
+  "direction": "response",
+  "status": "covered"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP server",
+  "instrumentation": "fastapi",
+  "library": "fastapi",
+  "attribute": "http.response.body",
+  "content": "Response body (http.response.body message)",
+  "direction": "response",
+  "status": "partial"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP server",
+  "instrumentation": "fastapi (upstream asgi)",
+  "library": "fastapi",
+  "attribute": "http.url",
+  "content": "Full URL incl. query string (redact_url only)",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP server",
+  "instrumentation": "flask, django, fastapi (upstream, OTEL_SEMCONV_STABILITY_OPT_IN=http|http/dup)",
+  "library": "flask/django/fastapi",
+  "attribute": "url.query",
+  "content": "Raw query string",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP server",
+  "instrumentation": "flask, django, fastapi (upstream)",
+  "library": "flask/django/fastapi",
+  "attribute": "http.request.header.<name> / http.response.header.<name>",
+  "content": "Headers listed in OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_REQUEST/RESPONSE",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP client",
+  "instrumentation": "requests",
+  "library": "requests",
+  "attribute": "http.request.headers",
+  "content": "Outgoing request headers",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP client",
+  "instrumentation": "requests",
+  "library": "requests",
+  "attribute": "http.request.body",
+  "content": "PreparedRequest.body (str/bytes; json= gives JSON, data=dict gives form-urlencoded)",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP client",
+  "instrumentation": "requests",
+  "library": "requests",
+  "attribute": "http.response.headers",
+  "content": "Response headers",
+  "direction": "response",
+  "status": "covered"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP client",
+  "instrumentation": "requests",
+  "library": "requests",
+  "attribute": "http.response.body",
+  "content": "response.content",
+  "direction": "response",
+  "status": "partial"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP client",
+  "instrumentation": "requests (upstream)",
+  "library": "requests",
+  "attribute": "http.url",
+  "content": "Full outgoing URL incl. query string (redact_url: userinfo + 4 AWS/Azure/GCS signature params)",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP client",
+  "instrumentation": "httpx",
+  "library": "httpx",
+  "attribute": "http.request.headers",
+  "content": "Outgoing request headers",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP client",
+  "instrumentation": "httpx",
+  "library": "httpx",
+  "attribute": "http.request.body",
+  "content": "Request stream bytes (fully buffered by the hook)",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP client",
+  "instrumentation": "httpx",
+  "library": "httpx",
+  "attribute": "http.response.headers",
+  "content": "Response headers",
+  "direction": "response",
+  "status": "covered"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP client",
+  "instrumentation": "httpx",
+  "library": "httpx",
+  "attribute": "http.response.body",
+  "content": "Response body",
+  "direction": "response",
+  "status": "not captured"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP client",
+  "instrumentation": "httpx (upstream)",
+  "library": "httpx",
+  "attribute": "http.url",
+  "content": "Full outgoing URL incl. query string (redact_url only)",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP client",
+  "instrumentation": "requests, httpx (upstream)",
+  "library": "requests/httpx",
+  "attribute": "http.request.header.<name> / http.response.header.<name>",
+  "content": "Headers listed in OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_REQUEST/RESPONSE",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "HTTP client",
+  "instrumentation": "urllib / urllib3 / aiohttp",
+  "library": "urllib, urllib3, aiohttp",
+  "attribute": "(none)",
+  "content": "Outbound HTTP via these libraries",
+  "direction": "n/a",
+  "status": "not captured"
+ },
+ {
+  "runtime": "python",
+  "category": "AWS SDK",
+  "instrumentation": "botocore (AwsParser)",
+  "library": "boto3/botocore - every service without a specific parser (S3, EventBridge, Step Functions, Kinesis, SSM, Secrets Manager, KMS, STS, Cognito, Bedrock, ...)",
+  "attribute": "http.request.body",
+  "content": "The whole API params dict of the call",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "python",
+  "category": "AWS SDK",
+  "instrumentation": "botocore (AwsParser)",
+  "library": "boto3/botocore - every service except SQS",
+  "attribute": "http.response.body",
+  "content": "Whole API response dict incl. ResponseMetadata",
+  "direction": "response",
+  "status": "partial"
+ },
+ {
+  "runtime": "python",
+  "category": "AWS SDK",
+  "instrumentation": "botocore (AwsParser)",
+  "library": "boto3/botocore",
+  "attribute": "http.response.headers",
+  "content": "ResponseMetadata.HTTPHeaders",
+  "direction": "response",
+  "status": "covered"
+ },
+ {
+  "runtime": "python",
+  "category": "AWS SDK",
+  "instrumentation": "botocore (SqsParser)",
+  "library": "boto3 SQS SendMessage / SendMessageBatch",
+  "attribute": "messaging.publish.body",
+  "content": "Whole SendMessage(Batch) input: QueueUrl, MessageBody, MessageAttributes, Entries",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "python",
+  "category": "AWS SDK",
+  "instrumentation": "botocore (SqsParser)",
+  "library": "boto3 SQS (other ops)",
+  "attribute": "http.request.body",
+  "content": "API params of non-send SQS calls (ReceiveMessage, DeleteMessage ReceiptHandle, ...)",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "python",
+  "category": "AWS SDK",
+  "instrumentation": "botocore (SqsParser)",
+  "library": "boto3 SQS ReceiveMessage",
+  "attribute": "messaging.consume.body",
+  "content": "ReceiveMessage result minus ResponseMetadata (Messages[].Body, MessageAttributes, ReceiptHandle)",
+  "direction": "response",
+  "status": "partial"
+ },
+ {
+  "runtime": "python",
+  "category": "AWS SDK",
+  "instrumentation": "botocore (SqsParser)",
+  "library": "boto3 SQS ReceiveMessage",
+  "attribute": "dash0Data",
+  "content": "Trigger metadata from lumigo parse_triggers (message IDs, ARNs, nested SNS/S3 trigger IDs)",
+  "direction": "response",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "AWS SDK",
+  "instrumentation": "botocore (SnsParser)",
+  "library": "boto3 SNS Publish",
+  "attribute": "http.request.body",
+  "content": "Only the `Message` param (if present), else all params",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "python",
+  "category": "AWS SDK",
+  "instrumentation": "botocore (LambdaParser)",
+  "library": "boto3 Lambda Invoke",
+  "attribute": "http.request.body",
+  "content": "Only the `Payload` param",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "python",
+  "category": "AWS SDK",
+  "instrumentation": "botocore (DynamoParser)",
+  "library": "boto3 DynamoDB",
+  "attribute": "http.request.body",
+  "content": "API params: Item, Key, ExpressionAttributeValues, KeyConditionExpression, ...",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "python",
+  "category": "AWS SDK",
+  "instrumentation": "botocore (DynamoParser)",
+  "library": "boto3 DynamoDB",
+  "attribute": "http.response.body",
+  "content": "Items/Item/Attributes/LastEvaluatedKey",
+  "direction": "response",
+  "status": "covered"
+ },
+ {
+  "runtime": "python",
+  "category": "AWS SDK",
+  "instrumentation": "botocore (upstream dynamodb extension)",
+  "library": "boto3 DynamoDB",
+  "attribute": "aws.dynamodb.item_collection_metrics",
+  "content": "JSON of ItemCollectionMetrics incl. ItemCollectionKey partition-key VALUES",
+  "direction": "response",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "AWS SDK",
+  "instrumentation": "botocore (upstream dynamodb extension)",
+  "library": "boto3 DynamoDB",
+  "attribute": "aws.dynamodb.projection / aws.dynamodb.exclusive_start_table",
+  "content": "ProjectionExpression (attribute names), table names",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "AWS SDK",
+  "instrumentation": "botocore (upstream bedrock extension)",
+  "library": "boto3 bedrock-runtime",
+  "attribute": "gen_ai.* events (prompt/choice content)",
+  "content": "Prompt and completion text when OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true",
+  "direction": "request",
+  "status": "not captured"
+ },
+ {
+  "runtime": "python",
+  "category": "AWS SDK",
+  "instrumentation": "botocore (upstream sns/sqs/secretsmanager/sfn/lambda extensions)",
+  "library": "boto3",
+  "attribute": "messaging.destination(.name), aws.secretsmanager.secret.arn, faas.invoked_name, aws.step_functions.*.arn",
+  "content": "Resource identifiers; SNS PhoneNumber redacted to `phone_number:**`",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "AWS SDK",
+  "instrumentation": "boto",
+  "library": "boto (v2)",
+  "attribute": "(none)",
+  "content": "-",
+  "direction": "n/a",
+  "status": "not captured"
+ },
+ {
+  "runtime": "python",
+  "category": "Messaging",
+  "instrumentation": "kafka_python",
+  "library": "kafka-python",
+  "attribute": "messaging.produce.body",
+  "content": "Message value passed to producer.send (before serialization)",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "python",
+  "category": "Messaging",
+  "instrumentation": "kafka_python",
+  "library": "kafka-python",
+  "attribute": "messaging.consume.body",
+  "content": "record.value of each consumed record",
+  "direction": "response",
+  "status": "partial"
+ },
+ {
+  "runtime": "python",
+  "category": "Messaging",
+  "instrumentation": "pika",
+  "library": "pika",
+  "attribute": "messaging.publish.body",
+  "content": "Published message body",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "python",
+  "category": "Messaging",
+  "instrumentation": "pika",
+  "library": "pika",
+  "attribute": "messaging.consume.body",
+  "content": "Consumed message body",
+  "direction": "response",
+  "status": "partial"
+ },
+ {
+  "runtime": "python",
+  "category": "Messaging",
+  "instrumentation": "pika (upstream)",
+  "library": "pika",
+  "attribute": "messaging.message_id / messaging.conversation_id",
+  "content": "AMQP message_id / correlation_id properties",
+  "direction": "n/a",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "Cache",
+  "instrumentation": "redis",
+  "library": "redis",
+  "attribute": "db.statement",
+  "content": "Full command with all arguments, space-joined (overrides upstream's sanitized `SET ? ?`)",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "python",
+  "category": "Cache",
+  "instrumentation": "redis",
+  "library": "redis",
+  "attribute": "db.response.body",
+  "content": "Command reply (incl. pipeline reply lists)",
+  "direction": "response",
+  "status": "partial"
+ },
+ {
+  "runtime": "python",
+  "category": "Cache",
+  "instrumentation": "redis (upstream)",
+  "library": "redis (RediSearch)",
+  "attribute": "redis.search.query / redis.search.xdoc_<id>.<field>",
+  "content": "FT.SEARCH query text and every returned document field VALUE",
+  "direction": "response",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "Database",
+  "instrumentation": "pymongo",
+  "library": "pymongo",
+  "attribute": "db.request.body",
+  "content": "Full command document (filter, update, documents)",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "python",
+  "category": "Database",
+  "instrumentation": "pymongo",
+  "library": "pymongo",
+  "attribute": "db.response.body",
+  "content": "Command reply (cursor.firstBatch documents) or failure document",
+  "direction": "response",
+  "status": "covered"
+ },
+ {
+  "runtime": "python",
+  "category": "Database",
+  "instrumentation": "pymongo",
+  "library": "pymongo",
+  "attribute": "db.statement",
+  "content": "Command name only (e.g. `find`)",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "python",
+  "category": "Database",
+  "instrumentation": "psycopg / psycopg2 (upstream dbapi)",
+  "library": "psycopg, psycopg2",
+  "attribute": "db.statement",
+  "content": "SQL text as passed to execute (Composed rendered to string)",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "Database",
+  "instrumentation": "psycopg / psycopg2",
+  "library": "psycopg, psycopg2",
+  "attribute": "db.statement.parameters",
+  "content": "str() of the query parameters tuple/dict",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "Database",
+  "instrumentation": "psycopg / psycopg2",
+  "library": "psycopg, psycopg2",
+  "attribute": "db.response.body",
+  "content": "fetchone/fetchmany/fetchall results on separate `fetch*` spans",
+  "direction": "response",
+  "status": "partial"
+ },
+ {
+  "runtime": "python",
+  "category": "Database",
+  "instrumentation": "pymysql (upstream dbapi)",
+  "library": "pymysql",
+  "attribute": "db.statement",
+  "content": "SQL text (template with %s placeholders, or inlined values)",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "Database",
+  "instrumentation": "pymysql (upstream dbapi)",
+  "library": "pymysql",
+  "attribute": "db.statement.parameters",
+  "content": "str() of query parameters",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "Database",
+  "instrumentation": "pymysql",
+  "library": "pymysql",
+  "attribute": "db.response.body",
+  "content": "Query results",
+  "direction": "response",
+  "status": "not captured"
+ },
+ {
+  "runtime": "python",
+  "category": "Database",
+  "instrumentation": "all instrumentations (span.record_exception)",
+  "library": "psycopg, pymysql, botocore, requests, ...",
+  "attribute": "exception.message / exception.stacktrace (span events)",
+  "content": "Exception text, e.g. Postgres `Key (email)=(jane@example.com) already exists`, botocore ClientError messages with parameter values",
+  "direction": "n/a",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "RPC",
+  "instrumentation": "grpcio (client)",
+  "library": "grpcio",
+  "attribute": "rpc.grpc.request.payload",
+  "content": "str() of the request protobuf (text format); streams joined with ',' up to 4 KB",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "RPC",
+  "instrumentation": "grpcio (client)",
+  "library": "grpcio",
+  "attribute": "rpc.grpc.response.payload",
+  "content": "str() of the response protobuf / streamed responses",
+  "direction": "response",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "RPC",
+  "instrumentation": "grpcio (server)",
+  "library": "grpcio",
+  "attribute": "rpc.grpc.request.payload",
+  "content": "str() of the incoming request protobuf / request stream",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "GenAI",
+  "instrumentation": "langchain (OpenLLMetry)",
+  "library": "langchain",
+  "attribute": "gen_ai.prompt.<i>.content / .role / .tool_calls.*",
+  "content": "Prompt messages sent to the LLM",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "GenAI",
+  "instrumentation": "langchain (OpenLLMetry)",
+  "library": "langchain",
+  "attribute": "gen_ai.completion.<i>.content / .tool_calls.<n>.arguments",
+  "content": "Model completions and tool-call arguments",
+  "direction": "response",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "GenAI",
+  "instrumentation": "langchain (OpenLLMetry)",
+  "library": "langchain",
+  "attribute": "traceloop.entity.input / traceloop.entity.output",
+  "content": "JSON of chain/tool inputs and outputs",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "GenAI",
+  "instrumentation": "langchain (OpenLLMetry)",
+  "library": "langchain",
+  "attribute": "llm.request.functions.<i>.parameters / .description",
+  "content": "Tool JSON schemas",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "GenAI",
+  "instrumentation": "langchain (OpenLLMetry)",
+  "library": "langchain",
+  "attribute": "traceloop.association.properties.<key>",
+  "content": "Run metadata values passed by the app",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "GenAI",
+  "instrumentation": "agno (OpenInference)",
+  "library": "agno",
+  "attribute": "input.value / output.value",
+  "content": "Agent/team/workflow run input & output, tool arguments & results, model input messages",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "GenAI",
+  "instrumentation": "agno (OpenInference)",
+  "library": "agno",
+  "attribute": "llm.input_messages.<i>.message.content / llm.output_messages.<i>.message.content (+ tool_calls.*.function.arguments)",
+  "content": "LLM prompt and completion messages",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "GenAI",
+  "instrumentation": "agno (OpenInference)",
+  "library": "agno",
+  "attribute": "tool.parameters / llm.invocation_parameters / session.id / user.id",
+  "content": "Tool argument values, model kwargs, session and user identifiers",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "Lambda",
+  "instrumentation": "aws_lambda (upstream, always on)",
+  "library": "opentelemetry-instrumentation-aws-lambda",
+  "attribute": "http.target",
+  "content": "API Gateway v1 `resource?urlencode(queryStringParameters)` / v2 `path?rawQueryString`",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "Lambda",
+  "instrumentation": "aws_lambda (upstream)",
+  "library": "opentelemetry-instrumentation-aws-lambda",
+  "attribute": "http.user_agent / net.host.name / http.route",
+  "content": "User-Agent, Host header, route/path",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "Lambda",
+  "instrumentation": "extension",
+  "library": "Dash0 extension",
+  "attribute": "dash0_payload log: lambda_event / lambda_response",
+  "content": "Handler event and return value",
+  "direction": "n/a",
+  "status": "partial"
+ },
+ {
+  "runtime": "python",
+  "category": "Lambda",
+  "instrumentation": "extension",
+  "library": "Dash0 extension",
+  "attribute": "url.query / http.request.header.<name>",
+  "content": "API Gateway query string and selected headers read from the event",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "python",
+  "category": "Env",
+  "instrumentation": "extension",
+  "library": "Dash0 extension",
+  "attribute": "process.environment_variable.<NAME> (resource)",
+  "content": "Every function environment variable",
+  "direction": "n/a",
+  "status": "covered"
+ },
+ {
+  "runtime": "java",
+  "category": "HTTP client",
+  "instrumentation": "dash0-java-http-client (java11)",
+  "library": "java.net.http.HttpClient",
+  "attribute": "http.request.body",
+  "content": "Outgoing request body",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "java",
+  "category": "HTTP client",
+  "instrumentation": "dash0-java-http-client (java11)",
+  "library": "java.net.http.HttpClient",
+  "attribute": "http.response.body",
+  "content": "Response body",
+  "direction": "response",
+  "status": "covered"
+ },
+ {
+  "runtime": "java",
+  "category": "HTTP client",
+  "instrumentation": "dash0-java-http-client (java11)",
+  "library": "java.net.http.HttpClient",
+  "attribute": "url.full",
+  "content": "Request URL incl. query string",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "java",
+  "category": "HTTP client",
+  "instrumentation": "dash0-java-http-client (java11)",
+  "library": "java.net.http.HttpClient",
+  "attribute": "http.request.header.<name>",
+  "content": "Request header values",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "java",
+  "category": "HTTP client",
+  "instrumentation": "dash0-java-http-client (java11)",
+  "library": "java.net.http.HttpClient",
+  "attribute": "http.response.header.<name>",
+  "content": "Response header values",
+  "direction": "response",
+  "status": "covered"
+ },
+ {
+  "runtime": "java",
+  "category": "HTTP client",
+  "instrumentation": "dash0 apache-httpclient-5.0",
+  "library": "Apache HttpClient 5",
+  "attribute": "http.request.body",
+  "content": "Outgoing request body (literal \"null\" when entity is absent)",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "java",
+  "category": "HTTP client",
+  "instrumentation": "dash0 apache-httpclient-5.0",
+  "library": "Apache HttpClient 5",
+  "attribute": "http.response.body",
+  "content": "Response body",
+  "direction": "response",
+  "status": "covered"
+ },
+ {
+  "runtime": "java",
+  "category": "HTTP client",
+  "instrumentation": "dash0 apache-httpclient-5.0",
+  "library": "Apache HttpClient 5",
+  "attribute": "url.full",
+  "content": "Request URL incl. query",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "java",
+  "category": "HTTP client",
+  "instrumentation": "dash0 apache-httpclient-5.0",
+  "library": "Apache HttpClient 5",
+  "attribute": "http.request.header.<name> / http.response.header.<name>",
+  "content": "Captured header values",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "java",
+  "category": "HTTP client",
+  "instrumentation": "upstream apache-httpclient-4.0 + dash0 aws-sdk-1.11 BHttpConnectionBase hook",
+  "library": "Apache HttpClient 4",
+  "attribute": "http.request.body / http.response.body",
+  "content": "Request/response bodies of any Apache 4 connection in a classloader that also has AmazonHttpClient",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "java",
+  "category": "HTTP client",
+  "instrumentation": "upstream (apache-httpclient-4, okhttp-3, http-url-connection, netty client, reactor-netty, jetty-client, spring-webclient, …)",
+  "library": "various",
+  "attribute": "url.full",
+  "content": "Request URL incl. query",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "java",
+  "category": "HTTP client",
+  "instrumentation": "upstream HTTP clients",
+  "library": "OkHttp, HttpURLConnection, etc.",
+  "attribute": "http.request.body / http.response.body",
+  "content": "—",
+  "direction": "n/a",
+  "status": "not captured"
+ },
+ {
+  "runtime": "java",
+  "category": "HTTP server",
+  "instrumentation": "dash0 servlet-3.0 (+spring-webmvc-3.1)",
+  "library": "Servlet 3+/Spring MVC (e.g. aws-serverless-java-container)",
+  "attribute": "http.request.body",
+  "content": "Incoming request body read via ServletInputStream/BufferedReader",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "java",
+  "category": "HTTP server",
+  "instrumentation": "dash0 servlet-3.0",
+  "library": "Servlet 3+/Spring MVC",
+  "attribute": "http.response.body",
+  "content": "Response body written via ServletOutputStream/PrintWriter",
+  "direction": "response",
+  "status": "covered"
+ },
+ {
+  "runtime": "java",
+  "category": "HTTP server",
+  "instrumentation": "upstream servlet / netty / spring / Lambda API Gateway",
+  "library": "various",
+  "attribute": "url.query",
+  "content": "Incoming query string",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "java",
+  "category": "HTTP server",
+  "instrumentation": "upstream servlet / netty",
+  "library": "various",
+  "attribute": "http.request.header.<name> / http.response.header.<name>",
+  "content": "Server header values",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "java",
+  "category": "HTTP server",
+  "instrumentation": "upstream servlet / netty / spring",
+  "library": "various",
+  "attribute": "url.path / http.route",
+  "content": "Request path (can embed IDs/tokens as path segments)",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "java",
+  "category": "HTTP server",
+  "instrumentation": "dash0 netty-4.1 (also Spring WebFlux / Reactor Netty server)",
+  "library": "Netty 4.1",
+  "attribute": "http.request.body",
+  "content": "Incoming request body",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "java",
+  "category": "HTTP server",
+  "instrumentation": "dash0 netty-4.1",
+  "library": "Netty 4.1",
+  "attribute": "http.response.body",
+  "content": "Response body",
+  "direction": "response",
+  "status": "covered"
+ },
+ {
+  "runtime": "java",
+  "category": "AWS SDK",
+  "instrumentation": "dash0 aws-sdk-2.2 (fork; upstream disabled)",
+  "library": "AWS SDK v2 (all services)",
+  "attribute": "http.request.body",
+  "content": "Raw wire request body of the SDK call",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "java",
+  "category": "AWS SDK",
+  "instrumentation": "dash0 aws-sdk-2.2",
+  "library": "AWS SDK v2 (all services)",
+  "attribute": "http.response.body",
+  "content": "Raw wire response body",
+  "direction": "response",
+  "status": "partial"
+ },
+ {
+  "runtime": "java",
+  "category": "AWS SDK",
+  "instrumentation": "dash0 aws-sdk-2.2",
+  "library": "SQS (SendMessage/SendMessageBatch)",
+  "attribute": "http.request.body",
+  "content": "QueueUrl, MessageBody (string), MessageAttributes",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "java",
+  "category": "AWS SDK",
+  "instrumentation": "dash0 aws-sdk-2.2",
+  "library": "SQS (ReceiveMessage)",
+  "attribute": "http.response.body",
+  "content": "Messages[].Body, MessageAttributes, ReceiptHandle",
+  "direction": "response",
+  "status": "partial"
+ },
+ {
+  "runtime": "java",
+  "category": "Messaging",
+  "instrumentation": "dash0 aws-sdk-2.2 SqsImpl",
+  "library": "SQS (ReceiveMessage → per-message process span)",
+  "attribute": "messaging.message.body",
+  "content": "Message.toString(): Body, MessageAttributes, Attributes, ReceiptHandle, MD5s",
+  "direction": "response",
+  "status": "partial"
+ },
+ {
+  "runtime": "java",
+  "category": "AWS SDK",
+  "instrumentation": "dash0 aws-sdk-2.2",
+  "library": "SNS (Publish/PublishBatch)",
+  "attribute": "http.request.body",
+  "content": "Form-encoded Message, Subject, MessageAttributes",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "java",
+  "category": "AWS SDK",
+  "instrumentation": "dash0 aws-sdk-2.2",
+  "library": "Kinesis (PutRecord/PutRecords/GetRecords)",
+  "attribute": "http.request.body / http.response.body",
+  "content": "JSON with base64 'Data' blobs",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "java",
+  "category": "AWS SDK",
+  "instrumentation": "dash0 aws-sdk-2.2",
+  "library": "DynamoDB",
+  "attribute": "http.request.body / http.response.body",
+  "content": "Items, Keys, ExpressionAttributeValues, query results",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "java",
+  "category": "AWS SDK",
+  "instrumentation": "aws-sdk-2.2 library FieldMapper",
+  "library": "DynamoDB",
+  "attribute": "aws.dynamodb.item_collection_metrics",
+  "content": "ItemCollectionKey values (partition key values) serialized as JSON",
+  "direction": "response",
+  "status": "not masked"
+ },
+ {
+  "runtime": "java",
+  "category": "AWS SDK",
+  "instrumentation": "dash0 aws-sdk-2.2",
+  "library": "S3 (PutObject/GetObject)",
+  "attribute": "http.request.body / http.response.body",
+  "content": "Object content (first 1024 chars) / XML listings",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "java",
+  "category": "Lambda",
+  "instrumentation": "dash0 aws-sdk-2.2",
+  "library": "Lambda Invoke",
+  "attribute": "http.request.body / http.response.body",
+  "content": "Invoke Payload (raw event JSON) / function result",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "java",
+  "category": "GenAI",
+  "instrumentation": "dash0 aws-sdk-2.2 (upstream Bedrock/gen_ai support not present in fork)",
+  "library": "Bedrock Runtime (InvokeModel/Converse)",
+  "attribute": "http.request.body / http.response.body",
+  "content": "Prompts and completions JSON",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "java",
+  "category": "AWS SDK",
+  "instrumentation": "aws-sdk-2.2 library",
+  "library": "AWS SDK v2",
+  "attribute": "aws.http.error_message",
+  "content": "Service error message (can echo input values)",
+  "direction": "response",
+  "status": "not masked"
+ },
+ {
+  "runtime": "java",
+  "category": "AWS SDK",
+  "instrumentation": "dash0 aws-sdk-1.11 (+ upstream aws-sdk-1.11)",
+  "library": "AWS SDK v1",
+  "attribute": "http.request.body",
+  "content": "Wire request body",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "java",
+  "category": "AWS SDK",
+  "instrumentation": "dash0 aws-sdk-1.11",
+  "library": "AWS SDK v1",
+  "attribute": "http.response.body",
+  "content": "Wire response body",
+  "direction": "response",
+  "status": "partial"
+ },
+ {
+  "runtime": "java",
+  "category": "Messaging",
+  "instrumentation": "dash0 kafka-clients-0.11",
+  "library": "Kafka producer",
+  "attribute": "messaging.message.payload",
+  "content": "record.value().toString()",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "java",
+  "category": "Messaging",
+  "instrumentation": "dash0 kafka-clients-0.11",
+  "library": "Kafka producer",
+  "attribute": "messaging.message.headers",
+  "content": "List of 'name=[byte values]' strings",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "java",
+  "category": "Messaging",
+  "instrumentation": "dash0 kafka-clients-0.11",
+  "library": "Kafka consumer (process span)",
+  "attribute": "messaging.message.payload",
+  "content": "record.value().toString()",
+  "direction": "response",
+  "status": "partial"
+ },
+ {
+  "runtime": "java",
+  "category": "Messaging",
+  "instrumentation": "dash0 kafka-clients-0.11",
+  "library": "Kafka consumer",
+  "attribute": "messaging.message.headers",
+  "content": "'name=[bytes]' list",
+  "direction": "response",
+  "status": "covered"
+ },
+ {
+  "runtime": "java",
+  "category": "Messaging",
+  "instrumentation": "upstream kafka-clients",
+  "library": "Kafka producer/consumer",
+  "attribute": "messaging.kafka.message.key",
+  "content": "Record key (string)",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "java",
+  "category": "Messaging",
+  "instrumentation": "dash0 rabbitmq-2.7 (fork; upstream disabled)",
+  "library": "RabbitMQ basicPublish",
+  "attribute": "messaging.message.payload",
+  "content": "new String(body)",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "java",
+  "category": "Messaging",
+  "instrumentation": "dash0 rabbitmq-2.7",
+  "library": "RabbitMQ handleDelivery (consumer)",
+  "attribute": "messaging.message.payload",
+  "content": "new String(body)",
+  "direction": "response",
+  "status": "partial"
+ },
+ {
+  "runtime": "java",
+  "category": "Messaging",
+  "instrumentation": "dash0 rabbitmq-2.7",
+  "library": "RabbitMQ basicGet",
+  "attribute": "messaging.message.payload",
+  "content": "new String(getResponse.getBody())",
+  "direction": "response",
+  "status": "partial"
+ },
+ {
+  "runtime": "java",
+  "category": "Messaging",
+  "instrumentation": "upstream messaging (kafka, rabbitmq, sqs, jms…)",
+  "library": "various",
+  "attribute": "messaging.header.<name>",
+  "content": "Captured message header values",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "java",
+  "category": "Messaging",
+  "instrumentation": "dash0 storm",
+  "library": "Apache Storm bolt/executor",
+  "attribute": "storm.tuple.values",
+  "content": "Tuple values toString() as string array",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "java",
+  "category": "Cache",
+  "instrumentation": "dash0 lettuce-5.1 (fork; upstream disabled)",
+  "library": "Lettuce",
+  "attribute": "db.statement (db.query.text under stable semconv)",
+  "content": "Command args joined (values included; sanitizer disabled)",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "java",
+  "category": "Cache",
+  "instrumentation": "dash0 lettuce-5.1",
+  "library": "Lettuce",
+  "attribute": "db.response.body",
+  "content": "Command result toString()",
+  "direction": "response",
+  "status": "partial"
+ },
+ {
+  "runtime": "java",
+  "category": "Cache",
+  "instrumentation": "upstream jedis-1.4/3.0/4.0 (sanitizer disabled by dash0)",
+  "library": "Jedis",
+  "attribute": "db.statement / db.query.text",
+  "content": "Full Redis command incl. values",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "java",
+  "category": "Cache",
+  "instrumentation": "upstream redisson / vertx-redis / spymemcached etc.",
+  "library": "other Redis/cache clients",
+  "attribute": "db.statement / db.query.text",
+  "content": "Commands with values (sanitizer globally disabled)",
+  "direction": "request",
+  "status": "partial"
+ },
+ {
+  "runtime": "java",
+  "category": "Database",
+  "instrumentation": "upstream jdbc (+dash0 JdbcConfigCustomizer)",
+  "library": "JDBC",
+  "attribute": "db.statement / db.query.text",
+  "content": "Full SQL text with literal values (common db-statement-sanitizer forced off unless user sets it)",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "java",
+  "category": "Database",
+  "instrumentation": "dash0 jdbc",
+  "library": "JDBC ResultSet.next",
+  "attribute": "db.results",
+  "content": "JSON array with each fetched row (column→value)",
+  "direction": "response",
+  "status": "not masked"
+ },
+ {
+  "runtime": "java",
+  "category": "Database",
+  "instrumentation": "upstream jdbc",
+  "library": "JDBC PreparedStatement",
+  "attribute": "db.query.parameter.<index>",
+  "content": "Bound parameter values",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "java",
+  "category": "Database",
+  "instrumentation": "upstream mongo / cassandra / couchbase / r2dbc / hibernate / vertx-sql …",
+  "library": "various",
+  "attribute": "db.statement / db.query.text",
+  "content": "Queries/commands with literal values (sanitizer off globally)",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "java",
+  "category": "Database",
+  "instrumentation": "upstream elasticsearch / opensearch",
+  "library": "Elasticsearch/OpenSearch",
+  "attribute": "db.query.text (search body)",
+  "content": "Search request body",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "java",
+  "category": "RPC",
+  "instrumentation": "dash0 grpc-1.6",
+  "library": "gRPC client",
+  "attribute": "rpc.grpc.request.payload",
+  "content": "Request messages as protobuf JSON (JsonFormat) or toString()",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "java",
+  "category": "RPC",
+  "instrumentation": "dash0 grpc-1.6",
+  "library": "gRPC client",
+  "attribute": "rpc.grpc.response.payload",
+  "content": "Response messages as JSON",
+  "direction": "response",
+  "status": "not masked"
+ },
+ {
+  "runtime": "java",
+  "category": "RPC",
+  "instrumentation": "dash0 grpc-1.6",
+  "library": "gRPC server",
+  "attribute": "rpc.grpc.request.payload",
+  "content": "Incoming request messages as JSON",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "java",
+  "category": "RPC",
+  "instrumentation": "dash0 grpc-1.6",
+  "library": "gRPC server",
+  "attribute": "rpc.grpc.response.payload",
+  "content": "Outgoing response messages as JSON",
+  "direction": "response",
+  "status": "not masked"
+ },
+ {
+  "runtime": "java",
+  "category": "RPC",
+  "instrumentation": "upstream grpc-1.6",
+  "library": "gRPC",
+  "attribute": "rpc.grpc.request.metadata.<key> / rpc.grpc.response.metadata.<key>",
+  "content": "Captured metadata (header) values",
+  "direction": "request",
+  "status": "not masked"
+ },
+ {
+  "runtime": "java",
+  "category": "Lambda",
+  "instrumentation": "upstream aws-lambda-events-2.2 / core-1.0",
+  "library": "Lambda handler (API Gateway)",
+  "attribute": "url.full",
+  "content": "URL built from API Gateway host, path and queryStringParameters",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "java",
+  "category": "Lambda",
+  "instrumentation": "upstream aws-lambda-events",
+  "library": "Lambda handler (API Gateway)",
+  "attribute": "http.request.header.<name>",
+  "content": "Event header values",
+  "direction": "request",
+  "status": "covered"
+ },
+ {
+  "runtime": "java",
+  "category": "Lambda",
+  "instrumentation": "Dash0 extension (not Java distro)",
+  "library": "Lambda runtime",
+  "attribute": "dash0_payload log records (event, return value)",
+  "content": "Invocation event and handler result",
+  "direction": "n/a",
+  "status": "covered"
+ },
+ {
+  "runtime": "java",
+  "category": "Env",
+  "instrumentation": "Dash0 extension",
+  "library": "process",
+  "attribute": "process.environment_variable.*",
+  "content": "Env var values (resource attrs)",
+  "direction": "n/a",
+  "status": "covered"
+ },
+ {
+  "runtime": "java",
+  "category": "Env",
+  "instrumentation": "all span producers",
+  "library": "OTel SDK",
+  "attribute": "span events: exception.message / exception.stacktrace",
+  "content": "Exception text (e.g. SQL errors with values, AWS errors, Lettuce error strings)",
+  "direction": "n/a",
+  "status": "not masked"
+ },
+ {
+  "runtime": "java",
+  "category": "Env",
+  "instrumentation": "upstream logback/log4j appender instrumentations",
+  "library": "application logs",
+  "attribute": "log record body / attributes",
+  "content": "Application log messages exported via OTLP logs",
+  "direction": "n/a",
+  "status": "not masked"
+ },
+ {
+  "runtime": "java",
+  "category": "Env",
+  "instrumentation": "Dash0Configurator spandump",
+  "library": "FileSpanExporter (debug)",
+  "attribute": "all span attributes",
+  "content": "DASH0_DEBUG_SPANDUMP file",
+  "direction": "n/a",
+  "status": "covered"
+ }
+]
