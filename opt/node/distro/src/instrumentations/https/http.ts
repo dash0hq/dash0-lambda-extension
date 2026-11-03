@@ -1,6 +1,14 @@
 import { ClientRequest, IncomingMessage, ServerResponse } from 'http';
 import * as shimmer from 'shimmer';
 import { URL } from 'url';
+import {
+  BrotliOptions,
+  brotliDecompressSync,
+  gunzipSync,
+  inflateRawSync,
+  inflateSync,
+  ZlibOptions,
+} from 'zlib';
 
 import { CommonUtils, ScrubContext } from '@lumigo/node-core';
 import type { RequestRawData } from '@lumigo/node-core/lib/types/spans/httpSpan';
@@ -47,7 +55,8 @@ const hook = (module, funcName, options: HookOptions = {}, shimmerLib = shimmer)
 };
 
 type OnRequestEndOptionsType = {
-  body: string;
+  /** Undefined when the body cannot be captured; no attribute is set then. */
+  body: string | undefined;
   headers: Record<string, string>;
   statusCode: number;
   truncated: boolean;
@@ -67,6 +76,76 @@ export const isEmptyString = (str): boolean =>
   !!(!str || (typeof str === 'string' && str.length === 0));
 
 type RequestType = (ClientRequest | IncomingMessage) & { headers?: any; getHeaders: () => any };
+
+// Node's http module never decompresses; clients such as axios and node-fetch pipe the
+// response through zlib themselves. The hook sees the compressed bytes, so it has to decode
+// them before the body can be parsed and masked. These bound the capture, not the response.
+const ENCODED_LIMIT = 32 * 1024;
+const DECODED_LIMIT = 64 * 1024;
+const decoders: Record<string, (buffer: Buffer, options: ZlibOptions) => Buffer> = {
+  gzip: gunzipSync,
+  'x-gzip': gunzipSync,
+  // HTTP deflate is zlib-wrapped, but some servers send a raw deflate stream.
+  deflate: (buffer, options) => {
+    try {
+      return inflateSync(buffer, options);
+    } catch {
+      return inflateRawSync(buffer, options);
+    }
+  },
+  br: (buffer, options) => brotliDecompressSync(buffer, options as BrotliOptions),
+};
+
+/** The single content-encoding of a response, lowercased; 'identity' when there is none. */
+export const contentEncoding = (headers: Record<string, unknown> | undefined): string => {
+  const value = headers?.['content-encoding'];
+  return typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : 'identity';
+};
+
+/**
+ * Decompresses a captured response body. Returns undefined, so that nothing is exported,
+ * for an unsupported or stacked encoding, a corrupt stream or one that decodes past
+ * DECODED_LIMIT. Never returns compressed bytes as text.
+ */
+export const decodeResponseBody = (encoded: Buffer, encoding: string): string | undefined => {
+  const decode = decoders[encoding];
+  if (!decode) return undefined;
+  try {
+    return decode(encoded, { maxOutputLength: DECODED_LIMIT, chunkSize: 16 * 1024 }).toString('utf8');
+  } catch {
+    return undefined;
+  }
+};
+
+function encodedResponseHandler(
+  requestRawData: RequestRawData,
+  response: any,
+  encoding: string,
+  onRequestEnd: (requestRawData: RequestRawData, options: OnRequestEndOptionsType) => void
+) {
+  let chunks: Buffer[] | undefined = decoders[encoding] ? [] : undefined;
+  let size = 0;
+  return function (args) {
+    if (args[0] === 'data' && chunks) {
+      const chunk = args[1];
+      // A string chunk means the consumer called setEncoding(): the bytes are already lost.
+      if (!Buffer.isBuffer(chunk) || size + chunk.length > ENCODED_LIMIT) {
+        chunks = undefined;
+      } else {
+        chunks.push(chunk);
+        size += chunk.length;
+      }
+    }
+    if (args[0] === 'end') {
+      const { headers, statusCode } = response;
+      // The decoded body goes through the same JSON parsing, masking and size limit as an
+      // identity body; scrubHttpPayload truncates the masked result.
+      const body = chunks ? decodeResponseBody(Buffer.concat(chunks, size), encoding) : undefined;
+      chunks = undefined;
+      onRequestEnd(requestRawData, { body, truncated: false, headers, statusCode });
+    }
+  };
+}
 
 export const HttpHooks: InstrumentationIfc<
   ClientRequest | IncomingMessage,
@@ -141,6 +220,7 @@ export class Http {
       requestRawData.response.headers = headers;
       requestRawData.response.statusCode = statusCode;
       requestRawData.response.truncated = truncated;
+      if (body === undefined) return;
       const scrubbed = scrubHttpPayload(
         requestRawData.response.body,
         contentType(headers),
@@ -265,6 +345,10 @@ export class Http {
     response: any,
     onRequestEnd: (requestRawData: RequestRawData, options: OnRequestEndOptionsType) => void
   ) {
+    const encoding = contentEncoding(response.headers);
+    if (encoding !== 'identity') {
+      return encodedResponseHandler(requestRawData, response, encoding, onRequestEnd);
+    }
     let body = '';
     const maxPayloadSize = getSpanAttributeMaxLength();
     return function (args) {

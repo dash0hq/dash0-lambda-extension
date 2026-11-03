@@ -68,12 +68,9 @@ const scenarios: [string, Scenario, (result: Result) => void][] = [
   ]),
   ['identity response, unchanged', { wire: json(graphqlResponse), chunked: true },
     result => expect(result.responseBody).toBe(masked)],
-  ['large gzip response, decoded then truncated to the attribute limit', { encoding: 'gzip', wire: gzipSync(json(large)) },
-    result => {
-      expect(result.responseBody!.startsWith('{"items":[{"id":0,"name":"Chicken Bucket"},')).toBe(true);
-      expect(result.responseBody!.length).toBeLessThanOrEqual(4096 + 1);
-      expect(result.responseBody).not.toContain('hidden');
-    }],
+  // Same structural truncation as any oversized parsed http payload (see masking-env.test.ts).
+  ['large gzip response, decoded, masked, then truncated', { encoding: 'gzip', wire: gzipSync(json(large)) },
+    result => expect(result.responseBody).toBe('{"items":"✂"}')],
   ['corrupt gzip', { encoding: 'gzip', wire: Buffer.from([0x1f, 0x8b, 8, 0, 1, 2, 3, 4, 5, 6]) },
     result => expect(result.responseBody).toBeUndefined()],
   ['unsupported encoding', { encoding: 'zstd', wire: Buffer.from([0x28, 0xb5, 0x2f, 0xfd, 0, 1, 2, 3]) },
