@@ -32,15 +32,17 @@ def compatible_runtimes(layer, source):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("layer", choices=("node", "python", "java", "manual"))
-    parser.add_argument("--check", action="store_true", help="Check GetLayerVersion JSON on stdin")
+    parser.add_argument("--check", action="store_true", help="Check PublishLayerVersion JSON on stdin and output its version")
     args = parser.parse_args()
     source = (Path(__file__).resolve().parents[1] / "integration-tests/runtimes.ts").read_text()
     expected = compatible_runtimes(args.layer, source)
     if args.check:
-        actual = json.load(sys.stdin)
+        response = json.load(sys.stdin)
+        actual = response.get("CompatibleRuntimes")
         if not isinstance(actual, list) or sorted(actual) != sorted(expected):
             raise ValueError(f"{args.layer}: expected {expected}, got {actual}")
-        print(f"Verified {args.layer} CompatibleRuntimes: {' '.join(actual)}")
+        print(f"Verified {args.layer} CompatibleRuntimes: {' '.join(actual)}", file=sys.stderr)
+        print(response["Version"])
     else:
         print(" ".join(expected))
 
