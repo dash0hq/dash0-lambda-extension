@@ -2,6 +2,14 @@ const OTHER_DASH0_ENDPOINT =
   'http://ec2-34-215-6-94.us-west-2.compute.amazonaws.com:55681/v1/trace';
 const DASH0_TOKEN = 't_10faa5e13e7844aaa1234';
 
+// Reads the effective limit from a span instead of the provider's private config.
+const attributeValueLengthLimitOf = (tracerProvider): number => {
+  const span = tracerProvider
+    .getTracer('span-limits-test')
+    .startSpan('span-limits-test', { attributes: { probe: 'x'.repeat(10_000) } });
+  return span.attributes.probe.length;
+};
+
 describe('Distro initialization', () => {
   const ORIGINAL_PROCESS_ENV = process.env;
 
@@ -89,7 +97,7 @@ describe('Distro initialization', () => {
         const { init } = jest.requireActual('./distro');
         const { tracerProvider } = await init;
 
-        expect(tracerProvider._config.spanLimits['attributeValueLengthLimit']).toBe(1);
+        expect(attributeValueLengthLimitOf(tracerProvider)).toBe(1);
       });
     });
 
@@ -102,7 +110,7 @@ describe('Distro initialization', () => {
         const { init } = jest.requireActual('./distro');
         const { tracerProvider } = await init;
 
-        expect(tracerProvider._config.spanLimits['attributeValueLengthLimit']).toBe(50);
+        expect(attributeValueLengthLimitOf(tracerProvider)).toBe(50);
       });
     });
 
@@ -114,7 +122,7 @@ describe('Distro initialization', () => {
         const { init } = jest.requireActual('./distro');
         const { tracerProvider } = await init;
 
-        expect(tracerProvider._config.spanLimits['attributeValueLengthLimit']).toBe(4096);
+        expect(attributeValueLengthLimitOf(tracerProvider)).toBe(4096);
       });
     });
 
@@ -128,7 +136,7 @@ describe('Distro initialization', () => {
         const { init } = jest.requireActual('./distro');
         const { tracerProvider } = await init;
 
-        expect(tracerProvider._config.spanLimits['attributeValueLengthLimit']).toBe(1);
+        expect(attributeValueLengthLimitOf(tracerProvider)).toBe(1);
       });
     });
   });

@@ -15,7 +15,7 @@ type PatchFunction = (moduleExports: any, moduleVersion?: string) => any;
  * after `mysql2/lib/connection.js` has been patched, because `mysql2/index.js` requires
  * the connection before it assigns `exports.format`. The wrapper is therefore left with
  * `format === undefined`, `getQueryText` falls back to the raw statement, and the query
- * parameter values are never interpolated into `db.statement`.
+ * parameter values are never interpolated into `db.query.text`.
  *
  * Which hook eventually supplies `format` depends on how the application loads the driver:
  *

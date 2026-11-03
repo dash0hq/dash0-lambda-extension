@@ -111,11 +111,11 @@ describe('Dash0Mysql2Instrumentation', () => {
     const dbStatementOf = () => {
       const spans = exporter.getFinishedSpans();
       expect(spans).toHaveLength(1);
-      return spans[0].attributes['db.statement'];
+      return spans[0].attributes['db.query.text'];
     };
 
     for (const formatCarrier of Object.keys(FORMAT_CARRIERS) as (keyof typeof FORMAT_CARRIERS)[]) {
-      test(`are interpolated into db.statement for query() when format arrives via ${formatCarrier}`, () => {
+      test(`are interpolated into db.query.text for query() when format arrives via ${formatCarrier}`, () => {
         const connection = loadModuleInRealWorldOrder(
           new Dash0MySQL2Instrumentation(),
           formatCarrier
@@ -132,7 +132,7 @@ describe('Dash0Mysql2Instrumentation', () => {
         );
       });
 
-      test(`are interpolated into db.statement for execute() when format arrives via ${formatCarrier}`, () => {
+      test(`are interpolated into db.query.text for execute() when format arrives via ${formatCarrier}`, () => {
         const connection = loadModuleInRealWorldOrder(
           new Dash0MySQL2Instrumentation(),
           formatCarrier
