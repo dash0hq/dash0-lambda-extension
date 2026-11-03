@@ -1,10 +1,14 @@
 use once_cell::sync::OnceCell;
+use opentelemetry_proto::tonic::common::v1::any_value::Value;
+use opentelemetry_proto::tonic::common::v1::AnyValue;
+use opentelemetry_proto::tonic::trace::v1::ResourceSpans;
 use regex::Regex;
 use std::env;
 use tracing::warn;
 
 const DASH0_MASK_RULES_ENV: &str = "DASH0_MASK_RULES";
 const DASH0_MASK_ENV_VARS_ENV: &str = "DASH0_MASK_ENV_VARS";
+const DASH0_MASK_SPAN_ATTRIBUTES_ENV: &str = "DASH0_MASK_SPAN_ATTRIBUTES";
 
 pub struct MaskingRules {
     pub global: Vec<Regex>,
@@ -25,6 +29,7 @@ static DEFAULT_MASKING_PATTERNS: &[&str] = &[
 
 static MASKING_RULES: OnceCell<MaskingRules> = OnceCell::new();
 static ENV_VAR_MASKING_RULES: OnceCell<MaskingRules> = OnceCell::new();
+static SPAN_ATTRIBUTE_MASKING_RULES: OnceCell<Option<MaskingRules>> = OnceCell::new();
 
 fn patterns_to_rules(patterns: &[&str]) -> MaskingRules {
     let global = patterns
@@ -73,10 +78,70 @@ pub fn init_masking_rules() {
         },
         Err(_) => MaskingRules { global: vec![] },
     });
+
+    span_attribute_masking_rules();
 }
 
 pub fn get_masking_rules() -> &'static MaskingRules {
     MASKING_RULES.get_or_init(default_masking_rules)
+}
+
+fn span_attribute_masking_rules() -> Option<&'static MaskingRules> {
+    SPAN_ATTRIBUTE_MASKING_RULES
+        .get_or_init(|| {
+            let setting = env::var(DASH0_MASK_SPAN_ATTRIBUTES_ENV).ok()?;
+            match setting.as_str() {
+                "false" => None,
+                "true" => Some(MaskingRules {
+                    global: get_masking_rules().global.clone(),
+                }),
+                _ => {
+                    let parsed = serde_json::from_str::<Vec<String>>(&setting)
+                        .ok()
+                        .and_then(|patterns| {
+                            patterns
+                                .iter()
+                                .map(|pattern| Regex::new(&format!("(?i){}", pattern)))
+                                .collect::<Result<Vec<_>, _>>()
+                                .ok()
+                        });
+                    match parsed {
+                        Some(global) => Some(MaskingRules { global }),
+                        None => {
+                            warn!(
+                                "Ignoring {}: expected false, true, or a JSON array of valid regular expressions. Span attribute masking is disabled.",
+                                DASH0_MASK_SPAN_ATTRIBUTES_ENV
+                            );
+                            None
+                        }
+                    }
+                }
+            }
+        })
+        .as_ref()
+        .filter(|rules| !rules.global.is_empty())
+}
+
+/// Mask only top-level span attributes, after correlation and span enrichment.
+/// Payload logs, resource attributes, events and links are outside this pass.
+pub fn mask_span_attributes(resource_spans: &mut [ResourceSpans]) {
+    let Some(rules) = span_attribute_masking_rules() else {
+        return;
+    };
+
+    for resource in resource_spans {
+        for scope in &mut resource.scope_spans {
+            for span in &mut scope.spans {
+                for attribute in &mut span.attributes {
+                    if should_mask(&attribute.key, rules) {
+                        attribute.value = Some(AnyValue {
+                            value: Some(Value::StringValue(MASKED_VALUE.to_string())),
+                        });
+                    }
+                }
+            }
+        }
+    }
 }
 
 const MASKED_VALUE: &str = "****";

@@ -139,6 +139,7 @@ Masking applies to Lambda event and response payloads and to environment variabl
 |---|---|---|---|
 | Lambda event and response payloads | ✅ | ✅ | ✅ |
 | Environment variables (`DASH0_MASK_ENV_VARS`) | ✅ | ✅ | ✅ |
+| Top-level span attributes (`DASH0_MASK_SPAN_ATTRIBUTES`, opt-in) | ✅ | ✅ | ✅ |
 | Payloads captured by the auto-instrumentation (`DASH0_MASK_RULES`) | ✅ | ⚠️ ¹ | ❌ |
 | `DASH0_MASK_RULES=all` | ✅ | ❌ | ❌ |
 | `DASH0_MASK_REQUEST_BODY` | ✅ | ⚠️ ¹ | ❌ |
@@ -157,7 +158,7 @@ Masking matches keys. Where a body is a string that is not parsed, such as an SQ
 
 **Custom masking rules:**
 
-Each variable takes a JSON array of regex patterns. Write patterns as `.*name.*` so they match anywhere in the key in every runtime. A value that is not a JSON array is ignored with a warning in the function's logs, and the fallback applies (`DASH0_MASK_RULES`, or the defaults).
+The payload and environment-variable settings below take a JSON array of regex patterns. Write patterns as `.*name.*` so they match anywhere in the key in every runtime. A value that is not a JSON array is ignored with a warning in the function's logs, and the fallback applies (`DASH0_MASK_RULES`, or the defaults).
 
 * `DASH0_MASK_RULES` - Patterns for all payloads. When set, this **replaces** the default patterns, so list the defaults too if you want to keep them.
 
@@ -168,6 +169,10 @@ Each variable takes a JSON array of regex patterns. Write patterns as `.*name.*`
 * `DASH0_MASK_ENV_VARS` - Patterns for environment variables captured in traces. Falls back to `DASH0_MASK_RULES` (or the defaults). Every environment variable is captured, including the AWS credentials, so keep `.*key.*`, `.*secret.*` and `.*token.*` in the list.
 
   Example: `DASH0_MASK_ENV_VARS='[".*pass.*", ".*key.*", ".*secret.*", ".*credential.*", ".*token.*", ".*DATABASE_URL.*"]'`
+
+* `DASH0_MASK_SPAN_ATTRIBUTES` - Opt-in masking of top-level span attributes, in every runtime, including manual instrumentation. Unset or `false` leaves the existing behavior unchanged. `true` uses `DASH0_MASK_RULES`, or the defaults when it is unset. A JSON array supplies independent rules, for example `DASH0_MASK_SPAN_ATTRIBUTES='["^user[.]email$", ".*token.*"]'`. `[]` disables this additional masking pass.
+
+  Patterns match attribute names case-insensitively. Each match replaces the entire value with the string `****`, regardless of its original type. Attribute names stay unchanged; values are not inspected or parsed. This does not mask resource attributes, span events, links, span names, or payloads already moved into log records. Invalid settings or regex patterns log a warning and disable this additional pass. `all` is not supported; use `[".*"]` to mask every top-level span attribute value.
 
 **Per-payload masking rules:**
 
