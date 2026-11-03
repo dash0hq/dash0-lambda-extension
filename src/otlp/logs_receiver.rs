@@ -67,6 +67,10 @@ pub async fn logs(req: Request<Incoming>) -> Result<Response<ResBody>, hyper::Er
         );
     }
 
+    if !crate::otlp::flusher::admit(encoded_body.len(), "logs") {
+        return Ok(Response::builder().status(200).body(empty_body()).unwrap());
+    }
+
     store_log(StoredLog {
         method: parts.method,
         path_and_query: parts
@@ -77,6 +81,7 @@ pub async fn logs(req: Request<Incoming>) -> Result<Response<ResBody>, hyper::Er
         headers,
         body: encoded_body,
     });
+    crate::otlp::flusher::stored();
 
     tracing::info!(
         "[{}] Total handle time for /v1/logs {} ms",

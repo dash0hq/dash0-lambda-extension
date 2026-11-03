@@ -124,6 +124,8 @@ async fn main() {
         }
     });
 
+    otlp::flusher::spawn();
+
     // Initialize the extension and continually get next extension event.
     tokio::task::spawn(async {
         extension::register::register().await;

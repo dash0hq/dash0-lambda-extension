@@ -37,6 +37,7 @@ pub async fn telemetry(req: Request<Incoming>) -> Result<Response<ResBody>, hype
 
         for log in &logs {
             if log.r#type == "platform.runtimeDone" {
+                crate::otlp::flusher::invocation_finished();
                 if let Some(id) = &log.invocation_id {
                     let is_error = error_invocation_ids.iter().any(|(eid, _)| eid == id);
                     if !is_error {
@@ -63,7 +64,12 @@ pub async fn telemetry(req: Request<Incoming>) -> Result<Response<ResBody>, hype
         }
 
         if !is_telemetry_log_collection_disabled() {
+            if !crate::otlp::flusher::admit(body_bytes.len(), "function logs") {
+                // Buffer full: keep only the few platform records.
+                logs.retain(|log| log.r#type.starts_with("platform."));
+            }
             crate::state::invocation_entry::store_telemetry_logs(logs);
+            crate::otlp::flusher::stored();
         }
     } else {
         tracing::debug!(

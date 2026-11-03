@@ -35,6 +35,23 @@ pub struct InvocationEntry {
     pub handler_status: Option<Status>,
     pub traces: Vec<StoredTrace>,
     pub logs: Vec<TelemetryLog>,
+    /// Approximate bytes held by `logs`. Kept in step by `push_log` and the
+    /// telemetry log take functions.
+    pub logs_bytes: usize,
+    /// (trace ID, parent span ID) of child spans that were flushed before the
+    /// invocation ended. See `remember_flushed_span_ids`.
+    pub flushed_span_ids: Option<(Vec<u8>, Vec<u8>)>,
+    /// Trace ID of the first non-handler span received for this invocation.
+    /// All spans of the invocation share the handler's trace, so this is the
+    /// trace ID before the handler span arrives. Kept apart from `trace_id`,
+    /// which `store_span_ids` compares against to pick the root span's parent.
+    pub child_trace_id: Option<String>,
+    /// (trace ID, Lambda function segment ID) from a sampled
+    /// `_X_AMZN_TRACE_ID` at INVOKE. In X-Ray mode the segment reaches Dash0
+    /// through X-Ray, and logs link to it.
+    pub xray_segment_ids: Option<(String, String)>,
+    /// Whether the handler span has arrived and set `trace_id` and `span_id`.
+    pub handler_seen: bool,
     /// HTTP semconv attributes extracted from an API Gateway v1/v2 or ALB
     /// event before secret masking runs on the stored `event_payload`. Masking
     /// (default rule `.*key.*`, case-insensitive) corrupts structural fields
@@ -68,10 +85,71 @@ impl Default for InvocationEntry {
             handler_status: None,
             traces: Vec::new(),
             logs: Vec::new(),
+            logs_bytes: 0,
+            flushed_span_ids: None,
+            child_trace_id: None,
+            xray_segment_ids: None,
+            handler_seen: false,
             http_request_attributes: Vec::new(),
             http_span_name: None,
         }
     }
+}
+
+impl InvocationEntry {
+    pub fn push_log(&mut self, log: TelemetryLog) {
+        self.logs_bytes += telemetry_log_size(&log);
+        self.logs.push(log);
+    }
+
+    /// (trace ID, span ID) that this invocation's logs link to, and whether
+    /// they are final, i.e. won't change before the invocation ends.
+    ///
+    /// - X-Ray mode: the Lambda function segment from `_X_AMZN_TRACE_ID`,
+    ///   known at INVOKE. Without a sampled segment, the handler span.
+    /// - Otherwise: the extension's root span, in the handler's trace. Until
+    ///   the handler span arrives, a child span tells the trace.
+    fn log_ids(&self) -> (Option<String>, Option<String>, bool) {
+        if crate::config::user::is_xray_traces_enabled() {
+            if let Some((trace_id, segment_id)) = &self.xray_segment_ids {
+                return (Some(trace_id.clone()), Some(segment_id.clone()), true);
+            }
+            return (
+                self.trace_id.clone(),
+                self.span_id.clone(),
+                self.handler_seen,
+            );
+        }
+        let trace_id = if self.handler_seen {
+            self.trace_id.clone()
+        } else {
+            self.child_trace_id
+                .clone()
+                .or_else(|| self.trace_id.clone())
+        };
+        // Without auto-instrumentation no spans arrive; the root span then
+        // uses the trace from INVOKE.
+        let trace_final = self.handler_seen
+            || self.child_trace_id.is_some()
+            || (crate::config::is_auto_instrumented_disabled() && self.trace_id.is_some());
+        let span_id = self.root_span_id.clone().or_else(|| self.span_id.clone());
+        (
+            trace_id,
+            span_id,
+            trace_final && self.root_span_id.is_some(),
+        )
+    }
+}
+
+/// Approximate encoded size of a telemetry log, used for buffer accounting
+/// and for splitting log exports into chunks.
+pub fn telemetry_log_size(log: &TelemetryLog) -> usize {
+    let record = match &log.record {
+        serde_json::Value::String(s) => s.len(),
+        other => other.to_string().len(),
+    };
+    // timestamp, ids and per-record overhead
+    record + 128
 }
 
 static INVOCATION_STORE: Lazy<Mutex<HashMap<String, InvocationEntry>>> =
@@ -111,6 +189,22 @@ pub fn get_http_request_data(invocation_id: &str) -> (Vec<KeyValue>, Option<Stri
         .get(invocation_id)
         .map(|e| (e.http_request_attributes.clone(), e.http_span_name.clone()))
         .unwrap_or_default()
+}
+
+/// Lightweight getter: whether IDs of early-flushed child spans are recorded.
+pub fn has_flushed_span_ids(invocation_id: &str) -> bool {
+    INVOCATION_STORE
+        .lock()
+        .get(invocation_id)
+        .is_some_and(|e| e.flushed_span_ids.is_some())
+}
+
+/// Lightweight getter: returns the IDs of early-flushed child spans.
+pub fn get_flushed_span_ids(invocation_id: &str) -> Option<(Vec<u8>, Vec<u8>)> {
+    INVOCATION_STORE
+        .lock()
+        .get(invocation_id)
+        .and_then(|e| e.flushed_span_ids.clone())
 }
 
 /// Lightweight getter: returns only the start_time.
@@ -172,28 +266,40 @@ pub fn get_trace_span_ids(
 }
 
 /// Lightweight getter: returns (trace_id, span_id) for log correlation.
-///
-/// When X-Ray tracing is enabled, the extension does not emit supplementary spans
-/// (root span / init span), so `root_span_id` is never exported to the backend.
-/// In that case we fall back to `span_id` (the handler span from the OTel
-/// instrumentation) so that the log → span backlink resolves correctly.
-/// In the standard (non-X-Ray) path we prefer `root_span_id` because the
-/// supplementary root span is emitted and acts as the natural parent for logs.
+/// See `InvocationEntry::log_ids`.
 pub fn get_trace_span_ids_for_logs(
     invocation_id: &str,
 ) -> Option<(Option<String>, Option<String>)> {
     INVOCATION_STORE.lock().get(invocation_id).map(|e| {
-        let sid = if crate::config::user::is_xray_traces_enabled() {
-            // X-Ray mode: no supplementary root span is ever exported; use the
-            // handler span id so logs reference an existing span.
-            e.span_id.clone()
-        } else {
-            // Standard mode: prefer root_span_id (the supplementary root span),
-            // fall back to span_id if it has not been set yet.
-            e.root_span_id.clone().or_else(|| e.span_id.clone())
-        };
-        (e.trace_id.clone(), sid)
+        let (trace_id, span_id, _) = e.log_ids();
+        (trace_id, span_id)
     })
+}
+
+/// Records the Lambda function segment from the `Lambda-Runtime-Trace-Id`
+/// header the runtime receives with the event. The handler span's parent in
+/// X-Ray mode. The INVOKE event's `Parent` is one level up, the Lambda
+/// service segment. AWS records segments only for sampled requests.
+pub fn record_runtime_trace_id(invocation_id: &str, header: &str) {
+    if let Some((trace_id, segment_id, true)) =
+        crate::otlp::span_link_extractor::parse_amzn_trace_id(header)
+    {
+        update(invocation_id, |entry| {
+            entry.xray_segment_ids = Some((hex::encode(trace_id), hex::encode(segment_id)));
+        });
+    }
+}
+
+/// Records the trace ID of a non-handler span; the first one wins.
+pub fn record_child_trace_id(invocation_id: &str, trace_id: &[u8]) {
+    if trace_id.len() != 16 || trace_id.iter().all(|b| *b == 0) {
+        return;
+    }
+    let mut store = INVOCATION_STORE.lock();
+    let entry = store.entry(invocation_id.to_string()).or_default();
+    if entry.child_trace_id.is_none() && !entry.handler_seen {
+        entry.child_trace_id = Some(hex::encode(trace_id));
+    }
 }
 
 /// Lightweight getter: returns the telemetry data fields needed for span annotation.
@@ -292,7 +398,7 @@ pub fn store_telemetry_logs(logs: Vec<TelemetryLog>) {
             .invocation_id
             .clone()
             .unwrap_or_else(|| "__unknown__".to_string());
-        store.entry(key).or_default().logs.push(log);
+        store.entry(key).or_default().push_log(log);
     }
 }
 
@@ -306,6 +412,38 @@ pub fn take_all_telemetry_logs(exclude_invocation_id: Option<&str>) -> Vec<Telem
             continue;
         }
         all_logs.append(&mut entry.logs);
+        entry.logs_bytes = 0;
+    }
+    all_logs
+}
+
+/// Takes the telemetry logs an early flush may send while invocations run:
+/// logs whose trace and span IDs are final, and logs of finished
+/// invocations. A running invocation's logs stay buffered until its IDs are
+/// known, unless they reach `max_held_bytes`; then they are sent with the
+/// IDs known so far, to keep the buffer bounded.
+pub fn take_telemetry_logs_while_running(max_held_bytes: usize) -> Vec<TelemetryLog> {
+    let mut store = INVOCATION_STORE.lock();
+    let mut all_logs = Vec::new();
+    for (key, entry) in store.iter_mut() {
+        if entry.logs.is_empty() {
+            continue;
+        }
+        let ready =
+            key == "__unknown__" || entry.state == InvocationState::Done || entry.log_ids().2;
+        if !ready {
+            if entry.logs_bytes < max_held_bytes {
+                continue;
+            }
+            tracing::warn!(
+                "[{}] Sending {} bytes of logs of invocation {} before its trace context is known; they may link to the wrong trace or span",
+                crate::log_prefix(),
+                entry.logs_bytes,
+                key
+            );
+        }
+        all_logs.append(&mut entry.logs);
+        entry.logs_bytes = 0;
     }
     all_logs
 }
@@ -356,6 +494,30 @@ pub fn take_all_traces() -> Vec<StoredTrace> {
         all_traces.append(&mut entry.traces);
     }
     all_traces
+}
+
+/// Take the traces that may be sent while the invocation is still running:
+/// everything except requests that carry the Lambda handler span.
+pub fn take_flushable_traces() -> Vec<StoredTrace> {
+    let mut store = INVOCATION_STORE.lock();
+    let mut taken = Vec::new();
+    for entry in store.values_mut() {
+        let (pinned, flushable) = std::mem::take(&mut entry.traces)
+            .into_iter()
+            .partition(|t| t.contains_handler_span);
+        entry.traces = pinned;
+        taken.extend::<Vec<StoredTrace>>(flushable);
+    }
+    taken
+}
+
+/// Bytes of buffered traces and telemetry logs across all invocations.
+pub fn buffered_bytes() -> usize {
+    INVOCATION_STORE
+        .lock()
+        .values()
+        .map(|e| e.traces.iter().map(|t| t.body.len()).sum::<usize>() + e.logs_bytes)
+        .sum()
 }
 
 /// Snapshot all traces from every invocation entry (non-destructive).
@@ -439,6 +601,7 @@ mod tests {
             headers: hyper::HeaderMap::new(),
             body: vec![],
             invocation_ids: invocation_ids.into_iter().map(String::from).collect(),
+            contains_handler_span: false,
         }
     }
 

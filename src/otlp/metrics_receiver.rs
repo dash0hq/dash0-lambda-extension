@@ -67,6 +67,10 @@ pub async fn metrics(req: Request<Incoming>) -> Result<Response<ResBody>, hyper:
         );
     }
 
+    if !crate::otlp::flusher::admit(encoded_body.len(), "metrics") {
+        return Ok(Response::builder().status(200).body(empty_body()).unwrap());
+    }
+
     store_metric(StoredMetric {
         method: parts.method,
         path_and_query: parts
@@ -77,6 +81,7 @@ pub async fn metrics(req: Request<Incoming>) -> Result<Response<ResBody>, hyper:
         headers,
         body: encoded_body,
     });
+    crate::otlp::flusher::stored();
 
     tracing::info!(
         "[{}] Total handle time for /v1/metrics {} ms",
