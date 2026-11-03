@@ -6,6 +6,7 @@ import {
     checkLogs,
     checkMetrics,
     checkResourceAttributes,
+    attributesToObject,
     getAttributesMap,
     getRequestPayload,
     invokeFunction,
@@ -231,6 +232,26 @@ const checkDbSpans = async ({
                 expect(expectation.spanNames, `"${name}" is not one of the expected span names`).toContain(name);
             }
 
+            let payloadLogs: any[] = [];
+            if (expectation.spanNamesWithParameterValues?.length) {
+                const logResponse = await fetch(DASH0_ENDPOINT + 'logs', {
+                    method: 'POST',
+                    headers: {
+                        accept: 'application/json',
+                        authorization: `Bearer ${DASH0_TOKEN}`,
+                        'content-type': 'application/json',
+                    },
+                    body: JSON.stringify(getRequestPayload(invocationId)),
+                });
+                expect(logResponse.ok).toBe(true);
+                const logExport = await logResponse.json() as any;
+                payloadLogs = (logExport.resourceLogs ?? []).flatMap((rl: any) =>
+                    rl.scopeLogs.flatMap((sl: any) => sl.logRecords)
+                ).filter((log: any) => ['db_statement', 'db_query_text'].includes(
+                    getAttributesMap(log.attributes ?? [])['dash0.faas.payload_type']?.stringValue
+                ));
+            }
+
             const remainingSpans = [...dbSpans];
             for (const expectedName of expectation.spanNames) {
                 const idx = remainingSpans.findIndex((s: any) => s.name === expectedName);
@@ -241,13 +262,21 @@ const checkDbSpans = async ({
                 expect(attrs['db.system.name']?.stringValue).toEqual(expectation.dbSystemName);
                 expect(attrs['db.namespace']?.stringValue).toEqual('testdb');
                 expect(matchingSpan.kind).toEqual(3); // CLIENT
+                for (const key of ['db.statement', 'db.query.text', 'db.statement.parameters', 'db.postgresql.values', 'db.request.body', 'db.response.body', 'db.results']) {
+                    expect(attrs[key], `Payload attribute ${key} remains on span`).toBeUndefined();
+                }
 
                 if (expectation.spanNamesWithParameterValues?.includes(expectedName)) {
-                    const statement = attrs['db.query.text']?.stringValue ?? attrs['db.statement']?.stringValue;
-                    expect(statement, `No statement attribute on the "${expectedName}" span`).toBeDefined();
+                    const log = payloadLogs.find((log: any) =>
+                        log.traceId === traceId && log.spanId === matchingSpan.spanId
+                    );
+                    expect(log, `No statement payload log for the "${expectedName}" span`).toBeDefined();
+                    const body = log.body?.stringValue
+                        ? JSON.parse(log.body.stringValue)
+                        : attributesToObject(log.attributes ?? []);
                     expect(
-                        statement,
-                        `Expected the statement of the "${expectedName}" span to carry the query parameter value, got: ${statement}`,
+                        body.message,
+                        `Expected the statement payload for "${expectedName}" to carry the query parameter value`,
                     ).toContain(invocationId);
                 }
             }

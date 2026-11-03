@@ -73,6 +73,32 @@ export class NodeTracingScenariosStack extends cdk.NestedStack {
         },
       });
 
+      for (const enabled of [true, false]) {
+        const mode = enabled ? 'enabled' : 'disabled';
+        const functionName = `${prefix}tracing-sqs-payloads-${mode}-${runtimeName}`;
+        // No event source: only this fixture receives from its queue.
+        const payloadQueue = new sqs.Queue(this, `SqsPayloadsQueue-${mode}-${runtimeName}`, {
+          queueName: functionName,
+        });
+        new lambda.Function(this, `SqsPayloadsLambda-${mode}-${runtimeName}`, {
+          functionName,
+          runtime,
+          handler: 'sqs_payloads.handler',
+          code: nodeCode,
+          layers: [props.layer],
+          role,
+          timeout: cdk.Duration.seconds(10),
+          logGroup: props.logGroup,
+          environment: {
+            ...baseEnvironment,
+            QUEUE_URL: payloadQueue.queueUrl,
+            DASH0_CREATE_PAYLOAD_LOG_RECORDS: String(enabled),
+            DASH0_MASK_REQUEST_BODY: '["^MessageBody$"]',
+            DASH0_MASK_RESPONSE_BODY: '["^Body$"]',
+          },
+        });
+      }
+
       const sqsConsumer = new lambda.Function(this, `SqsConsumerLambda-${runtimeName}`, {
         functionName: `${prefix}tracing-sqs-consumer-${runtimeName}`,
         runtime,
