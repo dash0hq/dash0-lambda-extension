@@ -363,6 +363,39 @@ class NodeStack extends cdk.NestedStack {
       });
     }
 
+    // Exercise the layer's SDK and extension masking with a customer-bundled OTel API.
+    // One supported runtime is sufficient for this extension-owned behavior.
+    for (const [mode, rules] of [
+      ['disabled', 'false'],
+      ['general', 'true'],
+      ['custom', '["^customer[.]email$"]'],
+    ]) {
+      new lambdaNodejs.NodejsFunction(this, `span-masking-${mode}`, {
+        functionName: `${props.prefix}span-masking-${mode}`,
+        runtime: runtimes[0],
+        memorySize: 128,
+        entry: path.join(__dirname, '../lambdas/node/span_masking.ts'),
+        handler: 'handler',
+        architecture: lambda.Architecture.X86_64,
+        timeout: cdk.Duration.seconds(10),
+        layers: [props.layer],
+        role: props.role,
+        environment: {
+          AWS_LAMBDA_EXEC_WRAPPER: '/opt/wrapper',
+          DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
+          DASH0_ENDPOINT: 'https://ingress.eu-west-1.aws.dash0-dev.com:4318',
+          DASH0_EXTENSION_LOG_LEVEL: 'info',
+          DASH0_SEND_ON_INVOCATION_END: 'true',
+          DASH0_MASK_RULES: '["^customer[.]credential$"]',
+          // The narrow test rules must not expose the function's credentials.
+          DASH0_MASK_ENV_VARS: '[".*"]',
+          DASH0_MASK_SPAN_ATTRIBUTES: rules,
+        },
+        logGroup: props.logGroup,
+        loggingFormat: lambda.LoggingFormat.TEXT,
+      });
+    }
+
     // Custom (user-defined) OpenTelemetry API metrics. Bundled with NodejsFunction because the
     // handler ships its own @opentelemetry/api, as customers do; the layer's copy is bundled into
     // init.mjs and not resolvable from user code.

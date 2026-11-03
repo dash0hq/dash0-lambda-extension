@@ -239,6 +239,7 @@ fn _build_traces_request(traces: Vec<StoredTrace>) -> Option<Vec<u8>> {
     }
 
     add_env_vars(&mut combined_resource_spans);
+    crate::otlp::masking::mask_span_attributes(&mut combined_resource_spans);
 
     let combined_export = ExportTraceServiceRequest {
         resource_spans: combined_resource_spans,
@@ -469,6 +470,162 @@ mod tests {
     use super::*;
     use hyper::Method;
     use opentelemetry_proto::tonic::trace::v1::ResourceSpans;
+
+    #[test]
+    fn span_attribute_masking_at_export() {
+        use opentelemetry_proto::tonic::common::v1::any_value::Value;
+        use opentelemetry_proto::tonic::common::v1::{AnyValue, ArrayValue, KeyValue};
+        use opentelemetry_proto::tonic::resource::v1::Resource;
+        use opentelemetry_proto::tonic::trace::v1::span::{Event, Link};
+        use opentelemetry_proto::tonic::trace::v1::{ScopeSpans, Span};
+
+        const CHILD: &str = "DASH0_TEST_SPAN_MASK_EXPECTED";
+        if std::env::var(CHILD).is_err() {
+            // Each process gets fresh OnceCells, without changing other tests' environment.
+            for (setting, general, expected) in [
+                (None, None, ""),
+                (Some("false"), None, ""),
+                (Some("true"), None, "0,1,2"),
+                (Some("true"), Some(r#"["^user[.]email$"]"#), "3"),
+                (Some("true"), Some("[]"), ""),
+                (Some(r#"["^user[.]email$"]"#), None, "3"),
+                (Some(r#"["^user[.]email$"]"#), Some(r#"[".*"]"#), "3"),
+                (Some(r#"[".*"]"#), None, "0,1,2,3,4"),
+                (Some("[]"), Some(r#"[".*"]"#), ""),
+                (Some("inherit"), None, ""),
+                (Some("all"), None, ""),
+                (Some("[null]"), None, ""),
+                (Some(r#"[".*password.*", "["]"#), None, ""),
+            ] {
+                let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+                command
+                    .args([
+                        "--exact",
+                        "otlp::exporter::tests::span_attribute_masking_at_export",
+                        "--nocapture",
+                    ])
+                    .env_remove("DASH0_MASK_SPAN_ATTRIBUTES")
+                    .env_remove("DASH0_MASK_RULES")
+                    .env_remove("DASH0_MASK_ENV_VARS")
+                    .env(CHILD, expected);
+                if let Some(setting) = setting {
+                    command.env("DASH0_MASK_SPAN_ATTRIBUTES", setting);
+                }
+                if let Some(general) = general {
+                    command.env("DASH0_MASK_RULES", general);
+                }
+                let output = command.output().unwrap();
+                assert!(
+                    output.status.success(),
+                    "setting={setting:?}, general={general:?}: {}{}",
+                    String::from_utf8_lossy(&output.stdout),
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                print!("{}", String::from_utf8_lossy(&output.stdout));
+            }
+            return;
+        }
+
+        crate::otlp::masking::init_masking_rules();
+        let attributes: Vec<KeyValue> = [
+            ("User.Password", Value::StringValue("secret".into())),
+            ("api_token", Value::IntValue(123)),
+            (
+                "secret.flags",
+                Value::ArrayValue(ArrayValue {
+                    values: vec![AnyValue {
+                        value: Some(Value::BoolValue(true)),
+                    }],
+                }),
+            ),
+            ("user.email", Value::StringValue("alice@example.com".into())),
+            (
+                "custom.data",
+                Value::StringValue(r#"{"password":"visible"}"#.into()),
+            ),
+        ]
+        .into_iter()
+        .map(|(key, value)| KeyValue {
+            key: key.into(),
+            value: Some(AnyValue { value: Some(value) }),
+        })
+        .collect();
+        let span = Span {
+            name: "password-operation".into(),
+            attributes: attributes.clone(),
+            events: vec![Event {
+                attributes: attributes.clone(),
+                ..Default::default()
+            }],
+            links: vec![Link {
+                attributes: attributes.clone(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let resource = Resource {
+            attributes: attributes.clone(),
+            ..Default::default()
+        };
+        let scope = ScopeSpans {
+            spans: vec![span.clone(), span.clone()],
+            ..Default::default()
+        };
+        let request = ExportTraceServiceRequest {
+            resource_spans: vec![
+                ResourceSpans {
+                    resource: Some(resource),
+                    scope_spans: vec![scope.clone(), scope],
+                    ..Default::default()
+                };
+                2
+            ],
+        };
+        let mut trace = create_valid_trace(vec!["invocation".into()], 0);
+        trace.body = request.encode_to_vec();
+        let output = _build_traces_request(vec![trace.clone(), trace]).unwrap();
+        let decoded = ExportTraceServiceRequest::decode(output.as_slice()).unwrap();
+        assert_eq!(decoded.resource_spans.len(), 4);
+        println!(
+            "setting={:?}, exported attributes={:?}",
+            std::env::var("DASH0_MASK_SPAN_ATTRIBUTES").ok(),
+            decoded.resource_spans[0].scope_spans[0].spans[0].attributes
+        );
+        let expected = std::env::var(CHILD).unwrap();
+        for resource in decoded.resource_spans {
+            assert!(resource
+                .resource
+                .unwrap()
+                .attributes
+                .starts_with(&attributes));
+            for scope in resource.scope_spans {
+                for actual in scope.spans {
+                    assert_eq!(actual.name, span.name);
+                    assert_eq!(actual.events, span.events);
+                    assert_eq!(actual.links, span.links);
+                    assert_eq!(actual.attributes.len(), attributes.len());
+                    for (index, (actual, original)) in
+                        actual.attributes.iter().zip(&attributes).enumerate()
+                    {
+                        assert_eq!(actual.key, original.key);
+                        if expected
+                            .split(',')
+                            .any(|masked| masked == index.to_string())
+                        {
+                            assert_eq!(
+                                actual.value,
+                                Some(AnyValue {
+                                    value: Some(Value::StringValue("****".into()))
+                                })
+                            );
+                        } else {
+                            assert_eq!(actual, original);
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     fn create_valid_trace(invocation_ids: Vec<String>, resource_spans_count: usize) -> StoredTrace {
         let resource_spans: Vec<ResourceSpans> = (0..resource_spans_count)

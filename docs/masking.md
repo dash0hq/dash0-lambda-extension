@@ -10,7 +10,7 @@ The examples use a Node.js function. Support differs by runtime, so each section
 - ⚠️ works in part; the note below the line says what differs
 - ❌ has no effect; the payload is sent as captured
 
-Masking of the Lambda event, the return value and environment variables is done by the Dash0 extension, so it works the same in every runtime.
+Masking of the Lambda event, the return value, environment variables and opt-in top-level span attributes is done by the Dash0 extension, so it works the same in every runtime.
 
 - [How masking works](#how-masking-works)
 - [Where each payload ends up](#where-each-payload-ends-up)
@@ -25,6 +25,7 @@ Masking of the Lambda event, the return value and environment variables is done 
 - [Combining variables](#combining-variables)
 - [`DASH0_MASK_ENV_VARS`](#dash0_mask_env_vars)
 - [Lambda event and return value](#lambda-event-and-return-value)
+- [`DASH0_MASK_SPAN_ATTRIBUTES`](#dash0_mask_span_attributes)
 - [Invalid values](#invalid-values)
 - [Payloads that are strings](#payloads-that-are-strings)
 - [Payloads that are not masked](#payloads-that-are-not-masked)
@@ -59,6 +60,7 @@ Masking of the Lambda event, the return value and environment variables is done 
 | Redis reply | `db.response.body` | `DASH0_MASK_RESPONSE_BODY`, then `DASH0_MASK_RULES` | ✅ `redis`, `ioredis` | ❌ | ❌ |
 | Lambda event and return value | `dash0_payload` log records | `DASH0_MASK_RULES` | ✅ | ✅ | ✅ |
 | Environment variables | `process.environment_variable.*` resource attributes | `DASH0_MASK_ENV_VARS`, then `DASH0_MASK_RULES` | ✅ | ✅ | ✅ |
+| Top-level span attributes, opt-in | Any span attribute name | `DASH0_MASK_SPAN_ATTRIBUTES` | ✅ | ✅ | ✅ |
 
 ¹ The extension moves HTTP bodies off the span into a `dash0_payload` log record of type `http_request_body` or `http_response_body`. It doesn't mask them again, so what you see below is what the log record contains. In Java, these records contain the bodies unmasked.
 
@@ -710,11 +712,42 @@ The API Gateway `body` is a string, so the extension doesn't look inside it, and
 Keys in the masked event are written in alphabetical order.
 
 > [!WARNING]
-> Headers and the query string captured with `DASH0_API_GATEWAY_REQUEST_HEADERS_TO_CAPTURE` and `DASH0_CAPTURE_API_GATEWAY_QUERY_STRING` are read from the event before masking, so they are not masked.
+> Headers and the query string captured with `DASH0_API_GATEWAY_REQUEST_HEADERS_TO_CAPTURE` and `DASH0_CAPTURE_API_GATEWAY_QUERY_STRING` are read from the event before masking. Payload rules do not mask them. The opt-in span-attribute pass below can mask their entire values by attribute name.
+
+## `DASH0_MASK_SPAN_ATTRIBUTES`
+
+> **Node.js** ✅ · **Python** ✅ · **Java** ✅ · **Manual instrumentation** ✅
+
+This additional masking pass is disabled by default. The extension applies it at trace export, after correlation and enrichment, to all top-level span attributes that remain on the span.
+
+| Setting | Behavior |
+|---|---|
+| Unset or `false` | No additional span-attribute masking |
+| `true` | Match names using `DASH0_MASK_RULES`, or the default patterns if it is unset |
+| JSON array of regex patterns | Match names using this independent list, without adding the general rules |
+| `[]` | No additional span-attribute masking |
+
+Matching ignores case and searches anywhere in the attribute name. Use anchors for an exact match. Dots in attribute names do not imply nesting. A match replaces the entire value with the string `"****"`, including numeric, boolean, array or object values. Names stay unchanged. Nonmatching values are not inspected, including strings containing JSON.
+
+These examples come from `cargo test span_attribute_masking_at_export -- --nocapture`, which runs the actual trace export builder. With `DASH0_MASK_RULES` unset:
+
+| Span attribute | Original value | Unset / `false` | `true` | `["^user[.]email$"]` |
+|---|---|---|---|---|
+| `User.Password` | `"secret"` | `"secret"` | `"****"` | `"secret"` |
+| `api_token` | `123` | `123` | `"****"` | `123` |
+| `secret.flags` | `[true]` | `[true]` | `"****"` | `[true]` |
+| `user.email` | `"alice@example.com"` | `"alice@example.com"` | `"alice@example.com"` | `"****"` |
+| `custom.data` | `"{\"password\":\"visible\"}"` | Unchanged | Unchanged | Unchanged |
+
+With `DASH0_MASK_RULES='["^user[.]email$"]'` and `DASH0_MASK_SPAN_ATTRIBUTES=true`, only `user.email` is masked in this example. An explicit span-attribute list replaces rather than extends those general rules.
+
+This setting does not affect resource attributes, span events, span links, span names, status messages, or log records. HTTP bodies already moved into `dash0_payload` logs are not covered. Keep the existing per-payload rules for masking fields inside headers and bodies.
+
+Invalid settings, including `inherit`, `all`, malformed JSON or any invalid regex, produce a warning and disable this additional pass. Existing payload masking is unaffected. Use `[".*"]` if you intend to replace every top-level span attribute value. Configuration is read once when the extension starts.
 
 ## Invalid values
 
-A value that is not a JSON array of strings or `all` is ignored. The function logs show a warning, and the next rule in line applies.
+For the payload and environment-variable settings, a value that is not a JSON array of strings or `all` is ignored. The function logs show a warning, and the next rule in line applies. `DASH0_MASK_SPAN_ATTRIBUTES` has its own validation described above.
 
 > **Node.js** ✅ · **Python** ✅ · **Java** ✅
 
@@ -873,7 +906,7 @@ DASH0_MASK_REQUEST_BODY=all
 
 ## Payloads that are not masked
 
-These attributes are captured as they are. None of the masking variables apply to them, not even `all`.
+These attributes are captured without payload masking. None of the per-payload masking variables apply to them, not even `all`. You can opt in to `DASH0_MASK_SPAN_ATTRIBUTES` to replace an entire attribute value by matching its name, but it does not mask individual fields inside the value.
 
 **Node.js**
 
@@ -897,7 +930,7 @@ These attributes are captured as they are. None of the masking variables apply t
 
 **Java**
 
-Nothing the auto-instrumentation captures is masked. That includes:
+Without the opt-in `DASH0_MASK_SPAN_ATTRIBUTES` pass, nothing the auto-instrumentation captures is masked. That includes:
 - HTTP headers and bodies
 - AWS SDK payloads
 - Kafka and RabbitMQ messages
