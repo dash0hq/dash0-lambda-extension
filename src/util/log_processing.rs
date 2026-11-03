@@ -1,4 +1,10 @@
+use once_cell::sync::Lazy;
+use parking_lot::Mutex;
+
 use crate::state::invocation_data::TelemetryLog;
+
+// Normal initialization precedes the first invocation and has no request ID.
+static PENDING_INIT_DURATION: Lazy<Mutex<Option<f64>>> = Lazy::new(|| Mutex::new(None));
 
 pub fn process_telemetry_logs(logs: &mut Vec<TelemetryLog>) {
     let mut current_invocation_id = crate::state::invocation_data::get_last_seen_invocation_start();
@@ -46,6 +52,12 @@ fn parse_platform_start(log: &TelemetryLog, current_invocation_id: &mut Option<S
             crate::state::invocation_data::store_last_seen_invocation_start(req_id);
             *current_invocation_id = Some(req_id.to_string());
 
+            if let Some(duration_ms) = PENDING_INIT_DURATION.lock().take() {
+                crate::state::invocation_entry::update(req_id, |entry| {
+                    entry.init_duration = duration_ms;
+                });
+            }
+
             if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&log.time) {
                 let start_time = dt.timestamp_millis() as f64;
                 crate::state::invocation_entry::update(req_id, |entry| {
@@ -69,7 +81,9 @@ fn parse_platform_init_report(log: &TelemetryLog) {
         .and_then(|m| m.get("durationMs"))
         .and_then(|d| d.as_f64())
     {
-        if let Some(req_id) = crate::state::invocation_data::get_current_invocation_id() {
+        if log.record.get("phase").and_then(|phase| phase.as_str()) == Some("init") {
+            *PENDING_INIT_DURATION.lock() = Some(duration_ms);
+        } else if let Some(req_id) = crate::state::invocation_data::get_current_invocation_id() {
             crate::state::invocation_entry::update(&req_id, |entry| {
                 entry.init_duration = duration_ms;
             });
@@ -217,6 +231,7 @@ mod tests {
             "platform.initReport",
             "2023-01-01T12:00:00.000Z",
             json!({
+                "phase": "invoke",
                 "metrics": { "durationMs": 123.45 }
             }),
             None,
