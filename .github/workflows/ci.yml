@@ -18,6 +18,14 @@ env:
   RESOURCE_PREFIX: pr-${{ github.event.pull_request.number }}-
 
 jobs:
+  layer-metadata-test:
+    name: Layer Runtime Metadata Tests
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -B -m unittest discover -s tools -p 'test_*.py'
+
   fmt:
     name: Format
     if: github.event.pull_request.draft == false
