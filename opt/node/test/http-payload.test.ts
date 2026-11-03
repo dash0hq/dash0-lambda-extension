@@ -16,6 +16,7 @@
 
 import { execFileSync } from 'child_process';
 import * as path from 'path';
+import { randomBytes } from 'crypto';
 import { brotliCompressSync, deflateSync, gzipSync } from 'zlib';
 
 const ROOT = path.join(__dirname, '..');
@@ -25,7 +26,8 @@ interface Scenario {
   encoding?: string;
   wire: Buffer;
   chunked?: boolean;
-  env?: Record<string, string>;
+  contentType?: string;
+  setEncoding?: BufferEncoding;
 }
 interface Result {
   appBodyLength: number;
@@ -36,8 +38,12 @@ interface Result {
 function run(scenarios: Scenario[]): Result[] {
   const stdout = execFileSync(
     process.execPath,
-    [RUNNER, JSON.stringify(scenarios.map(s => ({ ...s, wire: s.wire.toString('base64') })))],
-    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], cwd: ROOT }
+    [RUNNER],
+    {
+      // Scenarios go over stdin: one argv string is capped at 128 KiB on Linux.
+      input: JSON.stringify(scenarios.map(s => ({ ...s, wire: s.wire.toString('base64') }))),
+      encoding: 'utf8', stdio: ['pipe', 'pipe', 'inherit'], cwd: ROOT, timeout: 60_000,
+    }
   );
   const line = stdout.split('\n').find(l => l.startsWith('RESULT '));
   if (!line) throw new Error(`runner printed no result:\n${stdout}`);
@@ -50,7 +56,10 @@ const graphqlResponse = {
 };
 const masked = JSON.stringify({ ...graphqlResponse, extensions: { accessToken: '****' } });
 const json = (value: unknown) => Buffer.from(JSON.stringify(value));
-const large = { items: Array.from({ length: 400 }, (_, i) => ({ id: i, name: 'Chicken Bucket' })), password: 'hidden' };
+// The secret comes first, so the truncated capture proves it was masked rather than cut away.
+const large = { password: 'hidden', items: Array.from({ length: 400 }, (_, i) => ({ id: i, name: 'Chicken Bucket' })) };
+// Random base64 barely compresses: about 36 KiB on the wire, 48 KiB decoded.
+const incompressible = { blob: randomBytes(36_000).toString('base64') };
 
 const scenarios: [string, Scenario, (result: Result) => void][] = [
   ['gzip GraphQL response (customer reproduction)', { encoding: 'gzip', wire: gzipSync(json(graphqlResponse)) },
@@ -70,7 +79,18 @@ const scenarios: [string, Scenario, (result: Result) => void][] = [
     result => expect(result.responseBody).toBe(masked)],
   // Same structural truncation as any oversized parsed http payload (see masking-env.test.ts).
   ['large gzip response, decoded, masked, then truncated', { encoding: 'gzip', wire: gzipSync(json(large)) },
-    result => expect(result.responseBody).toBe('{"items":"✂"}')],
+    result => expect(result.responseBody).toBe('{"password":"****","items":"✂"}')],
+  ['gzip body past the 32 KiB wire limit', { encoding: 'gzip', wire: gzipSync(json(incompressible)) },
+    result => expect(result.responseBody).toBeUndefined()],
+  ['gzip text/html is decoded and captured as text',
+    { encoding: 'gzip', contentType: 'text/html', wire: gzipSync(Buffer.from('<p>Order 42 delivered</p>')) },
+    result => expect(result.responseBody).toBe(JSON.stringify('<p>Order 42 delivered</p>'))],
+  ['client calls setEncoding() on a gzip response',
+    { encoding: 'gzip', setEncoding: 'latin1', wire: gzipSync(json(graphqlResponse)) },
+    result => expect(result.responseBody).toBeUndefined()],
+  ['header value naming an Object.prototype member',
+    { encoding: 'constructor', wire: json(graphqlResponse) },
+    result => expect(result.responseBody).toBeUndefined()],
   ['corrupt gzip', { encoding: 'gzip', wire: Buffer.from([0x1f, 0x8b, 8, 0, 1, 2, 3, 4, 5, 6]) },
     result => expect(result.responseBody).toBeUndefined()],
   ['unsupported encoding', { encoding: 'zstd', wire: Buffer.from([0x28, 0xb5, 0x2f, 0xfd, 0, 1, 2, 3]) },
@@ -86,7 +106,7 @@ beforeAll(() => {
   execFileSync(
     process.execPath,
     [require.resolve('typescript/bin/tsc'), '-p', 'distro/tsconfig.json', '--skipLibCheck'],
-    { cwd: ROOT, stdio: 'inherit' }
+    { cwd: ROOT, stdio: 'inherit', timeout: 90_000 }
   );
   results = run(scenarios.map(([, scenario]) => scenario));
 }, 120_000);
@@ -95,7 +115,7 @@ describe('http/https response payload capture', () => {
   test.each(scenarios.map(([name], i) => [name, i] as const))('%s', (_name, i) => {
     const [, scenario, check] = scenarios[i];
     // The application still receives its response; capture never consumes it.
-    if (scenario.encoding !== 'zstd' && !scenario.wire.equals(Buffer.from([0x1f, 0x8b, 8, 0, 1, 2, 3, 4, 5, 6]))) {
+    if (!['zstd', 'constructor'].includes(scenario.encoding!) && !scenario.wire.equals(Buffer.from([0x1f, 0x8b, 8, 0, 1, 2, 3, 4, 5, 6]))) {
       expect(results[i].appBodyLength).toBeGreaterThan(0);
     }
     check(results[i]);

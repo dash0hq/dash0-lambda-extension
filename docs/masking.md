@@ -76,12 +76,15 @@ Attribute values are stored as compact JSON strings. They are pretty-printed her
 
 This covers clients built on the `http` and `https` modules, such as axios, got and
 node-fetch v2. Node never decompresses a response; these clients do it themselves. The
-capture therefore decodes `gzip`, `x-gzip`, `deflate` and `br` response bodies first,
-then parses, masks and truncates them like an uncompressed body.
+capture therefore decodes `gzip`, `x-gzip`, `deflate` and `br` response bodies first.
+A compressed body is captured whole, up to 32 KiB on the wire and 64 KiB decoded. An
+`application/json` body is then parsed, masked by key, and only then truncated to the
+span attribute limit (4 KiB by default). Other content types are exported as text,
+truncated to that limit.
 
-Compressed bodies are captured up to 32 KiB on the wire and 64 KiB decoded. Larger
-bodies, other encodings (such as `zstd`), corrupt streams, and responses whose client
-calls `setEncoding()` are omitted, never exported as compressed bytes.
+Larger bodies, any other `content-encoding` value (such as `zstd`), corrupt streams, and
+responses whose client calls `setEncoding()` are omitted, never exported as compressed
+bytes.
 
 The test `opt/node/test/http-payload.test.ts` sends real `http.request` traffic through
 the instrumentation. A gzip GraphQL response with default masking rules:

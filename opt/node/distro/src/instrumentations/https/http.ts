@@ -107,8 +107,12 @@ export const contentEncoding = (headers: Record<string, unknown> | undefined): s
  * for an unsupported or stacked encoding, a corrupt stream or one that decodes past
  * DECODED_LIMIT. Never returns compressed bytes as text.
  */
+// Only own keys: a header value such as `constructor` must not reach Object.prototype.
+const decoderFor = (encoding: string) =>
+  Object.prototype.hasOwnProperty.call(decoders, encoding) ? decoders[encoding] : undefined;
+
 export const decodeResponseBody = (encoded: Buffer, encoding: string): string | undefined => {
-  const decode = decoders[encoding];
+  const decode = decoderFor(encoding);
   if (!decode) return undefined;
   try {
     return decode(encoded, { maxOutputLength: DECODED_LIMIT, chunkSize: 16 * 1024 }).toString('utf8');
@@ -123,7 +127,7 @@ function encodedResponseHandler(
   encoding: string,
   onRequestEnd: (requestRawData: RequestRawData, options: OnRequestEndOptionsType) => void
 ) {
-  let chunks: Buffer[] | undefined = decoders[encoding] ? [] : undefined;
+  let chunks: Buffer[] | undefined = decoderFor(encoding) ? [] : undefined;
   let size = 0;
   return function (args) {
     if (args[0] === 'data' && chunks) {

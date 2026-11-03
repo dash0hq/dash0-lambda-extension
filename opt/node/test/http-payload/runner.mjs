@@ -7,26 +7,27 @@
  * `http.request` calls against a local server and consumes each response the way
  * axios and node-fetch v2 do, piping it through their own zlib stream.
  *
- * Usage: node runner.mjs '<JSON array of scenarios>'
+ * Usage: node runner.mjs < scenarios.json   (a JSON array of scenarios on stdin)
  *
  *   encoding   optional `content-encoding` of the response
  *   wire       the response bytes, base64
  *   chunked    send the body in several network chunks instead of one
- *   env        optional environment variables, set before the instrumentation loads
+ *   contentType optional response content type (default application/json)
+ *   setEncoding the client calls response.setEncoding() with this value, and reads text
  *
  * Prints one line `RESULT <JSON>` with, per scenario:
  *   { appBodyLength, responseBody, responseHeaders }
  * where appBodyLength is the size of what the application received after its own decoding.
  */
 
+import fs from 'fs';
 import path from 'path';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
 
 const require = createRequire(import.meta.url);
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const scenarios = JSON.parse(process.argv[2]);
-Object.assign(process.env, ...scenarios.map(s => s.env || {}));
+const scenarios = JSON.parse(fs.readFileSync(0, 'utf8'));
 
 const { NodeTracerProvider } = require('@opentelemetry/sdk-trace-node');
 const { InMemorySpanExporter, SimpleSpanProcessor } = require('@opentelemetry/sdk-trace-base');
@@ -83,7 +84,15 @@ function graphqlRequest() {
       host: '127.0.0.1', port, path: '/graphql', method: 'POST',
       headers: { 'content-type': 'application/json', 'accept-encoding': 'gzip, deflate, br' },
     }, response => {
-      const decoder = decoders[response.headers['content-encoding']];
+      if (current.setEncoding) {
+        response.setEncoding(current.setEncoding);
+        let text = '';
+        response.on('data', chunk => { text += chunk; });
+        response.on('end', () => resolve(Buffer.from(text, current.setEncoding)));
+        return;
+      }
+      const encoding = response.headers['content-encoding'];
+      const decoder = Object.hasOwn(decoders, encoding) ? decoders[encoding] : undefined;
       const stream = decoder ? response.pipe(decoder()) : response;
       const chunks = [];
       stream.on('data', chunk => chunks.push(chunk));
