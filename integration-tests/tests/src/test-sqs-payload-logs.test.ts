@@ -24,7 +24,7 @@ describe.concurrent('SQS send and receive payload logs', () => {
     for (const runtime of NODE_RUNTIMES) {
         for (const enabled of [true, false]) {
             const mode = enabled ? 'enabled' : 'disabled';
-            it(`verifies sends and receives with payload logs ${mode} on ${runtime}`, async () => {
+            it(`verifies sends and receives with payload logs ${mode} on ${runtime}`, async ({ expect }) => {
                 const functionName = `${RESOURCE_PREFIX}tracing-sqs-payloads-${mode}-${runtime}`;
                 const invocationId = await invokeFunction(functionName, true, false);
                 // Supplementary spans and logs may flush on the next invocation.
