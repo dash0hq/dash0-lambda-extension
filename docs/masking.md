@@ -49,7 +49,7 @@ Masking of the Lambda event, the return value and environment variables is done 
 | HTTP request headers | `http.request.headers` | `DASH0_MASK_REQUEST_HEADERS`, then `DASH0_MASK_RULES` | ✅ `http`/`https`, `fetch`, Express, Fastify | ⚠️ not `requests` or Django | ❌ |
 | HTTP request body | `http.request.body` ¹ | `DASH0_MASK_REQUEST_BODY`, then `DASH0_MASK_RULES` | ✅ `http`/`https`, `fetch`, Express, Fastify | ⚠️ FastAPI and AWS SDK only; not `requests`, `httpx` or Django | ❌ |
 | HTTP response headers | `http.response.headers` | `DASH0_MASK_RESPONSE_HEADERS`, then `DASH0_MASK_RULES` | ✅ `http`/`https`, `fetch`, Express; Fastify captures none | ⚠️ not Flask | ❌ |
-| HTTP response body | `http.response.body` ¹ | `DASH0_MASK_RESPONSE_BODY`, then `DASH0_MASK_RULES` | ✅ `http`/`https`, Express; bounded JSON capture for `fetch` (see below); Fastify captures none | ⚠️ depends on the library | ❌ |
+| HTTP response body | `http.response.body` ¹ | `DASH0_MASK_RESPONSE_BODY`, then `DASH0_MASK_RULES` | ✅ `http`/`https` (see below), Express; bounded JSON capture for `fetch` (see below); Fastify captures none | ⚠️ depends on the library | ❌ |
 | SQS `SendMessage` / `SendMessageBatch` input | `messaging.publish.body` | `DASH0_MASK_REQUEST_BODY`, then `DASH0_MASK_RULES` | ✅ | ⚠️ `SendMessage` captures only `MessageBody`, in `http.request.body` | ❌ |
 | SQS `ReceiveMessage` output | `messaging.consume.body` | `DASH0_MASK_RESPONSE_BODY`, then `DASH0_MASK_RULES` | ✅ | not captured | ❌ |
 | Kafka message sent | `messaging.produce.body` | `DASH0_MASK_QUERY_PARAMS`, then `DASH0_MASK_RULES` ² | ✅ `kafkajs` | ❌ | ❌ |
@@ -69,6 +69,27 @@ Some payloads are captured but not masked at all. See [Payloads that are not mas
 "Then" means: the per-payload variable applies if it is set and valid; otherwise `DASH0_MASK_RULES` applies; otherwise the defaults.
 
 Attribute values are stored as compact JSON strings. They are pretty-printed here for readability.
+
+### Node.js `http`/`https` compressed responses
+
+> **Node.js** ✅ · **Python** ❌ · **Java** ❌
+
+This covers clients built on the `http` and `https` modules, such as axios, got and
+node-fetch v2. Node never decompresses a response; these clients do it themselves. The
+capture therefore decodes `gzip`, `x-gzip`, `deflate` and `br` response bodies first,
+then parses, masks and truncates them like an uncompressed body.
+
+Compressed bodies are captured up to 32 KiB on the wire and 64 KiB decoded. Larger
+bodies, other encodings (such as `zstd`), corrupt streams, and responses whose client
+calls `setEncoding()` are omitted, never exported as compressed bytes.
+
+The test `opt/node/test/http-payload.test.ts` sends real `http.request` traffic through
+the instrumentation. A gzip GraphQL response with default masking rules:
+
+```diff
+-{"data":{"order":{"id":"order-42","status":"DELIVERED","items":[{"name":"Chicken Bucket","qty":1}]}},"extensions":{"accessToken":"response-canary"}}
++{"data":{"order":{"id":"order-42","status":"DELIVERED","items":[{"name":"Chicken Bucket","qty":1}]}},"extensions":{"accessToken":"****"}}
+```
 
 ### Bounded Node.js `fetch` responses
 
