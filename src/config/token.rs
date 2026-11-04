@@ -11,29 +11,34 @@ use tokio::sync::OnceCell;
 static DASH0_TOKEN: OnceCell<Option<String>> = OnceCell::const_new();
 
 /// Resolves the Dash0 token (from Secrets Manager if configured, otherwise the
-/// plain `DASH0_TOKEN` env var), caching the result.
+/// plain `DASH0_TOKEN` env var) on first call and caches the result, including
+/// a failed (`None`) resolution.
 ///
-/// Single-flight: this is called from two places -- a background prefetch
-/// task kicked off shortly after cold start, and the first telemetry export
-/// that actually needs the token -- and both may race. `OnceCell::get_or_init`
-/// guarantees only one of them actually performs the resolution (including
-/// the real network call to Secrets Manager); the other simply awaits that
-/// same in-flight future. Callers never need to check "is a fetch already
-/// running" themselves.
+/// Single-flight: exports can race for the token (the mid-invocation flusher
+/// and the end-of-invocation flush). `OnceCell::get_or_init` lets only one of
+/// them perform the resolution, including the network call to Secrets
+/// Manager; the others await that same in-flight future.
 pub async fn get_dash0_token() -> Option<String> {
-    DASH0_TOKEN
-        .get_or_init(|| async {
-            let token = resolve_token().await;
-            if token.is_none() {
-                tracing::warn!(
-                    "[{}] No Dash0 token configured, no telemetry will be collected",
-                    crate::log_prefix()
-                );
-            }
-            token
-        })
-        .await
-        .clone()
+    cached_token(&DASH0_TOKEN, resolve_token).await
+}
+
+async fn cached_token<F, Fut>(cell: &OnceCell<Option<String>>, resolve: F) -> Option<String>
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = Option<String>>,
+{
+    cell.get_or_init(|| async {
+        let token = resolve().await;
+        if token.is_none() {
+            tracing::warn!(
+                "[{}] No Dash0 token configured, no telemetry will be collected",
+                crate::log_prefix()
+            );
+        }
+        token
+    })
+    .await
+    .clone()
 }
 
 async fn resolve_token() -> Option<String> {
@@ -274,6 +279,91 @@ fn derive_signing_key(
 mod tests {
     use super::*;
     use serial_test::serial;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn cached_token_resolves_lazily_and_once() {
+        let cell = OnceCell::new();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let resolver = || {
+            let calls = calls.clone();
+            move || async move {
+                calls.fetch_add(1, Ordering::SeqCst);
+                Some("tok".to_string())
+            }
+        };
+
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+        assert_eq!(
+            cached_token(&cell, resolver()).await,
+            Some("tok".to_string())
+        );
+        assert_eq!(
+            cached_token(&cell, resolver()).await,
+            Some("tok".to_string())
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn cached_token_is_single_flight_under_concurrent_callers() {
+        let cell = OnceCell::new();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let resolver = || {
+            let calls = calls.clone();
+            move || async move {
+                calls.fetch_add(1, Ordering::SeqCst);
+                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                Some("tok".to_string())
+            }
+        };
+
+        let (a, b, c) = tokio::join!(
+            cached_token(&cell, resolver()),
+            cached_token(&cell, resolver()),
+            cached_token(&cell, resolver()),
+        );
+        assert_eq!(a, Some("tok".to_string()));
+        assert_eq!(b, a);
+        assert_eq!(c, a);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn cached_token_caches_a_failed_resolution() {
+        let cell = OnceCell::new();
+        assert_eq!(cached_token(&cell, || async { None }).await, None);
+        assert_eq!(
+            cached_token(&cell, || async { Some("late".to_string()) }).await,
+            None
+        );
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn resolve_token_uses_env_var_without_secret_arn() {
+        std::env::remove_var("DASH0_TOKEN_SECRET_ARN");
+        std::env::set_var("DASH0_TOKEN", "env-token");
+        assert_eq!(resolve_token().await, Some("env-token".to_string()));
+
+        std::env::set_var("DASH0_TOKEN", "");
+        assert_eq!(resolve_token().await, None);
+        std::env::remove_var("DASH0_TOKEN");
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn resolve_token_falls_back_to_env_var_when_secret_fetch_fails() {
+        // An ARN that fails to parse makes the fetch fail before any network call.
+        std::env::set_var("DASH0_TOKEN_SECRET_ARN", "not-an-arn");
+        std::env::set_var("DASH0_TOKEN", "env-token");
+        assert_eq!(resolve_token().await, Some("env-token".to_string()));
+
+        std::env::remove_var("DASH0_TOKEN");
+        assert_eq!(resolve_token().await, None);
+        std::env::remove_var("DASH0_TOKEN_SECRET_ARN");
+    }
 
     #[test]
     fn parse_region_from_valid_arn() {

@@ -322,10 +322,8 @@ async fn send_request(
     item_count: usize,
     item_type: &str,
 ) -> Result<(), ()> {
-    // Resolves the token if it isn't already cached (single-flight -- see
-    // `get_dash0_token`'s doc comment). On a fast-returning invocation whose
-    // export races ahead of the background prefetch, this is where the real
-    // Secrets Manager round trip actually happens.
+    // The first export resolves the token, including the Secrets Manager
+    // round trip when configured; later exports get the cached value.
     let token = crate::config::get_dash0_token().await;
     if token.is_none() {
         return Ok(());
@@ -832,6 +830,28 @@ mod tests {
         );
         let body_bytes = req.into_body().collect().await.unwrap().to_bytes();
         assert_eq!(body_bytes.as_ref(), body.as_slice());
+    }
+
+    #[test]
+    fn test_build_otlp_request_sets_bearer_token() {
+        std::env::set_var("DASH0_ENDPOINT", "https://example.com:443/v1/traces");
+
+        let req = _build_otlp_request("/v1/traces", Method::POST, vec![], false, Some("tok"))
+            .expect("request should build");
+        assert_eq!(
+            req.headers()
+                .get(header::AUTHORIZATION)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "Bearer tok"
+        );
+
+        for token in [None, Some("")] {
+            let req = _build_otlp_request("/v1/traces", Method::POST, vec![], false, token)
+                .expect("request should build");
+            assert!(req.headers().get(header::AUTHORIZATION).is_none());
+        }
     }
 
     /// Regression for a long, high-volume invocation (Java agent posting
