@@ -322,8 +322,9 @@ async fn send_request(
     item_count: usize,
     item_type: &str,
 ) -> Result<(), ()> {
-    // The first export resolves the token, including the Secrets Manager
-    // round trip when configured; later exports get the cached value.
+    // Normally resolved at startup; this resolves it only if that failed
+    // (a failed Secrets Manager call is retried here) and otherwise returns
+    // the cached value.
     let token = crate::config::get_dash0_token().await;
     if token.is_none() {
         return Ok(());

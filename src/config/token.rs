@@ -11,13 +11,16 @@ use tokio::sync::OnceCell;
 static DASH0_TOKEN: OnceCell<Option<String>> = OnceCell::const_new();
 
 /// Resolves the Dash0 token (from Secrets Manager if configured, otherwise the
-/// plain `DASH0_TOKEN` env var) on first call and caches the result, including
-/// a failed (`None`) resolution.
+/// plain `DASH0_TOKEN` env var) on first call and caches the result.
 ///
-/// Single-flight: exports can race for the token (the mid-invocation flusher
-/// and the end-of-invocation flush). `OnceCell::get_or_init` lets only one of
-/// them perform the resolution, including the network call to Secrets
-/// Manager; the others await that same in-flight future.
+/// A failed Secrets Manager call with no `DASH0_TOKEN` fallback is not cached,
+/// so the next call retries it. A missing token is cached: retrying can't fix
+/// configuration.
+///
+/// Single-flight: the startup prefetch and exports can race for the token.
+/// `OnceCell::get_or_try_init` lets only one of them perform the resolution,
+/// including the network call to Secrets Manager; the others await that same
+/// in-flight future.
 pub async fn get_dash0_token() -> Option<String> {
     cached_token(&DASH0_TOKEN, resolve_token).await
 }
@@ -25,24 +28,31 @@ pub async fn get_dash0_token() -> Option<String> {
 async fn cached_token<F, Fut>(cell: &OnceCell<Option<String>>, resolve: F) -> Option<String>
 where
     F: FnOnce() -> Fut,
-    Fut: std::future::Future<Output = Option<String>>,
+    Fut: std::future::Future<Output = Result<Option<String>, ()>>,
 {
-    cell.get_or_init(|| async {
-        let token = resolve().await;
-        if token.is_none() {
-            tracing::warn!(
-                "[{}] No Dash0 token configured, no telemetry will be collected",
-                crate::log_prefix()
-            );
-        }
-        token
-    })
-    .await
-    .clone()
+    let resolved = cell
+        .get_or_try_init(|| async {
+            let token = resolve().await?;
+            if token.is_none() {
+                tracing::warn!(
+                    "[{}] No Dash0 token configured, no telemetry will be collected",
+                    crate::log_prefix()
+                );
+            }
+            Ok(token)
+        })
+        .await;
+    match resolved {
+        Ok(token) => token.clone(),
+        Err(()) => None,
+    }
 }
 
-async fn resolve_token() -> Option<String> {
+/// `Err` means the Secrets Manager call failed and there is no `DASH0_TOKEN`
+/// fallback, so resolving again later may succeed.
+async fn resolve_token() -> Result<Option<String>, ()> {
     let start = std::time::Instant::now();
+    let mut fetch_failed = false;
 
     if let Ok(arn) = std::env::var("DASH0_TOKEN_SECRET_ARN") {
         if !arn.is_empty() {
@@ -55,7 +65,7 @@ async fn resolve_token() -> Option<String> {
                             crate::log_prefix(),
                             start.elapsed().as_millis()
                         );
-                        return token;
+                        return Ok(token);
                     }
                     tracing::error!(
                         "[{}] Secret from Secrets Manager was empty or key not found, falling back to DASH0_TOKEN env var",
@@ -64,17 +74,28 @@ async fn resolve_token() -> Option<String> {
                 }
                 Err(e) => {
                     tracing::error!(
-                        "[{}] Failed to fetch secret from Secrets Manager: {}, falling back to DASH0_TOKEN env var",
+                        "[{}] Failed to fetch secret from Secrets Manager in {}ms: {}, falling back to DASH0_TOKEN env var",
                         crate::log_prefix(),
+                        start.elapsed().as_millis(),
                         e
                     );
+                    fetch_failed = true;
                 }
             }
         }
     }
 
-    let token = std::env::var("DASH0_TOKEN").ok().filter(|v| !v.is_empty());
-    token
+    match std::env::var("DASH0_TOKEN").ok().filter(|v| !v.is_empty()) {
+        Some(token) => Ok(Some(token)),
+        None if fetch_failed => {
+            tracing::warn!(
+                "[{}] No DASH0_TOKEN fallback; retrying Secrets Manager on the next export",
+                crate::log_prefix()
+            );
+            Err(())
+        }
+        None => Ok(None),
+    }
 }
 
 /// If DASH0_TOKEN_SECRET_KEY is set, parse the secret as JSON and extract that field.
@@ -290,7 +311,7 @@ mod tests {
             let calls = calls.clone();
             move || async move {
                 calls.fetch_add(1, Ordering::SeqCst);
-                Some("tok".to_string())
+                Ok(Some("tok".to_string()))
             }
         };
 
@@ -315,7 +336,7 @@ mod tests {
             move || async move {
                 calls.fetch_add(1, Ordering::SeqCst);
                 tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-                Some("tok".to_string())
+                Ok(Some("tok".to_string()))
             }
         };
 
@@ -331,12 +352,26 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn cached_token_caches_a_failed_resolution() {
+    async fn cached_token_caches_a_missing_token() {
         let cell = OnceCell::new();
-        assert_eq!(cached_token(&cell, || async { None }).await, None);
+        assert_eq!(cached_token(&cell, || async { Ok(None) }).await, None);
         assert_eq!(
-            cached_token(&cell, || async { Some("late".to_string()) }).await,
+            cached_token(&cell, || async { Ok(Some("late".to_string())) }).await,
             None
+        );
+    }
+
+    #[tokio::test]
+    async fn cached_token_retries_after_a_failed_fetch() {
+        let cell = OnceCell::new();
+        assert_eq!(cached_token(&cell, || async { Err(()) }).await, None);
+        assert_eq!(
+            cached_token(&cell, || async { Ok(Some("tok".to_string())) }).await,
+            Some("tok".to_string())
+        );
+        assert_eq!(
+            cached_token(&cell, || async { Err(()) }).await,
+            Some("tok".to_string())
         );
     }
 
@@ -345,23 +380,24 @@ mod tests {
     async fn resolve_token_uses_env_var_without_secret_arn() {
         std::env::remove_var("DASH0_TOKEN_SECRET_ARN");
         std::env::set_var("DASH0_TOKEN", "env-token");
-        assert_eq!(resolve_token().await, Some("env-token".to_string()));
+        assert_eq!(resolve_token().await, Ok(Some("env-token".to_string())));
 
         std::env::set_var("DASH0_TOKEN", "");
-        assert_eq!(resolve_token().await, None);
+        assert_eq!(resolve_token().await, Ok(None));
         std::env::remove_var("DASH0_TOKEN");
     }
 
     #[tokio::test]
     #[serial]
-    async fn resolve_token_falls_back_to_env_var_when_secret_fetch_fails() {
+    async fn resolve_token_falls_back_to_env_var_or_reports_retryable_failure() {
         // An ARN that fails to parse makes the fetch fail before any network call.
         std::env::set_var("DASH0_TOKEN_SECRET_ARN", "not-an-arn");
         std::env::set_var("DASH0_TOKEN", "env-token");
-        assert_eq!(resolve_token().await, Some("env-token".to_string()));
+        assert_eq!(resolve_token().await, Ok(Some("env-token".to_string())));
 
+        // No fallback: the failure is reported as retryable.
         std::env::remove_var("DASH0_TOKEN");
-        assert_eq!(resolve_token().await, None);
+        assert_eq!(resolve_token().await, Err(()));
         std::env::remove_var("DASH0_TOKEN_SECRET_ARN");
     }
 

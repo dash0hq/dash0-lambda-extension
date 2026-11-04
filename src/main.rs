@@ -125,23 +125,19 @@ async fn main() {
 
     otlp::flusher::spawn();
 
-    // The Dash0 token (which may be a real network round trip to Secrets
-    // Manager) is intentionally *not* resolved here. It's fetched lazily,
-    // on first actual need, by the first telemetry export
-    // (`config::token::get_dash0_token`, single-flight-safe via
-    // `tokio::sync::OnceCell`) -- gating the event loop below on it would
-    // put a slow network request back on the critical path Lambda uses to
-    // decide the extension is ready (confirmed via this extension's own
-    // `Extension init` timing log, which is unaffected by the token fetch
-    // with this structure but was ~80ms higher when the fetch was joined
-    // in front of it).
-
     // Initialize the extension and continually get next extension event.
     tokio::task::spawn(async {
         extension::register::register().await;
         extension::register::register_telemetry().await;
         // Lambda Application runtime will start once our extension is registered
         stats::app_start();
+
+        // Resolve the Dash0 token (possibly a Secrets Manager round trip) after
+        // registering, so it overlaps the runtime's own init instead of delaying
+        // it, but before the first `next`: Init gets more CPU than a small
+        // function gets later, and Lambda can freeze the environment once every
+        // process has called `next`, which would suspend a fetch mid-flight.
+        config::get_dash0_token().await;
 
         loop {
             // Lambda Extension API requires we wait for next extension event
