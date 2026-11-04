@@ -305,59 +305,93 @@ fn add_resource_attributes(span: &mut Span) {
     }
 }
 
-fn extract_http_body_logs(span: &mut Span) {
-    let invocation_id = match crate::state::invocation_data::get_current_invocation_id() {
-        Some(id) => id,
-        None => return,
-    };
+fn payload_attribute_value(value: &AnyValue) -> serde_json::Value {
+    match &value.value {
+        Some(Value::StringValue(value)) => serde_json::json!(value),
+        Some(Value::BoolValue(value)) => serde_json::json!(value),
+        Some(Value::IntValue(value)) => serde_json::json!(value),
+        Some(Value::DoubleValue(value)) => serde_json::json!(value),
+        Some(Value::ArrayValue(value)) => {
+            value.values.iter().map(payload_attribute_value).collect()
+        }
+        Some(Value::KvlistValue(value)) => value
+            .values
+            .iter()
+            .map(|entry| {
+                (
+                    entry.key.clone(),
+                    entry
+                        .value
+                        .as_ref()
+                        .map(payload_attribute_value)
+                        .unwrap_or_default(),
+                )
+            })
+            .collect::<serde_json::Map<_, _>>()
+            .into(),
+        Some(Value::BytesValue(value)) => serde_json::json!(base64::Engine::encode(
+            &base64::engine::general_purpose::STANDARD,
+            value
+        )),
+        None => serde_json::Value::Null,
+    }
+}
 
+fn extract_body_logs(span: &mut Span) {
+    let invocation_id = crate::state::invocation_data::get_current_invocation_id();
+    let create_logs = crate::config::user::is_create_payload_log_records();
     const ONE_MS_NANOS: u64 = 1_000_000;
+    let request_timestamp = span.start_time_unix_nano.saturating_add(ONE_MS_NANOS);
+    let response_timestamp = span.end_time_unix_nano.saturating_sub(ONE_MS_NANOS);
     let trace_id_hex = hex::encode(&span.trace_id);
     let span_id_hex = hex::encode(&span.span_id);
 
     use crate::otlp::attributes::*;
-    let body_attr_keys: &[(&str, &str, u64)] = &[
-        (
-            HTTP_REQUEST_BODY,
-            "http_request_body",
-            span.start_time_unix_nano.saturating_add(ONE_MS_NANOS),
-        ),
-        (
-            HTTP_RESPONSE_BODY,
-            "http_response_body",
-            span.end_time_unix_nano.saturating_sub(ONE_MS_NANOS),
-        ),
-    ];
-
-    for &(attr_key, payload_type, timestamp_nanos) in body_attr_keys {
-        if let Some(value) = span.attributes.iter().find_map(|attr| {
-            if attr.key == attr_key {
-                if let Some(AnyValue {
-                    value: Some(Value::StringValue(val)),
-                }) = &attr.value
-                {
-                    return Some(val.clone());
+    span.attributes.retain(|attr| {
+        let timestamp = match attr.key.as_str() {
+            HTTP_RESPONSE_BODY
+            | "messaging.consume.body"
+            | "rpc.response.payload"
+            | "rpc.grpc.response.payload"
+            | "db.response.body"
+            | "db.results" => response_timestamp,
+            HTTP_REQUEST_BODY
+            | "messaging.publish.body"
+            | "messaging.produce.body"
+            | "messaging.message.payload"
+            | "messaging.message.body"
+            | "rpc.request.payload"
+            | "rpc.grpc.request.payload"
+            | "db.statement"
+            | "db.query.text"
+            | "db.statement.parameters"
+            | "db.postgresql.values"
+            | "db.request.body"
+            | "storm.tuple.values" => request_timestamp,
+            _ => return true,
+        };
+        if create_logs {
+            if let (Some(invocation_id), Some(value)) =
+                (invocation_id.as_deref(), attr.value.as_ref())
+            {
+                let payload: std::borrow::Cow<'_, str> = match &value.value {
+                    Some(Value::StringValue(value)) => std::borrow::Cow::Borrowed(value),
+                    _ => std::borrow::Cow::Owned(payload_attribute_value(value).to_string()),
+                };
+                if let Some(log) = crate::otlp::log_mutations::build_payload_log(
+                    &payload,
+                    &attr.key.replace('.', "_"),
+                    invocation_id,
+                    Some(timestamp),
+                    Some(trace_id_hex.clone()),
+                    Some(span_id_hex.clone()),
+                ) {
+                    invocation_entry::update(invocation_id, |entry| entry.push_log(log));
                 }
             }
-            None
-        }) {
-            if let Some(log) = crate::otlp::log_mutations::build_payload_log(
-                &value,
-                payload_type,
-                &invocation_id,
-                Some(timestamp_nanos),
-                Some(trace_id_hex.clone()),
-                Some(span_id_hex.clone()),
-            ) {
-                invocation_entry::update(&invocation_id, |entry| {
-                    entry.push_log(log);
-                });
-            }
         }
-    }
-
-    span.attributes
-        .retain(|attr| attr.key != HTTP_REQUEST_BODY && attr.key != HTTP_RESPONSE_BODY);
+        false
+    });
 }
 
 fn extract_span_attributes_from_event(event_payload: &str) -> Vec<KeyValue> {
@@ -806,7 +840,7 @@ pub fn process_trace_request(
             if !is_lambda {
                 for span in &mut scope_span.spans {
                     add_resource_attributes(span);
-                    extract_http_body_logs(span);
+                    extract_body_logs(span);
                 }
                 continue;
             }
@@ -2141,6 +2175,130 @@ mod tests {
 
     #[test]
     #[serial]
+    fn process_trace_request_extracts_all_payloads() {
+        use opentelemetry_proto::tonic::common::v1::ArrayValue;
+
+        let inv_id = "inv-all-payloads";
+        set_current_invocation(inv_id);
+        let payloads = [
+            ("http.request.body", "http_request_body"),
+            ("http.response.body", "http_response_body"),
+            ("messaging.publish.body", "messaging_publish_body"),
+            ("messaging.produce.body", "messaging_produce_body"),
+            ("messaging.consume.body", "messaging_consume_body"),
+            ("messaging.message.payload", "messaging_message_payload"),
+            ("messaging.message.body", "messaging_message_body"),
+            ("rpc.request.payload", "rpc_request_payload"),
+            ("rpc.response.payload", "rpc_response_payload"),
+            ("rpc.grpc.request.payload", "rpc_grpc_request_payload"),
+            ("rpc.grpc.response.payload", "rpc_grpc_response_payload"),
+            ("db.statement", "db_statement"),
+            ("db.query.text", "db_query_text"),
+            ("db.statement.parameters", "db_statement_parameters"),
+            ("db.request.body", "db_request_body"),
+            ("db.response.body", "db_response_body"),
+            ("db.results", "db_results"),
+            ("storm.tuple.values", "storm_tuple_values"),
+        ];
+
+        for enabled in [true, false] {
+            std::env::set_var("DASH0_CREATE_PAYLOAD_LOG_RECORDS", enabled.to_string());
+            let mut span = make_http_span(
+                None,
+                None,
+                1_700_000_000_000_000_000,
+                1_700_000_001_000_000_000,
+            );
+            for (key, _) in payloads {
+                span.attributes.push(KeyValue {
+                    key: key.to_string(),
+                    value: Some(AnyValue {
+                        value: Some(Value::StringValue(
+                            serde_json::json!({"source": key, "secret": "****"}).to_string(),
+                        )),
+                    }),
+                });
+            }
+            span.attributes.push(KeyValue {
+                key: "db.postgresql.values".into(),
+                value: Some(AnyValue {
+                    value: Some(Value::ArrayValue(ArrayValue {
+                        values: vec![
+                            AnyValue {
+                                value: Some(Value::StringValue("order-42".into())),
+                            },
+                            AnyValue {
+                                value: Some(Value::IntValue(7)),
+                            },
+                        ],
+                    })),
+                }),
+            });
+            for key in [
+                "rpc.method",
+                "db.system",
+                "http.request.body.size",
+                "messaging.message.body.size",
+            ] {
+                span.attributes.push(KeyValue {
+                    key: key.into(),
+                    value: Some(AnyValue {
+                        value: Some(Value::StringValue("metadata".into())),
+                    }),
+                });
+            }
+            let mut request =
+                make_request_with_scope("@opentelemetry/instrumentation-aws-sdk", span);
+            let mut encoded = Vec::new();
+            super::process_trace_request(&mut request, &mut Vec::new(), &mut encoded);
+
+            let exported = ExportTraceServiceRequest::decode(encoded.as_slice()).unwrap();
+            let span = &exported.resource_spans[0].scope_spans[0].spans[0];
+            for (key, _) in payloads {
+                assert!(
+                    find_attribute(span, key).is_none(),
+                    "payload attribute retained: {key}"
+                );
+            }
+            assert!(find_attribute(span, "db.postgresql.values").is_none());
+            assert!(find_attribute(span, "rpc.method").is_some());
+            assert!(find_attribute(span, "db.system").is_some());
+            assert!(find_attribute(span, "http.request.body.size").is_some());
+            assert!(find_attribute(span, "messaging.message.body.size").is_some());
+            let logs = take_logs_for(inv_id);
+            assert_eq!(logs.len(), if enabled { payloads.len() + 1 } else { 0 });
+            if enabled {
+                for (key, payload_type) in payloads {
+                    let log = logs
+                        .iter()
+                        .map(parse_payload_log)
+                        .find(|log| log["type"] == payload_type)
+                        .unwrap();
+                    assert_eq!(
+                        log["message"],
+                        serde_json::json!({"source": key, "secret": "****"})
+                    );
+                }
+                let parameters = logs
+                    .iter()
+                    .map(parse_payload_log)
+                    .find(|log| log["type"] == "db_postgresql_values")
+                    .unwrap();
+                assert_eq!(parameters["message"], serde_json::json!(["order-42", 7]));
+                for log in logs {
+                    assert_eq!(log.span_id.as_deref(), Some("023f54b19283745a"));
+                    assert_eq!(
+                        log.trace_id.as_deref(),
+                        Some("5b8eff129842a1b9c9283745a23f54b1")
+                    );
+                }
+            }
+        }
+        std::env::remove_var("DASH0_CREATE_PAYLOAD_LOG_RECORDS");
+    }
+
+    #[test]
+    #[serial]
     fn extract_http_body_logs_creates_request_and_response_logs() {
         enable_payload_log_records();
         let inv_id = "inv-http-body-1";
@@ -2155,7 +2313,7 @@ mod tests {
             end,
         );
 
-        super::extract_http_body_logs(&mut span);
+        super::extract_body_logs(&mut span);
 
         // Both body attributes should be removed from span
         assert!(
@@ -2204,7 +2362,7 @@ mod tests {
         let end = 1_700_000_001_000_000_000u64;
         let mut span = make_http_span(Some("req"), Some("resp"), start, end);
 
-        super::extract_http_body_logs(&mut span);
+        super::extract_body_logs(&mut span);
 
         let logs = take_logs_for(inv_id);
         assert_eq!(logs.len(), 2);
@@ -2239,7 +2397,7 @@ mod tests {
 
         let mut span = make_http_span(Some("request data"), None, 100, 200);
 
-        super::extract_http_body_logs(&mut span);
+        super::extract_body_logs(&mut span);
 
         assert!(span.attributes.is_empty());
 
@@ -2260,7 +2418,7 @@ mod tests {
 
         let mut span = make_http_span(None, Some("response data"), 100, 200);
 
-        super::extract_http_body_logs(&mut span);
+        super::extract_body_logs(&mut span);
 
         assert!(span.attributes.is_empty());
 
@@ -2288,7 +2446,7 @@ mod tests {
             }),
         });
 
-        super::extract_http_body_logs(&mut span);
+        super::extract_body_logs(&mut span);
 
         assert_eq!(
             span.attributes.len(),
@@ -2327,7 +2485,7 @@ mod tests {
             }),
         });
 
-        super::extract_http_body_logs(&mut span);
+        super::extract_body_logs(&mut span);
 
         assert_eq!(
             span.attributes.len(),
@@ -2353,7 +2511,7 @@ mod tests {
 
         let mut span = make_http_span(Some("req"), Some("resp"), 100, 200);
 
-        super::extract_http_body_logs(&mut span);
+        super::extract_body_logs(&mut span);
 
         // Attributes should still be removed even when log creation is disabled
         assert!(span.attributes.is_empty());
@@ -2374,7 +2532,7 @@ mod tests {
 
         let mut span = make_http_span(Some("plain text body"), None, 100, 200);
 
-        super::extract_http_body_logs(&mut span);
+        super::extract_body_logs(&mut span);
 
         let logs = take_logs_for(inv_id);
         assert_eq!(logs.len(), 1);
@@ -2394,7 +2552,7 @@ mod tests {
 
         let mut span = make_http_span(Some("req"), None, 100, 200);
 
-        super::extract_http_body_logs(&mut span);
+        super::extract_body_logs(&mut span);
 
         let logs = take_logs_for(inv_id);
         assert_eq!(logs.len(), 1);

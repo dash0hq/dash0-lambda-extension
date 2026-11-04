@@ -62,15 +62,49 @@ Masking of the Lambda event, the return value, environment variables and opt-in 
 | Environment variables | `process.environment_variable.*` resource attributes | `DASH0_MASK_ENV_VARS`, then `DASH0_MASK_RULES` | ✅ | ✅ | ✅ |
 | Top-level span attributes, opt-in | Any span attribute name | `DASH0_MASK_SPAN_ATTRIBUTES` | ✅ | ✅ | ✅ |
 
-¹ The extension moves HTTP bodies off the span into a `dash0_payload` log record of type `http_request_body` or `http_response_body`. It doesn't mask them again, so what you see below is what the log record contains. In Java, these records contain the bodies unmasked.
+¹ The HTTP log types are `http_request_body` and `http_response_body`. The extension preserves the instrumentation's masking. In Java, these records contain the bodies unmasked.
 
 ² Messages sent to Kafka and RabbitMQ are masked with the query-parameter rules, not the request-body rules.
+
+The table names the attributes produced by the instrumentation. The extension moves all captured payload bodies into `dash0_payload` logs as described below. The examples show captured values before this move, not attributes retained on exported spans.
 
 Some payloads are captured but not masked at all. See [Payloads that are not masked](#payloads-that-are-not-masked).
 
 "Then" means: the per-payload variable applies if it is set and valid; otherwise `DASH0_MASK_RULES` applies; otherwise the defaults.
 
 Attribute values are stored as compact JSON strings. They are pretty-printed here for readability.
+
+### Payload log records
+
+`DASH0_CREATE_PAYLOAD_LOG_RECORDS` controls all captured payload bodies in every runtime. With the default `true`, the extension moves them into trace-correlated `dash0_payload` logs. With `false`, it omits these logs. In both modes, the extension removes the payload attributes from spans. Lambda event and return-value logs follow the same switch.
+
+| Captured attribute or Lambda payload | Log type |
+|---|---|
+| Lambda event | `lambda_event` |
+| Lambda return value | `lambda_return_value` |
+| `http.request.body` | `http_request_body` |
+| `http.response.body` | `http_response_body` |
+| `messaging.publish.body` | `messaging_publish_body` |
+| `messaging.produce.body` | `messaging_produce_body` |
+| `messaging.consume.body` | `messaging_consume_body` |
+| `messaging.message.payload` | `messaging_message_payload` |
+| `messaging.message.body` | `messaging_message_body` |
+| `rpc.request.payload` | `rpc_request_payload` |
+| `rpc.response.payload` | `rpc_response_payload` |
+| `rpc.grpc.request.payload` | `rpc_grpc_request_payload` |
+| `rpc.grpc.response.payload` | `rpc_grpc_response_payload` |
+| `db.statement` | `db_statement` |
+| `db.query.text` | `db_query_text` |
+| `db.statement.parameters` | `db_statement_parameters` |
+| `db.postgresql.values` | `db_postgresql_values` |
+| `db.request.body` | `db_request_body` |
+| `db.response.body` | `db_response_body` |
+| `db.results` | `db_results` |
+| `storm.tuple.values` | `storm_tuple_values` |
+
+This setting does not enable additional instrumentation or masking. It preserves the payload as captured, including existing masks and structured array values. Request and response masking variables still select their own rules; for example, SQS sends use `DASH0_MASK_REQUEST_BODY` while receives use `DASH0_MASK_RESPONSE_BODY`.
+
+Headers, URLs, routing metadata, body sizes, environment attributes and application-written logs are unaffected. A custom application log containing a payload is not a generated `dash0_payload` record and is not removed by this switch.
 
 ### Node.js `http`/`https` compressed responses
 

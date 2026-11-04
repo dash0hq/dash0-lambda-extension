@@ -88,7 +88,7 @@ The extension layers are published to the following AWS regions:
 * `DASH0_MAX_BUFFER_SIZE` - Hard limit, in KB, for buffered telemetry. Telemetry received while the buffer is full is dropped and the extension logs a warning, so telemetry cannot make the function run out of memory. Default: 10% of the function memory, between 8 MiB and 64 MiB.
 * `DASH0_REQUEST_TIMEOUT` - Timeout in milliseconds for HTTP requests to the backend. Default: `2000`.
 
-* `DASH0_CREATE_PAYLOAD_LOG_RECORDS` - When set to `true` (the default), the extension creates log records containing the request and response payloads for the lambda invocation and each client call. Set to `false` to disable. Default: `true`.
+* `DASH0_CREATE_PAYLOAD_LOG_RECORDS` - Controls all captured payload bodies across Node.js, Python and Java, including Lambda events and return values, HTTP bodies, messaging sends and receives, gRPC messages, database queries, parameters and results, and Storm tuples. When `true` (the default), these payloads become trace-correlated `dash0_payload` log records. When `false`, these logs are omitted. In both modes, the extension removes the corresponding payload attributes from spans. Existing masking rules apply before log creation; this setting does not add capture or masking support to a runtime. Headers, URLs, other span metadata, environment attributes and application-written logs are unaffected. See [payload log records](docs/masking.md#payload-log-records) for the attribute mapping.
 
 * `DASH0_DISABLE_TELEMETRY_LOG_COLLECTION` - When set to `true`, disables collecting logs from the [Lambda Telemetry API](https://docs.aws.amazon.com/lambda/latest/dg/telemetry-api.html). Default: `false`.
 
@@ -286,7 +286,7 @@ The following attributes are added to log records by the extension (if relevant)
 | Attribute | Type | Description |
 |---|---|---|
 | `faas.invocation_id` | string | The AWS request ID, used to correlate logs with the invocation span. |
-| `dash0.faas.payload_type` | string | The type of payload log record. Values: `lambda_event`, `lambda_return_value`, `http_request_body`, `http_response_body`. Only present on payload log records. |
+| `dash0.faas.payload_type` | string | The type of payload log record. Lambda payloads use `lambda_event` or `lambda_return_value`. Other payloads use the original attribute name with dots replaced by underscores, such as `http_request_body`, `messaging_publish_body` or `db_statement`. See the [complete mapping](docs/masking.md#payload-log-records). Only present on payload log records. |
 
 #### Resource Attributes (Logs)
 
@@ -418,4 +418,3 @@ COPY target/my-function.jar ${LAMBDA_TASK_ROOT}
 
 CMD ["com.example.Handler::handleRequest"]
 ```
-
