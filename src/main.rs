@@ -71,7 +71,6 @@ async fn main() {
     stats::init_start();
 
     config::endpoints::latch_runtime_env();
-    config::token::init_dash0_token().await;
 
     init_masking_rules();
     route::init();
@@ -132,6 +131,13 @@ async fn main() {
         extension::register::register_telemetry().await;
         // Lambda Application runtime will start once our extension is registered
         stats::app_start();
+
+        // Resolve the Dash0 token (possibly a Secrets Manager round trip) after
+        // registering, so it overlaps the runtime's own init instead of delaying
+        // it, but before the first `next`: Init gets more CPU than a small
+        // function gets later, and Lambda can freeze the environment once every
+        // process has called `next`, which would suspend a fetch mid-flight.
+        config::get_dash0_token().await;
 
         loop {
             // Lambda Extension API requires we wait for next extension event

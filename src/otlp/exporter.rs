@@ -253,6 +253,7 @@ fn _build_otlp_request(
     method: hyper::Method,
     body: Vec<u8>,
     gzip_encoded: bool,
+    token: Option<&str>,
 ) -> Result<Request<ReqBody>, String> {
     let (scheme, authority) =
         parse_otlp_endpoint().ok_or_else(|| "Failed to parse OTLP endpoint".to_string())?;
@@ -287,7 +288,7 @@ fn _build_otlp_request(
             );
         }
 
-        if let Some(token) = crate::config::get_dash0_token() {
+        if let Some(token) = token {
             if !token.is_empty() {
                 if let Ok(auth_val) =
                     header::HeaderValue::from_str(format!("Bearer {}", token).as_str())
@@ -321,7 +322,11 @@ async fn send_request(
     item_count: usize,
     item_type: &str,
 ) -> Result<(), ()> {
-    if crate::config::get_dash0_token().is_none() {
+    // Normally resolved at startup; this resolves it only if that failed
+    // (a failed Secrets Manager call is retried here) and otherwise returns
+    // the cached value.
+    let token = crate::config::get_dash0_token().await;
+    if token.is_none() {
         return Ok(());
     }
 
@@ -348,7 +353,13 @@ async fn send_request(
     let max_attempts = request_retries() + 1;
 
     for attempt in 1..=max_attempts {
-        let req = match _build_otlp_request(path, method.clone(), body.clone(), gzip_encoded) {
+        let req = match _build_otlp_request(
+            path,
+            method.clone(),
+            body.clone(),
+            gzip_encoded,
+            token.as_deref(),
+        ) {
             Ok(req) => req,
             Err(err) => {
                 tracing::error!(
@@ -761,7 +772,7 @@ mod tests {
         .encode_to_vec();
         let compressed = gzip(&original).expect("gzip should succeed");
 
-        let req = _build_otlp_request("/v1/traces", Method::POST, compressed.clone(), true)
+        let req = _build_otlp_request("/v1/traces", Method::POST, compressed.clone(), true, None)
             .expect("request should build");
 
         // (a) Content-Encoding: gzip is set
@@ -804,7 +815,7 @@ mod tests {
         }
         .encode_to_vec();
 
-        let req = _build_otlp_request("/v1/traces", Method::POST, body.clone(), false)
+        let req = _build_otlp_request("/v1/traces", Method::POST, body.clone(), false, None)
             .expect("request should build");
 
         // No Content-Encoding header when compression is disabled
@@ -820,6 +831,28 @@ mod tests {
         );
         let body_bytes = req.into_body().collect().await.unwrap().to_bytes();
         assert_eq!(body_bytes.as_ref(), body.as_slice());
+    }
+
+    #[test]
+    fn test_build_otlp_request_sets_bearer_token() {
+        std::env::set_var("DASH0_ENDPOINT", "https://example.com:443/v1/traces");
+
+        let req = _build_otlp_request("/v1/traces", Method::POST, vec![], false, Some("tok"))
+            .expect("request should build");
+        assert_eq!(
+            req.headers()
+                .get(header::AUTHORIZATION)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "Bearer tok"
+        );
+
+        for token in [None, Some("")] {
+            let req = _build_otlp_request("/v1/traces", Method::POST, vec![], false, token)
+                .expect("request should build");
+            assert!(req.headers().get(header::AUTHORIZATION).is_none());
+        }
     }
 
     /// Regression for a long, high-volume invocation (Java agent posting
