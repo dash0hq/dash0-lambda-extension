@@ -17,6 +17,15 @@ use tokio::sync::{mpsc, oneshot};
 // in its own process rather than changing other tests' environment or stores.
 fn isolated(name: &str) -> bool {
     if std::env::var_os("DASH0_EXPORT_TEST_CHILD").is_some() {
+        if !name.ends_with("::benchmark_signal_exports") {
+            // A deadlock must fail CI, not leave Command::output waiting forever.
+            // This thread ends with the isolated process on normal completion.
+            std::thread::spawn(|| {
+                std::thread::sleep(Duration::from_secs(30));
+                eprintln!("export scenario exceeded its 30-second deadline");
+                std::process::exit(1);
+            });
+        }
         return false;
     }
     let output = std::process::Command::new(std::env::current_exe().unwrap())
@@ -132,6 +141,9 @@ fn store_trace(name: &str, handler: bool) {
             scope_spans: vec![ScopeSpans {
                 spans: vec![Span {
                     name: name.into(),
+                    trace_id: vec![0x11; 16],
+                    span_id: vec![0x22; 8],
+                    parent_span_id: vec![0x33; 8],
                     ..Default::default()
                 }],
                 ..Default::default()
@@ -166,7 +178,12 @@ fn telemetry_log(text: &str, invocation_id: Option<&str>) -> TelemetryLog {
 }
 
 fn seed() {
-    store_trace("child", false);
+    seed_sized("", 0);
+}
+
+fn seed_sized(suffix: &str, size: usize) {
+    let padding = "x".repeat(size);
+    store_trace(&format!("child{suffix}{padding}"), false);
     invocation_data::store_log(StoredLog {
         method: hyper::Method::POST,
         path_and_query: "/v1/logs".into(),
@@ -176,7 +193,7 @@ fn seed() {
                 scope_logs: vec![ScopeLogs {
                     log_records: vec![LogRecord {
                         body: Some(AnyValue {
-                            value: Some(Value::StringValue("sdk-log".into())),
+                            value: Some(Value::StringValue(format!("sdk-log{suffix}{padding}"))),
                         }),
                         ..Default::default()
                     }],
@@ -187,7 +204,10 @@ fn seed() {
         }
         .encode_to_vec(),
     });
-    invocation_entry::store_telemetry_logs(vec![telemetry_log("function-log", None)]);
+    invocation_entry::store_telemetry_logs(vec![telemetry_log(
+        &format!("function-log{suffix}{padding}"),
+        None,
+    )]);
     invocation_data::store_metric(StoredMetric {
         method: hyper::Method::POST,
         path_and_query: "/v1/metrics".into(),
@@ -196,7 +216,8 @@ fn seed() {
             resource_metrics: vec![ResourceMetrics {
                 scope_metrics: vec![ScopeMetrics {
                     metrics: vec![Metric {
-                        name: "test.metric".into(),
+                        name: format!("test.metric{suffix}"),
+                        description: padding,
                         ..Default::default()
                     }],
                     ..Default::default()
@@ -206,6 +227,530 @@ fn seed() {
         }
         .encode_to_vec(),
     });
+}
+
+async fn next_request(requests: &mut mpsc::UnboundedReceiver<Received>) -> Received {
+    tokio::time::timeout(Duration::from_secs(3), requests.recv())
+        .await
+        .expect("expected an export request")
+        .unwrap()
+}
+
+fn labels(request: &Received) -> Vec<String> {
+    match request.path.as_str() {
+        "/v1/traces" => ExportTraceServiceRequest::decode(request.body.as_slice())
+            .unwrap()
+            .resource_spans
+            .into_iter()
+            .flat_map(|r| r.scope_spans)
+            .flat_map(|s| s.spans)
+            .map(|s| s.name.trim_end_matches('x').to_string())
+            .collect(),
+        "/v1/logs" => ExportLogsServiceRequest::decode(request.body.as_slice())
+            .unwrap()
+            .resource_logs
+            .into_iter()
+            .flat_map(|r| r.scope_logs)
+            .flat_map(|s| s.log_records)
+            .map(|l| match l.body.unwrap().value.unwrap() {
+                Value::StringValue(text) => text.trim_end_matches('x').to_string(),
+                value => panic!("unexpected log body {value:?}"),
+            })
+            .collect(),
+        "/v1/metrics" => ExportMetricsServiceRequest::decode(request.body.as_slice())
+            .unwrap()
+            .resource_metrics
+            .into_iter()
+            .flat_map(|r| r.scope_metrics)
+            .flat_map(|s| s.metrics)
+            .map(|m| m.name)
+            .collect(),
+        path => panic!("unexpected export path {path}"),
+    }
+}
+
+#[tokio::test]
+async fn empty_and_single_signal_flushes_do_not_wait_for_missing_signals() {
+    if isolated("otlp::exporter::concurrency_tests::empty_and_single_signal_flushes_do_not_wait_for_missing_signals") {
+        return;
+    }
+    let (mut requests, server) = receiver().await;
+    flush(None).await;
+    flush_while_running().await;
+    assert!(requests.try_recv().is_err());
+    for expected in ["child", "sdk-log", "function-log", "test.metric"] {
+        seed();
+        if expected != "child" {
+            invocation_entry::take_all_traces();
+        }
+        if expected != "sdk-log" {
+            invocation_data::take_logs();
+        }
+        if expected != "function-log" {
+            invocation_entry::take_all_telemetry_logs(None);
+        }
+        if expected != "test.metric" {
+            invocation_data::take_metrics();
+        }
+        let active = tokio::spawn(flush(None));
+        let request = next_request(&mut requests).await;
+        assert_eq!(labels(&request), [expected]);
+        request.respond.send(200).unwrap();
+        tokio::time::timeout(Duration::from_secs(3), active)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(requests.try_recv().is_err());
+    }
+    server.abort();
+}
+
+#[tokio::test]
+async fn extension_events_wait_for_all_signals_in_both_modes_and_on_spindown() {
+    if isolated("otlp::exporter::concurrency_tests::extension_events_wait_for_all_signals_in_both_modes_and_on_spindown") {
+        return;
+    }
+    let (mut requests, server) = receiver().await;
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    std::env::set_var(
+        "AWS_LAMBDA_RUNTIME_API",
+        listener.local_addr().unwrap().to_string(),
+    );
+    std::env::remove_var("LRAP_RUNTIME_API_ENDPOINT");
+    let (events, events_rx) = mpsc::unbounded_channel::<String>();
+    let events_rx = Arc::new(tokio::sync::Mutex::new(events_rx));
+    let api = tokio::spawn(async move {
+        loop {
+            let (stream, _) = listener.accept().await.unwrap();
+            let events_rx = events_rx.clone();
+            tokio::spawn(async move {
+                let service = service_fn(move |request: Request<hyper::body::Incoming>| {
+                    let events_rx = events_rx.clone();
+                    async move {
+                        let register = request.uri().path().ends_with("/register");
+                        request.into_body().collect().await.unwrap();
+                        let body = if register {
+                            "{}".to_string()
+                        } else {
+                            events_rx.lock().await.recv().await.unwrap()
+                        };
+                        Ok::<_, Infallible>(
+                            hyper::Response::builder()
+                                .header("lambda-extension-identifier", "local-extension")
+                                .body(Full::new(Bytes::from(body)))
+                                .unwrap(),
+                        )
+                    }
+                });
+                let _ = http1::Builder::new()
+                    .serve_connection(TokioIo::new(stream), service)
+                    .await;
+            });
+        }
+    });
+    crate::extension::register::register().await;
+    for (on_end, event_type) in [(false, "INVOKE"), (true, "INVOKE"), (true, "SHUTDOWN")] {
+        std::env::set_var("DASH0_SEND_ON_INVOCATION_END", on_end.to_string());
+        seed();
+        events
+            .send(
+                serde_json::json!({ "eventType": event_type, "requestId": "next-invocation",
+            "shutdownReason": "spindown" })
+                .to_string(),
+            )
+            .unwrap();
+        let active = tokio::spawn(crate::extension::events::get_next());
+        if on_end && event_type == "INVOKE" {
+            let notifier = tokio::time::timeout(Duration::from_secs(3), async {
+                loop {
+                    if let Some(notifier) = invocation_data::take_runtime_done_notifier() {
+                        break notifier;
+                    }
+                    tokio::time::sleep(Duration::from_millis(1)).await;
+                }
+            })
+            .await
+            .unwrap();
+            assert!(
+                requests.try_recv().is_err(),
+                "invocation-end mode must wait for runtimeDone"
+            );
+            notifier.send(()).unwrap();
+        }
+        let mut held = Vec::new();
+        let mut names = Vec::new();
+        for _ in 0..4 {
+            let request = next_request(&mut requests).await;
+            names.extend(labels(&request));
+            held.push(request);
+        }
+        names.sort();
+        assert_eq!(names, ["child", "function-log", "sdk-log", "test.metric"]);
+        let last = held.pop().unwrap();
+        for request in held {
+            request.respond.send(200).unwrap();
+        }
+        tokio::time::sleep(Duration::from_millis(30)).await;
+        assert!(
+            !active.is_finished(),
+            "event handling must wait for the slowest export"
+        );
+        last.respond.send(200).unwrap();
+        active.await.unwrap();
+        assert!(requests.try_recv().is_err());
+    }
+    api.abort();
+    server.abort();
+}
+
+#[tokio::test]
+async fn chunked_exports_are_bounded_and_queued_flush_drains_new_data() {
+    if isolated("otlp::exporter::concurrency_tests::chunked_exports_are_bounded_and_queued_flush_drains_new_data") {
+        return;
+    }
+    let (mut requests, server) = receiver().await;
+    seed_sized("-0", MAX_REQUEST_BYTES / 2);
+    seed_sized("-1", MAX_REQUEST_BYTES / 2);
+    let active = tokio::spawn(flush(None));
+    let mut first = Vec::new();
+    for _ in 0..4 {
+        first.push(next_request(&mut requests).await);
+    }
+    let mut names: Vec<_> = first.iter().flat_map(labels).collect();
+    names.sort();
+    assert_eq!(
+        names,
+        ["child-0", "function-log-0", "sdk-log-0", "test.metric-0"]
+    );
+    assert!(
+        tokio::time::timeout(Duration::from_millis(30), requests.recv())
+            .await
+            .is_err(),
+        "chunks within a stream must not overlap"
+    );
+
+    seed();
+    let queued = tokio::spawn(flush(None));
+    for request in first {
+        let expected: Vec<_> = labels(&request)
+            .iter()
+            .map(|s| s.replace("-0", "-1"))
+            .collect();
+        request.respond.send(200).unwrap();
+        let second = next_request(&mut requests).await;
+        assert_eq!(labels(&second), expected);
+        second.respond.send(200).unwrap();
+    }
+    active.await.unwrap();
+    let mut names = Vec::new();
+    for _ in 0..4 {
+        let request = next_request(&mut requests).await;
+        names.extend(labels(&request));
+        request.respond.send(200).unwrap();
+    }
+    names.sort();
+    assert_eq!(names, ["child", "function-log", "sdk-log", "test.metric"]);
+    tokio::time::timeout(Duration::from_secs(3), queued)
+        .await
+        .unwrap()
+        .unwrap();
+    flush(None).await;
+    assert!(requests.try_recv().is_err());
+    assert_eq!(crate::otlp::flusher::buffered_bytes(), 0);
+    server.abort();
+}
+
+#[tokio::test]
+async fn failed_or_timed_out_signal_does_not_cancel_siblings_or_block_next_flush() {
+    if isolated("otlp::exporter::concurrency_tests::failed_or_timed_out_signal_does_not_cancel_siblings_or_block_next_flush") {
+        return;
+    }
+    let (mut requests, server) = receiver().await;
+    for timeout in [false, true] {
+        std::env::set_var(
+            "DASH0_REQUEST_TIMEOUT",
+            if timeout { "500" } else { "5000" },
+        );
+        std::env::set_var("DASH0_REQUEST_RETRIES", if timeout { "0" } else { "1" });
+        seed();
+        invocation_entry::take_all_traces();
+        for index in 0..2 {
+            store_trace(
+                &format!("healthy-{index}{}", "x".repeat(MAX_REQUEST_BYTES / 2)),
+                false,
+            );
+        }
+        let active = tokio::spawn(flush(None));
+        let mut metric = None;
+        let mut healthy = None;
+        let mut names = Vec::new();
+        for _ in 0..4 {
+            let request = next_request(&mut requests).await;
+            names.extend(labels(&request));
+            if request.path == "/v1/metrics" {
+                metric = Some(request);
+            } else if request.path == "/v1/traces" {
+                healthy = Some(request);
+            } else {
+                request.respond.send(200).unwrap();
+            }
+        }
+        names.sort();
+        assert_eq!(
+            names,
+            ["function-log", "healthy-0", "sdk-log", "test.metric"]
+        );
+        let metric = metric.unwrap();
+        let healthy = healthy.unwrap();
+        std::env::set_var("DASH0_REQUEST_TIMEOUT", "5000");
+        if timeout {
+            // The first attempt's 500 ms deadline is already fixed. Give the
+            // healthy stream's next chunk a longer deadline, then let metrics
+            // time out while that healthy request remains outstanding.
+            healthy.respond.send(200).unwrap();
+            let second = next_request(&mut requests).await;
+            assert_eq!(labels(&second), ["healthy-1"]);
+            tokio::time::sleep(Duration::from_millis(650)).await;
+            assert!(
+                !active.is_finished(),
+                "a timed-out stream must not cancel a healthy sibling"
+            );
+            second.respond.send(200).unwrap();
+            let _ = metric.respond.send(200);
+        } else {
+            metric.respond.send(503).unwrap();
+            let retry = next_request(&mut requests).await;
+            assert_eq!(retry.path, "/v1/metrics");
+            assert_eq!(retry.body, metric.body);
+            retry.respond.send(503).unwrap();
+            tokio::time::sleep(Duration::from_millis(30)).await;
+            assert!(
+                !active.is_finished(),
+                "an exhausted stream must not cancel a healthy sibling"
+            );
+            healthy.respond.send(200).unwrap();
+            let second = next_request(&mut requests).await;
+            assert_eq!(labels(&second), ["healthy-1"]);
+            second.respond.send(200).unwrap();
+        }
+        tokio::time::timeout(Duration::from_secs(3), active)
+            .await
+            .unwrap()
+            .unwrap();
+        // A failed batch is not requeued by the exporter. A fresh flush must
+        // still acquire the lock and export a single new copy of each signal.
+        std::env::set_var("DASH0_REQUEST_TIMEOUT", "5000");
+        seed();
+        let next = tokio::spawn(flush(None));
+        for _ in 0..4 {
+            next_request(&mut requests).await.respond.send(200).unwrap();
+        }
+        tokio::time::timeout(Duration::from_secs(3), next)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(requests.try_recv().is_err());
+    }
+    server.abort();
+}
+
+#[tokio::test]
+async fn all_signals_exhaust_retries_and_recover_after_throttling_or_outage() {
+    if isolated("otlp::exporter::concurrency_tests::all_signals_exhaust_retries_and_recover_after_throttling_or_outage") {
+        return;
+    }
+    let (mut requests, server) = receiver().await;
+    std::env::set_var("DASH0_REQUEST_RETRIES", "1");
+    for status in [Some(429), Some(503), None] {
+        std::env::set_var(
+            "DASH0_REQUEST_TIMEOUT",
+            if status.is_none() { "500" } else { "5000" },
+        );
+        seed();
+        let active = tokio::spawn(flush(None));
+        let mut held = Vec::new();
+        let mut timed_out_names = Vec::new();
+        for _ in 0..2 {
+            let mut names = Vec::new();
+            let mut attempt = Vec::new();
+            for _ in 0..4 {
+                let request = next_request(&mut requests).await;
+                names.extend(labels(&request));
+                attempt.push(request);
+            }
+            names.sort();
+            if let Some(status) = status {
+                assert_eq!(names, ["child", "function-log", "sdk-log", "test.metric"]);
+                for request in attempt {
+                    request.respond.send(status).unwrap();
+                }
+            } else {
+                // Independent timers need not expire in synchronized waves.
+                timed_out_names.extend(names);
+                held.extend(attempt);
+            }
+        }
+        if status.is_none() {
+            timed_out_names.sort();
+            assert_eq!(
+                timed_out_names,
+                [
+                    "child",
+                    "child",
+                    "function-log",
+                    "function-log",
+                    "sdk-log",
+                    "sdk-log",
+                    "test.metric",
+                    "test.metric"
+                ]
+            );
+        }
+        tokio::time::timeout(Duration::from_secs(3), active)
+            .await
+            .unwrap()
+            .unwrap();
+        for request in held {
+            let _ = request.respond.send(200);
+        }
+        std::env::set_var("DASH0_REQUEST_TIMEOUT", "5000");
+        seed();
+        let recovered = tokio::spawn(flush(None));
+        let mut names = Vec::new();
+        for _ in 0..4 {
+            let request = next_request(&mut requests).await;
+            names.extend(labels(&request));
+            request.respond.send(200).unwrap();
+        }
+        names.sort();
+        assert_eq!(names, ["child", "function-log", "sdk-log", "test.metric"]);
+        recovered.await.unwrap();
+        assert!(requests.try_recv().is_err());
+    }
+    server.abort();
+}
+
+#[tokio::test]
+async fn runtime_error_exports_finish_before_runtime_done_notification() {
+    if isolated("otlp::exporter::concurrency_tests::runtime_error_exports_finish_before_runtime_done_notification") {
+        return;
+    }
+    let (mut requests, server) = receiver().await;
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let ingress = tokio::spawn(async move {
+        loop {
+            let (stream, _) = listener.accept().await.unwrap();
+            tokio::spawn(async move {
+                let _ = http1::Builder::new()
+                    .serve_connection(TokioIo::new(stream), service_fn(crate::route::dispatch))
+                    .await;
+            });
+        }
+    });
+    for status in ["error", "timeout"] {
+        invocation_entry::remove("export-test");
+        seed();
+        let background = tokio::spawn(flush_while_running());
+        let mut held = Vec::new();
+        for _ in 0..4 {
+            held.push(next_request(&mut requests).await);
+        }
+        let (done, mut notified) = oneshot::channel();
+        invocation_data::store_runtime_done_notifier(done);
+        let body = serde_json::json!([
+            { "time": "2026-11-06T12:00:00.000Z", "type": "platform.start", "record": { "requestId": "export-test" } },
+            { "time": "2026-11-06T12:00:01.000Z", "type": "function", "record": "error-log" },
+            { "time": "2026-11-06T12:00:02.000Z", "type": "platform.runtimeDone", "record": { "requestId": "export-test", "status": status } }
+        ]);
+        let post = tokio::spawn(async move {
+            let client =
+                hyper_util::client::legacy::Client::builder(hyper_util::rt::TokioExecutor::new())
+                    .build_http::<Full<Bytes>>();
+            let response = client
+                .request(
+                    Request::post(format!("http://{address}/v1/telemetry"))
+                        .body(Full::new(Bytes::from(body.to_string())))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), 200);
+        });
+        assert!(
+            tokio::time::timeout(Duration::from_millis(50), &mut notified)
+                .await
+                .is_err(),
+            "runtimeDone must wait for the active background flush and error exports"
+        );
+        assert!(
+            requests.try_recv().is_err(),
+            "runtime-error exports must share the flush lock"
+        );
+        for request in held {
+            request.respond.send(200).unwrap();
+        }
+        background.await.unwrap();
+        let mut exported = Vec::new();
+        let mut error_requests = Vec::new();
+        for _ in 0..2 {
+            let request = next_request(&mut requests).await;
+            exported.extend(labels(&request));
+            if request.path == "/v1/traces" {
+                let decoded = ExportTraceServiceRequest::decode(request.body.as_slice()).unwrap();
+                let handler = decoded
+                    .resource_spans
+                    .iter()
+                    .flat_map(|r| &r.scope_spans)
+                    .flat_map(|s| &s.spans)
+                    .find(|s| s.name == "handler")
+                    .unwrap();
+                assert_eq!(handler.trace_id, vec![0x11; 16]);
+                assert_eq!(
+                    handler.span_id,
+                    vec![0x33; 8],
+                    "synthetic handler parents the already exported child"
+                );
+                assert_eq!(handler.status.as_ref().unwrap().code, 2);
+                assert!(handler.events.iter().any(|event| event.name == "exception"));
+            } else {
+                let decoded = ExportLogsServiceRequest::decode(request.body.as_slice()).unwrap();
+                let log = decoded
+                    .resource_logs
+                    .iter()
+                    .flat_map(|r| &r.scope_logs)
+                    .flat_map(|s| &s.log_records)
+                    .find(|l| {
+                        l.body.as_ref().and_then(|b| b.value.as_ref())
+                            == Some(&Value::StringValue("error-log".into()))
+                    })
+                    .unwrap();
+                assert_eq!(log.trace_id, vec![0x11; 16]);
+                assert!(!log.span_id.is_empty());
+            }
+            error_requests.push(request);
+        }
+        assert!(exported.contains(&"handler".to_string()));
+        assert!(exported.contains(&"error-log".to_string()));
+        assert!(notified.try_recv().is_err());
+        // Exercise both release orders. The notification must wait for the
+        // slower response, not just for receipt of the two request bodies.
+        error_requests.sort_by(|a, b| a.path.cmp(&b.path));
+        let last = error_requests.remove(if status == "error" { 0 } else { 1 });
+        error_requests.pop().unwrap().respond.send(200).unwrap();
+        tokio::time::sleep(Duration::from_millis(30)).await;
+        assert!(notified.try_recv().is_err());
+        assert!(!post.is_finished());
+        last.respond.send(200).unwrap();
+        tokio::time::timeout(Duration::from_secs(3), notified)
+            .await
+            .unwrap()
+            .unwrap();
+        post.await.unwrap();
+        assert!(requests.try_recv().is_err());
+    }
+    ingress.abort();
+    server.abort();
 }
 
 #[tokio::test]
@@ -232,63 +777,11 @@ async fn signals_export_concurrently_and_flush_waits() {
         // A sequential exporter cannot deliver all four requests while the
         // receiver withholds responses. No wall-clock speed assertion is needed.
         for _ in 0..4 {
-            received.push(
-                tokio::time::timeout(Duration::from_secs(3), requests.recv())
-                    .await
-                    .expect("signals must arrive before any response is released")
-                    .unwrap(),
-            );
+            received.push(next_request(&mut requests).await);
         }
-        let mut log_bodies = Vec::new();
-        let mut trace_names = Vec::new();
-        let mut metric_names = Vec::new();
-        for request in &received {
-            match request.path.as_str() {
-                "/v1/traces" => {
-                    let decoded =
-                        ExportTraceServiceRequest::decode(request.body.as_slice()).unwrap();
-                    trace_names.extend(
-                        decoded
-                            .resource_spans
-                            .into_iter()
-                            .flat_map(|r| r.scope_spans)
-                            .flat_map(|s| s.spans)
-                            .map(|s| s.name),
-                    );
-                }
-                "/v1/logs" => {
-                    let decoded =
-                        ExportLogsServiceRequest::decode(request.body.as_slice()).unwrap();
-                    log_bodies.extend(
-                        decoded
-                            .resource_logs
-                            .into_iter()
-                            .flat_map(|r| r.scope_logs)
-                            .flat_map(|s| s.log_records)
-                            .map(|l| l.body.unwrap().value.unwrap()),
-                    );
-                }
-                "/v1/metrics" => {
-                    let decoded =
-                        ExportMetricsServiceRequest::decode(request.body.as_slice()).unwrap();
-                    metric_names.extend(
-                        decoded
-                            .resource_metrics
-                            .into_iter()
-                            .flat_map(|r| r.scope_metrics)
-                            .flat_map(|s| s.metrics)
-                            .map(|m| m.name),
-                    );
-                }
-                path => panic!("unexpected path {path}"),
-            }
-        }
-        assert_eq!(trace_names, ["child"]);
-        assert_eq!(metric_names, ["test.metric"]);
-        assert_eq!(log_bodies.len(), 2);
-        for text in ["sdk-log", "function-log"] {
-            assert!(log_bodies.contains(&Value::StringValue(text.into())));
-        }
+        let mut names: Vec<_> = received.iter().flat_map(labels).collect();
+        names.sort();
+        assert_eq!(names, ["child", "function-log", "sdk-log", "test.metric"]);
         let next_flush = tokio::spawn(flush(Some("current")));
         // Even after the other exports complete, the slowest response must keep
         // this flush open and prevent the next flush from returning.
