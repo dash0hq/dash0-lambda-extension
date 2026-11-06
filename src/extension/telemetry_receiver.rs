@@ -105,10 +105,7 @@ pub async fn telemetry(req: Request<Incoming>) -> Result<Response<ResBody>, hype
             }
         }
 
-        if !traces_to_send.is_empty() {
-            send_traces(traces_to_send).await;
-        }
-        flush_telemetry_logs(None).await;
+        tokio::join!(send_traces(traces_to_send), flush_telemetry_logs(None));
     }
 
     Ok(Response::builder().status(200).body(empty_body()).unwrap())

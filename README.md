@@ -79,6 +79,8 @@ The extension layers are published to the following AWS regions:
 
 * `DASH0_SEND_ON_INVOCATION_END` - The extension has two modes of sending to the backend, either on invocation end or on the next invocation. The default is `true`. Sending on invocation end will increase the billed duration of the lambda, but not the response time. Sending on next invocation will decrease the billed duration since the sending will take place in parallel of the regular execution, but might delay the sending up to 7 minutes in case of last invocation in the container.
 
+  Within a flush, traces, OTLP logs, Lambda telemetry logs, and metrics are exported concurrently as separate OTLP requests. The flush waits for every export, including retries, to finish. Each stream still sends its chunks sequentially.
+
 * `DASH0_EXTENSION_LOG_LEVEL` - Log level for the extension itself. Valid values: `trace`, `debug`, `info`, `warn`, `error`. Default: `warn`.
 
 * `DASH0_DISTRO_DEBUG` - When set to true, additional logs related to tracing and auto-instrumentation will be emitted. Default: `false`.

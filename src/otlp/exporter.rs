@@ -30,10 +30,17 @@ const MAX_REQUEST_BYTES: usize = 4 * 1024 * 1024;
 /// that is still sending.
 static FLUSH_LOCK: Lazy<tokio::sync::Mutex<()>> = Lazy::new(|| tokio::sync::Mutex::new(()));
 
-pub async fn flush_traces() {
+/// Wait for any earlier flush, then export all signals concurrently. Each
+/// stream still sends its chunks sequentially to bound in-flight requests.
+pub async fn flush(exclude_invocation_id: Option<&str>) {
     let _guard = FLUSH_LOCK.lock().await;
     let traces = crate::state::invocation_entry::take_all_traces();
-    send_traces(traces).await;
+    tokio::join!(
+        send_traces(traces),
+        flush_otlp_logs(),
+        flush_telemetry_logs(exclude_invocation_id),
+        flush_metrics(),
+    );
 }
 
 /// Early flush while the invocation is still running: everything buffered,
@@ -51,26 +58,21 @@ pub async fn flush_while_running() {
     for id in ids {
         crate::otlp::span_mutations::remember_flushed_span_ids(id, &traces);
     }
-    send_traces(traces).await;
-    flush_otlp_logs().await;
     let logs = crate::state::invocation_entry::take_telemetry_logs_while_running(
         crate::config::flush_threshold_bytes(),
     );
-    send_telemetry_logs_chunked(logs).await;
-    flush_metrics().await;
+    tokio::join!(
+        send_traces(traces),
+        flush_otlp_logs(),
+        send_telemetry_logs_chunked(logs),
+        flush_metrics(),
+    );
 }
 
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
 
 use opentelemetry_proto::tonic::logs::v1::{ResourceLogs, ScopeLogs};
-
-pub async fn flush_logs(exclude_invocation_id: Option<&str>) {
-    let _guard = FLUSH_LOCK.lock().await;
-    flush_otlp_logs().await;
-    flush_telemetry_logs(exclude_invocation_id).await;
-    flush_metrics().await;
-}
 
 /// Splits `items` into consecutive chunks of at most MAX_REQUEST_BYTES. An
 /// item larger than the limit gets a chunk of its own.
@@ -464,6 +466,9 @@ fn combine_items<S, R>(
     }
     combined
 }
+
+#[cfg(test)]
+mod concurrency_tests;
 
 #[cfg(test)]
 mod tests {
