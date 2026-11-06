@@ -101,8 +101,7 @@ async fn flush_if_needed(
     } else {
         tokio::time::sleep(Duration::from_millis(20)).await;
     }
-    crate::otlp::exporter::flush_traces().await;
-    crate::otlp::exporter::flush_logs(invocation_id).await;
+    crate::otlp::exporter::flush(invocation_id).await;
     crate::state::invocation_entry::delete_done_invocations();
 }
 
@@ -127,8 +126,7 @@ async fn wait_for_runtime_done() {
                 "[{}] Received platform.runtimeDone signal",
                 crate::log_prefix_with("Extension")
             );
-            crate::otlp::exporter::flush_traces().await;
-            crate::otlp::exporter::flush_logs(None).await;
+            crate::otlp::exporter::flush(None).await;
             crate::state::invocation_entry::delete_done_invocations();
         }
         Ok(Err(_)) => {

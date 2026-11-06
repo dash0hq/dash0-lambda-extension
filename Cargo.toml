@@ -36,3 +36,5 @@ default = []
 [dev-dependencies]
 tokio-test = "0.4"
 serial_test = "3.0"
+rcgen = "0.13"
+tokio-rustls = "0.26"
