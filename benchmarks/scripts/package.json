@@ -1,6 +1,9 @@
 {
   "name": "benchmark-scripts",
   "version": "1.0.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "type": "module",
   "scripts": {
     "benchmark": "npx tsx run-benchmark.ts"

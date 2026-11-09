@@ -1,6 +1,9 @@
 {
   "name": "integration-tests",
   "version": "1.0.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "main": "index.js",
   "directories": {
     "test": "tests"

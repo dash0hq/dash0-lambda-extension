@@ -20,7 +20,7 @@
   "author": "OpenTelemetry Authors",
   "license": "Apache-2.0",
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=24.0.0"
   },
   "dependencies": {
     "@lumigo/node-core": "1.17.1",
