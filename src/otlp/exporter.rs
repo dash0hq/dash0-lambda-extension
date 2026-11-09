@@ -20,20 +20,54 @@ use crate::state::invocation_data::{
 use crate::state::invocation_entry::telemetry_log_size;
 use crate::util::parsers::parse_otlp_endpoint;
 
-/// Upper bound for the uncompressed body of one export request. Dash0 ingress
+/// Target size for the uncompressed body of one export request. Dash0 ingress
 /// rejects bodies above ~20 MiB (decompressed) with `400 request body too
-/// large`. Building a request also holds about 3x its size in decoded
-/// structs, so this bounds the flush memory too.
+/// large`. Decoding also needs temporary memory. Each stream builds and sends
+/// one chunk at a time; an individual oversized item is not split.
 const MAX_REQUEST_BYTES: usize = 4 * 1024 * 1024;
 
 /// Serializes flushes, so a flush at invocation end waits for an early flush
 /// that is still sending.
 static FLUSH_LOCK: Lazy<tokio::sync::Mutex<()>> = Lazy::new(|| tokio::sync::Mutex::new(()));
 
-pub async fn flush_traces() {
+/// Wait for any earlier flush, then export all signals concurrently. Each
+/// stream still sends its chunks sequentially to bound in-flight requests.
+pub async fn flush(exclude_invocation_id: Option<&str>) {
     let _guard = FLUSH_LOCK.lock().await;
     let traces = crate::state::invocation_entry::take_all_traces();
-    send_traces(traces).await;
+    let logs = crate::state::invocation_entry::take_all_telemetry_logs(exclude_invocation_id);
+    send_signals(traces, logs).await;
+}
+
+/// Build crash/timeout spans and export under the same lock as ordinary and
+/// background flushes, so invocation completion cannot outrun these exports.
+pub async fn flush_runtime_errors(error_invocation_ids: &[(String, String)]) {
+    let _guard = FLUSH_LOCK.lock().await;
+    let mut traces = crate::state::invocation_entry::take_all_traces();
+    for (invocation_id, error_type) in error_invocation_ids {
+        match crate::otlp::span_mutations::build_synthetic_trace(
+            invocation_id,
+            Some(error_type),
+            None,
+            &traces,
+        ) {
+            Some(trace) => {
+                traces.push(trace);
+                if let Some(supp) =
+                    crate::otlp::span_creation::create_supplementary_spans(invocation_id, false)
+                {
+                    traces.push(supp);
+                }
+            }
+            None => tracing::error!(
+                "[{}] Failed to build runtimeDone trace for invocation {}",
+                crate::log_prefix(),
+                invocation_id
+            ),
+        }
+    }
+    let logs = crate::state::invocation_entry::take_all_telemetry_logs(None);
+    send_signals(traces, logs).await;
 }
 
 /// Early flush while the invocation is still running: everything buffered,
@@ -51,26 +85,28 @@ pub async fn flush_while_running() {
     for id in ids {
         crate::otlp::span_mutations::remember_flushed_span_ids(id, &traces);
     }
-    send_traces(traces).await;
-    flush_otlp_logs().await;
     let logs = crate::state::invocation_entry::take_telemetry_logs_while_running(
         crate::config::flush_threshold_bytes(),
     );
-    send_telemetry_logs_chunked(logs).await;
-    flush_metrics().await;
+    send_signals(traces, logs).await;
+}
+
+async fn send_signals(
+    traces: Vec<StoredTrace>,
+    logs: Vec<crate::state::invocation_data::TelemetryLog>,
+) {
+    tokio::join!(
+        send_traces(traces),
+        flush_otlp_logs(),
+        send_telemetry_logs_chunked(logs),
+        flush_metrics(),
+    );
 }
 
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
 
 use opentelemetry_proto::tonic::logs::v1::{ResourceLogs, ScopeLogs};
-
-pub async fn flush_logs(exclude_invocation_id: Option<&str>) {
-    let _guard = FLUSH_LOCK.lock().await;
-    flush_otlp_logs().await;
-    flush_telemetry_logs(exclude_invocation_id).await;
-    flush_metrics().await;
-}
 
 /// Splits `items` into consecutive chunks of at most MAX_REQUEST_BYTES. An
 /// item larger than the limit gets a chunk of its own.
@@ -91,11 +127,6 @@ fn chunk_by_size<T>(items: Vec<T>, size: impl Fn(&T) -> usize) -> Vec<Vec<T>> {
         chunks.push(current);
     }
     chunks
-}
-
-pub async fn flush_telemetry_logs(exclude_invocation_id: Option<&str>) {
-    let logs = crate::state::invocation_entry::take_all_telemetry_logs(exclude_invocation_id);
-    send_telemetry_logs_chunked(logs).await;
 }
 
 async fn send_telemetry_logs_chunked(logs: Vec<crate::state::invocation_data::TelemetryLog>) {
@@ -140,7 +171,7 @@ async fn send_telemetry_logs(logs: &[crate::state::invocation_data::TelemetryLog
     let _ = send_request("/v1/logs", hyper::Method::POST, body, logs.len(), "logs").await;
 }
 
-pub async fn flush_otlp_logs() {
+async fn flush_otlp_logs() {
     for chunk in chunk_by_size(take_logs(), |l| l.body.len()) {
         let log_count = chunk.len();
         if let Some(body) = build_logs_request(chunk) {
@@ -156,7 +187,7 @@ pub async fn flush_otlp_logs() {
     }
 }
 
-pub async fn flush_metrics() {
+async fn flush_metrics() {
     for chunk in chunk_by_size(take_metrics(), |m| m.body.len()) {
         let metric_count = chunk.len();
         if let Some(body) = build_metrics_request(chunk) {
@@ -210,7 +241,7 @@ fn build_logs_request(logs: Vec<StoredLog>) -> Option<Vec<u8>> {
     Some(combined_export.encode_to_vec())
 }
 
-pub async fn send_traces(traces: Vec<StoredTrace>) {
+async fn send_traces(traces: Vec<StoredTrace>) {
     for chunk in chunk_by_size(traces, |t| t.body.len()) {
         let trace_count = chunk.len();
         if let Some(body) = _build_traces_request(chunk) {
@@ -251,7 +282,7 @@ fn _build_traces_request(traces: Vec<StoredTrace>) -> Option<Vec<u8>> {
 fn _build_otlp_request(
     path: &str,
     method: hyper::Method,
-    body: Vec<u8>,
+    body: Bytes,
     gzip_encoded: bool,
 ) -> Result<Request<ReqBody>, String> {
     let (scheme, authority) =
@@ -310,7 +341,7 @@ fn _build_otlp_request(
     }
 
     builder
-        .body(Full::new(Bytes::from(body)))
+        .body(Full::new(body))
         .map_err(|err| format!("Failed to build request: {}", err))
 }
 
@@ -329,7 +360,10 @@ async fn send_request(
     // every attempt would waste CPU during the post-invocation flush window.
     let gzip_encoded = crate::config::is_compression_enabled();
     let body = if gzip_encoded {
-        match gzip(&body) {
+        let compressed = gzip(&body);
+        // Do not retain the uncompressed chunk while requests/retries await I/O.
+        drop(body);
+        match compressed {
             Ok(compressed) => compressed,
             Err(err) => {
                 tracing::error!(
@@ -344,6 +378,8 @@ async fn send_request(
     } else {
         body
     };
+    // Attempts share immutable bytes rather than cloning the payload per retry.
+    let body = Bytes::from(body);
 
     let max_attempts = request_retries() + 1;
 
@@ -464,6 +500,9 @@ fn combine_items<S, R>(
     }
     combined
 }
+
+#[cfg(test)]
+mod concurrency_tests;
 
 #[cfg(test)]
 mod tests {
@@ -761,7 +800,7 @@ mod tests {
         .encode_to_vec();
         let compressed = gzip(&original).expect("gzip should succeed");
 
-        let req = _build_otlp_request("/v1/traces", Method::POST, compressed.clone(), true)
+        let req = _build_otlp_request("/v1/traces", Method::POST, compressed.clone().into(), true)
             .expect("request should build");
 
         // (a) Content-Encoding: gzip is set
@@ -804,7 +843,7 @@ mod tests {
         }
         .encode_to_vec();
 
-        let req = _build_otlp_request("/v1/traces", Method::POST, body.clone(), false)
+        let req = _build_otlp_request("/v1/traces", Method::POST, body.clone().into(), false)
             .expect("request should build");
 
         // No Content-Encoding header when compression is disabled

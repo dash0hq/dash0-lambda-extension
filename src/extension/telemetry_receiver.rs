@@ -3,10 +3,8 @@ use hyper::body::Incoming;
 use hyper::{Request, Response};
 
 use crate::config::user::is_telemetry_log_collection_disabled;
-use crate::otlp::exporter::{flush_telemetry_logs, send_traces};
 use crate::otlp::metrics_creation::create_supplementary_metrics;
 use crate::otlp::span_creation::{create_overhead_supplementary_span, create_supplementary_spans};
-use crate::otlp::span_mutations::build_synthetic_trace;
 use crate::route::{empty_body, ResBody};
 use crate::state::invocation_entry;
 use crate::util::parsers::extract_error_invocation_ids;
@@ -30,6 +28,7 @@ pub async fn telemetry(req: Request<Incoming>) -> Result<Response<ResBody>, hype
         body_text
     );
 
+    let mut runtime_done = false;
     if let Ok(mut logs) =
         serde_json::from_str::<Vec<crate::state::invocation_data::TelemetryLog>>(&body_text)
     {
@@ -37,17 +36,13 @@ pub async fn telemetry(req: Request<Incoming>) -> Result<Response<ResBody>, hype
 
         for log in &logs {
             if log.r#type == "platform.runtimeDone" {
+                runtime_done = true;
                 crate::otlp::flusher::invocation_finished();
                 if let Some(id) = &log.invocation_id {
                     let is_error = error_invocation_ids.iter().any(|(eid, _)| eid == id);
                     if !is_error {
                         create_supplementary_spans(id, true);
                     }
-                }
-                if let Some(notifier) = crate::state::invocation_data::take_runtime_done_notifier()
-                {
-                    tracing::info!("[{}] Signaled platform.runtimeDone", crate::log_prefix());
-                    let _ = notifier.send(());
                 }
             }
 
@@ -84,31 +79,16 @@ pub async fn telemetry(req: Request<Incoming>) -> Result<Response<ResBody>, hype
             error_invocation_ids,
             body_text
         );
+        crate::otlp::exporter::flush_runtime_errors(&error_invocation_ids).await;
+    }
 
-        let mut traces_to_send = invocation_entry::take_all_traces();
-
-        for (invocation_id, error_type) in &error_invocation_ids {
-            match build_synthetic_trace(invocation_id, Some(error_type), None, &traces_to_send) {
-                Some(trace) => {
-                    traces_to_send.push(trace);
-                    if let Some(supp) = create_supplementary_spans(invocation_id, false) {
-                        traces_to_send.push(supp);
-                    }
-                }
-                None => {
-                    tracing::error!(
-                        "[{}] Failed to build runtimeDone trace for invocation {}",
-                        crate::log_prefix(),
-                        invocation_id
-                    );
-                }
-            }
+    // Publish completion only after the entire batch is stored and any error
+    // exports finish. The event loop may freeze the environment after flushing.
+    if runtime_done {
+        if let Some(notifier) = crate::state::invocation_data::take_runtime_done_notifier() {
+            tracing::info!("[{}] Signaled platform.runtimeDone", crate::log_prefix());
+            let _ = notifier.send(());
         }
-
-        if !traces_to_send.is_empty() {
-            send_traces(traces_to_send).await;
-        }
-        flush_telemetry_logs(None).await;
     }
 
     Ok(Response::builder().status(200).body(empty_body()).unwrap())
