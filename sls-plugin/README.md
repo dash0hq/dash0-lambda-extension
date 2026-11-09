@@ -2,7 +2,7 @@
 
 Serverless Framework plugin that automatically adds the [Dash0](https://www.dash0.com) Lambda extension layer and environment variables to your functions.
 
-Compatible with Serverless Framework v3 and v4.
+Compatible with Serverless Framework v3 and v4. Running the plugin requires Node.js 22 or newer; instrumented Lambda functions can use Node.js 20 or newer.
 
 ## Installation
 
@@ -29,12 +29,12 @@ custom:
 functions:
   myFunction:
     handler: handler.hello
-    runtime: nodejs20.x
+    runtime: nodejs22.x
     dash0-traced: true
 
   untracedFunction:
     handler: handler.other
-    runtime: nodejs20.x
+    runtime: nodejs22.x
 ```
 
 Only functions with `dash0-traced: true` will have the Dash0 layer and environment variables added. All other functions are left untouched.
@@ -43,7 +43,7 @@ Only functions with `dash0-traced: true` will have the Dash0 layer and environme
 
 | Runtime         | Layer                    |
 | --------------- | ------------------------ |
-| `nodejs*`       | `dash0-extension-node`   |
+| `nodejs20.x` and newer | `dash0-extension-node`   |
 | `python*`       | `dash0-extension-python` |
 | `java*`         | `dash0-extension-java`   |
 

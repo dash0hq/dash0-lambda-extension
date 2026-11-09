@@ -3,7 +3,7 @@
 # This image contains the extension files at /opt and can be used in
 # multi-stage builds for containerized Lambda functions:
 #
-#   FROM public.ecr.aws/lambda/nodejs:20
+#   FROM public.ecr.aws/lambda/nodejs:22
 #   COPY --from=dash0/extension-node:latest /opt /opt
 #   ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper
 #   ...

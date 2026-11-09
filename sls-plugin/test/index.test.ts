@@ -12,7 +12,7 @@ function createMockServerless(overrides: {
     cli: { log: jest.fn() },
     getProvider: jest.fn().mockReturnValue({}),
     service: {
-      provider: { region: 'us-east-1', runtime: 'nodejs20.x', ...overrides.provider },
+      provider: { region: 'us-east-1', runtime: 'nodejs22.x', ...overrides.provider },
       custom: {
         dash0: {
           endpoint: 'https://ingress.eu-west-1.aws.dash0.com:4318',
@@ -49,7 +49,7 @@ describe('ServerlessDash0Plugin', () => {
   it('does not touch untraced functions', () => {
     const serverless = createMockServerless({
       functions: {
-        myFunc: { handler: 'handler.hello', runtime: 'nodejs20.x' },
+        myFunc: { handler: 'handler.hello', runtime: 'nodejs22.x' },
       },
     });
 
@@ -64,7 +64,7 @@ describe('ServerlessDash0Plugin', () => {
   it('does not touch functions with dash0-traced: false', () => {
     const serverless = createMockServerless({
       functions: {
-        myFunc: { handler: 'handler.hello', runtime: 'nodejs20.x', 'dash0-traced': false },
+        myFunc: { handler: 'handler.hello', runtime: 'nodejs22.x', 'dash0-traced': false },
       },
     });
 
@@ -77,7 +77,7 @@ describe('ServerlessDash0Plugin', () => {
   it('accepts dash0-traced as string "true"', () => {
     const serverless = createMockServerless({
       functions: {
-        myFunc: { handler: 'handler.hello', runtime: 'nodejs20.x', 'dash0-traced': 'true' },
+        myFunc: { handler: 'handler.hello', runtime: 'nodejs22.x', 'dash0-traced': 'true' },
       },
     });
 
@@ -92,7 +92,7 @@ describe('ServerlessDash0Plugin', () => {
       functions: {
         myFunc: {
           handler: 'handler.hello',
-          runtime: 'nodejs20.x',
+          runtime: 'nodejs22.x',
           'dash0-traced': true,
           layers: ['arn:aws:lambda:us-east-1:123456:layer:my-layer:1'],
         },
@@ -111,7 +111,7 @@ describe('ServerlessDash0Plugin', () => {
   it('does not duplicate layer ARN on repeated invocation', () => {
     const serverless = createMockServerless({
       functions: {
-        myFunc: { handler: 'handler.hello', runtime: 'nodejs20.x', 'dash0-traced': true },
+        myFunc: { handler: 'handler.hello', runtime: 'nodejs22.x', 'dash0-traced': true },
       },
     });
 
@@ -127,7 +127,7 @@ describe('ServerlessDash0Plugin', () => {
       functions: {
         myFunc: {
           handler: 'handler.hello',
-          runtime: 'nodejs20.x',
+          runtime: 'nodejs22.x',
           'dash0-traced': true,
           environment: { DASH0_EXTENSION_LOG_LEVEL: 'debug' },
         },
@@ -144,7 +144,7 @@ describe('ServerlessDash0Plugin', () => {
   it('uses correct layer for each runtime', () => {
     const serverless = createMockServerless({
       functions: {
-        nodeFunc: { handler: 'handler.hello', runtime: 'nodejs20.x', 'dash0-traced': true },
+        nodeFunc: { handler: 'handler.hello', runtime: 'nodejs22.x', 'dash0-traced': true },
         pyFunc: { handler: 'handler.hello', runtime: 'python3.12', 'dash0-traced': true },
         javaFunc: { handler: 'handler.hello', runtime: 'java21', 'dash0-traced': true },
       },
@@ -172,10 +172,10 @@ describe('ServerlessDash0Plugin', () => {
     expect(serverless.service.functions.myFunc.layers![0]).toContain('dash0-extension-python');
   });
 
-  it('warns and skips unsupported runtime', () => {
+  it.each(['ruby3.3', 'nodejs18.x'])('warns and skips unsupported runtime %s', (runtime) => {
     const serverless = createMockServerless({
       functions: {
-        myFunc: { handler: 'handler.hello', runtime: 'ruby3.3', 'dash0-traced': true },
+        myFunc: { handler: 'handler.hello', runtime, 'dash0-traced': true },
       },
     });
 
@@ -183,6 +183,7 @@ describe('ServerlessDash0Plugin', () => {
     plugin.hooks['before:package:initialize']();
 
     expect(serverless.service.functions.myFunc.layers).toBeUndefined();
+    expect(serverless.service.functions.myFunc.environment).toBeUndefined();
     expect(serverless.cli.log).toHaveBeenCalledWith(
       expect.stringContaining('unsupported runtime')
     );
@@ -216,7 +217,7 @@ describe('ServerlessDash0Plugin', () => {
     const serverless = createMockServerless({
       provider: { region: 'us-east-1' },
       functions: {
-        myFunc: { handler: 'handler.hello', runtime: 'nodejs20.x', 'dash0-traced': true },
+        myFunc: { handler: 'handler.hello', runtime: 'nodejs22.x', 'dash0-traced': true },
       },
     });
 
@@ -229,7 +230,7 @@ describe('ServerlessDash0Plugin', () => {
   it('works with SLS v4 logging utils', () => {
     const serverless = createMockServerless({
       functions: {
-        myFunc: { handler: 'handler.hello', runtime: 'nodejs20.x', 'dash0-traced': true },
+        myFunc: { handler: 'handler.hello', runtime: 'nodejs22.x', 'dash0-traced': true },
       },
     });
 
@@ -263,7 +264,7 @@ describe('ServerlessDash0Plugin', () => {
       const serverless = createMockServerless({
         dash0: { layerAccountId: '999888777666' },
         functions: {
-          myFunc: { handler: 'handler.hello', runtime: 'nodejs20.x', 'dash0-traced': true },
+          myFunc: { handler: 'handler.hello', runtime: 'nodejs22.x', 'dash0-traced': true },
         },
       });
 
@@ -281,7 +282,7 @@ describe('ServerlessDash0Plugin', () => {
       const serverless = createMockServerless({
         dash0: { layerVersion: 'latest' },
         functions: {
-          myFunc: { handler: 'handler.hello', runtime: 'nodejs20.x', 'dash0-traced': true },
+          myFunc: { handler: 'handler.hello', runtime: 'nodejs22.x', 'dash0-traced': true },
         },
       });
 
@@ -298,7 +299,7 @@ describe('ServerlessDash0Plugin', () => {
       const serverless = createMockServerless({
         dash0: { layerVersion: 'latest', layerAccountId: '999888777666' },
         functions: {
-          myFunc: { handler: 'handler.hello', runtime: 'nodejs20.x', 'dash0-traced': true },
+          myFunc: { handler: 'handler.hello', runtime: 'nodejs22.x', 'dash0-traced': true },
         },
       });
 
@@ -315,7 +316,7 @@ describe('ServerlessDash0Plugin', () => {
       const serverless = createMockServerless({
         dash0: { layerVersion: 'latest' },
         functions: {
-          nodeFunc: { handler: 'handler.hello', runtime: 'nodejs20.x', 'dash0-traced': true },
+          nodeFunc: { handler: 'handler.hello', runtime: 'nodejs22.x', 'dash0-traced': true },
           pyFunc: { handler: 'handler.hello', runtime: 'python3.12', 'dash0-traced': true },
           javaFunc: { handler: 'handler.hello', runtime: 'java21', 'dash0-traced': true },
         },
