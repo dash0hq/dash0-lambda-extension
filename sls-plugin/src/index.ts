@@ -110,7 +110,7 @@ class ServerlessDash0Plugin {
 
       if (!layerName) {
         this.warn(
-          `[serverless-dash0] Skipping function "${funcName}": unsupported runtime "${runtime ?? 'undefined'}". Supported: nodejs*, python*, java*.`
+          `[serverless-dash0] Skipping function "${funcName}": unsupported runtime "${runtime ?? 'undefined'}". Supported: nodejs20.x and newer, python*, java*.`
         );
         continue;
       }

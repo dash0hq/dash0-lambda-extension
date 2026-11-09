@@ -369,8 +369,10 @@ For containerized Lambda functions, use the provided Docker images in a multi-st
 
 ### Node.js
 
+Published layers support Node.js 20 or newer. Building and testing this repository requires Node.js 22 or newer.
+
 ```dockerfile
-FROM public.ecr.aws/lambda/nodejs:20
+FROM public.ecr.aws/lambda/nodejs:22
 
 # Copy extension from Dash0 image
 COPY --from=public.ecr.aws/r1r2x3i6/extension-node:latest /opt /opt

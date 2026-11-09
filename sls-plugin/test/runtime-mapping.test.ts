@@ -3,8 +3,9 @@ import { resolveLayerName } from '../src/runtime-mapping';
 describe('resolveLayerName', () => {
   it.each([
     ['nodejs20.x', 'dash0-extension-node'],
-    ['nodejs18.x', 'dash0-extension-node'],
-    ['nodejs16.x', 'dash0-extension-node'],
+    ['nodejs22.x', 'dash0-extension-node'],
+    ['nodejs24.x', 'dash0-extension-node'],
+    ['nodejs26.x', 'dash0-extension-node'],
     ['python3.12', 'dash0-extension-python'],
     ['python3.9', 'dash0-extension-python'],
     ['java21', 'dash0-extension-java'],
@@ -15,6 +16,9 @@ describe('resolveLayerName', () => {
   });
 
   it.each([
+    ['nodejs16.x'],
+    ['nodejs18.x'],
+    ['nodejs19.x'],
     ['ruby3.3'],
     ['dotnet8'],
     ['go1.x'],
@@ -29,7 +33,7 @@ describe('resolveLayerName', () => {
   });
 
   it('is case-insensitive', () => {
-    expect(resolveLayerName('NodeJS20.x')).toBe('dash0-extension-node');
+    expect(resolveLayerName('NodeJS22.x')).toBe('dash0-extension-node');
     expect(resolveLayerName('Python3.12')).toBe('dash0-extension-python');
     expect(resolveLayerName('JAVA21')).toBe('dash0-extension-java');
   });

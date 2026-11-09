@@ -10,6 +10,10 @@ export function resolveLayerName(runtime: string | undefined): string | null {
   }
 
   const normalized = runtime.toLowerCase();
+  if (normalized.startsWith('node')) {
+    const match = /^nodejs(\d+)\.x$/.exec(normalized);
+    return match && Number(match[1]) >= 20 ? RUNTIME_MAP.node : null;
+  }
   for (const [prefix, layerName] of Object.entries(RUNTIME_MAP)) {
     if (normalized.startsWith(prefix)) {
       return layerName;

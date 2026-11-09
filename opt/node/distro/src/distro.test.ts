@@ -13,6 +13,22 @@ const attributeValueLengthLimitOf = (tracerProvider): number => {
 describe('Distro initialization', () => {
   const ORIGINAL_PROCESS_ENV = process.env;
 
+  test.each(['v18.19.0', 'v19.9.0'])('skips initialization on unsupported Node.js %s', async (version) => {
+    const originalVersion = process.version;
+    const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+    Object.defineProperty(process, 'version', { value: version, configurable: true });
+    try {
+      await jest.isolateModulesAsync(async () => {
+        const { init } = jest.requireActual('./distro');
+        expect(await init).toBeUndefined();
+      });
+      expect(error).toHaveBeenCalledWith(expect.stringContaining('minimum supported version: 20.x'));
+    } finally {
+      Object.defineProperty(process, 'version', { value: originalVersion, configurable: true });
+      error.mockRestore();
+    }
+  });
+
   afterAll(() => {
     process.env = ORIGINAL_PROCESS_ENV;
   });
