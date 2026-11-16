@@ -274,6 +274,8 @@ fn is_lambda_instrumentation_scope(scope_name: &str) -> bool {
         || scope_name == "io.opentelemetry.aws-lambda-core-1.0"
         || scope_name == "io.opentelemetry.aws-lambda-events-2.2"
         || scope_name == "OpenTelemetry.Instrumentation.AWSLambda"
+        || scope_name
+            == "go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda"
 }
 
 fn extract_span_links(event_payload: &str) -> Vec<Link> {
@@ -1268,6 +1270,27 @@ mod tests {
 
         assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
         assert!(!encoded_body.is_empty(), "encoded_body should be updated");
+    }
+
+    #[test]
+    #[serial]
+    fn process_trace_request_recognizes_go_otellambda_handler_span() {
+        let invocation_id = "inv-process-go";
+        store_event_payload(invocation_id, r#"{"test":"data"}"#);
+
+        let span = make_span_with_invocation(invocation_id);
+        let mut request = make_request_with_scope(
+            "go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda",
+            span,
+        );
+        let mut invocation_ids = Vec::new();
+        let mut encoded_body = Vec::new();
+
+        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+
+        assert_eq!(invocation_ids, vec![invocation_id.to_string()]);
+        let span = &request.resource_spans[0].scope_spans[0].spans[0];
+        assert_eq!(span.name, "handler");
     }
 
     #[test]
