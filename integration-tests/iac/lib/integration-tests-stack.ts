@@ -614,8 +614,6 @@ class GoManualStack extends cdk.NestedStack {
         layers: [props.layer],
         role: props.role,
         environment: {
-          // provided.al2023 never runs /opt/wrapper, which otherwise sets OTEL_SERVICE_NAME for the extension.
-          OTEL_SERVICE_NAME: functionName,
           DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
           DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
           DASH0_EXTENSION_LOG_LEVEL: "info",
