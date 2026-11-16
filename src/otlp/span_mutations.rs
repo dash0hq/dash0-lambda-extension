@@ -268,6 +268,11 @@ fn create_exception_event(
     None
 }
 
+/// Scopes of the Lambda instrumentations whose handler span is recognized by
+/// scope alone. Outside these scopes, `process_trace_request` recognizes the
+/// handler span as a SERVER span carrying `faas.invocation_id`, which covers
+/// in-code instrumentations with no fixed scope name, such as Go's
+/// `otellambda` and handler spans created by hand in Rust.
 fn is_lambda_instrumentation_scope(scope_name: &str) -> bool {
     scope_name == "opentelemetry.instrumentation.aws_lambda"
         || scope_name == "@opentelemetry/instrumentation-aws-lambda"
@@ -672,6 +677,9 @@ pub fn apply_return_value_error_to_stored_traces(invocation_id: &str, return_val
     };
 
     let mut handler_span_data: Option<(Vec<KeyValue>, Option<Status>)> = None;
+    // Identifies the handler span outside the Lambda instrumentation scopes;
+    // `store_span_ids` recorded it when the span went through `process_trace_request`.
+    let handler_span_id = invocation_entry::get_span_id(invocation_id);
 
     invocation_entry::update_traces(invocation_id, |traces| {
         for trace in traces {
@@ -683,10 +691,13 @@ pub fn apply_return_value_error_to_stored_traces(invocation_id: &str, return_val
                             .scope
                             .as_ref()
                             .map_or(false, |s| is_lambda_instrumentation_scope(&s.name));
-                        if !is_lambda {
-                            continue;
-                        }
                         for span in &mut scope_span.spans {
+                            if !is_lambda
+                                && handler_span_id.as_deref()
+                                    != Some(hex::encode(&span.span_id).as_str())
+                            {
+                                continue;
+                            }
                             span.attributes.extend(response_attributes.clone());
                             if status_code >= 400 {
                                 apply_status_code_error(span, &json_val, status_code);
@@ -837,19 +848,17 @@ pub fn process_trace_request(
                 .scope
                 .as_ref()
                 .map_or(false, |s| is_lambda_instrumentation_scope(&s.name));
-            if !is_lambda {
-                for span in &mut scope_span.spans {
-                    add_resource_attributes(span);
-                    extract_body_logs(span);
-                }
-                continue;
-            }
 
             for span in &mut scope_span.spans {
                 add_resource_attributes(span);
                 let invocation_id = match extract_invocation_id(span) {
-                    Some(id) => id,
-                    None => continue,
+                    Some(id) if is_lambda || span.kind == SpanKind::Server as i32 => id,
+                    _ => {
+                        if !is_lambda {
+                            extract_body_logs(span);
+                        }
+                        continue;
+                    }
                 };
 
                 invocation_ids.push(invocation_id.clone());
@@ -867,7 +876,7 @@ pub fn process_trace_request(
 
 #[cfg(test)]
 mod tests {
-    use super::{build_synthetic_trace, StatusCode};
+    use super::{build_synthetic_trace, SpanKind, StatusCode};
     use crate::state::invocation_data::StoredTrace;
     use crate::state::invocation_entry;
     use hyper::{header, Method};
@@ -1423,6 +1432,63 @@ mod tests {
             invocation_ids.is_empty(),
             "invocation_ids should remain empty for non-lambda scopes"
         );
+    }
+
+    /// In-code instrumentations have no fixed scope: Go's otellambda uses its
+    /// module path, and a Rust function's tracer is usually named after its crate.
+    #[test]
+    #[serial]
+    fn process_trace_request_recognizes_server_handler_span_in_any_scope() {
+        for (invocation_id, scope) in [
+            (
+                "inv-any-scope-go",
+                "go.opentelemetry.io/contrib/instrumentation/github.com/aws/aws-lambda-go/otellambda",
+            ),
+            ("inv-any-scope-rust", "checkout"),
+        ] {
+            store_event_payload(invocation_id, r#"{"test":"data"}"#);
+            let mut span = make_span_with_invocation(invocation_id);
+            span.kind = SpanKind::Server as i32;
+            span.span_id = vec![0xCC; 8];
+            let mut request = make_request_with_scope(scope, span);
+            let mut invocation_ids = Vec::new();
+            let mut encoded_body = Vec::new();
+
+            super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+
+            assert_eq!(invocation_ids, vec![invocation_id.to_string()], "{scope}");
+            let span = &request.resource_spans[0].scope_spans[0].spans[0];
+            assert_eq!(span.name, "handler", "{scope}");
+            assert_eq!(span.kind, SpanKind::Internal as i32, "{scope}");
+            assert_eq!(
+                invocation_entry::get_span_id(invocation_id),
+                Some("cc".repeat(8)),
+                "{scope}"
+            );
+            invocation_entry::remove(invocation_id);
+        }
+    }
+
+    /// Outside the Lambda instrumentation scopes, only a SERVER span is the
+    /// handler span: a CLIENT child span carrying faas.invocation_id is not.
+    #[test]
+    #[serial]
+    fn process_trace_request_ignores_non_server_spans_in_other_scopes() {
+        let invocation_id = "inv-any-scope-client";
+        let mut span = make_span_with_invocation(invocation_id);
+        span.kind = SpanKind::Client as i32;
+        let mut request = make_request_with_scope("checkout", span);
+        let mut invocation_ids = Vec::new();
+        let mut encoded_body = Vec::new();
+
+        super::process_trace_request(&mut request, &mut invocation_ids, &mut encoded_body);
+
+        assert!(invocation_ids.is_empty());
+        assert_ne!(
+            request.resource_spans[0].scope_spans[0].spans[0].name,
+            "handler"
+        );
+        invocation_entry::remove(invocation_id);
     }
 
     #[test]
@@ -2635,6 +2701,57 @@ mod tests {
                 _ => None,
             });
         assert_eq!(ex_msg, Some("Internal Server Error".to_string()));
+    }
+
+    /// A handler span from a scope outside the Lambda instrumentation scopes is
+    /// found by the span ID `process_trace_request` stored; its sibling spans
+    /// in the same scope keep their status.
+    #[test]
+    #[serial]
+    fn apply_return_value_error_marks_handler_span_in_any_scope() {
+        let invocation_id = "inv-return-any-scope";
+        let mut handler = make_span_with_invocation(invocation_id);
+        handler.kind = SpanKind::Server as i32;
+        handler.span_id = vec![0xDD; 8];
+        let client = Span {
+            kind: SpanKind::Client as i32,
+            span_id: vec![0xEE; 8],
+            ..Default::default()
+        };
+        let mut request = make_request_with_scope("checkout", handler);
+        request.resource_spans[0].scope_spans[0].spans.push(client);
+        let mut invocation_ids = Vec::new();
+        let mut body = Vec::new();
+        super::process_trace_request(&mut request, &mut invocation_ids, &mut body);
+        invocation_entry::store_trace_by_id(
+            invocation_id,
+            StoredTrace {
+                method: hyper::Method::POST,
+                path_and_query: "/v1/traces".to_string(),
+                headers: hyper::HeaderMap::new(),
+                body,
+                invocation_ids,
+                contains_handler_span: true,
+            },
+        );
+
+        super::apply_return_value_error_to_stored_traces(
+            invocation_id,
+            r#"{"statusCode": 500, "body": "boom"}"#,
+        );
+
+        let decoded = decode_stored_traces(invocation_id);
+        let spans = &decoded.resource_spans[0].scope_spans[0].spans;
+        let status = spans[0]
+            .status
+            .as_ref()
+            .expect("handler status should be set");
+        assert_eq!(status.code, StatusCode::Error as i32);
+        assert!(
+            spans[1].status.is_none(),
+            "client span must keep its status"
+        );
+        invocation_entry::remove(invocation_id);
     }
 
     #[test]

@@ -216,6 +216,14 @@ pub fn get_start_time(invocation_id: &str) -> Option<f64> {
         .filter(|&t| t > 0.0)
 }
 
+/// Lightweight getter: returns only the handler span_id.
+pub fn get_span_id(invocation_id: &str) -> Option<String> {
+    INVOCATION_STORE
+        .lock()
+        .get(invocation_id)
+        .and_then(|e| e.span_id.clone())
+}
+
 /// Lightweight getter: returns only the root_span_id.
 pub fn get_root_span_id(invocation_id: &str) -> Option<String> {
     INVOCATION_STORE
