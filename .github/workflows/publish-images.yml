@@ -1,0 +1,89 @@
+name: Publish Public Images
+
+# Publishes the extension images to ECR Public, where the
+# `COPY --from=public.ecr.aws/<alias>/extension-<runtime>` line in the README
+# resolves without AWS credentials. ECR Public is one global registry, so this
+# runs once per deploy and not once per region like publish.yml.
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      # Space-separated, for example "v32 latest".
+      tags:
+        required: false
+        type: string
+        default: latest
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish:
+    name: Build and Publish ${{ matrix.runtime }} Image
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime: [python, node, java]
+    steps:
+      - name: Require the registry alias
+        env:
+          ECR_PUBLIC_ALIAS: ${{ vars.ECR_PUBLIC_ALIAS }}
+          ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          if [ -z "$ECR_PUBLIC_ALIAS" ]; then
+            echo "::error::ECR_PUBLIC_ALIAS is not set for the '$ENVIRONMENT' environment. Set it to the alias from: aws ecr-public describe-registries --region us-east-1"
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        if: matrix.runtime == 'node'
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v4
+        with:
+          name: rust-binaries
+          path: build
+      - name: Ensure binaries are executable and fresh
+        run: chmod +x build/dash0_x86_64 build/dash0_aarch64 && touch build/dash0_x86_64 build/dash0_aarch64
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          # The ECR Public API exists only in us-east-1.
+          aws-region: us-east-1
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and push the public image
+        run: make docker-${{ matrix.runtime }} ECR_PUBLIC=true ECR_PUBLIC_ALIAS="$ECR_PUBLIC_ALIAS" IMAGE_TAGS="$IMAGE_TAGS"
+        env:
+          ECR_PUBLIC_ALIAS: ${{ vars.ECR_PUBLIC_ALIAS }}
+          IMAGE_TAGS: ${{ inputs.tags }}
+
+  # Runs without AWS credentials on a fresh runner, so it pulls the way a
+  # customer's build does.
+  verify:
+    name: Verify ${{ matrix.runtime }} Image
+    needs: publish
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime: [python, node, java]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pull anonymously and check architectures and commit
+        env:
+          IMAGE_REPOSITORY: public.ecr.aws/${{ vars.ECR_PUBLIC_ALIAS }}/extension-${{ matrix.runtime }}
+          IMAGE_TAGS: ${{ inputs.tags }}
+        # IMAGE_TAGS is unquoted on purpose: each tag is one argument.
+        run: bash .github/scripts/verify-public-image.sh "$IMAGE_REPOSITORY" "$GITHUB_SHA" $IMAGE_TAGS
