@@ -76,6 +76,41 @@ fn merge_serialized_attributes(attributes: &mut Vec<(String, String)>, serialize
     }
 }
 
+const EXTENSION_GIT_HASH_PATH: &str = "/opt/dash0_git_hash";
+
+static EXTENSION_GIT_HASH: Lazy<Option<String>> =
+    Lazy::new(|| read_git_hash(EXTENSION_GIT_HASH_PATH));
+
+fn read_git_hash(path: &str) -> Option<String> {
+    std::fs::read_to_string(path)
+        .ok()
+        .map(|content| content.trim().to_string())
+        .filter(|hash| !hash.is_empty())
+}
+
+/// The Lambda attributes `opt/shared.sh` adds, built from what this process can
+/// see, so they are present on runtimes that never run the exec wrapper, such
+/// as `provided.al2023`. Dash0 drops extension logs without the git hash.
+fn lambda_attributes(git_hash: Option<&str>) -> Vec<(String, String)> {
+    use crate::otlp::attributes::*;
+
+    let mut attributes = vec![(CLOUD_PROVIDER.to_string(), "aws".to_string())];
+    for (key, variable) in [
+        (CLOUD_REGION, "AWS_REGION"),
+        (FAAS_NAME, "AWS_LAMBDA_FUNCTION_NAME"),
+        (FAAS_VERSION, "AWS_LAMBDA_FUNCTION_VERSION"),
+        (FAAS_INSTANCE, "AWS_LAMBDA_LOG_STREAM_NAME"),
+    ] {
+        if let Some(value) = read_configured_env(variable) {
+            attributes.push((key.to_string(), value));
+        }
+    }
+    if let Some(hash) = git_hash {
+        attributes.push((FAAS_EXTENSION_GIT_HASH.to_string(), hash.to_string()));
+    }
+    attributes
+}
+
 pub fn get_resources_attributes() -> Vec<KeyValue> {
     use crate::otlp::attributes::*;
 
@@ -90,6 +125,9 @@ pub fn get_resources_attributes() -> Vec<KeyValue> {
             crate::state::global::get_account_id().unwrap_or_else(|| "unknown".to_string()),
         ),
     ];
+    for (key, value) in lambda_attributes(EXTENSION_GIT_HASH.as_deref()) {
+        set_attribute(&mut attributes, &key, value);
+    }
 
     // The runtime process sees the attributes `opt/shared.sh` adds, including
     // faas.extension.git_hash, followed by the user's value. `write_env_vars`
@@ -122,7 +160,9 @@ pub fn get_resources_attributes() -> Vec<KeyValue> {
         Some(name) => set_attribute(&mut attributes, SERVICE_NAME, name),
         None => {
             if !has_service_name_attribute {
-                set_attribute(&mut attributes, SERVICE_NAME, "unknown_service".to_string());
+                let fallback = read_configured_env("AWS_LAMBDA_FUNCTION_NAME")
+                    .unwrap_or_else(|| "unknown_service".to_string());
+                set_attribute(&mut attributes, SERVICE_NAME, fallback);
             }
         }
     }
@@ -420,5 +460,121 @@ deployment.environment.name=preview,service.namespace=slfinrtl";
             attributes.get("service.name").map(String::as_str),
             Some("unknown_service")
         );
+    }
+
+    const LAMBDA_ENV: [(&str, &str); 3] = [
+        ("AWS_REGION", "us-west-2"),
+        ("AWS_LAMBDA_FUNCTION_NAME", "go-fn"),
+        ("AWS_LAMBDA_FUNCTION_VERSION", "$LATEST"),
+    ];
+
+    fn with_lambda_env<T>(run: impl FnOnce() -> T) -> T {
+        for (key, value) in LAMBDA_ENV {
+            std::env::set_var(key, value);
+        }
+        let result = run();
+        for (key, _) in LAMBDA_ENV {
+            std::env::remove_var(key);
+        }
+        result
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn test_lambda_attributes_without_wrapper() {
+        super::reset_env_vars_file_cache_for_test();
+        std::env::remove_var("OTEL_SERVICE_NAME");
+        std::env::remove_var("OTEL_RESOURCE_ATTRIBUTES");
+        let _ = std::fs::remove_file("/tmp/dash0_env_vars");
+
+        let attributes = with_lambda_env(attributes_map);
+
+        assert_eq!(
+            attributes.get("service.name").map(String::as_str),
+            Some("go-fn")
+        );
+        assert_eq!(
+            attributes.get("faas.name").map(String::as_str),
+            Some("go-fn")
+        );
+        assert_eq!(
+            attributes.get("faas.version").map(String::as_str),
+            Some("$LATEST")
+        );
+        assert_eq!(
+            attributes.get("cloud.region").map(String::as_str),
+            Some("us-west-2")
+        );
+        assert_eq!(
+            attributes.get("cloud.provider").map(String::as_str),
+            Some("aws")
+        );
+        assert!(!attributes.contains_key("faas.instance"));
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn test_lambda_attributes_include_git_hash() {
+        let attributes: std::collections::HashMap<String, String> =
+            with_lambda_env(|| lambda_attributes(Some("abc123")))
+                .into_iter()
+                .collect();
+
+        assert_eq!(
+            attributes
+                .get("faas.extension.git_hash")
+                .map(String::as_str),
+            Some("abc123")
+        );
+        assert_eq!(
+            attributes.get("faas.name").map(String::as_str),
+            Some("go-fn")
+        );
+    }
+
+    #[test]
+    fn test_read_git_hash() {
+        let path = std::env::temp_dir().join(format!("dash0_git_hash_{}", std::process::id()));
+        std::fs::write(&path, "7ca4b1d6ef0cf0f17c7101690ea55f94ce0d2152\n").unwrap();
+        let hash = read_git_hash(path.to_str().unwrap());
+        std::fs::write(&path, "  \n").unwrap();
+        let blank = read_git_hash(path.to_str().unwrap());
+        std::fs::remove_file(&path).unwrap();
+
+        assert_eq!(
+            hash.as_deref(),
+            Some("7ca4b1d6ef0cf0f17c7101690ea55f94ce0d2152")
+        );
+        assert_eq!(blank, None);
+        assert_eq!(read_git_hash("/nonexistent/dash0_git_hash"), None);
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn test_wrapper_and_configured_values_win_over_lambda_defaults() {
+        super::reset_env_vars_file_cache_for_test();
+        std::env::remove_var("OTEL_SERVICE_NAME");
+        std::env::set_var("OTEL_RESOURCE_ATTRIBUTES", "cloud.region=user-region");
+        write_wrapper_file(WRAPPER_ATTRS);
+
+        let attributes = with_lambda_env(get_resources_attributes);
+
+        std::env::remove_var("OTEL_RESOURCE_ATTRIBUTES");
+        std::fs::remove_file("/tmp/dash0_env_vars").expect("Failed to cleanup mock file");
+
+        let value_of = |key: &str| {
+            let matches: Vec<String> = attributes
+                .iter()
+                .filter(|kv| kv.key == key)
+                .filter_map(|kv| get_string_value(&kv.value))
+                .collect();
+            assert_eq!(matches.len(), 1, "expected one {} attribute", key);
+            matches[0].clone()
+        };
+
+        assert_eq!(value_of("faas.name"), "repro-fn");
+        assert_eq!(value_of("cloud.region"), "user-region");
+        assert_eq!(value_of("faas.instance"), "2026/08/21/[$LATEST]abc");
+        assert_eq!(value_of("service.name"), "go-fn");
     }
 }

@@ -9,6 +9,7 @@ import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as cr from 'aws-cdk-lib/custom-resources';
 import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as path from 'path';
+import { execSync } from 'child_process';
 import { PythonTracingScenariosStack, createPythonCode } from './python-tracing-scenarios-stack';
 import { NodeTracingScenariosStack } from './node-tracing-scenarios-stack';
 import { JavaTracingScenariosStack } from './java-tracing-scenarios-stack';
@@ -566,6 +567,64 @@ class ManualStack extends cdk.NestedStack {
   }
 }
 
+const GO_BUILD_COMMAND = 'CGO_ENABLED=0 go build -trimpath -tags lambda.norpc -o';
+
+function createGoCode(sourceDir: string, architecture: lambda.Architecture): lambda.Code {
+  const goArch = architecture === lambda.Architecture.ARM_64 ? 'arm64' : 'amd64';
+  return lambda.Code.fromAsset(sourceDir, {
+    assetHashType: cdk.AssetHashType.OUTPUT,
+    bundling: {
+      image: cdk.DockerImage.fromRegistry('public.ecr.aws/docker/library/golang:1.26'),
+      environment: { GOOS: 'linux', GOARCH: goArch, GOCACHE: '/tmp/go-cache', GOPATH: '/tmp/go' },
+      command: ['bash', '-c', `${GO_BUILD_COMMAND} /asset-output/bootstrap .`],
+      local: {
+        tryBundle(outputDir: string) {
+          try {
+            execSync('go version', { stdio: 'ignore' });
+          } catch {
+            return false;
+          }
+          execSync(`${GO_BUILD_COMMAND} ${path.join(outputDir, 'bootstrap')} .`, {
+            cwd: sourceDir,
+            env: { ...process.env, GOOS: 'linux', GOARCH: goArch },
+            stdio: 'inherit',
+          });
+          return true;
+        },
+      },
+    },
+  });
+}
+
+class GoManualStack extends cdk.NestedStack {
+  constructor(scope: Construct, id: string, props: SubStackProps) {
+    super(scope, id, props);
+
+    const sourceDir = path.join(__dirname, '../lambdas/go-manual');
+    for (const architecture of [lambda.Architecture.X86_64, lambda.Architecture.ARM_64]) {
+      const functionName = `${props.prefix}go-manual-instrumentation-${architecture.name}`;
+      new lambda.Function(this, functionName, {
+        functionName,
+        runtime: lambda.Runtime.PROVIDED_AL2023,
+        architecture,
+        memorySize: 512,
+        handler: 'bootstrap',
+        timeout: cdk.Duration.seconds(10),
+        code: createGoCode(sourceDir, architecture),
+        layers: [props.layer],
+        role: props.role,
+        environment: {
+          DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
+          DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
+          DASH0_EXTENSION_LOG_LEVEL: "info",
+        },
+        logGroup: props.logGroup,
+        loggingFormat: lambda.LoggingFormat.TEXT,
+      });
+    }
+  }
+}
+
 interface DockerizedStackProps extends cdk.NestedStackProps {
   role: iam.Role;
   logGroup: logs.ILogGroup;
@@ -665,6 +724,13 @@ export class IntegrationTestsStack extends cdk.Stack {
     });
 
     new ManualStack(this, 'ManualStack', {
+      role,
+      layer: manualLayer,
+      logGroup: sharedLogGroup,
+      prefix,
+    });
+
+    new GoManualStack(this, 'GoManualStack', {
       role,
       layer: manualLayer,
       logGroup: sharedLogGroup,
