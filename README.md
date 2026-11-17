@@ -365,7 +365,20 @@ For Serverless Framework users, the `serverless-dash0` plugin can automatically 
 
 ## Dockerized Lambdas
 
-For containerized Lambda functions, use the provided Docker images in a multi-stage build. The extension images are available for Node.js, Python, and Java runtimes.
+For containerized Lambda functions, use the provided Docker images in a multi-stage build. The extension images are available for Node.js, Python, and Java runtimes in the ECR Public Gallery:
+
+| Runtime | Image |
+|---|---|
+| Node.js | `public.ecr.aws/dash0-integrations/extension-node` |
+| Python | `public.ecr.aws/dash0-integrations/extension-python` |
+| Java | `public.ecr.aws/dash0-integrations/extension-java` |
+
+The images support `linux/amd64` and `linux/arm64`, and you can pull them without AWS credentials.
+
+Each release publishes two tags:
+
+* `v<N>`, for example `v32`, where `<N>` is the Lambda layer version of the same release. Use it to pin a version. Releases up to `v31` have no version tag.
+* `latest`, which moves to the newest release.
 
 ### Node.js
 
@@ -375,7 +388,7 @@ Published layers support Node.js 20 or newer. Repository tooling uses Node.js 24
 FROM public.ecr.aws/lambda/nodejs:22
 
 # Copy extension from Dash0 image
-COPY --from=public.ecr.aws/r1r2x3i6/extension-node:latest /opt /opt
+COPY --from=public.ecr.aws/dash0-integrations/extension-node:latest /opt /opt
 
 # Enable tracing
 ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper
@@ -393,7 +406,7 @@ CMD ["index.handler"]
 FROM public.ecr.aws/lambda/python:3.12
 
 # Copy extension from Dash0 image
-COPY --from=public.ecr.aws/r1r2x3i6/extension-python:latest /opt /opt
+COPY --from=public.ecr.aws/dash0-integrations/extension-python:latest /opt /opt
 
 # Enable tracing
 ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper
@@ -411,7 +424,7 @@ CMD ["app.handler"]
 FROM public.ecr.aws/lambda/java:21
 
 # Copy extension from Dash0 image
-COPY --from=public.ecr.aws/r1r2x3i6/extension-java:latest /opt /opt
+COPY --from=public.ecr.aws/dash0-integrations/extension-java:latest /opt /opt
 
 # Enable tracing
 ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/wrapper

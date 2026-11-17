@@ -24,6 +24,16 @@ jobs:
     with:
       environment: dev-integration
       region: ${{ matrix.region }}
+      publish_images: false
+    secrets: inherit
+
+  # Runs on every merge so a broken public push shows up before a release.
+  publish-images-dev:
+    if: github.event_name == 'push'
+    needs: build
+    uses: ./.github/workflows/publish-images.yml
+    with:
+      environment: dev-integration
     secrets: inherit
 
   deploy-prod:
@@ -36,6 +46,7 @@ jobs:
     with:
       environment: prod-integration
       region: ${{ matrix.region }}
+      publish_images: false
     secrets: inherit
 
   sanity-checks:
@@ -44,7 +55,7 @@ jobs:
     uses: ./.github/workflows/sanity-checks.yml
     secrets: inherit
 
-  create-release:
+  resolve-version:
     if: github.event_name == 'workflow_dispatch'
     needs: deploy-prod
     runs-on: ubuntu-latest
@@ -53,10 +64,9 @@ jobs:
       node_version: ${{ steps.layers.outputs.node_version }}
       python_version: ${{ steps.layers.outputs.python_version }}
       java_version: ${{ steps.layers.outputs.java_version }}
+      manual_version: ${{ steps.layers.outputs.manual_version }}
       tag: ${{ steps.tag.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
-
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
@@ -75,12 +85,12 @@ jobs:
 
       - name: Determine tag from layer version
         id: tag
+        env:
+          PYTHON: ${{ steps.layers.outputs.python_version }}
+          NODE: ${{ steps.layers.outputs.node_version }}
+          JAVA: ${{ steps.layers.outputs.java_version }}
+          MANUAL: ${{ steps.layers.outputs.manual_version }}
         run: |
-          PYTHON="${{ steps.layers.outputs.python_version }}"
-          NODE="${{ steps.layers.outputs.node_version }}"
-          JAVA="${{ steps.layers.outputs.java_version }}"
-          MANUAL="${{ steps.layers.outputs.manual_version }}"
-
           # The release tag must equal the published layer version. That only has
           # a single meaning when all four layers are aligned; if they have
           # drifted, fail loudly instead of silently picking one.
@@ -91,15 +101,37 @@ jobs:
 
           echo "tag=v${PYTHON}" >> "$GITHUB_OUTPUT"
 
+  # After deploy-prod, so a partial layer rollout never moves the public
+  # `latest` tag, and after resolve-version, so the images carry the layer version.
+  publish-images:
+    if: github.event_name == 'workflow_dispatch'
+    needs: resolve-version
+    uses: ./.github/workflows/publish-images.yml
+    with:
+      environment: prod-integration
+      tags: ${{ needs.resolve-version.outputs.tag }} latest
+    secrets: inherit
+
+  # Waits for publish-images so a release never exists without its images. If the
+  # image push fails, re-run the failed jobs: the layers are already published.
+  create-release:
+    if: github.event_name == 'workflow_dispatch'
+    needs: [resolve-version, publish-images]
+    runs-on: ubuntu-latest
+    environment: prod-integration
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.resolve-version.outputs.tag }}
+          PYTHON: ${{ needs.resolve-version.outputs.python_version }}
+          NODE: ${{ needs.resolve-version.outputs.node_version }}
+          JAVA: ${{ needs.resolve-version.outputs.java_version }}
+          MANUAL: ${{ needs.resolve-version.outputs.manual_version }}
+          IMAGE_REGISTRY: public.ecr.aws/${{ vars.ECR_PUBLIC_ALIAS }}
         run: |
-          PYTHON="${{ steps.layers.outputs.python_version }}"
-          NODE="${{ steps.layers.outputs.node_version }}"
-          JAVA="${{ steps.layers.outputs.java_version }}"
-          MANUAL="${{ steps.layers.outputs.manual_version }}"
-
           cat <<EOF > /tmp/release-notes.md
           ## Layer ARNs
 
@@ -114,10 +146,21 @@ jobs:
 
           **Manual:**
           \`arn:aws:lambda:<region>:115813213817:layer:dash0-extension-manual:${MANUAL}\`
+
+          ## Container images
+
+          **Python:**
+          \`${IMAGE_REGISTRY}/extension-python:${TAG}\`
+
+          **Node:**
+          \`${IMAGE_REGISTRY}/extension-node:${TAG}\`
+
+          **Java:**
+          \`${IMAGE_REGISTRY}/extension-java:${TAG}\`
           EOF
 
-          gh release create "${{ steps.tag.outputs.tag }}" \
-            --title "${{ steps.tag.outputs.tag }}" \
+          gh release create "$TAG" \
+            --title "$TAG" \
             --notes-file /tmp/release-notes.md \
             --generate-notes
 
@@ -127,7 +170,7 @@ jobs:
   # Opens a PR (rather than pushing to master) so the change is reviewed before it ships.
   sync-plugin-versions:
     if: github.event_name == 'workflow_dispatch'
-    needs: create-release
+    needs: [resolve-version, create-release]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -137,10 +180,10 @@ jobs:
       - name: Sync bundled versions.json, bump plugin version, and open PR
         env:
           GH_TOKEN: ${{ github.token }}
-          NODE: ${{ needs.create-release.outputs.node_version }}
-          PYTHON: ${{ needs.create-release.outputs.python_version }}
-          JAVA: ${{ needs.create-release.outputs.java_version }}
-          TAG: ${{ needs.create-release.outputs.tag }}
+          NODE: ${{ needs.resolve-version.outputs.node_version }}
+          PYTHON: ${{ needs.resolve-version.outputs.python_version }}
+          JAVA: ${{ needs.resolve-version.outputs.java_version }}
+          TAG: ${{ needs.resolve-version.outputs.tag }}
         run: |
           # Merge onto the existing file so keys we don't manage here (e.g.
           # dash0-extension-manual or a future runtime) are preserved rather than dropped.
