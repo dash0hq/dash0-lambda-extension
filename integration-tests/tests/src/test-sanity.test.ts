@@ -6,6 +6,7 @@ import {
     checkMetrics,
     LogToCheck,
     invokeFunction,
+    verifyDockerizedInvocation,
 } from './utils';
 import { TEST_TIMEOUT_MS } from './config';
 
@@ -73,5 +74,9 @@ describe('Production sanity checks', () => {
                 { message: JSON.stringify({ name: "dash0_payload", type: "lambda_return_value", message: { statusCode: 200, body: '"Hello from Lambda!"' } }), isJson: true, attributes: { "dash0.faas.payload_type": "lambda_return_value" } },
             ],
         );
+    }, TEST_TIMEOUT_MS);
+
+    it('Node.js container lambda built from the public extension image produces spans and logs', async () => {
+        await verifyDockerizedInvocation('sanity-dockerized-node', 'node');
     }, TEST_TIMEOUT_MS);
 });

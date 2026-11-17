@@ -596,3 +596,45 @@ export const runAllTests = (scenario: string, runtimes: readonly string[], verif
         }
     }
 }
+
+const DOCKERIZED_HANDLER_SCOPE_NAMES = {
+    python: 'opentelemetry.instrumentation.aws_lambda',
+    node: '@opentelemetry/instrumentation-aws-lambda',
+    java: 'io.opentelemetry.aws-lambda-events-2.2',
+};
+
+export type DockerizedRuntime = keyof typeof DOCKERIZED_HANDLER_SCOPE_NAMES;
+
+export const verifyDockerizedInvocation = async (functionName: string, runtime: DockerizedRuntime) => {
+    const invocationId = await invokeFunction(functionName, true, false);
+
+    const { traceId, rootSpanId } = await checkMainSpans({
+        invocationId,
+        functionName,
+        handlerScopeName: DOCKERIZED_HANDLER_SCOPE_NAMES[runtime],
+    });
+
+    const logsToBeChecked: LogToCheck[] = [
+        { message: 'START RequestId: ' },
+        { message: 'END RequestId: ' },
+        { message: JSON.stringify({ name: "dash0_payload", type: "lambda_event", message: { parameter1: "right" } }), isJson: true },
+        { message: JSON.stringify({ name: "dash0_payload", type: "lambda_return_value" }), isJson: true },
+    ]
+    await checkLogs({
+        invocationId,
+        functionName,
+        traceId,
+        parentSpanId: rootSpanId,
+        success: true,
+        logsToBeChecked,
+    });
+
+    // Overhead span is sent on the next invocation; trigger one
+    await invokeFunction(functionName, true, false);
+    await checkOverheadSpan({
+        invocationId,
+        functionName,
+        traceId,
+        rootSpanId,
+    });
+}
