@@ -49,9 +49,11 @@ jobs:
       publish_images: false
     secrets: inherit
 
+  # After publish-images, so the image check runs against this release's
+  # `latest` and not the previous one.
   sanity-checks:
     if: github.event_name == 'workflow_dispatch'
-    needs: deploy-prod
+    needs: [deploy-prod, publish-images]
     uses: ./.github/workflows/sanity-checks.yml
     secrets: inherit
 

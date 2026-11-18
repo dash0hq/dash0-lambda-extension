@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as ecr_assets from 'aws-cdk-lib/aws-ecr-assets';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as path from 'path';
@@ -12,9 +13,10 @@ export class SanityChecksStack extends cdk.Stack {
 
     const nodeLayerArn = process.env.SANITY_NODE_LAYER_ARN;
     const pythonLayerArn = process.env.SANITY_PYTHON_LAYER_ARN;
+    const nodeImage = process.env.SANITY_NODE_IMAGE;
 
-    if (!nodeLayerArn || !pythonLayerArn) {
-      throw new Error('SANITY_NODE_LAYER_ARN and SANITY_PYTHON_LAYER_ARN environment variables are required');
+    if (!nodeLayerArn || !pythonLayerArn || !nodeImage) {
+      throw new Error('SANITY_NODE_LAYER_ARN, SANITY_PYTHON_LAYER_ARN and SANITY_NODE_IMAGE environment variables are required');
     }
 
     const nodeLayer = lambda.LayerVersion.fromLayerVersionArn(this, 'NodeLayer', nodeLayerArn);
@@ -32,11 +34,15 @@ export class SanityChecksStack extends cdk.Stack {
       retention: logs.RetentionDays.ONE_DAY,
     });
 
-    const environment = {
-      AWS_LAMBDA_EXEC_WRAPPER: '/opt/wrapper',
+    const exportEnvironment = {
       DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
       DASH0_ENDPOINT: 'https://ingress.eu-west-1.aws.dash0-dev.com:4318',
       DASH0_EXTENSION_LOG_LEVEL: 'info',
+    };
+
+    const environment = {
+      ...exportEnvironment,
+      AWS_LAMBDA_EXEC_WRAPPER: '/opt/wrapper',
       DASH0_SEND_ON_INVOCATION_END: 'true',
     };
 
@@ -66,6 +72,26 @@ export class SanityChecksStack extends cdk.Stack {
       layers: [pythonLayer],
       role,
       environment,
+      logGroup,
+      loggingFormat: lambda.LoggingFormat.TEXT,
+    });
+
+    new lambda.DockerImageFunction(this, 'sanity-dockerized-node', {
+      functionName: 'sanity-dockerized-node',
+      code: lambda.DockerImageCode.fromImageAsset(path.join(__dirname, '../lambdas/dockerized-node'), {
+        buildArgs: {
+          EXTENSION_IMAGE: nodeImage,
+        },
+        // The tag behind nodeImage moves between releases while the build
+        // inputs stay the same, so an unchanged asset hash would reuse a stale image.
+        extraHash: Date.now().toString(),
+        platform: ecr_assets.Platform.LINUX_AMD64,
+      }),
+      memorySize: 512,
+      architecture: lambda.Architecture.X86_64,
+      timeout: cdk.Duration.seconds(10),
+      role,
+      environment: exportEnvironment,
       logGroup,
       loggingFormat: lambda.LoggingFormat.TEXT,
     });

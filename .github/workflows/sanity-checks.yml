@@ -48,6 +48,7 @@ jobs:
     env:
       SANITY_NODE_LAYER_ARN: arn:aws:lambda:${{ vars.AWS_REGION }}:115813213817:layer:dash0-extension-node:${{ needs.resolve-layers.outputs.node_version }}
       SANITY_PYTHON_LAYER_ARN: arn:aws:lambda:${{ vars.AWS_REGION }}:115813213817:layer:dash0-extension-python:${{ needs.resolve-layers.outputs.python_version }}
+      SANITY_NODE_IMAGE: public.ecr.aws/dash0-integrations/extension-node:latest
     steps:
       - uses: actions/checkout@v4
 
