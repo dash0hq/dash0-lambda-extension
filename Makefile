@@ -14,6 +14,8 @@ LAMBDA_LAYER_MARKER_MANUAL := .lambda-layer-manual
 CARGO_FEATURES :=
 PYTHON_DEPS_IMAGE := dash0-python-deps
 LAYER_VERSION ?= auto
+LAYERS_TOOL := node tools/layers/src/layers.ts
+LAYERS_TOOL_DEPS := tools/layers/node_modules/.package-lock.json $(wildcard tools/layers/src/*.ts) integration-tests/runtimes.ts
 LAYER_DESCRIPTION := Send traces, metrics, and logs from AWS Lambda to Dash0. Built on OpenTelemetry and AWS Lambda Extensions API.
 
 # Docker/ECR image settings
@@ -187,6 +189,9 @@ build/$(ZIP_NAME_MANUAL): build/dash0_x86_64 build/dash0_aarch64 opt/entrypoint 
 	@cd build/stage-manual && zip -r ../$(ZIP_NAME_MANUAL) *
 
 
+tools/layers/node_modules/.package-lock.json: tools/layers/package-lock.json
+	@cd tools/layers && npm ci --no-audit --no-fund
+
 python: $(LAMBDA_LAYER_MARKER_PYTHON)
 
 node: $(LAMBDA_LAYER_MARKER_NODE)
@@ -195,20 +200,20 @@ java: $(LAMBDA_LAYER_MARKER_JAVA)
 
 manual: $(LAMBDA_LAYER_MARKER_MANUAL)
 
-$(LAMBDA_LAYER_MARKER_PYTHON): build/$(ZIP_NAME_PYTHON) integration-tests/runtimes.ts tools/layer-runtimes.py tools/publish-layer.sh
-	@tools/publish-layer.sh python $(LAYER_NAME_PYTHON) build/$(ZIP_NAME_PYTHON) "$(LAYER_DESCRIPTION)" $(LAYER_VERSION)
+$(LAMBDA_LAYER_MARKER_PYTHON): build/$(ZIP_NAME_PYTHON) $(LAYERS_TOOL_DEPS)
+	@$(LAYERS_TOOL) publish python $(LAYER_NAME_PYTHON) build/$(ZIP_NAME_PYTHON) --description "$(LAYER_DESCRIPTION)" --version $(LAYER_VERSION)
 	@touch $(LAMBDA_LAYER_MARKER_PYTHON)
 
-$(LAMBDA_LAYER_MARKER_NODE): build/$(ZIP_NAME_NODE) integration-tests/runtimes.ts tools/layer-runtimes.py tools/publish-layer.sh
-	@tools/publish-layer.sh node $(LAYER_NAME_NODE) build/$(ZIP_NAME_NODE) "$(LAYER_DESCRIPTION)" $(LAYER_VERSION)
+$(LAMBDA_LAYER_MARKER_NODE): build/$(ZIP_NAME_NODE) $(LAYERS_TOOL_DEPS)
+	@$(LAYERS_TOOL) publish node $(LAYER_NAME_NODE) build/$(ZIP_NAME_NODE) --description "$(LAYER_DESCRIPTION)" --version $(LAYER_VERSION)
 	@touch $(LAMBDA_LAYER_MARKER_NODE)
 
-$(LAMBDA_LAYER_MARKER_JAVA): build/$(ZIP_NAME_JAVA) integration-tests/runtimes.ts tools/layer-runtimes.py tools/publish-layer.sh
-	@tools/publish-layer.sh java $(LAYER_NAME_JAVA) build/$(ZIP_NAME_JAVA) "$(LAYER_DESCRIPTION)" $(LAYER_VERSION)
+$(LAMBDA_LAYER_MARKER_JAVA): build/$(ZIP_NAME_JAVA) $(LAYERS_TOOL_DEPS)
+	@$(LAYERS_TOOL) publish java $(LAYER_NAME_JAVA) build/$(ZIP_NAME_JAVA) --description "$(LAYER_DESCRIPTION)" --version $(LAYER_VERSION)
 	@touch $(LAMBDA_LAYER_MARKER_JAVA)
 
-$(LAMBDA_LAYER_MARKER_MANUAL): build/$(ZIP_NAME_MANUAL) integration-tests/runtimes.ts tools/layer-runtimes.py tools/publish-layer.sh
-	@tools/publish-layer.sh manual $(LAYER_NAME_MANUAL) build/$(ZIP_NAME_MANUAL) "$(LAYER_DESCRIPTION)" $(LAYER_VERSION)
+$(LAMBDA_LAYER_MARKER_MANUAL): build/$(ZIP_NAME_MANUAL) $(LAYERS_TOOL_DEPS)
+	@$(LAYERS_TOOL) publish manual $(LAYER_NAME_MANUAL) build/$(ZIP_NAME_MANUAL) --description "$(LAYER_DESCRIPTION)" --version $(LAYER_VERSION)
 	@touch $(LAMBDA_LAYER_MARKER_MANUAL)
 
 

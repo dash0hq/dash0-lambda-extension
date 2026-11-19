@@ -67,6 +67,11 @@ jobs:
       tag: v${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci --no-audit --no-fund
+        working-directory: tools/layers
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
@@ -77,8 +82,7 @@ jobs:
         env:
           REQUESTED: ${{ inputs.version }}
         run: |
-          mapfile -t regions < <(grep . regions.txt)
-          version=$(tools/resolve-layer-version.sh "$REQUESTED" "${regions[@]}")
+          version=$(node tools/layers/src/layers.ts resolve-version "$REQUESTED")
           echo "version=${version}" >> "$GITHUB_OUTPUT"
 
   deploy-prod:
@@ -105,12 +109,20 @@ jobs:
     uses: ./.github/workflows/sanity-checks.yml
     secrets: inherit
 
+  # The release tag must equal the layer version in every region. If one
+  # drifted, this fails; dispatching the same version again repairs it.
   verify-layer-versions:
     if: github.event_name == 'workflow_dispatch'
-    needs: [regions, resolve-version, deploy-prod]
+    needs: [resolve-version, deploy-prod]
     runs-on: ubuntu-latest
     environment: prod-integration
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci --no-audit --no-fund
+        working-directory: tools/layers
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
@@ -118,27 +130,8 @@ jobs:
 
       - name: Check every layer is at the release version in every region
         env:
-          REGIONS: ${{ join(fromJSON(needs.regions.outputs.regions), ' ') }}
-          EXPECTED: ${{ needs.resolve-version.outputs.version }}
-        run: |
-          # The release tag must equal the layer version in every region. If one
-          # drifted, fail loudly; dispatching the same version again repairs it.
-          drifted=0
-          for region in $REGIONS; do
-            for layer in python node java manual; do
-              version=$(aws lambda list-layer-versions --region "$region" \
-                --layer-name "dash0-extension-${layer}" --max-items 1 \
-                --query 'LayerVersions[0].Version' --output text | head -1)
-              if [ "$version" != "$EXPECTED" ]; then
-                echo "error: ${region} dash0-extension-${layer} is at version ${version}, expected ${EXPECTED}" >&2
-                drifted=1
-              fi
-            done
-          done
-          if [ "$drifted" -ne 0 ]; then
-            echo "error: layer versions have drifted; refusing to tag" >&2
-            exit 1
-          fi
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: node tools/layers/src/layers.ts verify "$VERSION"
 
   # After deploy-prod, so a partial layer rollout never moves the public
   # `latest` tag, and after resolve-version, so the images carry the layer version.

@@ -8,7 +8,8 @@
 - `opt/node/distro`, `opt/python/distro`, `opt/java/opentelemetry-java-distro`: the per-language OpenTelemetry distros. `opt/manual` has a wrapper only.
 - `integration-tests/`: CDK stacks (`iac/`), Serverless stacks (`sls/v3`, `sls/v4`) and vitest suites (`tests/`). `integration-tests/runtimes.ts` is the canonical list of tested runtime versions.
 - `sls-plugin/`: the `@dash0/serverless-dash0` npm package.
-- `regions.txt`: the AWS regions the layers are published to, one per line. The deploy workflow reads it.
+- `tools/layers/`: TypeScript tool that publishes the layers (`make node|python|java|manual` calls it) and resolves and verifies the version a release publishes in every region.
+- `regions.txt`: the AWS regions the layers are published to, one per line. The deploy workflow and `tools/layers` read it.
 - `build/` is gitignored output (binaries, layer zips, the aws-sdk tarball). Don't put source there.
 
 ## Commands
@@ -25,6 +26,7 @@ Run these as CI does (`.github/workflows/ci.yml`):
   - `python -m venv opt/python/distro/.venv && opt/python/distro/.venv/bin/pip install -r opt/python/distro/requirements-dev.txt`
   - `cd opt/python/distro && .venv/bin/pytest`
 - sls-plugin: `cd sls-plugin && npm ci && npm run build && npm test`
+- Layer tooling: `cd tools/layers && npm ci && npm run typecheck && npm test`. Node 24 runs its TypeScript directly, with no build step.
 - Java distro: CI has no unit-test job. The only CI build is in `security.yml`: `cd opt/java/opentelemetry-java-distro && ./gradlew clean -Pversion=1.0.0-SNAPSHOT assemble -x javadoc`.
 - Layers: `make build/layer-dash0-<node|python|java|manual>.zip` builds a zip. It needs `cross` and Docker, and every `make` call also runs `aws sts get-caller-identity`. Bare `make` and `make node|python|java|manual` publish to AWS and push to ECR. Don't run them.
 - Integration tests run only in CI, on same-repo PRs, against stacks deployed with the `pr-<number>-` prefix. They can't run locally without AWS credentials and deployed layers.

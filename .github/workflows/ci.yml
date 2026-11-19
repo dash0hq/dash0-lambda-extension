@@ -24,7 +24,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: python3 -B -m unittest discover -s tools -p 'test_*.py'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      # tools/layers publishes the layers and resolves the release version.
+      - name: Type-check and test tools/layers
+        working-directory: tools/layers
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+          npm test
 
   fmt:
     name: Format

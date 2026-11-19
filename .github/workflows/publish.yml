@@ -22,7 +22,7 @@ on:
         type: boolean
         default: true
       # Layer version to publish: `auto` for whatever version AWS assigns next,
-      # or a number that every layer must get. See tools/publish-layer.sh.
+      # or a number that every layer must get. See tools/layers/src/publish.ts.
       version:
         required: false
         type: string
@@ -39,6 +39,10 @@ jobs:
     environment: ${{ inputs.environment }}
     steps:
       - uses: actions/checkout@v4
+      # For tools/layers, which publishes the layer.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
       - uses: actions/download-artifact@v4
         with:
           name: rust-binaries
@@ -100,6 +104,10 @@ jobs:
     environment: ${{ inputs.environment }}
     steps:
       - uses: actions/checkout@v4
+      # For tools/layers, which publishes the layer.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
       - uses: actions/download-artifact@v4
         with:
           name: rust-binaries
@@ -129,6 +137,10 @@ jobs:
     environment: ${{ inputs.environment }}
     steps:
       - uses: actions/checkout@v4
+      # For tools/layers, which publishes the layer.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
       - uses: actions/download-artifact@v4
         with:
           name: rust-binaries
