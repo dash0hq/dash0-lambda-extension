@@ -4,6 +4,11 @@ on:
   push:
     branches: [master]
   workflow_dispatch:
+    inputs:
+      version:
+        description: Layer version to release. `auto` releases the version after the highest one in any region; the current highest re-releases it, skipping the layers already out.
+        required: true
+        default: auto
 
 permissions:
   id-token: write
@@ -14,12 +19,23 @@ jobs:
   build:
     uses: ./.github/workflows/build.yml
 
+  # The regions the layers are published to, from regions.txt.
+  regions:
+    runs-on: ubuntu-latest
+    outputs:
+      regions: ${{ steps.regions.outputs.regions }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read regions.txt
+        id: regions
+        run: echo "regions=$(jq -cR 'select(length > 0)' regions.txt | jq -cs .)" >> "$GITHUB_OUTPUT"
+
   deploy-dev:
     if: github.event_name == 'push'
-    needs: build
+    needs: [build, regions]
     strategy:
       matrix:
-        region: [us-east-1, us-east-2, us-west-1, us-west-2, ap-south-1, ap-northeast-1, ap-northeast-2, ap-northeast-3, ap-southeast-1, ap-southeast-2, ca-central-1, eu-central-1, eu-west-1, eu-west-2, eu-west-3, eu-north-1, il-central-1, sa-east-1]
+        region: ${{ fromJSON(needs.regions.outputs.regions) }}
     uses: ./.github/workflows/publish.yml
     with:
       environment: dev-integration
@@ -36,17 +52,49 @@ jobs:
       environment: dev-integration
     secrets: inherit
 
+  # Settles the release version before any region publishes, so every region
+  # publishes the same one. deploy-prod pads the version counters up to it.
+  resolve-version:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: prod-integration
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      node_version: ${{ steps.version.outputs.version }}
+      python_version: ${{ steps.version.outputs.version }}
+      java_version: ${{ steps.version.outputs.version }}
+      manual_version: ${{ steps.version.outputs.version }}
+      tag: v${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: eu-central-1
+
+      - name: Resolve the release version
+        id: version
+        env:
+          REQUESTED: ${{ inputs.version }}
+        run: |
+          mapfile -t regions < <(grep . regions.txt)
+          version=$(tools/resolve-layer-version.sh "$REQUESTED" "${regions[@]}")
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
   deploy-prod:
     if: github.event_name == 'workflow_dispatch'
-    needs: build
+    needs: [build, regions, resolve-version]
     strategy:
+      # A failed region must not cancel the others partway through a publish.
+      fail-fast: false
       matrix:
-        region: [us-east-1, us-east-2, us-west-1, us-west-2, ap-south-1, ap-northeast-1, ap-northeast-2, ap-northeast-3, ap-southeast-1, ap-southeast-2, ca-central-1, eu-central-1, eu-west-1, eu-west-2, eu-west-3, eu-north-1, il-central-1, sa-east-1]
+        region: ${{ fromJSON(needs.regions.outputs.regions) }}
     uses: ./.github/workflows/publish.yml
     with:
       environment: prod-integration
       region: ${{ matrix.region }}
       publish_images: false
+      version: ${{ needs.resolve-version.outputs.version }}
     secrets: inherit
 
   # After publish-images, so the image check runs against this release's
@@ -57,57 +105,46 @@ jobs:
     uses: ./.github/workflows/sanity-checks.yml
     secrets: inherit
 
-  resolve-version:
+  verify-layer-versions:
     if: github.event_name == 'workflow_dispatch'
-    needs: deploy-prod
+    needs: [regions, resolve-version, deploy-prod]
     runs-on: ubuntu-latest
     environment: prod-integration
-    outputs:
-      node_version: ${{ steps.layers.outputs.node_version }}
-      python_version: ${{ steps.layers.outputs.python_version }}
-      java_version: ${{ steps.layers.outputs.java_version }}
-      manual_version: ${{ steps.layers.outputs.manual_version }}
-      tag: ${{ steps.tag.outputs.tag }}
     steps:
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: eu-central-1
 
-      - name: Get layer versions
-        id: layers
-        run: |
-          for layer in python node java manual; do
-            version=$(aws lambda list-layer-versions \
-              --layer-name "dash0-extension-${layer}" \
-              --query 'LayerVersions[0].Version' \
-              --output text)
-            echo "${layer}_version=${version}" >> "$GITHUB_OUTPUT"
-          done
-
-      - name: Determine tag from layer version
-        id: tag
+      - name: Check every layer is at the release version in every region
         env:
-          PYTHON: ${{ steps.layers.outputs.python_version }}
-          NODE: ${{ steps.layers.outputs.node_version }}
-          JAVA: ${{ steps.layers.outputs.java_version }}
-          MANUAL: ${{ steps.layers.outputs.manual_version }}
+          REGIONS: ${{ join(fromJSON(needs.regions.outputs.regions), ' ') }}
+          EXPECTED: ${{ needs.resolve-version.outputs.version }}
         run: |
-          # The release tag must equal the published layer version. That only has
-          # a single meaning when all four layers are aligned; if they have
-          # drifted, fail loudly instead of silently picking one.
-          if [ "$PYTHON" != "$NODE" ] || [ "$PYTHON" != "$JAVA" ] || [ "$PYTHON" != "$MANUAL" ]; then
-            echo "error: layer versions have drifted (python=$PYTHON node=$NODE java=$JAVA manual=$MANUAL); refusing to tag" >&2
+          # The release tag must equal the layer version in every region. If one
+          # drifted, fail loudly; dispatching the same version again repairs it.
+          drifted=0
+          for region in $REGIONS; do
+            for layer in python node java manual; do
+              version=$(aws lambda list-layer-versions --region "$region" \
+                --layer-name "dash0-extension-${layer}" --max-items 1 \
+                --query 'LayerVersions[0].Version' --output text | head -1)
+              if [ "$version" != "$EXPECTED" ]; then
+                echo "error: ${region} dash0-extension-${layer} is at version ${version}, expected ${EXPECTED}" >&2
+                drifted=1
+              fi
+            done
+          done
+          if [ "$drifted" -ne 0 ]; then
+            echo "error: layer versions have drifted; refusing to tag" >&2
             exit 1
           fi
-
-          echo "tag=v${PYTHON}" >> "$GITHUB_OUTPUT"
 
   # After deploy-prod, so a partial layer rollout never moves the public
   # `latest` tag, and after resolve-version, so the images carry the layer version.
   publish-images:
     if: github.event_name == 'workflow_dispatch'
-    needs: resolve-version
+    needs: [resolve-version, verify-layer-versions]
     uses: ./.github/workflows/publish-images.yml
     with:
       environment: prod-integration
@@ -161,6 +198,10 @@ jobs:
           \`${IMAGE_REGISTRY}/extension-java:${TAG}\`
           EOF
 
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "::warning::Release ${TAG} already exists; leaving it as is"
+            exit 0
+          fi
           gh release create "$TAG" \
             --title "$TAG" \
             --notes-file /tmp/release-notes.md \
@@ -209,6 +250,10 @@ jobs:
           new_plugin_version=$(jq -r .version sls-plugin/package.json)
 
           branch="chore/sync-layer-versions-${TAG}"
+          if git ls-remote --exit-code --heads origin "$branch" > /dev/null; then
+            echo "::warning::Branch ${branch} already exists; not opening another sync PR"
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b "$branch"
