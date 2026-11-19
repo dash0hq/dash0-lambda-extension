@@ -7,6 +7,7 @@ const RUNTIME_MAP: Record<string, lambda.Runtime> = {
   'python3-12': lambda.Runtime.PYTHON_3_12,
   'python3-13': lambda.Runtime.PYTHON_3_13,
   'python3-14': lambda.Runtime.PYTHON_3_14,
+  'nodejs18-x': lambda.Runtime.NODEJS_18_X,
   'nodejs20-x': lambda.Runtime.NODEJS_20_X,
   'nodejs22-x': lambda.Runtime.NODEJS_22_X,
   'nodejs24-x': lambda.Runtime.NODEJS_24_X,

@@ -8,7 +8,7 @@ This package uses  *Make* to build binary executables for *aarch64* and *x86_64*
 ### Dependencies 
 
 * Make tools
-* Node.js 24 or newer for repository tooling. The published Serverless plugin supports Node.js 22 or newer and is tested on both 22 and 24. Published Lambda layers support Node.js 20 or newer.
+* Node.js 24 or newer for repository tooling. The published Serverless plugin supports Node.js 22 or newer and is tested on both 22 and 24. Published Lambda layers support Node.js 18 or newer.
 * Rust standard: https://www.rust-lang.org/tools/install (tested with 1.72)
 * Cargo cross (~0.2.5)
   * cross-compiling to different targets; Docker or podman based

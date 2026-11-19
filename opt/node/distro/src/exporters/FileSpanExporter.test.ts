@@ -164,8 +164,6 @@ describe('FileSpanExporter tests', () => {
   test('should log an error when provided an invalid file path', async () => {
     expect(() => {
       new FileSpanExporter('\0');
-    }).toThrow(
-      "The argument 'path' must be a string, Uint8Array, or URL without null bytes. Received '\\x00'"
-    );
+    }).toThrow(/^The argument 'path' must be a string.* without null bytes\. Received '\\x00'$/);
   });
 });

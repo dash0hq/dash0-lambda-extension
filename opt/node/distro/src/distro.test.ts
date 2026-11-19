@@ -13,7 +13,7 @@ const attributeValueLengthLimitOf = (tracerProvider): number => {
 describe('Distro initialization', () => {
   const ORIGINAL_PROCESS_ENV = process.env;
 
-  test.each(['v18.19.0', 'v19.9.0'])('skips initialization on unsupported Node.js %s', async (version) => {
+  test.each(['v16.20.2', 'v17.9.1'])('skips initialization on unsupported Node.js %s', async (version) => {
     const originalVersion = process.version;
     const error = jest.spyOn(console, 'error').mockImplementation(() => {});
     Object.defineProperty(process, 'version', { value: version, configurable: true });
@@ -22,7 +22,7 @@ describe('Distro initialization', () => {
         const { init } = jest.requireActual('./distro');
         expect(await init).toBeUndefined();
       });
-      expect(error).toHaveBeenCalledWith(expect.stringContaining('minimum supported version: 20.x'));
+      expect(error).toHaveBeenCalledWith(expect.stringContaining('minimum supported version: 18.x'));
     } finally {
       Object.defineProperty(process, 'version', { value: originalVersion, configurable: true });
       error.mockRestore();

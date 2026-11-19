@@ -382,7 +382,7 @@ Each release publishes two tags:
 
 ### Node.js
 
-Published layers support Node.js 20 or newer. Repository tooling uses Node.js 24 or newer; the published Serverless plugin supports Node.js 22 or newer.
+Published layers support Node.js 18.19 or newer. Repository tooling uses Node.js 24 or newer; the published Serverless plugin supports Node.js 22 or newer.
 
 ```dockerfile
 FROM public.ecr.aws/lambda/nodejs:22
