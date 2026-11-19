@@ -2,6 +2,7 @@ import { resolveLayerName } from '../src/runtime-mapping';
 
 describe('resolveLayerName', () => {
   it.each([
+    ['nodejs18.x', 'dash0-extension-node'],
     ['nodejs20.x', 'dash0-extension-node'],
     ['nodejs22.x', 'dash0-extension-node'],
     ['nodejs24.x', 'dash0-extension-node'],
@@ -17,8 +18,6 @@ describe('resolveLayerName', () => {
 
   it.each([
     ['nodejs16.x'],
-    ['nodejs18.x'],
-    ['nodejs19.x'],
     ['ruby3.3'],
     ['dotnet8'],
     ['go1.x'],

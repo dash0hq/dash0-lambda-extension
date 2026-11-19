@@ -12,7 +12,8 @@ let activeCaptures = 0;
 const decoder = new TextDecoder('utf-8', { fatal: true });
 const nodeMajor = Number(process.versions.node.split('.')[0]);
 const undiciVersion = process.versions.undici;
-const supported = ([20, 22].includes(nodeMajor) && undiciVersion?.startsWith('6.')) ||
+const supported = (nodeMajor === 18 && undiciVersion?.startsWith('5.')) ||
+  ([20, 22].includes(nodeMajor) && undiciVersion?.startsWith('6.')) ||
   (nodeMajor === 24 && undiciVersion?.startsWith('7.')) ||
   (nodeMajor === 26 && undiciVersion?.startsWith('8.'));
 let cachedSetting: string | undefined;

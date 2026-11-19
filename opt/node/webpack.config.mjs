@@ -7,7 +7,7 @@ const __dirname = path.dirname(__filename);
 
 export default {
   mode: "production",
-  target: "node20",
+  target: "node18",
   entry: "./init.mjs",
   output: {
     path: path.resolve(__dirname, "dist"),

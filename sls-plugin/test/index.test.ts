@@ -172,7 +172,7 @@ describe('ServerlessDash0Plugin', () => {
     expect(serverless.service.functions.myFunc.layers![0]).toContain('dash0-extension-python');
   });
 
-  it.each(['ruby3.3', 'nodejs18.x'])('warns and skips unsupported runtime %s', (runtime) => {
+  it.each(['ruby3.3', 'nodejs16.x'])('warns and skips unsupported runtime %s', (runtime) => {
     const serverless = createMockServerless({
       functions: {
         myFunc: { handler: 'handler.hello', runtime, 'dash0-traced': true },
