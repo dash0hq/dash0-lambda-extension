@@ -170,8 +170,8 @@ describe('Distro initialization', () => {
         let defaultProcessors: unknown[] = [];
         (globalThis as any).configureTracer = (defaultConfig) => {
           defaultProcessors = defaultConfig.spanProcessors;
+          // Only the changed key: the other defaults must be merged back in.
           return {
-            ...defaultConfig,
             spanProcessors: [
               ...defaultConfig.spanProcessors,
               {
@@ -190,7 +190,30 @@ describe('Distro initialization', () => {
         expect(defaultProcessors).toEqual([expect.any(BatchSpanProcessor)]);
         const span = tracerProvider.getTracer('hook-test').startSpan('hook-test');
         expect(span.attributes.custom).toBe('hook');
+        expect(span.resource.attributes['process.pid']).toBe(process.pid);
         expect(attributeValueLengthLimitOf(tracerProvider)).toBe(7);
+      });
+    });
+
+    test.each([
+      ['nothing', () => undefined],
+      ['a Promise', async (defaultConfig) => defaultConfig],
+    ])('keeps the default config and logs an error when the hook returns %s', async (_, hook) => {
+      await jest.isolateModulesAsync(async () => {
+        const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+        let defaultProcessor;
+        (globalThis as any).configureTracer = (defaultConfig) => {
+          [defaultProcessor] = defaultConfig.spanProcessors;
+          jest.spyOn(defaultProcessor, 'onStart');
+          return hook(defaultConfig);
+        };
+
+        const { init } = jest.requireActual('./distro');
+        const { tracerProvider } = await init;
+        tracerProvider.getTracer('hook-test').startSpan('hook-test');
+
+        expect(defaultProcessor.onStart).toHaveBeenCalled();
+        expect(error).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('globalThis.configureTracer must synchronously return'));
       });
     });
   });
@@ -211,7 +234,7 @@ describe('Distro initialization', () => {
         let defaultReaders: unknown[] = [];
         (globalThis as any).configureMeter = (defaultConfig) => {
           defaultReaders = defaultConfig.readers;
-          return { ...defaultConfig, readers: [...defaultConfig.readers, reader] };
+          return { readers: [...defaultConfig.readers, reader] };
         };
 
         const { init } = jest.requireActual('./distro');
@@ -223,6 +246,29 @@ describe('Distro initialization', () => {
         const [metric] = resourceMetrics.scopeMetrics[0].metrics;
         expect(metric.descriptor.name).toBe('hook.counter');
         expect(metric.dataPoints[0].value).toBe(3);
+        expect(resourceMetrics.resource.attributes['process.pid']).toBe(process.pid);
+        await meterProvider.shutdown();
+      });
+    });
+
+    test.each([
+      ['nothing', () => undefined],
+      ['a Promise', async (defaultConfig) => defaultConfig],
+    ])('keeps the default config and logs an error when the hook returns %s', async (_, hook) => {
+      await jest.isolateModulesAsync(async () => {
+        const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+        let defaultReader;
+        (globalThis as any).configureMeter = (defaultConfig) => {
+          [defaultReader] = defaultConfig.readers;
+          return hook(defaultConfig);
+        };
+
+        const { init } = jest.requireActual('./distro');
+        const { meterProvider } = await init;
+
+        // collect() rejects unless the reader is registered with a meter provider.
+        await expect(defaultReader.collect()).resolves.toBeDefined();
+        expect(error).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('globalThis.configureMeter must synchronously return'));
         await meterProvider.shutdown();
       });
     });

@@ -43,11 +43,11 @@ import { AWSXRayLambdaPropagator } from '@opentelemetry/propagator-aws-xray-lamb
 
 declare global {
   /*
-   * Same contract as the upstream OpenTelemetry Lambda layer: functions the application assigns to
-   * `globalThis` in a module loaded before `/opt/init.mjs` (for example with
+   * Same names and signatures as the upstream OpenTelemetry Lambda layer's hooks: functions the
+   * application assigns to `globalThis` in a module loaded before `/opt/init.mjs` (for example with
    * `NODE_OPTIONS=--import /var/task/otel-extension.mjs`). Each receives the provider config the
-   * distro would use and returns the config to use instead, such as with extra span processors
-   * or metric views.
+   * distro would use, including the processors and readers that export to the extension, and
+   * returns the keys to change, such as extra span processors or metric views.
    */
   function configureTracer(defaultConfig: NodeTracerConfig): NodeTracerConfig;
   function configureMeter(defaultConfig: MeterProviderOptions): MeterProviderOptions;
@@ -78,6 +78,22 @@ const traceEndpoint = process.env.DASH0_EXTENSION_ENDPOINT || DEFAULT_DASH0_EXTE
 const metricsEndpoint = new URL('/v1/metrics', traceEndpoint).toString();
 
 let isTraceInitialized = false;
+
+/*
+ * Like upstream, the keys the hook returns replace the defaults one by one, so a partial return such
+ * as `{ spanProcessors }` keeps the other defaults. A hook that forgets to return, or is `async`,
+ * would otherwise build a provider without exporters and drop all telemetry without a log line.
+ */
+function applyConfigHook<T extends object>(name: string, hook: (defaultConfig: T) => T, defaultConfig: T): T {
+  const config: unknown = hook(defaultConfig);
+  if (typeof config !== 'object' || config === null || typeof (config as PromiseLike<T>).then === 'function') {
+    logger.error(
+      `globalThis.${name} must synchronously return a config object; ignoring its return value and using the default config.`
+    );
+    return defaultConfig;
+  }
+  return { ...defaultConfig, ...config };
+}
 
 function reportInitError(err: Error) {
   logger.error(
@@ -197,7 +213,7 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
       spanProcessors,
     };
     if (typeof configureTracer === 'function') {
-      tracerConfig = configureTracer(tracerConfig);
+      tracerConfig = applyConfigHook('configureTracer', configureTracer, tracerConfig);
     }
 
     const tracerProvider = new NodeTracerProvider(tracerConfig);
@@ -233,7 +249,7 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
       ],
     };
     if (typeof configureMeter === 'function') {
-      meterConfig = configureMeter(meterConfig);
+      meterConfig = applyConfigHook('configureMeter', configureMeter, meterConfig);
     }
 
     const meterProvider = new MeterProvider(meterConfig);
