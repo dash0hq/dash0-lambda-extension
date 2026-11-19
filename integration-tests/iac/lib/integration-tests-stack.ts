@@ -424,6 +424,43 @@ class NodeStack extends cdk.NestedStack {
       });
     }
 
+    // globalThis.configureTracer and configureMeter, defined in a file the function loads with
+    // NODE_OPTIONS before the layer's /opt/init.mjs. The bundle is a single file, so the hook file
+    // is copied next to it after bundling, where it lands at /var/task/otel-extension.mjs.
+    for (const runtime of runtimes) {
+      const runtimeName = runtime.name.replace(/\./g, '-');
+      new lambdaNodejs.NodejsFunction(this, `configure-hooks-${runtimeName}`, {
+        functionName: `${props.prefix}configure-hooks-${runtimeName}`,
+        runtime,
+        memorySize: 128,
+        entry: path.join(__dirname, '../lambdas/node/configure_hooks.ts'),
+        handler: 'handler',
+        architecture: lambda.Architecture.X86_64,
+        timeout: cdk.Duration.seconds(10),
+        bundling: {
+          commandHooks: {
+            beforeBundling: () => [],
+            beforeInstall: () => [],
+            afterBundling: (inputDir: string, outputDir: string) => [
+              `cp ${inputDir}/lambdas/node/configure_hooks_extension.mjs ${outputDir}/otel-extension.mjs`,
+            ],
+          },
+        },
+        layers: [props.layer],
+        role: props.role,
+        environment: {
+          AWS_LAMBDA_EXEC_WRAPPER: "/opt/wrapper",
+          NODE_OPTIONS: "--import /var/task/otel-extension.mjs",
+          DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
+          DASH0_ENDPOINT: "https://ingress.eu-west-1.aws.dash0-dev.com:4318",
+          DASH0_EXTENSION_LOG_LEVEL: "info",
+          DASH0_SEND_ON_INVOCATION_END: 'true',
+        },
+        logGroup: props.logGroup,
+        loggingFormat: lambda.LoggingFormat.TEXT,
+      });
+    }
+
     /*
      * Functions whose handler string carries a directory prefix that the deployment
      * package does not have -- the shape a bundler leaves behind when it flattens its
