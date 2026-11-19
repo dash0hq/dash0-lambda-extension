@@ -11,8 +11,8 @@ import {
   defaultResource,
 } from '@opentelemetry/resources';
 import {BasicTracerProvider, BatchSpanProcessor, SimpleSpanProcessor} from '@opentelemetry/sdk-trace-base';
-import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
-import { MeterProvider, PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
+import { NodeTracerProvider, type NodeTracerConfig } from '@opentelemetry/sdk-trace-node';
+import { MeterProvider, type MeterProviderOptions, PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
 
 import {
   DEFAULT_DASH0_EXTENSION_ENDPOINT,
@@ -42,6 +42,16 @@ import { safeRequire } from './requireUtils';
 import { AWSXRayLambdaPropagator } from '@opentelemetry/propagator-aws-xray-lambda';
 
 declare global {
+  /*
+   * Same contract as the upstream OpenTelemetry Lambda layer: functions the application assigns to
+   * `globalThis` in a module loaded before `/opt/init.mjs` (for example with
+   * `NODE_OPTIONS=--import /var/task/otel-extension.mjs`). Each receives the provider config the
+   * distro would use and returns the config to use instead, such as with extra span processors
+   * or metric views.
+   */
+  function configureTracer(defaultConfig: NodeTracerConfig): NodeTracerConfig;
+  function configureMeter(defaultConfig: MeterProviderOptions): MeterProviderOptions;
+
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace NodeJS {
     interface ProcessEnv {
@@ -179,14 +189,18 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
       })
     );
 
-    // Create providers with processors
-    const tracerProvider = new NodeTracerProvider({
+    let tracerConfig: NodeTracerConfig = {
       resource,
       spanLimits: {
         attributeValueLengthLimit: getSpanAttributeMaxLength(),
       },
       spanProcessors,
-    });
+    };
+    if (typeof configureTracer === 'function') {
+      tracerConfig = configureTracer(tracerConfig);
+    }
+
+    const tracerProvider = new NodeTracerProvider(tracerConfig);
 
     tracerProvider.register({
       propagator: new CompositePropagator({
@@ -204,7 +218,7 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
      * aws-lambda instrumentation force-flushes it at handler exit (see `init.mjs`), so the
      * periodic export is only a fallback.
      */
-    const meterProvider = new MeterProvider({
+    let meterConfig: MeterProviderOptions = {
       resource,
       readers: [
         new PeriodicExportingMetricReader({
@@ -217,7 +231,12 @@ export const init = async (): Promise<Dash0SdkInitialization> => {
           exportIntervalMillis: 60_000,
         }),
       ],
-    });
+    };
+    if (typeof configureMeter === 'function') {
+      meterConfig = configureMeter(meterConfig);
+    }
+
+    const meterProvider = new MeterProvider(meterConfig);
     metrics.setGlobalMeterProvider(meterProvider);
 
     logger.info(

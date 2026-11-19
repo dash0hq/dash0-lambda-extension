@@ -11,6 +11,8 @@ An extension for capturing observability data from AWS Lambda invocations and sh
   - [Optional](#optional)
   - [Secret Masking](#secret-masking)
 - [Manual Instrumentation](#manual-instrumentation)
+- [Extend Instrumentation](#extend-instrumentation)
+  - [Node.js](#nodejs)
 - [Enrichment Attributes](#enrichment-attributes)
   - [Span Attributes](#span-attributes)
   - [Log Attributes](#log-attributes)
@@ -202,6 +204,33 @@ Published layers declare compatible runtimes for the Lambda console's runtime fi
 2. Configure your OTLP trace exporter to send to `http://127.0.0.1:9009/v1/traces`.
 3. If exporting metrics, configure your OTLP metric exporter to send to `http://127.0.0.1:9009/v1/metrics`.
 4. Make sure to flush all telemetry before the Lambda invocation completes (e.g., in a response hook or before returning the response).
+
+## Extend Instrumentation
+
+### Node.js
+
+The Node.js layer calls `globalThis.configureTracer` and `globalThis.configureMeter`, if they are defined, with the tracer and meter provider configs it would use, and builds each provider from the config the hook returns. These are the same hooks as in the [OpenTelemetry Lambda layer](https://github.com/open-telemetry/opentelemetry-lambda/blob/main/nodejs/packages/layer/src/wrapper.ts). Use `configureTracer` to add your own span processors, for example one that adds an attribute to every span, and `configureMeter` to add metric readers or views:
+
+```js
+// otel-extension.mjs, shipped in your deployment package
+globalThis.configureTracer = (defaultConfig) => ({
+  ...defaultConfig,
+  spanProcessors: [
+    ...defaultConfig.spanProcessors,
+    {
+      onStart(span) { span.setAttribute('my.custom.attribute', 'hello'); },
+      onEnd() {},
+      forceFlush: () => Promise.resolve(),
+      shutdown: () => Promise.resolve(),
+    },
+  ],
+});
+```
+
+1. Assign the functions to `globalThis`. A module-level `const configureTracer` is not visible to the layer.
+2. Load the file before the layer by setting `NODE_OPTIONS=--import /var/task/otel-extension.mjs` on the function. The layer appends its own `--import /opt/init.mjs` after it.
+3. Keep `defaultConfig.spanProcessors` and `defaultConfig.readers`: they export the spans and metrics to the extension.
+4. The layer does not expose OpenTelemetry packages to your code. Bundle the packages your extension file imports, such as `@opentelemetry/api`, in your deployment package.
 
 
 ## Enrichment Attributes
