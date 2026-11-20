@@ -158,6 +158,122 @@ describe('Distro initialization', () => {
   });
 
 
+  describe('with globalThis.configureTracer defined', () => {
+    afterEach(() => {
+      delete (globalThis as any).configureTracer;
+    });
+
+    test('builds the tracer provider from the config the hook returns', async () => {
+      await jest.isolateModulesAsync(async () => {
+        process.env.OTEL_SPAN_ATTRIBUTE_VALUE_LENGTH_LIMIT = '7';
+        const { BatchSpanProcessor } = require('@opentelemetry/sdk-trace-base');
+        let defaultProcessors: unknown[] = [];
+        (globalThis as any).configureTracer = (defaultConfig) => {
+          defaultProcessors = defaultConfig.spanProcessors;
+          // Only the changed key: the other defaults must be merged back in.
+          return {
+            spanProcessors: [
+              ...defaultConfig.spanProcessors,
+              {
+                onStart: (span) => span.setAttribute('custom', 'hook'),
+                onEnd: () => {},
+                forceFlush: () => Promise.resolve(),
+                shutdown: () => Promise.resolve(),
+              },
+            ],
+          };
+        };
+
+        const { init } = jest.requireActual('./distro');
+        const { tracerProvider } = await init;
+
+        expect(defaultProcessors).toEqual([expect.any(BatchSpanProcessor)]);
+        const span = tracerProvider.getTracer('hook-test').startSpan('hook-test');
+        expect(span.attributes.custom).toBe('hook');
+        expect(span.resource.attributes['process.pid']).toBe(process.pid);
+        expect(attributeValueLengthLimitOf(tracerProvider)).toBe(7);
+      });
+    });
+
+    test.each([
+      ['nothing', () => undefined],
+      ['a Promise', async (defaultConfig) => defaultConfig],
+    ])('keeps the default config and logs an error when the hook returns %s', async (_, hook) => {
+      await jest.isolateModulesAsync(async () => {
+        const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+        let defaultProcessor;
+        (globalThis as any).configureTracer = (defaultConfig) => {
+          [defaultProcessor] = defaultConfig.spanProcessors;
+          jest.spyOn(defaultProcessor, 'onStart');
+          return hook(defaultConfig);
+        };
+
+        const { init } = jest.requireActual('./distro');
+        const { tracerProvider } = await init;
+        tracerProvider.getTracer('hook-test').startSpan('hook-test');
+
+        expect(defaultProcessor.onStart).toHaveBeenCalled();
+        expect(error).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('globalThis.configureTracer must synchronously return'));
+      });
+    });
+  });
+
+  describe('with globalThis.configureMeter defined', () => {
+    afterEach(() => {
+      delete (globalThis as any).configureMeter;
+    });
+
+    test('builds the meter provider from the config the hook returns', async () => {
+      await jest.isolateModulesAsync(async () => {
+        const { MetricReader, PeriodicExportingMetricReader } = require('@opentelemetry/sdk-metrics');
+        class TestReader extends MetricReader {
+          protected onForceFlush = () => Promise.resolve();
+          protected onShutdown = () => Promise.resolve();
+        }
+        const reader = new TestReader();
+        let defaultReaders: unknown[] = [];
+        (globalThis as any).configureMeter = (defaultConfig) => {
+          defaultReaders = defaultConfig.readers;
+          return { readers: [...defaultConfig.readers, reader] };
+        };
+
+        const { init } = jest.requireActual('./distro');
+        const { meterProvider } = await init;
+        meterProvider.getMeter('hook-test').createCounter('hook.counter').add(3);
+
+        expect(defaultReaders).toEqual([expect.any(PeriodicExportingMetricReader)]);
+        const { resourceMetrics } = await reader.collect();
+        const [metric] = resourceMetrics.scopeMetrics[0].metrics;
+        expect(metric.descriptor.name).toBe('hook.counter');
+        expect(metric.dataPoints[0].value).toBe(3);
+        expect(resourceMetrics.resource.attributes['process.pid']).toBe(process.pid);
+        await meterProvider.shutdown();
+      });
+    });
+
+    test.each([
+      ['nothing', () => undefined],
+      ['a Promise', async (defaultConfig) => defaultConfig],
+    ])('keeps the default config and logs an error when the hook returns %s', async (_, hook) => {
+      await jest.isolateModulesAsync(async () => {
+        const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+        let defaultReader;
+        (globalThis as any).configureMeter = (defaultConfig) => {
+          [defaultReader] = defaultConfig.readers;
+          return hook(defaultConfig);
+        };
+
+        const { init } = jest.requireActual('./distro');
+        const { meterProvider } = await init;
+
+        // collect() rejects unless the reader is registered with a meter provider.
+        await expect(defaultReader.collect()).resolves.toBeDefined();
+        expect(error).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('globalThis.configureMeter must synchronously return'));
+        await meterProvider.shutdown();
+      });
+    });
+  });
+
   it('does not invoke console.error', async () => {
     console.error = jest.fn();
 
