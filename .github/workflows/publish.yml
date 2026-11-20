@@ -21,36 +21,20 @@ on:
         required: false
         type: boolean
         default: true
+      # Layer version to publish: `auto` for whatever version AWS assigns next,
+      # or a number that every layer must get. See tools/publish-layer.sh.
+      version:
+        required: false
+        type: string
+        default: auto
 
 permissions:
   id-token: write
   contents: read
 
 jobs:
-  backfill:
-    # Disabled: the backfill races eu-west-1's parallel deploy and drifts version
-    # counters (notably the fast, Docker-less manual layer). Re-enable only once
-    # it aligns to a pre-deploy snapshot instead of reading eu-west-1 live.
-    if: false
-    name: Backfill layer versions
-    runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
-          aws-region: ${{ inputs.region }}
-      - name: Backfill layer version counters
-        env:
-          REGION: ${{ inputs.region }}
-        run: tools/backfill-layer-versions.sh eu-west-1 "$REGION"
-
   deploy-python:
     name: Build and Publish Python
-    needs: backfill
-    # Run when backfill succeeded or was skipped (dev, eu-west-1), but not when it failed.
-    if: ${{ !cancelled() && (needs.backfill.result == 'success' || needs.backfill.result == 'skipped') }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     steps:
@@ -72,15 +56,14 @@ jobs:
         if: inputs.publish_images
         uses: docker/setup-buildx-action@v3
       - name: Build and publish Python layer and Docker image
-        run: make python $DOCKER_TARGET LAYER_NAME_PREFIX="$LAYER_PREFIX" ECR_REPO_PREFIX="$LAYER_PREFIX"
+        run: make python $DOCKER_TARGET LAYER_NAME_PREFIX="$LAYER_PREFIX" ECR_REPO_PREFIX="$LAYER_PREFIX" LAYER_VERSION="$LAYER_VERSION"
         env:
           LAYER_PREFIX: ${{ inputs.prefix }}
+          LAYER_VERSION: ${{ inputs.version }}
           DOCKER_TARGET: ${{ inputs.publish_images && 'docker-python' || '' }}
 
   deploy-node:
     name: Build and Publish Node.js
-    needs: backfill
-    if: ${{ !cancelled() && (needs.backfill.result == 'success' || needs.backfill.result == 'skipped') }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     steps:
@@ -105,15 +88,14 @@ jobs:
         if: inputs.publish_images
         uses: docker/setup-buildx-action@v3
       - name: Build and publish Node.js layer and Docker image
-        run: make node $DOCKER_TARGET LAYER_NAME_PREFIX="$LAYER_PREFIX" ECR_REPO_PREFIX="$LAYER_PREFIX"
+        run: make node $DOCKER_TARGET LAYER_NAME_PREFIX="$LAYER_PREFIX" ECR_REPO_PREFIX="$LAYER_PREFIX" LAYER_VERSION="$LAYER_VERSION"
         env:
           LAYER_PREFIX: ${{ inputs.prefix }}
+          LAYER_VERSION: ${{ inputs.version }}
           DOCKER_TARGET: ${{ inputs.publish_images && 'docker-node' || '' }}
 
   deploy-java:
     name: Build and Publish Java
-    needs: backfill
-    if: ${{ !cancelled() && (needs.backfill.result == 'success' || needs.backfill.result == 'skipped') }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     steps:
@@ -135,15 +117,14 @@ jobs:
         if: inputs.publish_images
         uses: docker/setup-buildx-action@v3
       - name: Build and publish Java layer and Docker image
-        run: make java $DOCKER_TARGET LAYER_NAME_PREFIX="$LAYER_PREFIX" ECR_REPO_PREFIX="$LAYER_PREFIX"
+        run: make java $DOCKER_TARGET LAYER_NAME_PREFIX="$LAYER_PREFIX" ECR_REPO_PREFIX="$LAYER_PREFIX" LAYER_VERSION="$LAYER_VERSION"
         env:
           LAYER_PREFIX: ${{ inputs.prefix }}
+          LAYER_VERSION: ${{ inputs.version }}
           DOCKER_TARGET: ${{ inputs.publish_images && 'docker-java' || '' }}
 
   deploy-manual:
     name: Build and Publish Manual
-    needs: backfill
-    if: ${{ !cancelled() && (needs.backfill.result == 'success' || needs.backfill.result == 'skipped') }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     steps:
@@ -159,6 +140,7 @@ jobs:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ inputs.region || vars.AWS_REGION }}
       - name: Build and publish Manual layer
-        run: make manual LAYER_NAME_PREFIX="$LAYER_PREFIX"
+        run: make manual LAYER_NAME_PREFIX="$LAYER_PREFIX" LAYER_VERSION="$LAYER_VERSION"
         env:
           LAYER_PREFIX: ${{ inputs.prefix }}
+          LAYER_VERSION: ${{ inputs.version }}

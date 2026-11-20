@@ -8,6 +8,7 @@
 - `opt/node/distro`, `opt/python/distro`, `opt/java/opentelemetry-java-distro`: the per-language OpenTelemetry distros. `opt/manual` has a wrapper only.
 - `integration-tests/`: CDK stacks (`iac/`), Serverless stacks (`sls/v3`, `sls/v4`) and vitest suites (`tests/`). `integration-tests/runtimes.ts` is the canonical list of tested runtime versions.
 - `sls-plugin/`: the `@dash0/serverless-dash0` npm package.
+- `regions.txt`: the AWS regions the layers are published to, one per line. The deploy workflow reads it.
 - `build/` is gitignored output (binaries, layer zips, the aws-sdk tarball). Don't put source there.
 
 ## Commands
@@ -35,6 +36,7 @@ Run these as CI does (`.github/workflows/ci.yml`):
 - Changes to `opt/shared.sh` need a test in `opt/test/shared.test.sh`, and you must check them against all four wrappers.
 - Don't edit `sls-plugin/src/versions.json` or the plugin version by hand. `deploy.yml` syncs both after each release and opens a `chore: sync 'latest' layer versions` PR.
 - When you add or drop a runtime version, update `integration-tests/runtimes.ts`. The CDK stacks and the tests both read it.
+- When you add or drop a region, update `regions.txt` and the region table in `README.md`. The first release after adding a region pads its layer versions to match the others.
 
 ## Gotchas
 

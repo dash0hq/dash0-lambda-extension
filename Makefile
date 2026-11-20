@@ -13,6 +13,7 @@ LAMBDA_LAYER_MARKER_JAVA := .lambda-layer-java
 LAMBDA_LAYER_MARKER_MANUAL := .lambda-layer-manual
 CARGO_FEATURES :=
 PYTHON_DEPS_IMAGE := dash0-python-deps
+LAYER_VERSION ?= auto
 LAYER_DESCRIPTION := Send traces, metrics, and logs from AWS Lambda to Dash0. Built on OpenTelemetry and AWS Lambda Extensions API.
 
 # Docker/ECR image settings
@@ -194,56 +195,20 @@ java: $(LAMBDA_LAYER_MARKER_JAVA)
 
 manual: $(LAMBDA_LAYER_MARKER_MANUAL)
 
-$(LAMBDA_LAYER_MARKER_PYTHON): build/$(ZIP_NAME_PYTHON) integration-tests/runtimes.ts tools/layer-runtimes.py
-	@echo "Publishing Lambda Extension to layer \"$(LAYER_NAME_PYTHON)\""
-	@RUNTIMES=$$(python3 tools/layer-runtimes.py python) && \
-		LAYER_VERSION=$$(aws lambda publish-layer-version --layer-name $(LAYER_NAME_PYTHON) --zip-file fileb://build/$(ZIP_NAME_PYTHON) \
-		--description "$(LAYER_DESCRIPTION)" \
-		--compatible-runtimes $$RUNTIMES \
-		--compatible-architectures x86_64 arm64 --no-cli-pager --output json \
-		| python3 tools/layer-runtimes.py python --check) && \
-		echo "Making $(LAYER_NAME_PYTHON) version $$LAYER_VERSION public" && \
-		aws lambda add-layer-version-permission --layer-name $(LAYER_NAME_PYTHON) --version-number $$LAYER_VERSION \
-		--statement-id public --action lambda:GetLayerVersion --principal "*" --no-cli-pager
+$(LAMBDA_LAYER_MARKER_PYTHON): build/$(ZIP_NAME_PYTHON) integration-tests/runtimes.ts tools/layer-runtimes.py tools/publish-layer.sh
+	@tools/publish-layer.sh python $(LAYER_NAME_PYTHON) build/$(ZIP_NAME_PYTHON) "$(LAYER_DESCRIPTION)" $(LAYER_VERSION)
 	@touch $(LAMBDA_LAYER_MARKER_PYTHON)
 
-$(LAMBDA_LAYER_MARKER_NODE): build/$(ZIP_NAME_NODE) integration-tests/runtimes.ts tools/layer-runtimes.py
-	@echo "Publishing Lambda Extension to layer \"$(LAYER_NAME_NODE)\""
-	@RUNTIMES=$$(python3 tools/layer-runtimes.py node) && \
-		LAYER_VERSION=$$(aws lambda publish-layer-version --layer-name $(LAYER_NAME_NODE) --zip-file fileb://build/$(ZIP_NAME_NODE) \
-		--description "$(LAYER_DESCRIPTION)" \
-		--compatible-runtimes $$RUNTIMES \
-		--compatible-architectures x86_64 arm64 --no-cli-pager --output json \
-		| python3 tools/layer-runtimes.py node --check) && \
-		echo "Making $(LAYER_NAME_NODE) version $$LAYER_VERSION public" && \
-		aws lambda add-layer-version-permission --layer-name $(LAYER_NAME_NODE) --version-number $$LAYER_VERSION \
-		--statement-id public --action lambda:GetLayerVersion --principal "*" --no-cli-pager
+$(LAMBDA_LAYER_MARKER_NODE): build/$(ZIP_NAME_NODE) integration-tests/runtimes.ts tools/layer-runtimes.py tools/publish-layer.sh
+	@tools/publish-layer.sh node $(LAYER_NAME_NODE) build/$(ZIP_NAME_NODE) "$(LAYER_DESCRIPTION)" $(LAYER_VERSION)
 	@touch $(LAMBDA_LAYER_MARKER_NODE)
 
-$(LAMBDA_LAYER_MARKER_JAVA): build/$(ZIP_NAME_JAVA) integration-tests/runtimes.ts tools/layer-runtimes.py
-	@echo "Publishing Lambda Extension to layer \"$(LAYER_NAME_JAVA)\""
-	@RUNTIMES=$$(python3 tools/layer-runtimes.py java) && \
-		LAYER_VERSION=$$(aws lambda publish-layer-version --layer-name $(LAYER_NAME_JAVA) --zip-file fileb://build/$(ZIP_NAME_JAVA) \
-		--description "$(LAYER_DESCRIPTION)" \
-		--compatible-runtimes $$RUNTIMES \
-		--compatible-architectures x86_64 arm64 --no-cli-pager --output json \
-		| python3 tools/layer-runtimes.py java --check) && \
-		echo "Making $(LAYER_NAME_JAVA) version $$LAYER_VERSION public" && \
-		aws lambda add-layer-version-permission --layer-name $(LAYER_NAME_JAVA) --version-number $$LAYER_VERSION \
-		--statement-id public --action lambda:GetLayerVersion --principal "*" --no-cli-pager
+$(LAMBDA_LAYER_MARKER_JAVA): build/$(ZIP_NAME_JAVA) integration-tests/runtimes.ts tools/layer-runtimes.py tools/publish-layer.sh
+	@tools/publish-layer.sh java $(LAYER_NAME_JAVA) build/$(ZIP_NAME_JAVA) "$(LAYER_DESCRIPTION)" $(LAYER_VERSION)
 	@touch $(LAMBDA_LAYER_MARKER_JAVA)
 
-$(LAMBDA_LAYER_MARKER_MANUAL): build/$(ZIP_NAME_MANUAL) integration-tests/runtimes.ts tools/layer-runtimes.py
-	@echo "Publishing Lambda Extension to layer \"$(LAYER_NAME_MANUAL)\""
-	@RUNTIMES=$$(python3 tools/layer-runtimes.py manual) && \
-		LAYER_VERSION=$$(aws lambda publish-layer-version --layer-name $(LAYER_NAME_MANUAL) --zip-file fileb://build/$(ZIP_NAME_MANUAL) \
-		--description "$(LAYER_DESCRIPTION)" \
-		--compatible-runtimes $$RUNTIMES \
-		--compatible-architectures x86_64 arm64 --no-cli-pager --output json \
-		| python3 tools/layer-runtimes.py manual --check) && \
-		echo "Making $(LAYER_NAME_MANUAL) version $$LAYER_VERSION public" && \
-		aws lambda add-layer-version-permission --layer-name $(LAYER_NAME_MANUAL) --version-number $$LAYER_VERSION \
-		--statement-id public --action lambda:GetLayerVersion --principal "*" --no-cli-pager
+$(LAMBDA_LAYER_MARKER_MANUAL): build/$(ZIP_NAME_MANUAL) integration-tests/runtimes.ts tools/layer-runtimes.py tools/publish-layer.sh
+	@tools/publish-layer.sh manual $(LAYER_NAME_MANUAL) build/$(ZIP_NAME_MANUAL) "$(LAYER_DESCRIPTION)" $(LAYER_VERSION)
 	@touch $(LAMBDA_LAYER_MARKER_MANUAL)
 
 
