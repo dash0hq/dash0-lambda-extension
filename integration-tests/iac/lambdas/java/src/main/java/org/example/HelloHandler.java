@@ -45,6 +45,9 @@ public class HelloHandler implements RequestHandler<Object, String> {
             }
         }
 
+        // Text-format Java logs carry no level prefix, so only the JSON `level` field carries severity.
+        context.getLogger().log("{\"level\":\"error\",\"jsonSeverity\":\"inferred\"}");
+
         return "Hello World from Java Lambda!";
     }
 }
