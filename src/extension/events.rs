@@ -481,6 +481,34 @@ mod tests {
 
     #[test]
     #[serial]
+    fn xray_mode_passthrough_links_logs_to_the_handler_span() {
+        set_mode(true, true);
+        let id = "early-xray-passthrough";
+        state::invocation_entry::remove(id);
+        // PassThrough behind a traced REST API: sampled, and INVOKE and the
+        // runtime carry the same Parent, API Gateway's subsegment. Lambda
+        // records no function segment.
+        let header = format!("Root=1-11111111-111111111111111111111111;Parent={FS};Sampled=1");
+        handle_invoke_event(&invoke_event(id, &header));
+        state::invocation_entry::record_runtime_trace_id(id, &header);
+
+        function_log(id);
+        assert!(
+            early_flush(id, usize::MAX).is_empty(),
+            "no function segment: hold the log for the handler span"
+        );
+
+        handler_span_arrives(id, X_BYTES, FS_BYTES);
+        assert_eq!(
+            early_flush(id, usize::MAX),
+            vec![(X.to_string(), hex::encode(H))]
+        );
+        state::invocation_entry::remove(id);
+        reset_mode();
+    }
+
+    #[test]
+    #[serial]
     fn xray_mode_unsampled_holds_logs_until_the_handler_span() {
         set_mode(true, true);
         let id = "early-xray-unsampled";

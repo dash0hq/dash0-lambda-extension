@@ -1,4 +1,5 @@
 import { randomBytes } from 'crypto';
+import { APIGatewayClient, GetRestApisCommand, RestApi } from '@aws-sdk/client-api-gateway';
 import { setTimeout as delay } from 'timers/promises';
 import fetch from 'node-fetch';
 import { describe, expect, it } from 'vitest';
@@ -53,6 +54,36 @@ const fetchHandlerSpan = async (invocationId: string, scopeName: string): Promis
     }
 };
 
+const REGION = process.env.AWS_REGION ?? 'us-west-2';
+const apiGateway = new APIGatewayClient({ region: REGION });
+
+// Calls the function through its traced REST API until API Gateway samples a
+// request (by default one per second, then 5%), and returns the invocation ID.
+const invokeSampledThroughRestApi = async (restApiName: string): Promise<string> => {
+    const apis: RestApi[] = [];
+    let position: string | undefined;
+    do {
+        const page = await apiGateway.send(new GetRestApisCommand({ limit: 500, position }));
+        apis.push(...(page.items ?? []));
+        position = page.position;
+    } while (position);
+    const api = apis.find((a) => a.name === restApiName);
+    expect(api, `REST API ${restApiName}`).toBeDefined();
+    const url = `https://${api!.id}.execute-api.${REGION}.amazonaws.com/prod/`;
+
+    for (let attempt = 1; attempt <= 10; attempt++) {
+        const response = await fetch(url);
+        expect(response.status).toEqual(200);
+        const { requestId, traceHeader } = await response.json() as { requestId: string, traceHeader?: string };
+        console.log(`${restApiName} attempt ${attempt}: ${requestId} ${traceHeader}`);
+        if (traceHeader?.includes('Sampled=1')) {
+            return requestId;
+        }
+        await delay(1500);
+    }
+    throw new Error(`API Gateway sampled none of 10 requests to ${restApiName}`);
+};
+
 describe.concurrent('Logs sent while the invocation runs', () => {
     it(`link to the root span in the upstream trace (${NODE})`, async () => {
         const functionName = `${RESOURCE_PREFIX}early-flush-${NODE}`;
@@ -96,6 +127,25 @@ describe.concurrent('Logs sent while the invocation runs', () => {
             functionName,
             traceId: handlerSpan.traceId,
             parentSpanId: handlerSpan.parentSpanId,
+            success: true,
+            logsToBeChecked: functionLogs('info'),
+        });
+    }, TEST_TIMEOUT_MS);
+
+    it(`link to the handler span in X-Ray mode with PassThrough behind a traced REST API (${NODE})`, async () => {
+        const functionName = `${RESOURCE_PREFIX}early-flush-xray-passthrough-${NODE}`;
+        const invocationId = await invokeSampledThroughRestApi(`${RESOURCE_PREFIX}early-flush-xray-passthrough`);
+
+        // Lambda records no function segment here. The handler's parent is
+        // API Gateway's subsegment, which must not get the function's logs.
+        const handlerSpan = await fetchHandlerSpan(invocationId, NODE_HANDLER_SCOPE);
+        expect(handlerSpan.parentSpanId).toBeTruthy();
+
+        await checkLogs({
+            invocationId,
+            functionName,
+            traceId: handlerSpan.traceId,
+            parentSpanId: handlerSpan.spanId,
             success: true,
             logsToBeChecked: functionLogs('info'),
         });
