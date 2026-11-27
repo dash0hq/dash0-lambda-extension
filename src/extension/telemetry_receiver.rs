@@ -110,18 +110,33 @@ mod tests {
     use tokio::net::TcpListener;
 
     async fn post_telemetry(body: serde_json::Value) {
+        post(
+            "/2018-06-01/telemetry",
+            Bytes::from(body.to_string()),
+            false,
+        )
+        .await;
+    }
+
+    async fn post(path: &str, body: Bytes, traces: bool) {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
         let server = tokio::spawn(async move {
             let (stream, _) = listener.accept().await.unwrap();
-            http1::Builder::new()
-                .serve_connection(TokioIo::new(stream), service_fn(telemetry))
-                .await
-                .unwrap();
+            let io = TokioIo::new(stream);
+            if traces {
+                let service = service_fn(crate::otlp::receiver::traces);
+                http1::Builder::new().serve_connection(io, service).await
+            } else {
+                http1::Builder::new()
+                    .serve_connection(io, service_fn(telemetry))
+                    .await
+            }
+            .unwrap();
         });
         let client: Client<_, Full<Bytes>> = Client::builder(TokioExecutor::new()).build_http();
-        let request = Request::post(format!("http://{address}/2018-06-01/telemetry"))
-            .body(Full::new(Bytes::from(body.to_string())))
+        let request = Request::post(format!("http://{address}{path}"))
+            .body(Full::new(body))
             .unwrap();
         let response = client.request(request).await.unwrap();
         assert_eq!(response.status(), 200);
@@ -185,19 +200,39 @@ mod tests {
 
     #[tokio::test]
     #[serial]
-    async fn runtime_done_builds_handler_span_only_when_no_sdk_sent_one() {
+    async fn runtime_done_builds_handler_span_only_when_no_spans_arrived() {
         // The wrapper is set, so the extension expects an SDK. A Go or Rust
         // binary behind a bootstrap shim has none.
         std::env::set_var("AWS_LAMBDA_EXEC_WRAPPER", "/opt/wrapper");
-        for sdk_sent_handler in [false, true] {
-            let id = format!("missing-handler-{sdk_sent_handler}");
+        // A span that isn't recognized as the handler, e.g. an outgoing HTTP
+        // call, still proves an SDK runs.
+        for spans_arrived in [false, true] {
+            let id = format!("missing-handler-{spans_arrived}");
             invocation_entry::update(&id, |entry| {
                 entry.trace_id = Some("aa".repeat(16));
                 entry.root_span_id = Some("bb".repeat(8));
                 entry.span_id = Some("cc".repeat(8));
-                entry.handler_seen = sdk_sent_handler;
                 entry.return_value = Some(r#"{"statusCode":500}"#.to_string());
             });
+            if spans_arrived {
+                crate::state::invocation_data::store_current_invocation_id(&id);
+                let client_span = ExportTraceServiceRequest {
+                    resource_spans: vec![opentelemetry_proto::tonic::trace::v1::ResourceSpans {
+                        scope_spans: vec![opentelemetry_proto::tonic::trace::v1::ScopeSpans {
+                            spans: vec![opentelemetry_proto::tonic::trace::v1::Span {
+                                trace_id: vec![0xaa; 16],
+                                span_id: vec![0xdd; 8],
+                                name: "GET".to_string(),
+                                kind: 3, // CLIENT
+                                ..Default::default()
+                            }],
+                            ..Default::default()
+                        }],
+                        ..Default::default()
+                    }],
+                };
+                post("/v1/traces", client_span.encode_to_vec().into(), true).await;
+            }
             post_telemetry(serde_json::json!([{
                 "time": "2026-11-27T19:59:00.100Z", "type": "platform.runtimeDone",
                 "record": { "requestId": id, "status": "success", "metrics": { "durationMs": 3.0 } }
@@ -212,8 +247,11 @@ mod tests {
                 })
                 .filter(|span| span.name == "handler")
                 .collect();
-            if sdk_sent_handler {
-                assert!(handlers.is_empty(), "must not duplicate the SDK's span");
+            if spans_arrived {
+                assert!(
+                    handlers.is_empty(),
+                    "an SDK runs; must not duplicate its handler"
+                );
             } else {
                 assert_eq!(handlers.len(), 1);
                 assert_eq!(hex::encode(&handlers[0].parent_span_id), "bb".repeat(8));

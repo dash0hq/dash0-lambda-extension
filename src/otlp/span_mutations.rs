@@ -15,17 +15,28 @@ use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span, Sta
 use prost::Message;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Builds the synthetic handler span for an invocation that finished without
-/// one, although `AWS_LAMBDA_EXEC_WRAPPER` promised auto-instrumentation: for
-/// example a Go or Rust binary started through a bootstrap shim, which has no
-/// OpenTelemetry SDK. Call at `platform.runtimeDone`: the runtime has asked for
-/// its next event by then, so an SDK has already flushed its handler span.
+/// Builds the synthetic handler span for an invocation during which no span
+/// arrived at all, although `AWS_LAMBDA_EXEC_WRAPPER` promised
+/// auto-instrumentation: for example a Go or Rust binary started through a
+/// bootstrap shim, which has no OpenTelemetry SDK. Any span, recognized as the
+/// handler or not, means an SDK runs, and a second handler span would
+/// duplicate its own. Call at `platform.runtimeDone`: the runtime has asked for
+/// its next event by then, so an SDK has already flushed its spans.
 pub fn build_missing_handler_span(invocation_id: &str) {
     if crate::config::is_auto_instrumented_disabled()
-        || invocation_entry::handler_seen(invocation_id)
+        || invocation_entry::spans_received(invocation_id)
     {
         return;
     }
+    static WARNED: std::sync::Once = std::sync::Once::new();
+    WARNED.call_once(|| {
+        tracing::warn!(
+            "[{}] AWS_LAMBDA_EXEC_WRAPPER is set, but no spans arrived for invocation {}; \
+             building the handler span. Check that an OpenTelemetry SDK runs in the function.",
+            crate::log_prefix(),
+            invocation_id,
+        );
+    });
     let return_value = invocation_entry::get_return_value(invocation_id);
     if let Some(trace) = build_synthetic_trace(invocation_id, None, return_value.as_deref(), &[]) {
         invocation_entry::store_trace_by_id(invocation_id, trace);
