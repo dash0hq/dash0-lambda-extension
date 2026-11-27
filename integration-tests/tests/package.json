@@ -23,6 +23,7 @@
     "vitest": "^4.0.15"
   },
   "dependencies": {
+    "@aws-sdk/client-api-gateway": "^3.1179.0",
     "@aws-sdk/client-lambda": "^3.943.0",
     "node-fetch": "^3.3.2"
   }

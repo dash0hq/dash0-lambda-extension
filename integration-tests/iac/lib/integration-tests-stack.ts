@@ -142,8 +142,8 @@ function createEarlyFlushLambda(
     props: SubStackProps,
     name: string,
     runtime: lambda.Runtime,
-    options: { handler: string; code: lambda.Code; memorySize: number; xray?: boolean },
-) {
+    options: { handler: string; code: lambda.Code; memorySize: number; xray?: lambda.Tracing },
+): lambda.Function {
   const environment: Record<string, string> = {
     AWS_LAMBDA_EXEC_WRAPPER: "/opt/wrapper",
     DASH0_TOKEN: process.env.DASH0_DEV_API_TOKEN!,
@@ -155,7 +155,7 @@ function createEarlyFlushLambda(
   if (options.xray) {
     environment["DASH0_XRAY_TRACES_ENABLED"] = "true";
   }
-  new lambda.Function(scope, name, {
+  return new lambda.Function(scope, name, {
     functionName: `${props.prefix}${name}`,
     runtime,
     memorySize: options.memorySize,
@@ -166,7 +166,7 @@ function createEarlyFlushLambda(
     layers: [props.layer],
     role: props.role,
     environment,
-    tracing: options.xray ? lambda.Tracing.ACTIVE : undefined,
+    tracing: options.xray,
     logGroup: props.logGroup,
     loggingFormat: lambda.LoggingFormat.TEXT,
   });
@@ -310,7 +310,20 @@ class NodeStack extends cdk.NestedStack {
       handler: 'early_flush.handler', code: nodeCode, memorySize: 128,
     });
     createEarlyFlushLambda(this, props, `early-flush-xray-${latestNodeName}`, latestNode, {
-      handler: 'early_flush.handler', code: nodeCode, memorySize: 128, xray: true,
+      handler: 'early_flush.handler', code: nodeCode, memorySize: 128, xray: lambda.Tracing.ACTIVE,
+    });
+    // PassThrough behind a traced REST API: API Gateway samples the request
+    // and Lambda records no function segment, so INVOKE and the runtime carry
+    // the same Parent, API Gateway's subsegment.
+    const passThrough = createEarlyFlushLambda(this, props, `early-flush-xray-passthrough-${latestNodeName}`, latestNode, {
+      handler: 'early_flush.handler', code: nodeCode, memorySize: 128, xray: lambda.Tracing.PASS_THROUGH,
+    });
+    new apigateway.LambdaRestApi(this, 'EarlyFlushXrayPassThroughApi', {
+      restApiName: `${props.prefix}early-flush-xray-passthrough`,
+      handler: passThrough,
+      proxy: true,
+      deployOptions: { tracingEnabled: true },
+      endpointConfiguration: { types: [apigateway.EndpointType.REGIONAL] },
     });
 
     for (const runtime of runtimes) {
