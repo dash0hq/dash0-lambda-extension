@@ -15,6 +15,23 @@ use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span, Sta
 use prost::Message;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+/// Builds the synthetic handler span for an invocation that finished without
+/// one, although `AWS_LAMBDA_EXEC_WRAPPER` promised auto-instrumentation: for
+/// example a Go or Rust binary started through a bootstrap shim, which has no
+/// OpenTelemetry SDK. Call at `platform.runtimeDone`: the runtime has asked for
+/// its next event by then, so an SDK has already flushed its handler span.
+pub fn build_missing_handler_span(invocation_id: &str) {
+    if crate::config::is_auto_instrumented_disabled()
+        || invocation_entry::handler_seen(invocation_id)
+    {
+        return;
+    }
+    let return_value = invocation_entry::get_return_value(invocation_id);
+    if let Some(trace) = build_synthetic_trace(invocation_id, None, return_value.as_deref(), &[]) {
+        invocation_entry::store_trace_by_id(invocation_id, trace);
+    }
+}
+
 pub fn drop_duplicate_java_instrumenations(decoded: &ExportTraceServiceRequest) -> bool {
     let scope_name = get_span_scope_name(decoded);
     scope_name.as_deref() == Some("io.opentelemetry.aws-lambda-core-1.0")

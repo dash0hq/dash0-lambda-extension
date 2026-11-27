@@ -252,6 +252,14 @@ pub fn get_sampled(invocation_id: &str) -> bool {
         .map_or(false, |e| e.sampled)
 }
 
+/// Lightweight getter: whether the handler span of the invocation arrived.
+pub fn handler_seen(invocation_id: &str) -> bool {
+    INVOCATION_STORE
+        .lock()
+        .get(invocation_id)
+        .is_some_and(|e| e.handler_seen)
+}
+
 /// Lightweight getter: returns only the return_value, avoiding a full entry clone.
 pub fn get_return_value(invocation_id: &str) -> Option<String> {
     INVOCATION_STORE

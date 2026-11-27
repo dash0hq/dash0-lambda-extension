@@ -41,6 +41,7 @@ pub async fn telemetry(req: Request<Incoming>) -> Result<Response<ResBody>, hype
                 if let Some(id) = &log.invocation_id {
                     let is_error = error_invocation_ids.iter().any(|(eid, _)| eid == id);
                     if !is_error {
+                        crate::otlp::span_mutations::build_missing_handler_span(id);
                         create_supplementary_spans(id, true);
                     }
                 }
@@ -180,6 +181,51 @@ mod tests {
                 invocation_entry::remove(&id);
             }
         }
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn runtime_done_builds_handler_span_only_when_no_sdk_sent_one() {
+        // The wrapper is set, so the extension expects an SDK. A Go or Rust
+        // binary behind a bootstrap shim has none.
+        std::env::set_var("AWS_LAMBDA_EXEC_WRAPPER", "/opt/wrapper");
+        for sdk_sent_handler in [false, true] {
+            let id = format!("missing-handler-{sdk_sent_handler}");
+            invocation_entry::update(&id, |entry| {
+                entry.trace_id = Some("aa".repeat(16));
+                entry.root_span_id = Some("bb".repeat(8));
+                entry.span_id = Some("cc".repeat(8));
+                entry.handler_seen = sdk_sent_handler;
+                entry.return_value = Some(r#"{"statusCode":500}"#.to_string());
+            });
+            post_telemetry(serde_json::json!([{
+                "time": "2026-11-27T19:59:00.100Z", "type": "platform.runtimeDone",
+                "record": { "requestId": id, "status": "success", "metrics": { "durationMs": 3.0 } }
+            }]))
+            .await;
+
+            let handlers: Vec<_> = invocation_entry::take_traces_by_id(&id)
+                .iter()
+                .flat_map(|t| {
+                    let export = ExportTraceServiceRequest::decode(t.body.as_slice()).unwrap();
+                    export.resource_spans[0].scope_spans[0].spans.clone()
+                })
+                .filter(|span| span.name == "handler")
+                .collect();
+            if sdk_sent_handler {
+                assert!(handlers.is_empty(), "must not duplicate the SDK's span");
+            } else {
+                assert_eq!(handlers.len(), 1);
+                assert_eq!(hex::encode(&handlers[0].parent_span_id), "bb".repeat(8));
+                assert_eq!(
+                    handlers[0].status.as_ref().unwrap().code,
+                    opentelemetry_proto::tonic::trace::v1::status::StatusCode::Error as i32,
+                    "statusCode 500 from the return value"
+                );
+            }
+            invocation_entry::remove(&id);
+        }
+        std::env::remove_var("AWS_LAMBDA_EXEC_WRAPPER");
     }
 
     #[tokio::test]
