@@ -94,7 +94,7 @@ The extension layers are published to the following AWS regions:
 
 * `DASH0_CREATE_PAYLOAD_LOG_RECORDS` - Controls all captured payload bodies across Node.js, Python and Java, including Lambda events and return values, HTTP bodies, messaging sends and receives, gRPC messages, database queries, parameters and results, and Storm tuples. When `true` (the default), these payloads become trace-correlated `dash0_payload` log records. When `false`, these logs are omitted. In both modes, the extension removes the corresponding payload attributes from spans. Existing masking rules apply before log creation; this setting does not add capture or masking support to a runtime. Headers, URLs, other span metadata, environment attributes and application-written logs are unaffected. See [payload log records](docs/masking.md#payload-log-records) for the attribute mapping.
 
-* `DASH0_DISABLE_TELEMETRY_LOG_COLLECTION` - When set to `true`, disables collecting logs from the [Lambda Telemetry API](https://docs.aws.amazon.com/lambda/latest/dg/telemetry-api.html). Default: `false`.
+* `DASH0_DISABLE_TELEMETRY_LOG_COLLECTION` - When set to `true`, disables collecting logs from the [Lambda Telemetry API](https://docs.aws.amazon.com/lambda/latest/dg/telemetry-api.html). Default: `false`. When Lambda drops function logs because they are written faster than it delivers them, the extension sends a `WARN` log record with the number of dropped records and bytes.
 
 * `DASH0_DISABLE_TELEMETRY_METRICS` - When set to `true`, disables emission of the supplementary FaaS metrics (`faas.invoke_duration`, `faas.init_duration`, `dash0.faas.billed_duration`, `faas.mem_usage`). Default: `false`.
 
