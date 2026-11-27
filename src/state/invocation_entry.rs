@@ -46,9 +46,10 @@ pub struct InvocationEntry {
     /// trace ID before the handler span arrives. Kept apart from `trace_id`,
     /// which `store_span_ids` compares against to pick the root span's parent.
     pub child_trace_id: Option<String>,
-    /// (trace ID, Lambda function segment ID) from a sampled
-    /// `_X_AMZN_TRACE_ID` at INVOKE. In X-Ray mode the segment reaches Dash0
-    /// through X-Ray, and logs link to it.
+    /// (trace ID, `Parent`) from a sampled `_X_AMZN_TRACE_ID` at INVOKE. It
+    /// is the Lambda function segment only with Active tracing; see
+    /// `function_segment`. In X-Ray mode the segment reaches Dash0 through
+    /// X-Ray, and logs link to it.
     pub xray_segment_ids: Option<(String, String)>,
     /// Whether the handler span has arrived and set `trace_id` and `span_id`.
     pub handler_seen: bool,
@@ -106,13 +107,13 @@ impl InvocationEntry {
     /// they are final, i.e. won't change before the invocation ends.
     ///
     /// - X-Ray mode: the Lambda function segment from `_X_AMZN_TRACE_ID`,
-    ///   known at INVOKE. Without a sampled segment, the handler span.
+    ///   known at INVOKE. Without a function segment, the handler span.
     /// - Otherwise: the extension's root span, in the handler's trace. Until
     ///   the handler span arrives, a child span tells the trace.
     fn log_ids(&self) -> (Option<String>, Option<String>, bool) {
         if crate::config::user::is_xray_traces_enabled() {
-            if let Some((trace_id, segment_id)) = &self.xray_segment_ids {
-                return (Some(trace_id.clone()), Some(segment_id.clone()), true);
+            if let Some((trace_id, segment_id)) = self.function_segment() {
+                return (Some(trace_id), Some(segment_id), true);
             }
             return (
                 self.trace_id.clone(),
@@ -138,6 +139,18 @@ impl InvocationEntry {
             span_id,
             trace_final && self.root_span_id.is_some(),
         )
+    }
+
+    /// (trace ID, segment ID) of the Lambda function segment, when Lambda
+    /// records one. Only with Active tracing does the runtime's `Parent` point
+    /// at the function segment, and then it differs from the INVOKE `Parent`,
+    /// the Lambda service segment. With PassThrough both carry the caller's
+    /// `Parent`, such as API Gateway's subsegment, even when sampled.
+    fn function_segment(&self) -> Option<(String, String)> {
+        let (trace_id, segment_id) = self.xray_segment_ids.as_ref()?;
+        let (_, invoke_parent, _) =
+            crate::otlp::span_link_extractor::parse_amzn_trace_id(self.x_amzn_trace_id.as_ref()?)?;
+        (hex::encode(invoke_parent) != *segment_id).then(|| (trace_id.clone(), segment_id.clone()))
     }
 }
 
@@ -284,10 +297,11 @@ pub fn get_trace_span_ids_for_logs(
     })
 }
 
-/// Records the Lambda function segment from the `Lambda-Runtime-Trace-Id`
-/// header the runtime receives with the event. The handler span's parent in
-/// X-Ray mode. The INVOKE event's `Parent` is one level up, the Lambda
-/// service segment. AWS records segments only for sampled requests.
+/// Records the `Parent` of the `Lambda-Runtime-Trace-Id` header the runtime
+/// receives with the event. With Active tracing it is the Lambda function
+/// segment, the handler span's parent in X-Ray mode, and the INVOKE event's
+/// `Parent` is one level up, the Lambda service segment. AWS records
+/// segments only for sampled requests.
 pub fn record_runtime_trace_id(invocation_id: &str, header: &str) {
     if let Some((trace_id, segment_id, true)) =
         crate::otlp::span_link_extractor::parse_amzn_trace_id(header)

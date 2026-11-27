@@ -102,7 +102,7 @@ The extension layers are published to the following AWS regions:
 
 * `DASH0_DATASET` - When set, the extension adds a `Dash0-Dataset` header to all OTLP export requests, routing telemetry to the specified dataset in the Dash0 backend.
 
-* `DASH0_XRAY_TRACES_ENABLED` - When set to `true`, the extension preserves the original X-Ray trace context instead of creating supplementary spans. Use this when AWS X-Ray active tracing is enabled on the Lambda function and X-Ray traces reach Dash0. Function logs then link to the Lambda function segment from X-Ray. Default: `false`.
+* `DASH0_XRAY_TRACES_ENABLED` - When set to `true`, the extension preserves the original X-Ray trace context instead of creating supplementary spans. Use this when AWS X-Ray active tracing is enabled on the Lambda function and X-Ray traces reach Dash0. Function logs then link to the Lambda function segment from X-Ray. Lambda records that segment only for sampled requests with active tracing; otherwise, for example with PassThrough tracing behind a traced API Gateway, logs link to the handler span. Default: `false`.
 
 The four `API_GATEWAY` variables below also apply to Application Load Balancer-triggered invocations; the names are kept for backwards compatibility.
 
