@@ -92,6 +92,21 @@ fn format_platform_runtime_done_message(
     format!("END RequestId: {}", request_id)
 }
 
+/// Formats a platform.logsDropped record, which Lambda sends when it dropped
+/// function logs because a Telemetry API subscriber could not keep up.
+fn format_platform_logs_dropped_message(
+    record: &serde_json::Map<String, serde_json::Value>,
+) -> String {
+    let count = |key: &str| record.get(key).and_then(|v| v.as_u64()).unwrap_or(0);
+    let reason = record.get("reason").and_then(|v| v.as_str()).unwrap_or("");
+    format!(
+        "Lambda dropped {} log records ({} bytes): {}",
+        count("droppedRecords"),
+        count("droppedBytes"),
+        reason
+    )
+}
+
 /// Attempts to parse a Node.js Lambda log message into its severity and body.
 /// Node.js Lambda logs follow the format:
 ///   <ISO-8601 timestamp>\t<UUID request-id>\t<SEVERITY>\t<message>
@@ -316,6 +331,12 @@ pub fn map_logs_to_otlp(logs: &[TelemetryLog]) -> Vec<LogRecord> {
             } else {
                 None
             }
+        } else if log.r#type == "platform.logsDropped" {
+            if let serde_json::Value::Object(record) = &log.record {
+                Some(format_platform_logs_dropped_message(record))
+            } else {
+                None
+            }
         } else {
             None
         };
@@ -404,7 +425,9 @@ pub fn map_logs_to_otlp(logs: &[TelemetryLog]) -> Vec<LogRecord> {
         // lines, only set a severity when we could parse one from the message;
         // otherwise leave it unset (UNSPECIFIED / empty text) rather than
         // guessing INFO.
-        let severity: Option<String> = if is_platform_log || is_dash0_payload_log {
+        let severity: Option<String> = if log.r#type == "platform.logsDropped" {
+            Some("WARN".to_string())
+        } else if is_platform_log || is_dash0_payload_log {
             Some("INFO".to_string())
         } else if let Some((sev, body)) = parse_node_lambda_log_message(&body_message)
             .or_else(|| parse_python_lambda_log_message(&body_message))
@@ -592,6 +615,38 @@ mod tests {
 
         let result = map_logs_to_otlp(&logs);
         assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_map_logs_platform_logs_dropped_is_a_warning() {
+        let logs = vec![TelemetryLog {
+            time: "2026-11-27T19:59:39.786Z".to_string(),
+            r#type: "platform.logsDropped".to_string(),
+            record: json!({
+                "reason": "Some logs were dropped because the downstream consumer is slower than the logs production rate",
+                "droppedRecords": 1201,
+                "droppedBytes": 1230848
+            }),
+            invocation_id: Some("inv-flood".to_string()),
+            trace_id: None,
+            span_id: None,
+            custom_attributes: vec![],
+        }];
+
+        let result = map_logs_to_otlp(&logs);
+
+        assert_eq!(result.len(), 1);
+        let log = &result[0];
+        assert_eq!(
+            get_string_value(&log.body).unwrap(),
+            "Lambda dropped 1201 log records (1230848 bytes): Some logs were dropped because the downstream consumer is slower than the logs production rate"
+        );
+        assert_eq!(log.severity_number, 13);
+        assert_eq!(log.severity_text, "WARN");
+        assert_eq!(
+            get_string_value(&log.attributes[0].value),
+            Some("inv-flood".to_string())
+        );
     }
 
     #[test]
