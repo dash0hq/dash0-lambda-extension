@@ -231,6 +231,8 @@ pub async fn invocation_response_proxy(
             }
         } else {
             apply_return_value_error_to_stored_traces(&id, &return_payload);
+            // Kept for the synthetic handler span in case no SDK sends one.
+            invocation_entry::update(&id, |entry| entry.return_value = Some(return_payload));
         }
     }
     tracing::info!(

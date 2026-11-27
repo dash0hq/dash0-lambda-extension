@@ -52,6 +52,9 @@ pub struct InvocationEntry {
     pub xray_segment_ids: Option<(String, String)>,
     /// Whether the handler span has arrived and set `trace_id` and `span_id`.
     pub handler_seen: bool,
+    /// Whether any `/v1/traces` request arrived while this invocation ran.
+    /// Without one, no SDK is running, whatever `AWS_LAMBDA_EXEC_WRAPPER` says.
+    pub spans_received: bool,
     /// HTTP semconv attributes extracted from an API Gateway v1/v2 or ALB
     /// event before secret masking runs on the stored `event_payload`. Masking
     /// (default rule `.*key.*`, case-insensitive) corrupts structural fields
@@ -90,6 +93,7 @@ impl Default for InvocationEntry {
             child_trace_id: None,
             xray_segment_ids: None,
             handler_seen: false,
+            spans_received: false,
             http_request_attributes: Vec::new(),
             http_span_name: None,
         }
@@ -250,6 +254,14 @@ pub fn get_sampled(invocation_id: &str) -> bool {
         .lock()
         .get(invocation_id)
         .map_or(false, |e| e.sampled)
+}
+
+/// Lightweight getter: whether any `/v1/traces` request arrived for the invocation.
+pub fn spans_received(invocation_id: &str) -> bool {
+    INVOCATION_STORE
+        .lock()
+        .get(invocation_id)
+        .is_some_and(|e| e.spans_received)
 }
 
 /// Lightweight getter: returns only the return_value, avoiding a full entry clone.

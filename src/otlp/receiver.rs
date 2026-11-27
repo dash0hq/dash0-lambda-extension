@@ -16,6 +16,11 @@ pub async fn traces(req: Request<Incoming>) -> Result<Response<ResBody>, hyper::
     let (parts, body) = req.into_parts();
     let body_bytes = body.collect().await?.to_bytes();
 
+    // An SDK is running, even if its spans are dropped or unrecognized below.
+    if let Some(current) = crate::state::invocation_data::get_current_invocation_id() {
+        invocation_entry::update(&current, |entry| entry.spans_received = true);
+    }
+
     // Try to decode and add event payload to server span from AWS Lambda instrumentation
     let mut encoded_body: Vec<u8> = body_bytes.to_vec();
     let mut invocation_ids: Vec<String> = Vec::new();
